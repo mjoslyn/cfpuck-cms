@@ -31,3 +31,4 @@ supabase/.temp/
 data/
 .claude/worktrees/
 public/_redirects
+deno.lock
