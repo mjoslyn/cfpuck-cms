@@ -419,8 +419,9 @@ skips fields hidden by conditional logic, honeypot, limits (an answer is cut at 
 form takes 20 submissions a minute, then answers 429), storage, notifications to the form's addresses or
 `FORMS_ADMIN_EMAIL` / the config's `adminEmail`). A notification's email is built in the email builder
 (`src/forms/EmailBuilder.tsx`, opened by Edit email): a Puck document (`Notification.design`) of email
-blocks (Heading, Text, Button, Image, Form field (one answer, or all as a table), Section, Two columns,
-Divider, Spacer) that `src/lib/forms/email.ts` renders to email-safe HTML (tables, inline styles, a 600px
+blocks (Heading, Text, Button, Image, Form field (one answer, or all as a table), Payment (the
+submission's items, total, status, provider, payment id and date; nothing without a payment), Section,
+Two columns, Divider, Spacer) that `src/lib/forms/email.ts` renders to email-safe HTML (tables, inline styles, a 600px
 body, a preheader, columns stacking on phones; text kept to paragraphs, emphasis, links and lists), the
 canvas included. Its Plain text tab (`Notification.text`, merge tags allowed) is the text part; empty,
 the text is made from the HTML. Its Preview tab renders the email as sent (`renderNotification`, the
@@ -443,8 +444,8 @@ confirmation; otherwise the form again with their answers and a note. Webhooks
 (`/api/payments/stripe`, `/api/payments/square`, signature checked) catch visitors who don't come back.
 Neither the return nor a webhook is trusted as to the outcome: the site asks the provider where the
 checkout stands, and the update that marks a submission paid is the one that sends its notifications,
-so they go once, after payment (`{payment_total}`, `{payment_id}` merge tags; `{all_fields}` adds the
-total). A total of zero is sent at once without checkout; under 50 cents is refused. Keys are
+so they go once, after payment (`{payment_total}`, `{payment_id}`, `{payment_summary}` merge tags and
+the email builder's Payment block; `{all_fields}` adds the total). A total of zero is sent at once without checkout; under 50 cents is refused. Keys are
 environment variables, never settings (settings sync between copies): `STRIPE_SECRET_KEY`,
 `STRIPE_WEBHOOK_SECRET`, `SQUARE_ACCESS_TOKEN`, `SQUARE_LOCATION_ID`, `SQUARE_ENVIRONMENT`,
 `SQUARE_WEBHOOK_SIGNATURE_KEY`, `SQUARE_WEBHOOK_URL`; the builder shows which are set

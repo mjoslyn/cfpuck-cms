@@ -7,7 +7,7 @@ import { HONEYPOT, INPUT_TYPES, NAME_LABELS, displayValue, formatMoney, isFieldH
 import { MAX_QUANTITY, currencyOf, lineItems, totalOf } from './payment';
 import { startCheckout } from './checkout';
 import { sendMail, textVersion } from './mail';
-import { renderEmail } from './email';
+import { emailPayment, paymentTable, renderEmail } from './email';
 import { Loader } from '../data';
 import { permalink } from '../permalink';
 import { serviceClient } from '../supabase';
@@ -131,7 +131,7 @@ function emailBody(written: string, merged: string): string {
 
 /**
  * Merge tags: {all_fields}, {form_title}, {admin_email}, {date}, {Label:f3}, {Label:f1.first}, and on a
- * form that takes payment {payment_total} and {payment_id}.
+ * form that takes payment {payment_total}, {payment_id} and {payment_summary} (items, total and details).
  */
 export function mergeTags(text: string, row: FormRow, values: Values, opts: { html: boolean; adminEmail: string; payment?: SubmissionPayment | null }): string {
   const fields = row.definition.fields;
@@ -140,6 +140,11 @@ export function mergeTags(text: string, row: FormRow, values: Values, opts: { ht
     if (inner === 'all_fields') return allFields(row.definition, values, opts.html);
     if (inner === 'payment_total') return out(formatMoney(opts.payment?.amount ?? totalOf(lineItems(row.definition, values)), opts.payment?.currency ?? currencyOf(row.definition)));
     if (inner === 'payment_id') return out(opts.payment?.payment_id ?? '');
+    if (inner === 'payment_summary') {
+      if (!opts.payment) return '';
+      const table = paymentTable(emailPayment(opts.payment, SITE_TZ));
+      return opts.html ? table : textVersion(table);
+    }
     if (inner === 'form_title') return out(row.title);
     if (inner === 'admin_email') return opts.adminEmail;
     if (inner === 'date' || inner === 'date_mdy') return new Intl.DateTimeFormat('en-US', { timeZone: SITE_TZ, dateStyle: 'long' }).format(new Date());
@@ -198,6 +203,7 @@ export function renderNotification(row: FormRow, n: Notification, values: Values
         {
           merge: (text, html) => mergeTags(text, row, values, { ...tags, html }),
           field: (id, showLabel) => fieldHtml(row.definition, values, id, showLabel),
+          payment: payment ? emailPayment(payment, SITE_TZ) : null,
           origin,
         },
         subject,

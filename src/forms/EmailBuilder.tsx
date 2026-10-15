@@ -5,14 +5,35 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Puck, type Config, type Data } from '@puckeditor/core';
 import '@puckeditor/core/no-external.css'; // without its Inter webfont: the admin uses the system font
-import { EMAIL_DEFAULTS, defaultEmail, renderBlock, renderEmail, textVersion, type EmailContext, type EmailDoc, type EmailItem, type EmailRoot } from '../lib/forms/email';
-import { INPUT_TYPES } from '../lib/forms/logic';
+import { EMAIL_DEFAULTS, defaultEmail, renderBlock, renderEmail, textVersion, type EmailContext, type EmailDoc, type EmailItem, type EmailPayment, type EmailRoot } from '../lib/forms/email';
+import { INPUT_TYPES, toMinor } from '../lib/forms/logic';
+import { currencyOf, productsOf } from '../lib/forms/payment';
 import type { FormDef, Notification } from '../lib/forms/types';
 import { MediaPicker } from '../puck/fields';
 import { MergeTags, RichMessage } from './rich-message';
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 const fieldsOf = (form: FormDef) => form.fields.filter((f) => INPUT_TYPES.includes(f.type) && f.type !== 'hidden');
+
+/** A payment for the canvas: one of each product at its price (the first choice; 25 for an amount). */
+function samplePayment(form: FormDef): EmailPayment {
+  const items = productsOf(form).map((f) => {
+    const mode = f.priceMode ?? 'fixed';
+    const choice = f.choices?.[0];
+    const unit = mode === 'fixed' ? toMinor(f.price) : mode === 'amount' ? 2500 : toMinor(choice?.price);
+    return { name: mode === 'choice' && choice ? `${f.label}: ${choice.label}` : f.label || 'Item', unit, quantity: 1 };
+  });
+  if (!items.length) items.push({ name: 'Product', unit: 2500, quantity: 1 });
+  return {
+    items,
+    amount: items.reduce((s, it) => s + it.unit * it.quantity, 0),
+    currency: currencyOf(form),
+    status: 'Paid',
+    method: form.payment?.provider === 'square' ? 'Square' : 'Stripe',
+    id: 'the payment ID',
+    date: new Date().toLocaleDateString('en-US', { dateStyle: 'long' }),
+  };
+}
 
 /** The canvas's stand-ins for what a submission fills in: tags shown as written, answers as their labels. */
 function canvasContext(form: FormDef): EmailContext {
@@ -29,12 +50,22 @@ function canvasContext(form: FormDef): EmailContext {
       return showLabel ? `<p style="margin:0 0 4px 0;font-weight:600">${esc(f.label)}</p><p style="margin:0">${answer(`${f.label} answer`)}</p>` : `<p style="margin:0">${answer(`${f.label} answer`)}</p>`;
     },
     origin: typeof window === 'undefined' ? '' : window.location.origin,
+    payment: samplePayment(form),
   };
 }
 
+/** Payment blocks as the {payment_summary} tag, wherever they sit (for the plain text). */
+const paymentAsTag = (items: EmailItem[] = []): EmailItem[] =>
+  items.map((it) => {
+    if (it.type === 'Payment') return { type: 'Text', props: { id: it.props.id, html: `${it.props.heading ? `<p>${esc(it.props.heading)}</p>` : ''}<p>{payment_summary}</p>` } };
+    const p = { ...it.props };
+    for (const slot of ['content', 'left', 'right']) if (Array.isArray(p[slot])) p[slot] = paymentAsTag(p[slot]);
+    return { ...it, props: p };
+  });
+
 /** What the plain-text version starts from: the design, with field tags where answers go. */
 function textFromDesign(doc: EmailDoc, form: FormDef): string {
-  const html = renderEmail(doc, {
+  const html = renderEmail({ ...doc, content: paymentAsTag(doc.content) }, {
     merge: (text) => text,
     field: (id, showLabel) => {
       if (id === 'all') return '{all_fields}';
@@ -76,7 +107,7 @@ function emailConfig(form: FormDef): Config {
   const leaf = (type: string) => (props: any) => <Leaf type={type} props={props} />;
   return {
     categories: {
-      content: { title: 'Content', components: ['Heading', 'Text', 'Button', 'Image', 'FormField'] },
+      content: { title: 'Content', components: ['Heading', 'Text', 'Button', 'Image', 'FormField', 'Payment'] },
       layout: { title: 'Layout', components: ['Section', 'Columns', 'Divider', 'Spacer'] },
     },
     root: {
@@ -152,6 +183,24 @@ function emailConfig(form: FormDef): Config {
         },
         defaultProps: { field: 'all', showLabel: true },
         render: leaf('FormField'),
+      },
+      Payment: {
+        label: 'Payment',
+        fields: {
+          heading: { type: 'text', label: 'Heading (optional)' },
+          showItems: { type: 'radio', label: 'Show each item', options: [{ label: 'Yes', value: true }, { label: 'No, only the total', value: false }] },
+          showDetails: { type: 'radio', label: 'Show status, provider, payment ID and date', options: [{ label: 'Yes', value: true }, { label: 'No', value: false }] },
+          note: {
+            type: 'custom',
+            render: () => (
+              <p className="text-xs text-admin-muted">
+                {form.payment ? 'Shows the submission’s payment. In the canvas, one of each product stands in for it.' : 'This form doesn’t take payment (its Payment tab), so the block shows nothing in sent emails.'}
+              </p>
+            ),
+          },
+        },
+        defaultProps: { heading: 'Payment', showItems: true, showDetails: true },
+        render: leaf('Payment'),
       },
       Divider: { label: 'Divider', fields: { color: color('Colour', '#e5e1dc') }, defaultProps: {}, render: leaf('Divider') },
       Spacer: { label: 'Spacer', fields: { height: { type: 'number', label: 'Height (px)', min: 4, max: 200 } }, defaultProps: { height: 24 }, render: leaf('Spacer') },

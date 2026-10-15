@@ -2,6 +2,8 @@
 // email blocks, rendered here to email-safe HTML: tables for layout, inline styles, a 600px body, a
 // preheader, and a media query only to stack columns on phones. The builder's canvas uses the same
 // renderer, so what an editor sees is what is sent. Runs in the browser and on the server.
+import { PAYMENT_STATUS, formatMoney } from './logic';
+import type { SubmissionPayment } from './types';
 
 export interface EmailItem {
   type: string;
@@ -30,6 +32,51 @@ export interface EmailContext {
   field: (id: string, showLabel: boolean) => string;
   /** The site's address, for images and links given as /paths. */
   origin: string;
+  /** The submission's payment, for the Payment block (none: the block shows nothing). */
+  payment?: EmailPayment | null;
+}
+
+/** A payment as the Payment block and {payment_summary} show it. */
+export interface EmailPayment {
+  items: { name: string; unit: number; quantity: number }[];
+  /** Minor units (cents). */
+  amount: number;
+  currency: string;
+  /** As shown: Paid, Processing... */
+  status: string;
+  /** Stripe or Square. */
+  method?: string;
+  id?: string;
+  /** When it was paid, written out. */
+  date?: string;
+}
+
+/** A stored payment as the email shows it, its date in the site's timezone. */
+export function emailPayment(p: SubmissionPayment, timeZone: string): EmailPayment {
+  return {
+    items: p.items ?? [],
+    amount: p.amount,
+    currency: p.currency,
+    status: PAYMENT_STATUS[p.status] ?? p.status,
+    method: p.provider === 'stripe' ? 'Stripe' : p.provider === 'square' ? 'Square' : undefined,
+    id: p.payment_id,
+    date: p.paid_at ? new Intl.DateTimeFormat('en-US', { timeZone, dateStyle: 'long' }).format(new Date(p.paid_at)) : undefined,
+  };
+}
+
+/** A payment as an email table: each item and its amount, the total, then status, provider, id and date. */
+export function paymentTable(pay: EmailPayment, opts: { items?: boolean; details?: boolean } = {}): string {
+  const money = (n: number) => esc(formatMoney(n, pay.currency));
+  const cell = 'padding:6px 0;border-bottom:1px solid #e5e1dc;vertical-align:top';
+  const items = opts.items === false ? '' : pay.items
+    .map((it) => `<tr><td style="${cell}">${esc(it.name)}${it.quantity > 1 ? ` <span style="color:#64748b">x ${it.quantity}</span>` : ''}</td><td align="right" style="${cell};padding-left:12px;text-align:right;white-space:nowrap">${money(it.unit * it.quantity)}</td></tr>`)
+    .join('');
+  const total = `<tr><td style="padding:8px 0;font-weight:700">Total</td><td align="right" style="padding:8px 0 8px 12px;text-align:right;font-weight:700;white-space:nowrap">${money(pay.amount)}</td></tr>`;
+  const details = opts.details === false ? [] : [pay.status, pay.method, pay.id && `Payment ID ${pay.id}`, pay.date].filter(Boolean) as string[];
+  return (
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-size:15px">${items}${total}</table>` +
+    (details.length ? `<p style="margin:8px 0 0 0;font-size:13px;color:#64748b">${details.map(esc).join(' · ')}</p>` : '')
+  );
 }
 
 export const EMAIL_DEFAULTS: Required<Omit<EmailRoot, 'preheader'>> = {
@@ -130,6 +177,11 @@ export function renderBlock(item: EmailItem, ctx: EmailContext, rootIn: EmailRoo
     }
     case 'FormField':
       return row(`<div style="${font}font-size:16px;line-height:1.55;color:${root.textColor}">${ctx.field(String(p.field || 'all'), p.showLabel !== false)}</div>`, ' style="padding:0 0 12px 0"');
+    case 'Payment': {
+      if (!ctx.payment) return '';
+      const heading = p.heading ? `<p style="margin:0 0 8px 0;font-weight:700">${ctx.merge(esc(p.heading), true)}</p>` : '';
+      return row(`<div style="${font}font-size:16px;line-height:1.55;color:${root.textColor}">${heading}${paymentTable(ctx.payment, { items: p.showItems !== false, details: p.showDetails !== false })}</div>`, ' style="padding:0 0 12px 0"');
+    }
     case 'Section': {
       const bg = color(p.background, 'transparent');
       const pad = num(p.padding, 24, 0, 80);

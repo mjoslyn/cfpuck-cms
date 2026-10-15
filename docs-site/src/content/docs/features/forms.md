@@ -45,6 +45,7 @@ editor like the page editor with blocks made for email:
 | Button | A link styled as a button (a field tag works as the link, such as `mailto:{Email:f3}`) |
 | Image | An image from the media library, optionally linked |
 | Form field | One answer, with or without its label, or every answer as a table |
+| Payment | The submission's payment: each item and its amount, the total, then its status, provider, payment ID and date (either part can be left out). Nothing on a submission without a payment |
 | Section | A box with a background and padding, holding other blocks |
 | Two columns | Blocks side by side, stacked on phones |
 | Divider, Spacer | A line, or space |
@@ -87,7 +88,9 @@ When someone submits a form with something to pay:
    once. Webhooks catch visitors who pay and close the tab.
 
 A submission with nothing to pay is sent at once, without checkout. Notifications can use
-`{payment_total}` and `{payment_id}`, and `{all_fields}` ends with the total. Submissions show each
+`{payment_total}`, `{payment_id}` and `{payment_summary}` (the items, total and details as text or a
+table), the email builder's **Payment** block shows the same as a receipt, and `{all_fields}` ends with
+the total. Submissions show each
 payment's status, items and payment id, and the CSV export has payment columns.
 
 ### Setting up the providers
