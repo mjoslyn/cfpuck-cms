@@ -85,6 +85,8 @@ export async function verifySquareSignature(body: string, header: string, url: s
 
 export const provider: Provider = {
   label: 'Square',
+  // Square sends the buyer back once paid; the order can take a moment to show the payment.
+  returnLag: 1500,
   keys: ['SQUARE_ACCESS_TOKEN', 'SQUARE_LOCATION_ID'],
   configured: () => !!(env('SQUARE_ACCESS_TOKEN') && env('SQUARE_LOCATION_ID')),
   sandbox,
@@ -96,5 +98,19 @@ export const provider: Provider = {
   async webhookEvent(body, headers, url) {
     const key = env('SQUARE_WEBHOOK_SIGNATURE_KEY');
     return key && (await verifySquareSignature(body, headers.get('x-square-hmacsha256-signature') ?? '', env('SQUARE_WEBHOOK_URL') || url, key)) ? JSON.parse(body) : null;
+  },
+  async parseEvent(event) {
+    const obj = event?.data?.object ?? {};
+    switch (event?.type) {
+      case 'payment.created':
+      case 'payment.updated':
+        return obj.payment?.order_id ? { kind: 'checkout', order: String(obj.payment.order_id) } : null;
+      case 'refund.created':
+      case 'refund.updated': {
+        const r = obj.refund ?? {};
+        return r.status === 'COMPLETED' && r.payment_id ? { kind: 'refund', payment: String(r.payment_id), refunded: Number((await payment(r.payment_id)).refunded_money?.amount ?? 0) } : null;
+      }
+    }
+    return null;
   },
 };

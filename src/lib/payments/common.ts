@@ -42,8 +42,19 @@ export interface CheckoutState {
   refunded?: number;
 }
 
+/**
+ * What a webhook reports, in terms both features share: a checkout to look at again (found by `ref`, or
+ * Square's `order`), with `failed` or `expired` when it won't be paid; or a payment's refunds (`refunded`,
+ * the total so far).
+ */
+export type PaymentEvent =
+  | { kind: 'checkout'; ref?: string; order?: string; failed?: boolean; expired?: boolean }
+  | { kind: 'refund'; payment: string; refunded: number };
+
 export interface Provider {
   label: string;
+  /** How long after the buyer comes back its checkout can take to show the payment, worth one wait and a second look (ms). */
+  returnLag?: number;
   /** The environment variables it needs, all set: configured. */
   keys: string[];
   configured(): boolean;
@@ -59,6 +70,8 @@ export interface Provider {
   refunded(paymentId: string): Promise<number>;
   /** A webhook's event if it is signed by the provider; null if not. */
   webhookEvent(body: string, headers: Headers, url: string): Promise<any | null>;
+  /** What a signed event reports; null for events neither feature uses. */
+  parseEvent(event: any): Promise<PaymentEvent | null>;
 }
 
 /** Timing-safe comparison of two strings (signatures, tokens). */

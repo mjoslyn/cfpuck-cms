@@ -107,7 +107,8 @@ Forms and tickets share them, and one webhook per provider serves both.
 | `SQUARE_WEBHOOK_SIGNATURE_KEY`, `SQUARE_WEBHOOK_URL` | A webhook subscription to `payment.created`, `payment.updated`, `refund.created` and `refund.updated` at `<site>/api/payments/square`: its signature key, and that exact address (when the site sees another) |
 
 The Payment tab and Settings > Tickets show which providers are set up, what they still need, and mark
-test and sandbox keys.
+test and sandbox keys. In Square's sandbox a payment link opens Square's testing panel rather than a card
+form: **Next**, then **Test Payment** pays the order, and the last step links back to the site.
 
 ## Mail
 

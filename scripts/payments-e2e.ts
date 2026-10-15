@@ -108,8 +108,8 @@ try {
   out.afterSubmitNotice = await page.locator('.c-form__errors').allTextContents();
   await page.screenshot({ path: shot('after-submit'), fullPage: true });
 
-  // At the provider's checkout: pay with a test card (Stripe's 4242 4242 4242 4242; Square's sandbox
-  // takes 4111 1111 1111 1111) and come back to the confirmation.
+  // At the provider's checkout: pay (Stripe with its test card 4242 4242 4242 4242, Square through its
+  // sandbox testing panel) and come back to the confirmation.
   if (out.atCheckout && provider === 'stripe') {
     // The card option's button sits under a cover that takes the pointer; a dispatched click opens it.
     await page.locator('[data-testid="card-accordion-item-button"]').dispatchEvent('click', undefined, { timeout: 30_000 }).catch(() => {});
@@ -123,13 +123,14 @@ try {
     await page.screenshot({ path: shot('checkout'), fullPage: true });
     await Promise.all([page.waitForURL((u) => u.toString().startsWith(origin), { timeout: 90_000 }), page.locator('[data-testid="hosted-payment-submit-button"], .SubmitButton').first().click()]);
   } else if (out.atCheckout && provider === 'square') {
-    const card = page.frameLocator('iframe[name^="sq-card"], iframe.sq-card-component').first();
-    await card.locator('input[name="cardNumber"]').fill('4111 1111 1111 1111', { timeout: 30_000 });
-    await card.locator('input[name="expirationDate"]').fill('12/34');
-    await card.locator('input[name="cvv"]').fill('111');
-    await card.locator('input[name="postalCode"]').fill('14731').catch(() => {});
+    // A sandbox payment link opens Square's testing panel, not a card form: Next, then Test Payment pays
+    // the order, and the last step links to the return address (in a new tab) rather than redirecting.
+    await page.locator('button:has-text("Next")').click({ timeout: 30_000 });
+    await page.locator('button:has-text("Test Payment")').click({ timeout: 30_000 });
+    const back = page.locator(`a[href^="${origin}"]`).first();
+    await back.waitFor({ timeout: 60_000 });
     await page.screenshot({ path: shot('checkout'), fullPage: true });
-    await Promise.all([page.waitForURL((u) => u.toString().startsWith(origin), { timeout: 90_000 }), page.locator('button[type=submit]').last().click()]);
+    await page.goto((await back.getAttribute('href'))!); // it opens in a new tab
   }
   if (out.atCheckout) {
     await page.waitForLoadState('load');

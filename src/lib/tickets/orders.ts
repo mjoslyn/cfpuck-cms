@@ -11,7 +11,7 @@ import { permalink } from '../permalink';
 import { SITE_TZ, site } from '../site';
 import { sendMail } from '../forms/mail';
 import { emailToSend, localNow, maxFor, offSale, offeredTypes, remaining, ticketEmailFrom, ticketSettings, ticketsOf, timedEmail, DEFAULT_MAX_PER_ORDER, type EmailKind, type EventEmail, type EventTickets, type TicketSettings } from './config';
-import { PROVIDERS, ProviderError, closeCheckout, providerOf, type CheckoutState, type PaymentProvider } from '../payments';
+import { PROVIDERS, ProviderError, closeCheckout, providerOf, type CheckoutState, type PaymentEvent, type PaymentProvider } from '../payments';
 import { ticketEmail, type EventView, type OrderView } from './email';
 import type { EmailPayment } from '../forms/email';
 import { formatMoney } from '../payments/money';
@@ -317,49 +317,25 @@ export async function recordRefund(db: SupabaseClient, order: OrderRow, refunded
 
 const orderBy = async (db: SupabaseClient, column: string, value: unknown) => (value ? (await db.from('ticket_orders').select('*').eq(column, String(value)).maybeSingle<OrderRow>()).data : null);
 
-/** A provider's webhook (/api/payments/<provider>, signature checked there); orders not found are another's. */
-export async function ticketsWebhook(provider: PaymentProvider, event: any) {
-  if (provider === 'stripe') await stripeWebhook(event);
-  else await squareWebhook(event);
-}
-
-async function stripeWebhook(event: any) {
+/**
+ * A provider's webhook (/api/payments/<provider>, signature checked there): the order's payment asked of
+ * the provider, or its refunds recorded. Orders not found are another feature's.
+ */
+export async function ticketsWebhook(provider: PaymentProvider, event: PaymentEvent) {
   const db = serviceClient();
-  const o = event?.data?.object ?? {};
-  switch (event?.type) {
-    case 'checkout.session.completed':
-    case 'checkout.session.async_payment_succeeded': {
-      const order = await orderBy(db, 'provider_ref', o.id);
-      if (order && o.payment_status === 'paid') await markPaid(db, order, typeof o.payment_intent === 'string' ? o.payment_intent : o.payment_intent?.id);
-      break;
-    }
-    case 'checkout.session.expired':
-    case 'checkout.session.async_payment_failed': {
-      const order = await orderBy(db, 'provider_ref', o.id);
-      if (order?.status === 'pending') await db.from('ticket_orders').update({ status: 'expired' }).eq('id', order.id).eq('status', 'pending');
-      break;
-    }
-    case 'charge.refunded': {
-      const order = await orderBy(db, 'provider_payment', o.payment_intent);
-      if (order) await recordRefund(db, order, Number(o.amount_refunded) || 0);
-      break;
-    }
+  if (event.kind === 'refund') {
+    const order = await orderBy(db, 'provider_payment', event.payment);
+    if (order?.provider === provider) await recordRefund(db, order, event.refunded);
+    return;
   }
-}
-
-async function squareWebhook(event: any) {
-  const db = serviceClient();
-  const obj = event?.data?.object ?? {};
-  if (event?.type === 'payment.created' || event?.type === 'payment.updated') {
-    const p = obj.payment ?? {};
-    const order = await orderBy(db, 'provider_order', p.order_id);
-    if (order && p.status === 'COMPLETED') await markPaid(db, order, p.id);
-  } else if (event?.type === 'refund.created' || event?.type === 'refund.updated') {
-    const r = obj.refund ?? {};
-    if (r.status !== 'COMPLETED') return;
-    const order = await orderBy(db, 'provider_payment', r.payment_id);
-    if (order) await recordRefund(db, order, await PROVIDERS.square.refunded(r.payment_id));
+  const order = event.ref ? await orderBy(db, 'provider_ref', event.ref) : await orderBy(db, 'provider_order', event.order);
+  if (!order || order.provider !== provider || (order.status !== 'pending' && order.status !== 'expired')) return;
+  if (event.failed || event.expired) {
+    await db.from('ticket_orders').update({ status: 'expired' }).eq('id', order.id).eq('status', 'pending');
+    return;
   }
+  const state = await paymentState(order);
+  if (state.status === 'paid') await markPaid(db, order, state.paymentId);
 }
 
 // ---- The attendee list -----------------------------------------------------------------------

@@ -458,13 +458,16 @@ export adds payment columns.
 Forms and tickets take payments through the same code, `src/lib/payments/`: `stripe.ts` (Checkout
 Sessions) and `square.ts` (payment links, an order each), over their REST APIs with no SDK, behind one
 `Provider` interface (`create` a hosted checkout, `check` where it stands, `close` an unpaid one,
-`refund`, `refunded`, `webhookEvent` with the signature checked), `providerStatus()` for the admin
+`refund`, `refunded`, `webhookEvent` with the signature checked, `parseEvent` turning it into a
+`PaymentEvent` both features read: a checkout to look at again, or a payment's refunds; `returnLag`, a
+wait before a second look at a checkout the buyer just came back from), `providerStatus()` for the admin
 screens (configured, test or sandbox keys, the variables still missing) and `money.ts` (`CURRENCIES`,
 `formatMoney`, `toMinor`, `MIN_CHARGE`; safe in the browser). A checkout's `ref` is the Stripe session
 or Square payment link, `order` Square's order (which its payment is on). One webhook per provider
 serves both features, `/api/payments/stripe` and `/api/payments/square`
-(`src/pages/api/payments/[provider].ts`): it checks the signature and hands the event to
-`formsWebhook` and `ticketsWebhook`, each ignoring checkouts that aren't its own. Keys are environment
+(`src/pages/api/payments/[provider].ts`): it checks the signature and hands the parsed event to
+`formsWebhook` and `ticketsWebhook`, each ignoring checkouts that aren't its own and asking the provider
+where a checkout stands. Provider-specific code stays in `src/lib/payments/`. Keys are environment
 variables, never settings (settings sync between copies): `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
 `SQUARE_ACCESS_TOKEN`, `SQUARE_LOCATION_ID`, `SQUARE_ENVIRONMENT`, `SQUARE_WEBHOOK_SIGNATURE_KEY`,
 `SQUARE_WEBHOOK_URL` (`.env.example`). The email builder's **Payment** block (`paymentTable` in
@@ -615,8 +618,9 @@ request.
 `scripts/sync-e2e.ts` (a sync stopped by a row made since Compare; undoing a half-finished sync; needs
 a second local stack as `SYNC_REMOTE_*`) use the running site without a browser and remove what they make.
 `scripts/payments-e2e.ts [stripe|square]` builds a form with Product fields and a payment provider in the
-browser, submits it, pays on the provider's checkout with its test card and reports the confirmation and
-the stored payment (that needs the provider's test keys and network access to it).
+browser, submits it, pays (Stripe's checkout with its test card; a Square sandbox payment link opens
+Square's testing panel, whose Test Payment pays the order) and reports the confirmation and the stored
+payment (that needs the provider's test keys and network access to it).
 
 The e2e scripts (`scripts/*-e2e.ts`, `scripts/checks/compose.ts`) sign in as `LOCAL_ADMIN_EMAIL` /
 `LOCAL_ADMIN_PASSWORD` and were written against a site with content (pages, events, venues, members);

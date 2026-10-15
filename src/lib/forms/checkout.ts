@@ -8,7 +8,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { FormResult, FormRow, SubmissionPayment, Values } from './types';
 import { MAX_CHARGE, currencyOf, totalOf, type LineItem } from './payment';
 import { MIN_CHARGE, formatMoney } from '../payments/money';
-import { PROVIDERS, type PaymentProvider } from '../payments';
+import { PROVIDERS, type PaymentEvent, type PaymentProvider } from '../payments';
 import { env, sameString } from '../payments/common';
 import { confirmationResult, mergeTags, notify } from './submit';
 import { site } from '../site';
@@ -116,7 +116,7 @@ export async function confirmPayment(db: SupabaseClient, sub: Submission): Promi
   return updated;
 }
 
-/** A bank payment that failed after checkout (Stripe's async_payment_failed, from a signed webhook). */
+/** A bank payment that failed after checkout (from a signed webhook). */
 export async function markPaymentFailed(db: SupabaseClient, sub: Submission) {
   if (sub.payment.status !== 'processing' && sub.payment.status !== 'pending') return;
   await db.from('form_submissions').update({ payment: { ...sub.payment, status: 'failed' } }).eq('id', sub.id).eq('payment->>status', sub.payment.status);
@@ -134,7 +134,7 @@ async function loadForm(db: SupabaseClient, id: number): Promise<FormRow | null>
   return (data as FormRow) ?? null;
 }
 
-/** The submission a provider's checkout (`ref`) or Square order (`order`) belongs to. */
+/** The submission a provider's checkout (`ref`) or order (`order`) belongs to. */
 async function submissionBy(db: SupabaseClient, key: 'ref' | 'order', value: unknown): Promise<Submission | null> {
   if (!value) return null;
   const { data, error } = await db.from('form_submissions').select('id, form_id, data, payment').eq(`payment->>${key}`, String(value)).limit(1).maybeSingle();
@@ -146,19 +146,13 @@ async function submissionBy(db: SupabaseClient, key: 'ref' | 'order', value: unk
  * A provider's webhook (/api/payments/<provider>, signature checked there): it only says which checkout
  * to look at, whose state is then asked of the provider. Checkouts that aren't a form's are ignored.
  */
-export async function formsWebhook(provider: PaymentProvider, event: any) {
-  const type = String(event?.type ?? '');
-  const obj = event?.data?.object ?? {};
+export async function formsWebhook(provider: PaymentProvider, event: PaymentEvent) {
+  if (event.kind !== 'checkout') return;
   const db = serviceClient();
-  if (provider === 'stripe' && type.startsWith('checkout.session.') && obj.object === 'checkout.session') {
-    const sub = await submissionBy(db, 'ref', obj.id);
-    if (!sub) return;
-    if (type === 'checkout.session.async_payment_failed') await markPaymentFailed(db, sub);
-    else await confirmPayment(db, sub);
-  } else if (provider === 'square' && type.startsWith('payment.')) {
-    const sub = await submissionBy(db, 'order', obj.payment?.order_id);
-    if (sub) await confirmPayment(db, sub);
-  }
+  const sub = event.ref ? await submissionBy(db, 'ref', event.ref) : await submissionBy(db, 'order', event.order);
+  if (!sub || sub.payment.provider !== provider) return;
+  if (event.failed) await markPaymentFailed(db, sub);
+  else await confirmPayment(db, sub);
 }
 
 /**
@@ -172,9 +166,9 @@ export async function paymentReturn(db: SupabaseClient, param: string): Promise<
   if (!sub || !sub.form_id || !sameString(sub.payment.token, m[2])) return null;
   try {
     sub = await confirmPayment(db, sub);
-    // Square sends the visitor back once paid; its order can take a moment to show the payment.
-    if (sub.payment.status === 'pending' && sub.payment.provider === 'square') {
-      await new Promise((r) => setTimeout(r, 1500));
+    const lag = PROVIDERS[sub.payment.provider]?.returnLag;
+    if (sub.payment.status === 'pending' && lag) {
+      await new Promise((r) => setTimeout(r, lag));
       sub = await confirmPayment(db, sub);
     }
   } catch (e) {

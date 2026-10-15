@@ -23,8 +23,11 @@ export const POST: APIRoute = async ({ params, request, url }) => {
   const event = await provider.webhookEvent(body, request.headers, `${url.origin}${url.pathname}`);
   if (!event) return new Response('Bad signature', { status: 400 });
   try {
-    await formsWebhook(name, event);
-    await ticketsWebhook(name, event);
+    const reported = await provider.parseEvent(event);
+    if (reported) {
+      await formsWebhook(name, reported);
+      await ticketsWebhook(name, reported);
+    }
   } catch (e) {
     // A failure answers 500, so the provider tries again later.
     console.error(`${name} webhook ${event?.type}: ${(e as Error).message}`);

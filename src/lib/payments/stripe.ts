@@ -93,4 +93,13 @@ export const provider: Provider = {
     const secret = env('STRIPE_WEBHOOK_SECRET');
     return secret && (await verifyStripeSignature(body, headers.get('stripe-signature') ?? '', secret)) ? JSON.parse(body) : null;
   },
+  async parseEvent(event) {
+    const o = event?.data?.object ?? {};
+    const type = String(event?.type ?? '');
+    if (type.startsWith('checkout.session.') && o.object === 'checkout.session' && o.id) {
+      return { kind: 'checkout', ref: String(o.id), failed: type === 'checkout.session.async_payment_failed', expired: type === 'checkout.session.expired' };
+    }
+    if (type === 'charge.refunded' && o.payment_intent) return { kind: 'refund', payment: id(o.payment_intent)!, refunded: Number(o.amount_refunded) || 0 };
+    return null;
+  },
 };
