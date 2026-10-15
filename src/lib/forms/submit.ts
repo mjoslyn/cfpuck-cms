@@ -3,9 +3,10 @@
 // visitor to checkout instead, and notifies once paid (./checkout.ts).
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Field, FormDef, FormResult, FormRow, NamePart, Notification, ProductValue, SubmissionPayment, Values } from './types';
-import { HONEYPOT, INPUT_TYPES, NAME_LABELS, displayValue, formatMoney, isFieldHidden, isProduct, visibleNameParts } from './logic';
+import { HONEYPOT, INPUT_TYPES, NAME_LABELS, displayValue, isFieldHidden, isProduct, visibleNameParts } from './logic';
 import { MAX_QUANTITY, currencyOf, lineItems, totalOf } from './payment';
 import { startCheckout } from './checkout';
+import { formatMoney } from '../payments/money';
 import { sendMail, textVersion } from './mail';
 import { emailPayment, paymentTable, renderEmail } from './email';
 import { Loader } from '../data';

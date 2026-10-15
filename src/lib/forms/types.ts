@@ -1,3 +1,4 @@
+import type { PaymentProvider } from '../payments';
 import type { EmailDoc } from './email';
 // Form definitions (forms.definition) and submissions. Field ids are short strings ("f1"); a field
 // posts under its id ("f1"), with parts for names ("f1[first]") and lists for checkboxes ("f1[]").
@@ -88,12 +89,12 @@ export interface Field {
 
 export type PriceMode = 'fixed' | 'choice' | 'amount';
 
-export type PaymentProvider = 'stripe' | 'square';
+export type { PaymentProvider };
 
 /** Taking payment for a form: its Product fields add up to the total charged at checkout. */
 export interface PaymentSettings {
   provider: PaymentProvider;
-  /** ISO 4217 code (CURRENCIES in ./payment.ts); USD by default. */
+  /** ISO 4217 code (CURRENCIES in src/lib/payments/money.ts); USD by default. */
   currency?: string;
   /** Shown with the charge on the checkout page and the receipt; merge tags allowed. */
   description?: string;
@@ -196,8 +197,10 @@ export interface SubmissionPayment {
   amount: number;
   currency: string;
   items: { name: string; unit: number; quantity: number }[];
-  /** The provider's checkout: a Stripe Checkout Session id, or a Square order id. */
+  /** The provider's checkout: a Stripe Checkout Session id, or a Square payment link id. */
   ref?: string;
+  /** Square's order, which the payment is on. */
+  order?: string;
   /** The provider's payment id, once paid. */
   payment_id?: string;
   /** Secret part of the return address, so only the visitor's browser can come back to this submission. */

@@ -1,62 +1,66 @@
 // Square payment links (https://developer.squareup.com/reference/square/checkout-api/create-payment-link):
-// an order per submission, paid on Square's page. Env: SQUARE_ACCESS_TOKEN, SQUARE_LOCATION_ID,
+// an order per checkout, paid on Square's page. Env: SQUARE_ACCESS_TOKEN, SQUARE_LOCATION_ID,
 // SQUARE_ENVIRONMENT (sandbox or production, the default), SQUARE_WEBHOOK_SIGNATURE_KEY and
-// SQUARE_WEBHOOK_URL (the address the webhook subscription posts to, which the signature covers).
-import { env, hmac, sameString, type CheckoutRequest, type CheckoutState, type Provider } from './common';
+// SQUARE_WEBHOOK_URL (the address the webhook subscription posts to, which the signature covers, when the
+// site sees another one).
+import { ProviderError, env, hmac, sameString, type CheckoutRequest, type CheckoutState, type Provider } from './common';
 
-const VERSION = '2025-01-23';
+const VERSION = '2025-09-24';
 const sandbox = () => env('SQUARE_ENVIRONMENT') === 'sandbox';
 const api = () => (sandbox() ? 'https://connect.squareupsandbox.com/v2' : 'https://connect.squareup.com/v2');
 
-async function call(method: 'GET' | 'POST', path: string, body?: unknown) {
+async function call(method: 'GET' | 'POST' | 'DELETE', path: string, body?: unknown) {
   const token = env('SQUARE_ACCESS_TOKEN');
-  if (!token) throw new Error('Square is not set up (SQUARE_ACCESS_TOKEN).');
+  if (!token) throw new ProviderError('Square is not set up (SQUARE_ACCESS_TOKEN).');
   const res = await fetch(`${api()}${path}`, {
     method,
     headers: { Authorization: `Bearer ${token}`, 'Square-Version': VERSION, 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(`Square ${res.status}: ${data?.errors?.map((e: { detail?: string; code?: string }) => e.detail || e.code).join('; ') || res.statusText}`);
+  if (!res.ok) throw new ProviderError(`Square ${res.status}: ${data?.errors?.map((e: { detail?: string; code?: string }) => e.detail || e.code).join('; ') || res.statusText}`);
   return data;
 }
 
 async function create(req: CheckoutRequest) {
   const location = env('SQUARE_LOCATION_ID');
-  if (!location) throw new Error('Square is not set up (SQUARE_LOCATION_ID).');
-  const data = await call('POST', '/online-checkout/payment-links', {
-    idempotency_key: req.idempotencyKey,
+  if (!location) throw new ProviderError('Square is not set up (SQUARE_LOCATION_ID).');
+  const currency = req.currency.toUpperCase();
+  const { payment_link } = await call('POST', '/online-checkout/payment-links', {
+    idempotency_key: req.idempotencyKey.slice(0, 45),
     order: {
       location_id: location,
       reference_id: req.reference.slice(0, 40),
-      line_items: req.items.map((it) => ({ name: it.name.slice(0, 512), quantity: String(it.quantity), base_price_money: { amount: it.unit, currency: req.currency } })),
+      line_items: req.items.map((it) => ({ name: it.name.slice(0, 500), quantity: String(it.quantity), base_price_money: { amount: it.unit, currency } })),
     },
     checkout_options: { redirect_url: req.returnUrl, ask_for_shipping_address: false },
     ...(req.email ? { pre_populated_data: { buyer_email: req.email } } : {}),
     ...(req.description ? { payment_note: req.description.slice(0, 500) } : {}),
   });
-  return { ref: String(data.payment_link.order_id), url: String(data.payment_link.url) };
+  return { ref: String(payment_link.id), order: String(payment_link.order_id), url: String(payment_link.url) };
 }
 
-/** Paid once the order's tenders cover it (payment-link orders can stay OPEN until fulfilled). */
-async function check(ref: string): Promise<CheckoutState> {
-  const { order } = await call('GET', `/orders/${encodeURIComponent(ref)}`);
-  const tenders: { id?: string; payment_id?: string }[] = order?.tenders ?? [];
-  const due = Number(order?.net_amount_due_money?.amount ?? order?.total_money?.amount ?? 1);
+const payment = async (id: string) => (await call('GET', `/payments/${encodeURIComponent(id)}`)).payment ?? {};
+
+/** Paid when a payment on the order has completed (Square leaves a payment link's order open). */
+async function check({ order: orderId }: { order?: string | null }): Promise<CheckoutState> {
+  if (!orderId) return { status: 'pending' };
+  const { order } = await call('GET', `/orders/${encodeURIComponent(orderId)}`);
   if (order?.state === 'CANCELED') return { status: 'cancelled' };
-  if (tenders.length && (due === 0 || order?.state === 'COMPLETED')) {
-    return { status: 'paid', paymentId: tenders[0].payment_id ?? tenders[0].id, amount: Number(order?.total_money?.amount ?? 0) };
+  for (const tender of order?.tenders ?? []) {
+    const p = await payment(tender.payment_id ?? tender.id);
+    if (p.status === 'COMPLETED') return { status: 'paid', paymentId: p.id, amount: Number(p.amount_money?.amount ?? order?.total_money?.amount ?? 0), refunded: Number(p.refunded_money?.amount ?? 0) };
   }
   return { status: 'pending' };
 }
 
-export const provider: Provider = {
-  label: 'Square',
-  configured: () => !!(env('SQUARE_ACCESS_TOKEN') && env('SQUARE_LOCATION_ID')),
-  sandbox,
-  create,
-  check,
-};
+async function close(ref: string) {
+  await call('DELETE', `/online-checkout/payment-links/${encodeURIComponent(ref)}`);
+}
+
+async function refund(paymentId: string, amount: number, currency: string, key: string) {
+  await call('POST', '/refunds', { idempotency_key: `refund-${key}`.slice(0, 45), payment_id: paymentId, amount_money: { amount, currency: currency.toUpperCase() } });
+}
 
 /**
  * A webhook's x-square-hmacsha256-signature: base64 HMAC-SHA256 of the subscription's URL followed by
@@ -66,3 +70,19 @@ export async function verifySquareSignature(body: string, header: string, url: s
   if (!header) return false;
   return sameString(header, await hmac(key, `${url}${body}`, 'base64'));
 }
+
+export const provider: Provider = {
+  label: 'Square',
+  keys: ['SQUARE_ACCESS_TOKEN', 'SQUARE_LOCATION_ID'],
+  configured: () => !!(env('SQUARE_ACCESS_TOKEN') && env('SQUARE_LOCATION_ID')),
+  sandbox,
+  create,
+  check,
+  close,
+  refund,
+  refunded: async (id) => Number((await payment(id)).refunded_money?.amount ?? 0),
+  async webhookEvent(body, headers, url) {
+    const key = env('SQUARE_WEBHOOK_SIGNATURE_KEY');
+    return key && (await verifySquareSignature(body, headers.get('x-square-hmacsha256-signature') ?? '', env('SQUARE_WEBHOOK_URL') || url, key)) ? JSON.parse(body) : null;
+  },
+};

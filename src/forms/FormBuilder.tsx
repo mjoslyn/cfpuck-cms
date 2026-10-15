@@ -7,12 +7,15 @@ import { renderForm } from '../render/forms/form';
 import { INPUT_TYPES, NAME_LABELS, NAME_PARTS, logicOf } from '../lib/forms/logic';
 import { FIELD_TYPES, defaultNotification, newField } from '../lib/forms/defaults';
 import type { Choice, Confirmation, Field, FieldType, FormDef, Logic, Notification, Operator, PaymentProvider, PaymentSettings, PriceMode, Width } from '../lib/forms/types';
-import { CURRENCIES, MAX_QUANTITY, productsOf } from '../lib/forms/payment';
+import { MAX_QUANTITY, productsOf } from '../lib/forms/payment';
+import { CURRENCIES } from '../lib/payments/money';
+import type { ProviderStatus } from '../lib/payments';
 import siteCss from '../styles/site.css?url';
 import { site } from '../lib/site';
-import { MergeTags } from './rich-message';
+import { MergeTags, mergeTagOptions } from './rich-message';
 import EmailBuilder from './EmailBuilder';
-import { emailFromMessage } from '../lib/forms/email';
+import { formEmailKit } from './form-email';
+import { defaultEmail, emailFromMessage } from '../lib/forms/email';
 
 const input = 'w-full rounded border border-admin-ink/15 bg-white px-2 py-1.5 text-sm outline-none focus:border-admin-accent';
 const labelCls = 'mb-1 block text-xs font-medium text-admin-muted';
@@ -28,7 +31,7 @@ interface Row {
 
 type Tab = 'build' | 'settings' | 'confirmation' | 'payment' | 'notifications';
 
-type Providers = Record<PaymentProvider, { label: string; configured: boolean; sandbox: boolean }>;
+type Providers = Record<PaymentProvider, ProviderStatus>;
 
 // Small controls ---------------------------------------------------------------------------
 
@@ -570,6 +573,13 @@ export default function FormBuilder({ formId }: { formId: number }) {
   }, [formId]);
 
   const dirty = row != null && JSON.stringify(row) !== saved;
+  // The email builder's kit: the form's fields and tags; its preview reads the notification as it is then.
+  const latestRow = useRef(row);
+  latestRow.current = row;
+  const emailKit = useMemo(
+    () => (row && emailFor ? formEmailKit(row.id, row.definition, () => latestRow.current!.notifications.find((n) => n.id === emailFor)!) : null),
+    [emailFor, row?.id, row?.definition],
+  );
 
   useEffect(() => {
     const warn = (e: BeforeUnloadEvent) => {
@@ -698,7 +708,15 @@ export default function FormBuilder({ formId }: { formId: number }) {
   return (
     <div className="flex h-[calc(100vh-3.5rem)] flex-col">
       {emailIndex >= 0 && (
-        <EmailBuilder formId={row.id} form={form} notification={row.notifications[emailIndex]} onChange={(patch) => setNotification(emailIndex, patch)} onClose={() => setEmailFor(null)} />
+        <EmailBuilder
+          title={`${row.notifications[emailIndex].name || 'Notification'}: email`}
+          kit={emailKit!}
+          design={row.notifications[emailIndex].design ?? defaultEmail()}
+          text={row.notifications[emailIndex].text}
+          note="Changes are saved with the form."
+          onChange={(patch) => setNotification(emailIndex, patch)}
+          onClose={() => setEmailFor(null)}
+        />
       )}
       <div className="flex items-center gap-4 border-b border-admin-ink/10 bg-white px-4 py-2">
         <a href="/admin/forms/" className="text-sm text-admin-muted hover:text-admin-accent">
@@ -812,7 +830,7 @@ export default function FormBuilder({ formId }: { formId: number }) {
               <Pick label="After someone submits" value={confirmation.type} options={[['message', 'Show a message'], ['page', 'Go to a page'], ['redirect', 'Go to a web address']]} onChange={(v) => setConfirmation({ type: v })} />
               {confirmation.type === 'message' && (
                 <>
-                  <MergeTags form={form} onInsert={(tag) => setConfirmation({ message: `${confirmation.message ?? ''}${tag}` })} />
+                  <MergeTags tags={mergeTagOptions(form)} onInsert={(tag) => setConfirmation({ message: `${confirmation.message ?? ''}${tag}` })} />
                   <Area label="Message" value={confirmation.message} rows={8} onChange={(v) => setConfirmation({ message: v })} hint="Paragraphs are added automatically. HTML is allowed." />
                 </>
               )}
@@ -851,13 +869,13 @@ export default function FormBuilder({ formId }: { formId: number }) {
               </Labelled>
               {payment && providers && !providers[payment.provider].configured && (
                 <p className="mb-3 rounded bg-[#fef3f2] p-2 text-xs text-[#b42318]">
-                  {payment.provider === 'stripe' ? 'Stripe needs STRIPE_SECRET_KEY' : 'Square needs SQUARE_ACCESS_TOKEN and SQUARE_LOCATION_ID'} in the site's environment. Until then the form refuses submissions that have something to pay.
+                  {providers[payment.provider].label} needs {providers[payment.provider].missing.join(' and ')} in the site's environment. Until then the form refuses submissions that have something to pay.
                 </p>
               )}
               {payment && (
                 <>
                   <Pick label="Currency" value={payment.currency ?? 'USD'} options={CURRENCIES.map(([code, name]) => [code, `${code}: ${name}`] as [string, string])} onChange={(v) => setPayment({ currency: v === 'USD' ? undefined : v })} />
-                  <MergeTags form={form} onInsert={(tag) => setPayment({ description: `${payment.description ?? ''}${tag}` })} />
+                  <MergeTags tags={mergeTagOptions(form)} onInsert={(tag) => setPayment({ description: `${payment.description ?? ''}${tag}` })} />
                   <TextIn label="Description of the payment" value={payment.description} placeholder={form.title} hint="Shown at checkout and on the receipt." onChange={(v) => setPayment({ description: v || undefined })} />
                   <Labelled label="Receipt email" hint="Filled in at checkout; the payment provider sends its receipt there.">
                     <select className={input} value={payment.emailField ?? ''} onChange={(e) => setPayment({ emailField: e.target.value || undefined })}>
@@ -873,6 +891,9 @@ export default function FormBuilder({ formId }: { formId: number }) {
                   <div className="space-y-2 text-xs leading-relaxed text-admin-muted">
                     <p>Visitors pay on {providers?.[payment.provider]?.label ?? 'the provider'}'s checkout page after they submit, then come back to the confirmation. A submission with nothing to pay is sent right away.</p>
                     <p>Notifications are sent once the payment is complete. Submissions list unpaid checkouts as Unpaid.</p>
+                    <p>
+                      Webhook address (for visitors who pay and don't come back): <code>{location.origin}/api/payments/{payment.provider}</code>
+                    </p>
                   </div>
                 </>
               )}
@@ -894,7 +915,7 @@ export default function FormBuilder({ formId }: { formId: number }) {
                     <TextIn label="Send to" value={n.to} hint="Addresses separated by commas. {admin_email} is the Chamber's address; a field tag like {Email:f3} sends to what the visitor entered." onChange={(v) => setNotification(i, { to: v })} />
                     <TextIn label="Reply-to" value={n.replyTo} placeholder="The visitor's email, if the form has one" onChange={(v) => setNotification(i, { replyTo: v || undefined })} />
                     <TextIn label="From name" value={n.fromName} placeholder={site.organization} onChange={(v) => setNotification(i, { fromName: v || undefined })} />
-                    <MergeTags form={form} onInsert={(tag) => setNotification(i, { subject: `${n.subject ?? ''}${tag}` })} />
+                    <MergeTags tags={mergeTagOptions(form)} onInsert={(tag) => setNotification(i, { subject: `${n.subject ?? ''}${tag}` })} />
                     <TextIn label="Subject" value={n.subject} onChange={(v) => setNotification(i, { subject: v })} />
                     <div className="mb-3">
                       <span className={labelCls}>Email</span>

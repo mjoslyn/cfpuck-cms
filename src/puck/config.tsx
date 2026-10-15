@@ -32,6 +32,12 @@ const PANELS: Record<string, Panel> = {
 };
 
 Object.assign(PANELS, {
+  tickets: (a: Attrs, set: (p: Attrs) => void) => (
+    <>
+      <Text title="Heading" value={a.heading} placeholder="Tickets (or the event's own)" onChange={(v) => set({ heading: v || undefined })} />
+      <p className="mb-2 text-xs text-admin-muted">The event's ticket types, prices and questions are in its settings, under Tickets. The Event details block shows tickets on its own; use this block in templates without it.</p>
+    </>
+  ),
   'form': (a: Attrs, set: (p: Attrs) => void) => (
     <>
       <FormPicker value={a.formId} onChange={(formId) => set({ formId })} />
@@ -117,6 +123,7 @@ const LABELS: Record<string, string> = {
   pattern: 'Linked pattern',
   'form': 'Form',
   'event-details': 'Event details',
+  tickets: 'Tickets',
   'events-calendar': 'Events page (list, month, day)',
   'event-calendar': 'Events calendar',
 };
@@ -148,6 +155,7 @@ const withSite = (category: BlockCategory, core: string[]) => [...core, ...Objec
 const APPLIES_TO: Record<string, string[]> = {
   'event-details': ['event'],
   'event-schedule': ['event'],
+  tickets: ['event'],
   ...Object.fromEntries(Object.entries(SITE_BLOCKS).flatMap(([t, d]) => (d.types ? [[t, d.types]] : []))),
 };
 
@@ -191,7 +199,7 @@ export function buildConfig(types: string[], entryType?: string): Config {
       dynamic: { title: 'Lists and listings', components: withSite('dynamic', ['collection', 'collection-filters', 'map', 'search-form', 'event-calendar', 'events-calendar', 'archive-title']) },
       card: { title: 'Card fields', components: withSite('card', ['entry-title', 'entry-image', 'entry-excerpt', 'entry-date', 'event-date', 'entry-terms', 'entry-field']) },
       sections: { title: 'Sections', components: withSite('sections', ['hero', 'form']) },
-      site: { title: 'Site', components: withSite('site', ['event-details', 'event-schedule']) },
+      site: { title: 'Site', components: withSite('site', ['event-details', 'event-schedule', 'tickets']) },
       advanced: { title: 'Advanced', components: withSite('advanced', ['html', 'part', 'entry-content']) },
       // Collection internals (items, empty state, pagination) are managed from the collection's settings.
       other: { visible: false },
@@ -203,7 +211,7 @@ export function buildConfig(types: string[], entryType?: string): Config {
 export const EDITABLE_TYPES = [
   ...Object.keys(CONTENT_PANELS),
   'collection',
-  'event-date', 'event-details', 'event-schedule', 'events-calendar', 'event-calendar',
+  'event-date', 'event-details', 'event-schedule', 'tickets', 'events-calendar', 'event-calendar',
   'entry-field', 'form', 'pattern',
   ...Object.keys(SITE_BLOCKS),
 ];

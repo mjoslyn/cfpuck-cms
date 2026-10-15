@@ -1,6 +1,7 @@
 // Conditional logic, value formatting and helpers shared by the renderer, the submit handler, the
 // builder and the submissions screen. The browser runs the same rules (public/assets/js/forms.js).
 import type { Field, FormDef, Logic, NamePart, ProductValue, Rule, Value, Values } from './types';
+import { formatMoney, toMinor } from '../payments/money';
 
 export const HONEYPOT = '_hp';
 
@@ -70,18 +71,6 @@ export function isFieldHidden(form: FormDef, field: Field, values: Values, seen 
 }
 
 const choiceLabel = (f: Field, v: string) => f.choices?.find((c) => c.value.trim() === v.trim())?.label ?? v;
-
-/** Amounts in the form's currency, e.g. $25.00 (amounts in minor units: cents). */
-export function formatMoney(minor: number, currency = 'USD'): string {
-  try {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(minor / 100);
-  } catch {
-    return `${(minor / 100).toFixed(2)} ${currency}`;
-  }
-}
-
-/** A price in the form's currency as minor units (12.5 -> 1250). */
-export const toMinor = (n: unknown) => (Number.isFinite(Number(n)) ? Math.round(Number(n) * 100) : 0);
 
 /** A product's answer as text: "Gold member ($100.00) x 2", "$25.00". */
 function productText(f: Field, v: ProductValue, currency: string): string {

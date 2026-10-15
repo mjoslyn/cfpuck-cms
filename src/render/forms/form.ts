@@ -4,7 +4,8 @@
 // characters, and keeps the total of a form that takes payment; without it the form still works and
 // the server validates (and prices) everything.
 import type { Field, FormDef, FormState, NamePart, ProductValue, Value, Values } from '../../lib/forms/types';
-import { HONEYPOT, NAME_LABELS, formatMoney, isProduct, logicOf, toMinor, visibleNameParts, WIDTH_SPANS } from '../../lib/forms/logic';
+import { HONEYPOT, NAME_LABELS, isProduct, logicOf, visibleNameParts, WIDTH_SPANS } from '../../lib/forms/logic';
+import { formatMoney, toMinor } from '../../lib/payments/money';
 import { MAX_QUANTITY, currencyOf, defaultProductValue, lineItems, productsOf, totalOf } from '../../lib/forms/payment';
 
 export const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);

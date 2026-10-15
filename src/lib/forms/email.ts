@@ -2,7 +2,8 @@
 // email blocks, rendered here to email-safe HTML: tables for layout, inline styles, a 600px body, a
 // preheader, and a media query only to stack columns on phones. The builder's canvas uses the same
 // renderer, so what an editor sees is what is sent. Runs in the browser and on the server.
-import { PAYMENT_STATUS, formatMoney } from './logic';
+import { PAYMENT_STATUS } from './logic';
+import { formatMoney } from '../payments/money';
 import type { SubmissionPayment } from './types';
 
 export interface EmailItem {

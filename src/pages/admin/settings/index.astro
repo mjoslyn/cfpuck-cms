@@ -2,6 +2,7 @@
 import Admin from '../../../layouts/Admin.astro';
 import SiteSettings from '../../../puck/SiteSettings';
 import { hasContentBlock } from '../../../lib/templates';
+import { providerStatus } from '../../../lib/payments';
 
 const db = Astro.locals.db;
 const [{ data: settings }, { data: pages }, { data: templates }, { data: redirects }, { data: notFound }] = await Promise.all([
@@ -15,5 +16,5 @@ const byKey = Object.fromEntries((settings ?? []).map((s) => [s.key, s.value]));
 ---
 <Admin title="Settings">
   <h1 class="mb-6 text-3xl font-normal">Settings</h1>
-  <SiteSettings client:load site={byKey.site ?? {}} options={byKey.options ?? {}} pages={pages ?? []} templates={(templates ?? []).map((t) => ({ slug: t.slug, title: t.title, content: hasContentBlock((t.content as any)?.content) }))} redirects={redirects ?? []} notFound={notFound ?? []} />
+  <SiteSettings client:load site={byKey.site ?? {}} options={byKey.options ?? {}} pages={pages ?? []} templates={(templates ?? []).map((t) => ({ slug: t.slug, title: t.title, content: hasContentBlock((t.content as any)?.content) }))} redirects={redirects ?? []} notFound={notFound ?? []} ticketProviders={providerStatus()} />
 </Admin>

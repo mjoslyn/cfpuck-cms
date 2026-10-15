@@ -1,0 +1,342 @@
+---
+// An event's attendee list: its orders (paid by default) with check-in at the door, the buyer's
+// details and answers, resend, cancel and refund; what's sold of each ticket type; and the waitlist,
+// with Notify. A recurring event's dates each have their own list. Actions: /api/admin/tickets.
+import Admin from '../../../layouts/Admin.astro';
+import { SITE_TZ } from '../../../lib/site';
+import { allRows } from '../../../lib/rows';
+import { defaultHorizon, expandEntry, recurrenceOf } from '../../../lib/recurrence';
+import { money, ticketSettings, ticketsOf } from '../../../lib/tickets/config';
+import { addressText, type OrderRow, type WaitlistRow } from '../../../lib/tickets/orders';
+import type { Entry } from '../../../lib/types';
+import TicketEmails from '../../../admin/TicketEmails';
+import { ticketEmailFrom, type EmailKind, type EventEmail } from '../../../lib/tickets/config';
+
+const db = Astro.locals.db;
+const isAdmin = Astro.locals.user?.role === 'admin';
+const id = Number(Astro.params.id) || 0;
+const { data: event } = await db.from('entries').select('id, type, title, slug, status, fields, event_start').eq('id', id).eq('type', 'event').maybeSingle<Entry>();
+if (!event) return Astro.redirect('/admin/tickets/');
+const t = ticketsOf(event.fields);
+const { data: settings } = await db.from('settings').select('value').eq('key', 'site').maybeSingle();
+const currency = ticketSettings(settings?.value).currency ?? 'usd';
+const params = Astro.url.searchParams;
+const view = params.get('view') === 'waitlist' ? 'waitlist' : params.get('view') === 'emails' ? 'emails' : 'attendees';
+const status = params.get('status') ?? 'paid';
+const search = (params.get('q') ?? '').trim().toLowerCase();
+
+// A recurring event's dates: those with orders or a waitlist, and the next ones to come.
+const recurring = !!recurrenceOf(event);
+const today = new Date().toLocaleDateString('en-CA', { timeZone: SITE_TZ });
+let dates: string[] = [];
+if (recurring) {
+  const { data: used } = await allRows(db.from('ticket_orders').select('occurrence').eq('entry_id', id).order('id'));
+  const { data: listed } = await allRows(db.from('ticket_waitlist').select('occurrence').eq('entry_id', id).order('id'));
+  const upcoming = expandEntry(event, defaultHorizon()).map((o) => o.occurrence ?? '').filter((d) => d >= today).slice(0, 24);
+  dates = [...new Set([...(used ?? []), ...(listed ?? [])].map((r) => r.occurrence).concat(upcoming))].filter(Boolean).sort();
+}
+const date = recurring ? params.get('date') || dates.find((d) => d >= today) || dates[dates.length - 1] || '' : '';
+
+const { data: all } = await allRows<OrderRow>(db.from('ticket_orders').select('*').eq('entry_id', id).eq('occurrence', date).order('created_at', { ascending: false }).order('id'));
+const orders = (all ?? []).filter((o) => (status === 'all' ? true : status === 'closed' ? ['cancelled', 'expired'].includes(o.status) : o.status === status)).filter((o) => !search || `${o.code} ${o.name} ${o.email} ${o.phone}`.toLowerCase().includes(search));
+const paid = (all ?? []).filter((o) => o.status === 'paid');
+const sold = new Map<string, number>();
+for (const o of paid) for (const i of o.items) sold.set(i.type, (sold.get(i.type) ?? 0) + i.quantity);
+const tickets = paid.reduce((n, o) => n + o.quantity, 0);
+const checkedIn = paid.filter((o) => o.checked_in_at).reduce((n, o) => n + o.quantity, 0);
+const takings = (all ?? []).filter((o) => o.status === 'paid' || o.status === 'refunded').reduce((n, o) => n + o.amount - o.refunded_amount, 0);
+const counts: Record<string, number> = { paid: paid.length, pending: 0, closed: 0, refunded: 0, all: all?.length ?? 0 };
+for (const o of all ?? []) {
+  if (o.status === 'pending') counts.pending++;
+  if (o.status === 'cancelled' || o.status === 'expired') counts.closed++;
+  if (o.status === 'refunded') counts.refunded++;
+}
+const { data: waitlist } = await allRows<WaitlistRow>(db.from('ticket_waitlist').select('*').eq('entry_id', id).eq('occurrence', date).in('status', ['waiting', 'notified', 'bought']).order('id'));
+
+// The event's own emails, for the Emails tab.
+const { data: ownRows } = await db.from('ticket_emails').select('kind, subject, design, text, off').eq('entry_id', id);
+const ownEmails = Object.fromEntries((ownRows ?? []).map((r) => [r.kind, { ...ticketEmailFrom(r), off: r.off || undefined }])) as Partial<Record<EmailKind, EventEmail>>;
+
+const labels = new Map((t.questions ?? []).map((q) => [q.id, q.label]));
+const when = (s: string | null) => (s ? new Date(s).toLocaleString('en-US', { timeZone: SITE_TZ, dateStyle: 'medium', timeStyle: 'short' }) : '');
+const dayLabel = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+const link = (patch: Record<string, string>) => {
+  const p = new URLSearchParams({ ...(date ? { date } : {}), ...(view === 'waitlist' ? { view } : {}), ...(status !== 'paid' ? { status } : {}), ...(search ? { q: search } : {}), ...patch });
+  for (const [k, v] of [...p]) if (!v) p.delete(k);
+  return `/admin/tickets/${id}/${p.toString() ? `?${p}` : ''}`;
+};
+const STATUS: Record<string, [string, string]> = {
+  paid: ['Paid', 'bg-[#ecfdf5] text-[#047857]'],
+  pending: ['Awaiting payment', 'bg-[#fffbeb] text-[#b45309]'],
+  cancelled: ['Cancelled', 'bg-[#f1f5f9] text-admin-muted'],
+  expired: ['Expired', 'bg-[#f1f5f9] text-admin-muted'],
+  refunded: ['Refunded', 'bg-[#eff6ff] text-[#1d4ed8]'],
+};
+const tabs: [string, string][] = [['paid', 'Attendees'], ['pending', 'Awaiting payment'], ['closed', 'Cancelled and expired'], ['refunded', 'Refunded'], ['all', 'All orders']];
+const csv = `/api/admin/tickets/attendees.csv?event=${id}${recurring ? `&date=${date}` : ''}&status=${status === 'closed' ? 'all' : status}`;
+---
+<Admin title={`Tickets: ${event.title}`}>
+  <p class="text-sm print:hidden"><a href="/admin/tickets/" class="text-admin-muted hover:text-admin-accent">← Tickets</a></p>
+  <div class="mt-2 flex flex-wrap items-end justify-between gap-4">
+    <div>
+      <h1 class="text-3xl font-normal">{event.title}</h1>
+      <p class="mt-1 text-sm text-admin-muted">
+        {recurring && date ? dayLabel(date) : event.event_start ? when(event.event_start) : ''}
+        {!t.enabled && <span class="ml-2 rounded bg-[#fffbeb] px-2 py-0.5 text-xs text-[#b45309]">Ticket sales are off</span>}
+      </p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2 print:hidden">
+      {recurring && (
+        <select id="date-filter" class="rounded border border-admin-ink/15 bg-white px-2 py-1.5 text-sm" aria-label="Date">
+          {dates.map((d) => <option value={d} selected={d === date}>{dayLabel(d)}</option>)}
+        </select>
+      )}
+      <a href={csv} class="rounded border border-admin-ink/15 bg-white px-3 py-1.5 text-sm hover:border-admin-accent hover:text-admin-accent">Export CSV</a>
+      <button type="button" onclick="print()" class="rounded border border-admin-ink/15 bg-white px-3 py-1.5 text-sm hover:border-admin-accent hover:text-admin-accent">Print</button>
+      <a href={`/admin/edit/${id}/`} class="rounded border border-admin-ink/15 bg-white px-3 py-1.5 text-sm hover:border-admin-accent hover:text-admin-accent">Edit event</a>
+    </div>
+  </div>
+
+  <dl class="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <div class="rounded bg-white p-4 shadow-[0_0_0_1px_rgba(26,26,46,0.08)]"><dt class="text-xs text-admin-muted">Tickets sold</dt><dd class="mt-1 text-2xl">{tickets}{t.capacity ? <span class="text-sm text-admin-muted"> of {t.capacity}</span> : ''}</dd></div>
+    <div class="rounded bg-white p-4 shadow-[0_0_0_1px_rgba(26,26,46,0.08)]"><dt class="text-xs text-admin-muted">Checked in</dt><dd class="mt-1 text-2xl" id="checked-in" data-total={tickets}>{checkedIn}</dd></div>
+    <div class="rounded bg-white p-4 shadow-[0_0_0_1px_rgba(26,26,46,0.08)]"><dt class="text-xs text-admin-muted">Takings (after refunds)</dt><dd class="mt-1 text-2xl">{money(takings, currency, '0')}</dd></div>
+    <div class="rounded bg-white p-4 shadow-[0_0_0_1px_rgba(26,26,46,0.08)]"><dt class="text-xs text-admin-muted">Waitlist</dt><dd class="mt-1 text-2xl">{t.waitlist === 'off' ? 'Off' : (waitlist ?? []).filter((w) => w.status === 'waiting').length}</dd></div>
+  </dl>
+  {t.types.length > 0 && (
+    <p class="mt-3 text-sm text-admin-muted">
+      {t.types.map((x) => `${x.name}: ${sold.get(x.id) ?? 0}${x.capacity ? ` of ${x.capacity}` : ''}`).join(' · ')}
+    </p>
+  )}
+
+  <nav class="mt-6 flex flex-wrap gap-1 border-b border-admin-ink/10 text-sm print:hidden" aria-label="Lists">
+    <a href={link({ view: '', status: '' })} aria-current={view === 'attendees' ? 'page' : undefined} class:list={['-mb-px border-b-2 px-3 py-2', view === 'attendees' ? 'border-admin-accent text-admin-ink' : 'border-transparent text-admin-muted hover:text-admin-ink']}>Orders</a>
+    <a href={link({ view: 'emails', status: '' })} aria-current={view === 'emails' ? 'page' : undefined} class:list={['-mb-px border-b-2 px-3 py-2', view === 'emails' ? 'border-admin-accent text-admin-ink' : 'border-transparent text-admin-muted hover:text-admin-ink']}>Emails{ownRows?.length ? ` (${ownRows.length} own)` : ''}</a>
+    {t.waitlist !== 'off' || waitlist?.length ? (
+      <a href={link({ view: 'waitlist', status: '' })} aria-current={view === 'waitlist' ? 'page' : undefined} class:list={['-mb-px border-b-2 px-3 py-2', view === 'waitlist' ? 'border-admin-accent text-admin-ink' : 'border-transparent text-admin-muted hover:text-admin-ink']}>Waitlist ({(waitlist ?? []).length})</a>
+    ) : null}
+  </nav>
+
+  {view === 'attendees' && (
+    <>
+      <div class="mt-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
+        <div class="flex flex-wrap gap-1 text-xs">
+          {tabs.map(([k, label]) => (
+            <a href={link({ status: k === 'paid' ? '' : k })} class:list={['rounded-full px-3 py-1', status === k ? 'bg-admin-ink text-white' : 'bg-white text-admin-muted shadow-[0_0_0_1px_rgba(26,26,46,0.12)] hover:text-admin-ink']}>{label} ({counts[k]})</a>
+          ))}
+        </div>
+        <form method="get" class="flex gap-2">
+          {date && <input type="hidden" name="date" value={date} />}
+          {status !== 'paid' && <input type="hidden" name="status" value={status} />}
+          <input type="search" name="q" value={search} placeholder="Name, email or code" aria-label="Search orders" class="w-56 rounded border border-admin-ink/15 bg-white px-2 py-1.5 text-sm" />
+        </form>
+      </div>
+      <div class="mt-3 overflow-x-auto rounded bg-white shadow-[0_0_0_1px_rgba(26,26,46,0.08)]">
+        <table class="w-full text-sm">
+          <thead class="border-b border-admin-ink/10 text-left text-xs text-admin-muted">
+            <tr>
+              <th class="w-20 px-4 py-2 font-medium">In</th>
+              <th class="px-4 py-2 font-medium">Name</th>
+              <th class="px-4 py-2 font-medium">Code</th>
+              <th class="px-4 py-2 font-medium">Tickets</th>
+              <th class="px-4 py-2 font-medium">Total</th>
+              <th class="px-4 py-2 font-medium">Status</th>
+              <th class="px-4 py-2 print:hidden"><span class="sr-only">Details</span></th>
+            </tr>
+          </thead>
+          {orders.map((o) => {
+            const left = o.amount - o.refunded_amount;
+            return (
+              <tbody class="border-b border-admin-ink/5 last:border-0" data-order={o.id}>
+                <tr class="hover:bg-admin-bg">
+                  <td class="px-4 py-3">
+                    {o.status === 'paid' ? <input type="checkbox" class="h-4 w-4" data-checkin={o.id} data-quantity={o.quantity} checked={!!o.checked_in_at} aria-label={`${o.name} checked in`} /> : null}
+                  </td>
+                  <td class="px-4 py-3">
+                    <div class="font-medium">{o.name}</div>
+                    <div class="text-xs text-admin-muted">{o.email}{o.phone ? ` · ${o.phone}` : ''}</div>
+                  </td>
+                  <td class="px-4 py-3 font-mono text-xs">{o.code}</td>
+                  <td class="px-4 py-3">{o.items.map((i) => `${i.quantity} × ${i.name}`).join(', ')}</td>
+                  <td class="px-4 py-3 whitespace-nowrap">
+                    {money(o.amount, o.currency)}
+                    {o.refunded_amount > 0 && <div class="text-xs text-admin-muted">{money(o.refunded_amount, o.currency)} refunded</div>}
+                  </td>
+                  <td class="px-4 py-3"><span class:list={['rounded px-2 py-0.5 text-xs whitespace-nowrap', STATUS[o.status]?.[1]]}>{STATUS[o.status]?.[0] ?? o.status}</span></td>
+                  <td class="px-4 py-3 text-right print:hidden">
+                    <button type="button" class="text-xs text-admin-muted hover:text-admin-accent" data-more={o.id} aria-expanded="false" aria-controls={`order-${o.id}`}>Details</button>
+                  </td>
+                </tr>
+                <tr id={`order-${o.id}`} hidden class="bg-admin-bg/60 print:hidden">
+                  <td></td>
+                  <td colspan="6" class="px-4 pt-1 pb-4">
+                    <dl class="grid grid-cols-[10rem_1fr] gap-x-4 gap-y-1 text-sm">
+                      {o.address && (<><dt class="text-admin-muted">Address</dt><dd>{addressText(o.address)}</dd></>)}
+                      {Object.entries(o.answers ?? {}).map(([k, v]) => (<><dt class="text-admin-muted">{labels.get(k) ?? k}</dt><dd class="whitespace-pre-wrap">{v}</dd></>))}
+                      <dt class="text-admin-muted">Ordered</dt><dd>{when(o.created_at)}</dd>
+                      {o.paid_at && (<><dt class="text-admin-muted">Paid</dt><dd>{when(o.paid_at)}{o.provider !== 'free' ? ` with ${o.provider === 'stripe' ? 'Stripe' : 'Square'}` : ' (free)'}</dd></>)}
+                      {o.provider_payment && (<><dt class="text-admin-muted">Payment</dt><dd class="font-mono text-xs">{o.provider_payment}</dd></>)}
+                      {o.checked_in_at && (<><dt class="text-admin-muted">Checked in</dt><dd>{when(o.checked_in_at)}</dd></>)}
+                      <dt class="text-admin-muted">Emails</dt>
+                      <dd>{[o.emailed_at && `confirmation ${when(o.emailed_at)}`, o.reminded_at && `reminder ${when(o.reminded_at)}`, o.followed_up_at && `follow-up ${when(o.followed_up_at)}`].filter(Boolean).join(' · ') || 'none yet'}</dd>
+                    </dl>
+                    <div class="mt-3 flex flex-wrap items-center gap-3">
+                      <a href={`mailto:${o.email}`} class="text-xs text-admin-muted hover:text-admin-accent">Email {o.name.split(/\s+/)[0]}</a>
+                      {o.status === 'paid' && <button type="button" data-action="resend" data-id={o.id} class="text-xs text-admin-muted hover:text-admin-accent">Resend confirmation</button>}
+                      {(['pending', 'expired'].includes(o.status) || (o.status === 'paid' && left <= 0)) && (
+                        <button type="button" data-action="cancel" data-id={o.id} data-confirm={o.status === 'paid' ? `Cancel ${o.name}'s order? Its tickets go back on sale.` : `Cancel this unpaid order? Its checkout closes and its tickets go back on sale.`} class="text-xs text-[#b91c1c] hover:underline">Cancel order</button>
+                      )}
+                      {o.status === 'paid' && left > 0 && isAdmin && (
+                        <form class="flex items-center gap-2" data-refund={o.id} data-left={left} data-currency={o.currency} data-name={o.name}>
+                          <label class="text-xs text-admin-muted" for={`refund-${o.id}`}>Refund</label>
+                          <input id={`refund-${o.id}`} name="amount" inputmode="decimal" value={(left / 100).toFixed(2)} class="w-24 rounded border border-admin-ink/15 bg-white px-2 py-1 text-xs" />
+                          <button class="rounded border border-[#b91c1c]/40 px-2 py-1 text-xs text-[#b91c1c] hover:bg-[#b91c1c] hover:text-white">Refund</button>
+                          <span class="text-xs text-admin-muted">All of it refunds the order and puts its tickets back on sale.</span>
+                        </form>
+                      )}
+                      {o.status === 'paid' && left > 0 && !isAdmin && <span class="text-xs text-admin-muted">Refunds are made by admins.</span>}
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            );
+          })}
+          {!orders.length && (
+            <tbody><tr><td colspan="7" class="px-4 py-10 text-center text-admin-muted">{search ? 'No orders match.' : 'No orders here yet.'}</td></tr></tbody>
+          )}
+        </table>
+      </div>
+    </>
+  )}
+
+  {view === 'waitlist' && (
+    <>
+      <div class="mt-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
+        <p class="text-sm text-admin-muted">
+          {t.waitlist === 'auto' ? 'People are emailed in order as tickets free up.' : 'Tick people and Notify them when tickets free up.'} Notified people are told tickets are available; whoever buys first gets them.
+        </p>
+        <div class="flex gap-2">
+          <button type="button" id="notify-selected" class="rounded border border-admin-ink/15 bg-white px-3 py-1.5 text-sm hover:border-admin-accent hover:text-admin-accent">Notify selected</button>
+          <button type="button" id="notify-next" class="rounded bg-admin-accent px-3 py-1.5 text-sm text-white hover:bg-admin-accent-dark">Notify as many as tickets allow</button>
+        </div>
+      </div>
+      <div class="mt-3 overflow-x-auto rounded bg-white shadow-[0_0_0_1px_rgba(26,26,46,0.08)]">
+        <table class="w-full text-sm">
+          <thead class="border-b border-admin-ink/10 text-left text-xs text-admin-muted">
+            <tr>
+              <th class="w-10 px-4 py-2"><span class="sr-only">Select</span></th>
+              <th class="px-4 py-2 font-medium">#</th>
+              <th class="px-4 py-2 font-medium">Name</th>
+              <th class="px-4 py-2 font-medium">Wants</th>
+              <th class="px-4 py-2 font-medium">Joined</th>
+              <th class="px-4 py-2 font-medium">Status</th>
+              <th class="px-4 py-2"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {(waitlist ?? []).map((w, i) => (
+              <tr class="border-b border-admin-ink/5 last:border-0 hover:bg-admin-bg" data-waitlist={w.id}>
+                <td class="px-4 py-3">{w.status !== 'bought' && <input type="checkbox" class="h-4 w-4" data-pick={w.id} aria-label={`Select ${w.name}`} />}</td>
+                <td class="px-4 py-3 text-admin-muted">{i + 1}</td>
+                <td class="px-4 py-3">
+                  <div class="font-medium">{w.name}</div>
+                  <div class="text-xs text-admin-muted">{w.email}{w.phone ? ` · ${w.phone}` : ''}</div>
+                </td>
+                <td class="px-4 py-3">{w.quantity}</td>
+                <td class="px-4 py-3 text-admin-muted">{when(w.created_at)}</td>
+                <td class="px-4 py-3 text-xs">{w.status === 'waiting' ? 'Waiting' : w.status === 'notified' ? `Notified ${when(w.notified_at)}` : 'Bought tickets'}</td>
+                <td class="px-4 py-3 text-right">{w.status !== 'bought' && <button type="button" data-action="waitlist-remove" data-id={w.id} data-confirm={`Take ${w.name} off the waitlist?`} class="text-xs text-[#b91c1c] hover:underline">Remove</button>}</td>
+              </tr>
+            ))}
+            {!waitlist?.length && <tr><td colspan="7" class="px-4 py-10 text-center text-admin-muted">Nobody is on the waitlist.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </>
+  )}
+  {view === 'emails' && (
+    <div class="mt-4">
+      <TicketEmails client:load eventId={id} eventTitle={event.title} own={ownEmails} site={ticketSettings(settings?.value).emails} />
+    </div>
+  )}
+  <p id="ticket-status" role="status" class="mt-3 text-sm text-admin-muted"></p>
+</Admin>
+
+<script define:vars={{ eventId: id, date }}>
+  const status = document.getElementById('ticket-status');
+  const post = async (body) => {
+    status.textContent = 'Working…';
+    const res = await fetch('/api/admin/tickets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (!res.ok) {
+      status.textContent = '';
+      alert(await res.text());
+      return null;
+    }
+    status.textContent = '';
+    return res.json();
+  };
+  const money = (cents, currency) => new Intl.NumberFormat('en-US', { style: 'currency', currency: currency.toUpperCase() }).format(cents / 100);
+
+  document.getElementById('date-filter')?.addEventListener('change', (e) => {
+    const p = new URLSearchParams(location.search);
+    p.set('date', e.target.value);
+    location.search = p.toString();
+  });
+
+  for (const b of document.querySelectorAll('[data-more]')) {
+    b.addEventListener('click', () => {
+      const row = document.getElementById(`order-${b.dataset.more}`);
+      row.hidden = !row.hidden;
+      b.setAttribute('aria-expanded', String(!row.hidden));
+    });
+  }
+
+  // Check-in: saved as it's ticked; the count above follows.
+  const counter = document.getElementById('checked-in');
+  for (const box of document.querySelectorAll('[data-checkin]')) {
+    box.addEventListener('change', async () => {
+      const ok = await post({ action: 'check-in', id: Number(box.dataset.checkin), on: box.checked });
+      if (!ok) box.checked = !box.checked;
+      else if (counter) counter.textContent = String(Number(counter.textContent) + (box.checked ? 1 : -1) * Number(box.dataset.quantity));
+    });
+  }
+
+  for (const b of document.querySelectorAll('[data-action]')) {
+    b.addEventListener('click', async () => {
+      if (b.dataset.confirm && !confirm(b.dataset.confirm)) return;
+      const r = await post({ action: b.dataset.action, id: Number(b.dataset.id) });
+      if (r && b.dataset.action === 'resend') status.textContent = 'Confirmation sent.';
+      else if (r) location.reload();
+    });
+  }
+
+  for (const form of document.querySelectorAll('[data-refund]')) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const m = form.amount.value.trim().replace(/[$,\s]/g, '').match(/^(\d*)(?:\.(\d{0,2}))?$/);
+      const cents = m && (m[1] || m[2]) ? Number(m[1] || 0) * 100 + Number((m[2] ?? '').padEnd(2, '0')) : 0;
+      const left = Number(form.dataset.left);
+      if (!cents || cents > left) return alert(`Refund between ${money(1, form.dataset.currency)} and ${money(left, form.dataset.currency)}.`);
+      const full = cents === left;
+      if (!confirm(`Refund ${money(cents, form.dataset.currency)} to ${form.dataset.name}?${full ? ' This refunds the whole order and puts its tickets back on sale.' : ''} The money goes back to their card; this can't be undone.`)) return;
+      const r = await post({ action: 'refund', id: Number(form.dataset.refund), amount: cents });
+      if (r) location.reload();
+    });
+  }
+
+  const notify = async (ids) => {
+    const r = await post({ action: 'notify', event: eventId, date, ids });
+    if (r) {
+      alert(r.sent ? `Emailed ${r.sent} ${r.sent === 1 ? 'person' : 'people'}.` : 'Nobody was emailed: no one waiting fits the tickets free now.');
+      location.reload();
+    }
+  };
+  document.getElementById('notify-selected')?.addEventListener('click', () => {
+    const ids = [...document.querySelectorAll('[data-pick]:checked')].map((b) => Number(b.dataset.pick));
+    if (!ids.length) return alert('Tick the people to notify.');
+    if (confirm(`Email ${ids.length} ${ids.length === 1 ? 'person' : 'people'} that tickets are available?`)) notify(ids);
+  });
+  document.getElementById('notify-next')?.addEventListener('click', () => {
+    if (confirm('Email the people waiting, in order, as far as the tickets on sale now go?')) notify(undefined);
+  });
+</script>

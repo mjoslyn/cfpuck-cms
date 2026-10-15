@@ -47,8 +47,10 @@ export const GET: APIRoute = async ({ url, request, cache }) => {
     return new Response(html, { status, headers: { 'Content-Type': 'text/html; charset=UTF-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' } });
   }
   const { status, html, location } = await renderRequest(url, supabase);
+  // A buyer's own order (?order=<token>) and a checkout's outcome (?tickets=) are never cached.
+  const personal = url.searchParams.has('order') || url.searchParams.has('tickets');
   // Cached at the CDN and cleared after edits (src/lib/cache.ts).
-  if (cache.enabled) cache.set(location ? { ...PAGE_CACHE, swr: undefined } : PAGE_CACHE);
+  if (cache.enabled && !personal) cache.set(location ? { ...PAGE_CACHE, swr: undefined } : PAGE_CACHE);
   if (location) {
     return new Response(null, { status, headers: { Location: new URL(location, url).toString(), 'Cache-Control': BROWSER_CACHE_CONTROL } });
   }
@@ -58,7 +60,8 @@ export const GET: APIRoute = async ({ url, request, cache }) => {
     status,
     headers: {
       'Content-Type': 'text/html; charset=UTF-8',
-      'Cache-Control': BROWSER_CACHE_CONTROL,
+      'Cache-Control': personal ? 'private, no-store' : BROWSER_CACHE_CONTROL,
+      ...(personal ? { 'X-Robots-Tag': 'noindex' } : {}),
     },
   });
 };

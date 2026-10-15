@@ -375,7 +375,7 @@ Text materials count toward the budget of what is sent in full (`MATERIAL_BUDGET
   in Netlify's durable cache (shared by its edge servers), tagged `pages`. A successful admin write
   (POST, PUT, PATCH or DELETE under `/api/admin/`) clears that tag from the middleware
   (`cache.invalidate`; a 2xx answer, or the 303 a form post such as a bulk action answers with), so edits show at once; previews, Claude drafting, accessibility marks,
-  submissions, users and sync requests other than a sync into this copy or a restore don't
+  submissions, users, the attendee list and sync requests other than a sync into this copy or a restore don't
   (`changesPages`). A failed purge is logged and the edit shows within the minute. Under `astro dev`
   nothing is cached. The first cover or hero image on a page loads at high priority (`optimizeImages`).
   Signed-in editors get an editor bar
@@ -426,6 +426,9 @@ body, a preheader, columns stacking on phones; text kept to paragraphs, emphasis
 canvas included. Its Plain text tab (`Notification.text`, merge tags allowed) is the text part; empty,
 the text is made from the HTML. Its Preview tab renders the email as sent (`renderNotification`, the
 code that sends it) for a stored submission or sample answers (`/api/admin/forms/<id>/notification-preview`).
+The builder itself knows nothing of forms: its caller passes a kit (`EmailKit`: the data block's
+options, merge tags, canvas stand-ins, preview); a notification's is `formEmailKit`
+(`src/forms/form-email.ts`), ticket emails have their own.
 Notifications from before the builder send their message as before until opened there. Mail goes out over SMTP
 (`SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_PASS`/`SMTP_SECURE`, or one `SMTP_URL`; sender `MAIL_FROM`,
 default `mailFrom` in the site config).
@@ -437,20 +440,36 @@ a choice of priced options (`choices[].price`, dropdown or radio) or an amount t
 items and a total (`src/lib/forms/payment.ts`; a product hidden by conditional logic isn't charged);
 the form shows the total above the button, kept live by `forms.js`, while the server's total is what is
 charged. A submission with a total is stored as pending (`form_submissions.payment`, `SubmissionPayment`)
-and the visitor goes to the provider's hosted checkout (`src/lib/forms/checkout.ts`,
-`src/lib/payments/`: Stripe Checkout Sessions, Square payment links, over their REST APIs). They come
+and the visitor goes to the provider's hosted checkout (`src/lib/forms/checkout.ts`, through the shared
+payments code; see Payments below). They come
 back to the form's page with `?form_payment=<submission id>.<token>` (uncached): once paid, the form's
-confirmation; otherwise the form again with their answers and a note. Webhooks
-(`/api/payments/stripe`, `/api/payments/square`, signature checked) catch visitors who don't come back.
+confirmation; otherwise the form again with their answers and a note. The webhooks (`formsWebhook`)
+catch visitors who don't come back.
 Neither the return nor a webhook is trusted as to the outcome: the site asks the provider where the
 checkout stands, and the update that marks a submission paid is the one that sends its notifications,
 so they go once, after payment (`{payment_total}`, `{payment_id}`, `{payment_summary}` merge tags and
-the email builder's Payment block; `{all_fields}` adds the total). A total of zero is sent at once without checkout; under 50 cents is refused. Keys are
-environment variables, never settings (settings sync between copies): `STRIPE_SECRET_KEY`,
-`STRIPE_WEBHOOK_SECRET`, `SQUARE_ACCESS_TOKEN`, `SQUARE_LOCATION_ID`, `SQUARE_ENVIRONMENT`,
-`SQUARE_WEBHOOK_SIGNATURE_KEY`, `SQUARE_WEBHOOK_URL`; the builder shows which are set
-(`/api/admin/forms/payments`) and test or sandbox mode. Submissions show each payment's status, items
-and payment id; the CSV export adds payment columns.
+the email builder's Payment block; `{all_fields}` adds the total). A total of zero is sent at once
+without checkout; under 50 cents is refused. The builder shows which providers are set up
+(`/api/admin/forms/payments`). Submissions show each payment's status, items and payment id; the CSV
+export adds payment columns.
+
+### Payments
+
+Forms and tickets take payments through the same code, `src/lib/payments/`: `stripe.ts` (Checkout
+Sessions) and `square.ts` (payment links, an order each), over their REST APIs with no SDK, behind one
+`Provider` interface (`create` a hosted checkout, `check` where it stands, `close` an unpaid one,
+`refund`, `refunded`, `webhookEvent` with the signature checked), `providerStatus()` for the admin
+screens (configured, test or sandbox keys, the variables still missing) and `money.ts` (`CURRENCIES`,
+`formatMoney`, `toMinor`, `MIN_CHARGE`; safe in the browser). A checkout's `ref` is the Stripe session
+or Square payment link, `order` Square's order (which its payment is on). One webhook per provider
+serves both features, `/api/payments/stripe` and `/api/payments/square`
+(`src/pages/api/payments/[provider].ts`): it checks the signature and hands the event to
+`formsWebhook` and `ticketsWebhook`, each ignoring checkouts that aren't its own. Keys are environment
+variables, never settings (settings sync between copies): `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
+`SQUARE_ACCESS_TOKEN`, `SQUARE_LOCATION_ID`, `SQUARE_ENVIRONMENT`, `SQUARE_WEBHOOK_SIGNATURE_KEY`,
+`SQUARE_WEBHOOK_URL` (`.env.example`). The email builder's **Payment** block (`paymentTable` in
+`src/lib/forms/email.ts`, offered by a kit's `payment`) shows a payment's items, total, status,
+provider, payment id and date in form notifications and ticket emails alike, as does `{payment_summary}`.
 
 ## Events
 
@@ -476,6 +495,52 @@ the event sidebar. Occurrences are virtual entries (negative ids, own `event_sta
 only when a recurring event exists (for an upcoming list, only series and events still to start are
 loaded). A series is expanded to the horizon (two years ahead); of a long
 one the newest 1,100 occurrences are kept. Saving an event rewrites the `start`/`end` fields the views read.
+
+## Tickets
+
+An event sells tickets or takes free registrations when Tickets is on in its settings
+(`fields.tickets`, `src/puck/TicketsForm.tsx`; read with `ticketsOf`, `src/lib/tickets/config.ts`):
+ticket types (name, description, price in cents, capacity, most per order, sales window as local times
+in the event's timezone, hidden for past ones), the event's capacity (per date for a recurring event),
+most per order, phone (off, optional, required), address (off, for paid orders, always), the event's own
+questions (asked once per order) and a waitlist (`off`, `auto`, `manual`). Settings > Tickets
+(`settings.site.tickets`, `ticketSettings`, `src/admin/TicketSettings.tsx`): the payment provider (Stripe
+or Square; keys in the environment, `providerStatus`), currency, how long an unpaid order holds its
+tickets (30-120 minutes), and the emails with the reminder's and follow-up's timing.
+
+- Rendering: `src/render/c/tickets.ts`. The Event details block shows the form below the content and a
+  Tickets box in its sidebar, unless the page has a `tickets` block (offered on events and in templates).
+  `prepareTickets` loads what's taken (`ticket_sold`) and, with `?order=<token>`, the buyer's order
+  (`ticket_order_status`; both functions anon may call). `?tickets=<reason>` shows a checkout's outcome.
+  Pages with either are never cached. `public/assets/js/tickets.js` adds the total, the address only
+  for paid orders, and what's left now (`GET /api/tickets/availability`).
+- Orders (`ticket_orders`, editors read, the site writes with the service key; `src/lib/tickets/orders.ts`):
+  `POST /api/tickets/checkout` checks the order and holds its tickets in `ticket_order_create`, which takes
+  an advisory lock per event and date and counts paid orders and unexpired holds against the capacities.
+  A free order is paid at once; a paid one goes to Stripe Checkout or a Square payment link (the shared
+  payments code, see Forms > Payments). `/api/tickets/return` checks the payment with the provider and
+  shows the order; the webhooks (`ticketsWebhook`) confirm payments, expiries and refunds. `markPaid` is idempotent and sends the confirmation
+  once. An expired hold that is paid anyway (a Square link used late) is still marked paid.
+- Attendee list (`/admin/tickets/`, `/admin/tickets/<id>/[?date=]`; actions `POST /api/admin/tickets`,
+  `GET /api/admin/tickets/attendees.csv`): check-in, resend, cancel (unpaid, free or fully refunded),
+  refund (admins; part or all, at the provider; all of it frees the tickets), the waitlist with Notify.
+  Its writes don't clear the page cache.
+- Waitlist (`ticket_waitlist`, one place per email per event and date; `POST /api/tickets/waitlist`):
+  shown when every type on sale is sold out. `notifyWaitlist` emails people in order as far as the free
+  tickets go, counting those told in the last day as still deciding; `auto` runs it after a cancellation
+  or refund and hourly. Buying moves a person to `bought`.
+- Emails: confirmation, reminder (hours before), follow-up (hours after, for up to three days),
+  waitlist, and the admin's copy of each order (`notify`). Each is a subject, an email builder design
+  and an optional plain text (`TicketEmail`), with ticket merge tags (`MERGE_TAGS`) and an Order details
+  block (`ORDER_DETAILS`: the summary table, date, venue, code, tickets, total, answers, the buyer's
+  contact), and the Payment block (a paid order's payment; nothing for free orders). Sent: the event's own (table `ticket_emails`, its attendee list > Emails,
+  `src/admin/TicketEmails.tsx`; kept out of the event's fields so editor saves can't overwrite it), else
+  the site's, else `DEFAULT_EMAILS` (`emailToSend`). `src/lib/tickets/email.ts` renders them with the
+  forms' renderer (`renderEmail`); the builder's kit is `src/admin/ticket-email.ts`, its preview a sample
+  order rendered in the browser. `netlify/functions/ticket-emails.mts` runs
+  `sendDueTicketEmails` hourly (deployed site only): reminders, follow-ups, expired holds, auto waitlists.
+  Links use `SITE_URL`, else Netlify's `URL`.
+- Orders, waitlists and events' own emails aren't synced or backed up: they stay on the copy where they were made.
 
 ## Editor
 
@@ -550,8 +615,8 @@ request.
 `scripts/sync-e2e.ts` (a sync stopped by a row made since Compare; undoing a half-finished sync; needs
 a second local stack as `SYNC_REMOTE_*`) use the running site without a browser and remove what they make.
 `scripts/payments-e2e.ts [stripe|square]` builds a form with Product fields and a payment provider in the
-browser, submits it and reports whether it reached the provider's checkout (that needs the provider's
-test keys and network access to it).
+browser, submits it, pays on the provider's checkout with its test card and reports the confirmation and
+the stored payment (that needs the provider's test keys and network access to it).
 
 The e2e scripts (`scripts/*-e2e.ts`, `scripts/checks/compose.ts`) sign in as `LOCAL_ADMIN_EMAIL` /
 `LOCAL_ADMIN_PASSWORD` and were written against a site with content (pages, events, venues, members);

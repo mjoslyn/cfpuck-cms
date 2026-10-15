@@ -8,6 +8,7 @@ import { fieldsFor as siteFields, PAGELESS_TYPES, SITE_TZ, type FieldDef, taxono
 import { permalink } from '../lib/permalink';
 import { isPlaceholderSlug, slugify } from '../lib/slug';
 import { SeoForm } from './SeoForm';
+import { TicketsForm } from './TicketsForm';
 import { itemsText } from '../lib/seo';
 import { NO_CONTENT_WARNING, templateLabel, type TemplateInfo } from '../lib/templates';
 
@@ -395,6 +396,12 @@ export function EntryForm({ type, value, onChange, templates, pageItems }: { typ
         <details open className="mt-4 border-t border-admin-ink/10 pt-3">
           <summary className="mb-2 cursor-pointer text-xs font-semibold tracking-wider text-admin-muted uppercase">Details</summary>
           <FieldsForm defs={defs} value={value.fields} onChange={(fields) => set({ fields })} />
+        </details>
+      )}
+      {type === 'event' && (
+        <details open={!!value.fields?.tickets?.enabled} className="mt-4 border-t border-admin-ink/10 pt-3">
+          <summary className="mb-2 cursor-pointer text-xs font-semibold tracking-wider text-admin-muted uppercase">Tickets</summary>
+          <TicketsForm fields={value.fields} onChange={(fields) => set({ fields })} />
         </details>
       )}
       {!PAGELESS_TYPES.has(type) && (

@@ -6,15 +6,15 @@
 // exactly once (the update that flips it to paid is the one that sends).
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { FormResult, FormRow, SubmissionPayment, Values } from './types';
-import { MAX_CHARGE, MIN_CHARGE, currencyOf, totalOf, type LineItem } from './payment';
-import { formatMoney } from './logic';
-import { PROVIDERS } from '../payments';
-import { sameString } from '../payments/common';
+import { MAX_CHARGE, currencyOf, totalOf, type LineItem } from './payment';
+import { MIN_CHARGE, formatMoney } from '../payments/money';
+import { PROVIDERS, type PaymentProvider } from '../payments';
+import { env, sameString } from '../payments/common';
 import { confirmationResult, mergeTags, notify } from './submit';
 import { site } from '../site';
+import { serviceClient } from '../supabase';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const env = (k: string) => (import.meta.env?.[k] as string | undefined) ?? process.env[k];
 /** The query parameter a visitor comes back from checkout with. */
 export const RETURN_PARAM = 'form_payment';
 
@@ -69,7 +69,7 @@ export async function startCheckout(db: SupabaseClient, form: FormRow, data: Sto
       email: EMAIL.test(email) ? email : undefined,
       returnUrl: `${url.origin}${url.pathname}?${RETURN_PARAM}=${id}.${payment.token}`,
     });
-    await db.from('form_submissions').update({ payment: { ...payment, ref: checkout.ref } }).eq('id', id).throwOnError();
+    await db.from('form_submissions').update({ payment: { ...payment, ref: checkout.ref, ...(checkout.order ? { order: checkout.order } : {}) } }).eq('id', id).throwOnError();
     return { url: checkout.url };
   } catch (e) {
     console.error(`form ${form.id}: checkout for submission ${id} failed`, e);
@@ -92,7 +92,7 @@ interface Submission {
 export async function confirmPayment(db: SupabaseClient, sub: Submission): Promise<Submission> {
   const p = sub.payment;
   if (!p?.ref || p.status === 'paid' || p.status === 'failed') return sub;
-  const state = await PROVIDERS[p.provider].check(p.ref);
+  const state = await PROVIDERS[p.provider].check({ ref: p.ref, order: p.order });
   if (state.status === 'pending' || state.status === p.status) return sub;
   if (state.status === 'paid' && state.amount != null && state.amount !== p.amount) {
     // Never expected (the site sets the amount); recorded rather than trusted.
@@ -134,11 +134,31 @@ async function loadForm(db: SupabaseClient, id: number): Promise<FormRow | null>
   return (data as FormRow) ?? null;
 }
 
-/** The submission a provider's checkout id belongs to (webhooks). */
-export async function submissionByRef(db: SupabaseClient, ref: string): Promise<Submission | null> {
-  const { data, error } = await db.from('form_submissions').select('id, form_id, data, payment').eq('payment->>ref', ref).limit(1).maybeSingle();
+/** The submission a provider's checkout (`ref`) or Square order (`order`) belongs to. */
+async function submissionBy(db: SupabaseClient, key: 'ref' | 'order', value: unknown): Promise<Submission | null> {
+  if (!value) return null;
+  const { data, error } = await db.from('form_submissions').select('id, form_id, data, payment').eq(`payment->>${key}`, String(value)).limit(1).maybeSingle();
   if (error) throw error;
   return data?.payment ? (data as Submission) : null;
+}
+
+/**
+ * A provider's webhook (/api/payments/<provider>, signature checked there): it only says which checkout
+ * to look at, whose state is then asked of the provider. Checkouts that aren't a form's are ignored.
+ */
+export async function formsWebhook(provider: PaymentProvider, event: any) {
+  const type = String(event?.type ?? '');
+  const obj = event?.data?.object ?? {};
+  const db = serviceClient();
+  if (provider === 'stripe' && type.startsWith('checkout.session.') && obj.object === 'checkout.session') {
+    const sub = await submissionBy(db, 'ref', obj.id);
+    if (!sub) return;
+    if (type === 'checkout.session.async_payment_failed') await markPaymentFailed(db, sub);
+    else await confirmPayment(db, sub);
+  } else if (provider === 'square' && type.startsWith('payment.')) {
+    const sub = await submissionBy(db, 'order', obj.payment?.order_id);
+    if (sub) await confirmPayment(db, sub);
+  }
 }
 
 /**

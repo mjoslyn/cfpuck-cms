@@ -11,6 +11,7 @@ import { localToUtc } from '../../lib/recurrence';
 import { zoneLabel } from '../../lib/events/timezone';
 import { termPagesOn } from '../../lib/templates';
 import { taxonomiesOf } from '../../lib/site';
+import { ticketPriceSummary, ticketsSection } from '../c/tickets';
 
 /** The event type's taxonomies (its categories), from the site config. */
 const EVENT_TAXONOMIES = taxonomiesOf('event');
@@ -80,7 +81,10 @@ function details(env: Env, e: Entry): string {
         (map ? `<p class="c-event__map"><a href="${esc(map)}" target="_blank" rel="noopener">Get directions</a></p>` : ''),
     );
   }
-  if (cost) out += box('Cost', `<p>${esc(cost)}</p>`);
+  // Tickets sold here: their prices and a link to the form below the content.
+  const tickets = ticketPriceSummary(env);
+  if (tickets) out += box('Tickets', `<p>${esc(tickets)}</p><p class="c-event__map"><a href="#tickets">Get tickets</a></p>`);
+  else if (cost) out += box('Cost', `<p>${esc(cost)}</p>`);
   if (website) out += box('Website', `<p><a href="${esc(website)}" target="_blank" rel="noopener">${esc(String(website).replace(/^https?:\/\/(www\.)?|\/$/g, ''))}</a></p>`);
   if (cats.length) out += box('Category', `<p>${cats.map((t) => (termPagesOn(env.ctx.settings.site, t.taxonomy) ? `<a href="${termLink(t)}" rel="tag">${esc(t.name)}</a>` : esc(t.name))).join(', ')}</p>`);
   return out;
@@ -127,7 +131,7 @@ export const eventDetails: Renderer = (_b, env) => {
     `<h1 class="c-event__title">${title}</h1></div></header>` +
     `<div class="c-event__main">` +
     (past ? `<p class="c-event__passed">This event has passed. <a href="/events/">See upcoming events</a>.</p>` : '') +
-    `<div class="c-event__content">${content}</div><aside class="c-event__details">${details(env, e)}</aside></div>` +
+    `<div class="c-event__content">${content}${env.ctx.data.get('tickets-block') ? '' : ticketsSection(env)}</div><aside class="c-event__details">${details(env, e)}</aside></div>` +
     schedule(e) +
     `<nav class="c-event__back"><a href="/events/">← All events</a></nav>` +
     `</article>`

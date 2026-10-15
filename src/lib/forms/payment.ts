@@ -2,20 +2,9 @@
 // renderer (the total under the fields), the submit handler (the charge) and the builder. The browser
 // works the total out the same way for display (public/assets/js/forms.js); the server's is the charge.
 import type { Field, FormDef, ProductValue, Values } from './types';
-import { isFieldHidden, isProduct, toMinor } from './logic';
+import { isFieldHidden, isProduct } from './logic';
+import { toMinor } from '../payments/money';
 
-/** Currencies offered for payment (all with cents, which the amounts assume). */
-export const CURRENCIES: [string, string][] = [
-  ['USD', 'US dollar'],
-  ['CAD', 'Canadian dollar'],
-  ['EUR', 'Euro'],
-  ['GBP', 'British pound'],
-  ['AUD', 'Australian dollar'],
-  ['NZD', 'New Zealand dollar'],
-];
-
-/** Stripe's smallest charge (50 cents) is the floor for both providers; a total of 0 needs no checkout. */
-export const MIN_CHARGE = 50;
 /** No form takes more than this in one checkout. */
 export const MAX_CHARGE = 99_999_999;
 export const MAX_QUANTITY = 100;

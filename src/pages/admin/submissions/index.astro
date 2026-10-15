@@ -1,7 +1,8 @@
 ---
 import Admin from '../../../layouts/Admin.astro';
 import { SITE_TZ } from '../../../lib/site';
-import { INPUT_TYPES, PAYMENT_STATUS, displayValue, formatMoney } from '../../../lib/forms/logic';
+import { INPUT_TYPES, PAYMENT_STATUS, displayValue } from '../../../lib/forms/logic';
+import { formatMoney } from '../../../lib/payments/money';
 import { currencyOf } from '../../../lib/forms/payment';
 import type { FormDef, SubmissionPayment } from '../../../lib/forms/types';
 

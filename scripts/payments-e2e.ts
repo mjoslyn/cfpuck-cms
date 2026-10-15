@@ -107,8 +107,39 @@ try {
   out.atCheckout = !page.url().startsWith(origin);
   out.afterSubmitNotice = await page.locator('.c-form__errors').allTextContents();
   await page.screenshot({ path: shot('after-submit'), fullPage: true });
-  const { data: subs } = await sb.from('form_submissions').select('id, payment, data').eq('form_id', formId).order('id');
-  out.submissions = subs;
+
+  // At the provider's checkout: pay with a test card (Stripe's 4242 4242 4242 4242; Square's sandbox
+  // takes 4111 1111 1111 1111) and come back to the confirmation.
+  if (out.atCheckout && provider === 'stripe') {
+    // The card option's button sits under a cover that takes the pointer; a dispatched click opens it.
+    await page.locator('[data-testid="card-accordion-item-button"]').dispatchEvent('click', undefined, { timeout: 30_000 }).catch(() => {});
+    await page.locator('#cardNumber').waitFor({ timeout: 30_000 });
+    await page.fill('#cardNumber', '4242 4242 4242 4242');
+    await page.fill('#cardExpiry', '12 / 34');
+    await page.fill('#cardCvc', '123');
+    await page.fill('#billingName', 'Robin Tester');
+    if (await page.locator('#billingPostalCode').isVisible().catch(() => false)) await page.fill('#billingPostalCode', '14731');
+    if (await page.locator('#enableStripePass').isChecked().catch(() => false)) await page.locator('#enableStripePass').uncheck({ force: true });
+    await page.screenshot({ path: shot('checkout'), fullPage: true });
+    await Promise.all([page.waitForURL((u) => u.toString().startsWith(origin), { timeout: 90_000 }), page.locator('[data-testid="hosted-payment-submit-button"], .SubmitButton').first().click()]);
+  } else if (out.atCheckout && provider === 'square') {
+    const card = page.frameLocator('iframe[name^="sq-card"], iframe.sq-card-component').first();
+    await card.locator('input[name="cardNumber"]').fill('4111 1111 1111 1111', { timeout: 30_000 });
+    await card.locator('input[name="expirationDate"]').fill('12/34');
+    await card.locator('input[name="cvv"]').fill('111');
+    await card.locator('input[name="postalCode"]').fill('14731').catch(() => {});
+    await page.screenshot({ path: shot('checkout'), fullPage: true });
+    await Promise.all([page.waitForURL((u) => u.toString().startsWith(origin), { timeout: 90_000 }), page.locator('button[type=submit]').last().click()]);
+  }
+  if (out.atCheckout) {
+    await page.waitForLoadState('load');
+    out.returnedTo = page.url();
+    out.confirmation = await page.locator('.c-form__confirmation').textContent().catch(() => null);
+    out.returnNotice = await page.locator('.c-form__errors').allTextContents();
+    await page.screenshot({ path: shot('confirmation'), fullPage: true });
+  }
+  const { data: subs } = await sb.from('form_submissions').select('id, payment').eq('form_id', formId).order('id');
+  out.submissions = subs?.map((s) => ({ id: s.id, ...s.payment, token: undefined }));
 } catch (e) {
   errors.push(String(e));
   await page.screenshot({ path: shot('error') }).catch(() => {});

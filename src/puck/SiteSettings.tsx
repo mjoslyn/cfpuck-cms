@@ -1,8 +1,9 @@
 // Site settings island, in tabs: General (name, tagline, front page, timezone), Types (the templates for
 // each type's pages and listing), Search (the types it covers), Social (profile links, default share
-// image), Admin (the admin's colors and logo), Redirects (saved as they are added, with the Not found log), Sync (with another copy of the
+// image), Tickets (payments and ticket emails), Admin (the admin's colors and logo), Redirects (saved as they are added, with the Not found log), Sync (with another copy of the
 // site), Backups (snapshots and sync backups) and the site's own options. One Save for all;
 // the tab is in the URL (#search), and leaving with unsaved changes asks first.
+import type { PaymentProvider, ProviderStatus } from '../lib/payments';
 import { Fragment, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { FieldsForm } from './entry-fields';
 import { SITE_EDITOR } from '../lib/site/editor';
@@ -13,18 +14,22 @@ import { NETWORKS } from '../lib/social/icons';
 import Redirects, { type NotFound } from '../admin/Redirects';
 import Sync from '../admin/Sync';
 import BackupsTab from '../admin/Backups';
+import TicketSettingsPanel from '../admin/TicketSettings';
+import type { TicketSettings } from '../lib/tickets/config';
 import type { Redirect } from '../lib/redirects';
 import { MENU_FIELDS } from '../lib/navigation';
 import type { TaxonomyMeta } from '../lib/page-meta';
 import { ADMIN_THEME_DEFAULTS, ADMIN_THEME_FIELDS, adminThemeVars, contrast, type AdminTheme } from '../lib/admin-theme';
 
 interface Props {
-  site: { name?: string; description?: string; front_page_id?: number | null; timezone?: string; search_types?: string[]; social?: { network: string; url: string }[]; share_image?: number; share_image_url?: string; templates?: TemplateMap; taxonomy_templates?: Record<string, string>; taxonomy_pages_off?: string[]; taxonomy_meta?: Record<string, TaxonomyMeta>; listing_meta?: Record<string, TaxonomyMeta>; listings_off?: string[]; icons?: Record<string, string>; icon_media_id?: number | null; icon_preview?: string; admin_theme?: AdminTheme };
+  site: { name?: string; description?: string; front_page_id?: number | null; timezone?: string; search_types?: string[]; social?: { network: string; url: string }[]; share_image?: number; share_image_url?: string; templates?: TemplateMap; taxonomy_templates?: Record<string, string>; taxonomy_pages_off?: string[]; taxonomy_meta?: Record<string, TaxonomyMeta>; listing_meta?: Record<string, TaxonomyMeta>; listings_off?: string[]; icons?: Record<string, string>; icon_media_id?: number | null; icon_preview?: string; admin_theme?: AdminTheme; tickets?: TicketSettings };
   options: Record<string, any>;
   pages: { id: number; title: string }[];
   templates: TemplateInfo[];
   redirects: Redirect[];
   notFound: NotFound[];
+  /** Which payment providers have their keys set (for Tickets). */
+  ticketProviders: Record<PaymentProvider, ProviderStatus>;
 }
 
 /** The template pickers' value for "Off" (no listing page, no term pages). */
@@ -33,7 +38,7 @@ const OFF = '__off__';
 /** Every IANA timezone the browser knows. */
 const TIMEZONES: string[] = (Intl as any).supportedValuesOf?.('timeZone') ?? [config.timezone];
 
-export default function SiteSettings({ site: initialSite, options: initialOptions, pages, templates, redirects, notFound }: Props) {
+export default function SiteSettings({ site: initialSite, options: initialOptions, pages, templates, redirects, notFound, ticketProviders }: Props) {
   const [site, setSite] = useState(initialSite);
   const [options, setOptions] = useState(initialOptions);
   const [status, setStatus] = useState('');
@@ -215,6 +220,11 @@ export default function SiteSettings({ site: initialSite, options: initialOption
       ),
     },
     {
+      id: 'tickets',
+      label: 'Tickets',
+      panel: <TicketSettingsPanel value={site.tickets ?? {}} providers={ticketProviders} onChange={(tickets) => setSite((s) => ({ ...s, tickets }))} />,
+    },
+    {
       id: 'admin',
       label: 'Admin',
       panel: <AdminThemePanel value={site.admin_theme ?? {}} onChange={(t) => setSite((s) => ({ ...s, admin_theme: Object.keys(t).length ? t : undefined }))} />,
@@ -280,7 +290,7 @@ export default function SiteSettings({ site: initialSite, options: initialOption
         </div>
       </div>
       {tabs.map((t) => (
-        <section key={t.id} role="tabpanel" id={`settings-panel-${t.id}`} aria-labelledby={`settings-tab-${t.id}`} tabIndex={0} hidden={t.id !== current.id} className={['redirects', 'sync', 'backups'].includes(t.id) ? 'max-w-5xl' : t.id === 'site' || t.id === 'types' ? 'max-w-3xl' : 'max-w-md'}>
+        <section key={t.id} role="tabpanel" id={`settings-panel-${t.id}`} aria-labelledby={`settings-tab-${t.id}`} tabIndex={0} hidden={t.id !== current.id} className={['redirects', 'sync', 'backups'].includes(t.id) ? 'max-w-5xl' : t.id === 'site' || t.id === 'types' || t.id === 'tickets' ? 'max-w-3xl' : 'max-w-md'}>
           {t.panel}
         </section>
       ))}
