@@ -20,8 +20,6 @@ In the event's settings, under Tickets (stored in `fields.tickets`, `src/lib/tic
 - **Waitlist**: off; on, emailing people as tickets free up; or on, notified by hand from the attendee list.
 - **Buyers are asked**: name and email always; phone (optional or required); address (for paid orders,
   or always); and questions of your own (short or long text, a choice, a checkbox, a number).
-- **Emails**: the event's own wording for its confirmation, reminder, follow-up and waitlist emails, and
-  the reminder and follow-up turned off for it.
 
 The ticket form shows below the event's content in the Event details block, with the prices in its
 sidebar. A template without Event details can place the **Tickets** block instead.
@@ -51,16 +49,27 @@ attendee list (`/admin/tickets/<id>/`):
 - **Resend confirmation**, **Cancel order** (unpaid or free orders) and **Refund** (admins: all or part of a
   paid order, at Stripe or Square; refunding all of it puts its tickets back on sale)
 - the waitlist, with **Notify selected** and **Notify as many as tickets allow**
+- the event's own **Emails**
 - **Export CSV** and **Print**
 
 Refunds made in the Stripe or Square dashboard are recorded too, through the webhook.
 
 ## Emails
 
-Settings > Tickets holds the wording of each email (merge tags such as `{first_name}`, `{event}`,
-`{date}`, `{code}`, `{order_link}`), and when the reminder (hours before the event) and the follow-up
-(hours after it) go out. `netlify/functions/ticket-emails.mts` sends them hourly on the deployed site.
-Mail goes out over the same SMTP settings as form notifications.
+Five emails, each designed in the same email builder as form notifications: the **confirmation**, a
+**reminder** before the event, a **follow-up** after it, the **waitlist** notice, and the **copy to the
+admin** of each order. Besides the usual blocks they have:
+
+- merge tags such as `{first_name}`, `{event}`, `{date}`, `{code}`, `{order_link}`, `{attendee_link}`
+- an **Order details** block: the order summary as a table, or one detail (date, venue, code, tickets,
+  total, answers, the buyer's contact details)
+- a Preview filled in with a sample order
+
+Settings > Tickets holds the site's emails, when the reminder (hours before the event) and follow-up
+(hours after it) go out, and whether the admin gets a copy. An event can have its own on its attendee
+list's **Emails** tab, and turn the reminder or follow-up off. `netlify/functions/ticket-emails.mts`
+sends reminders and follow-ups hourly on the deployed site, over the same SMTP settings as form
+notifications.
 
 ## Setting up payments
 
@@ -73,4 +82,4 @@ Square: set `SQUARE_ACCESS_TOKEN`, `SQUARE_LOCATION_ID` and `SQUARE_WEBHOOK_SIGN
 (`SQUARE_ENVIRONMENT=sandbox` to test), and subscribe `https://<site>/api/tickets/webhook/square` to
 `payment.created`, `payment.updated`, `refund.created` and `refund.updated`.
 
-Orders and waitlists aren't part of sync, backups or snapshots: they stay on the copy where they were made.
+Orders, waitlists and events' own emails aren't part of sync, backups or snapshots: they stay on the copy where they were made.

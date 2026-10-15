@@ -6,9 +6,12 @@
 //                            refunds the order and puts its tickets back on sale
 //   notify { event, date, ids? }  email the waitlist: those people, or as many as the free tickets cover
 //   waitlist-remove { id }   take someone off the waitlist
+//   email-save { event, kind, email: { subject, design, text, off } }   the event's own email of a kind
+//                            (an empty one, not off, goes back to the site's)
 // Freed tickets go to the waitlist at once when the event emails it on its own.
 import type { APIRoute } from 'astro';
 import { serviceClient } from '../../../../lib/supabase';
+import { EMAIL_KINDS, ticketEmailFrom } from '../../../../lib/tickets/config';
 import { cancelOrder, loadEvent, notifyWaitlist, refundOrder, resendConfirmation, siteOrigin, waitlistAfterRelease } from '../../../../lib/tickets/orders';
 
 export const POST: APIRoute = async ({ request, locals, url }) => {
@@ -48,6 +51,19 @@ export const POST: APIRoute = async ({ request, locals, url }) => {
         if (!ev) return new Response('No such event or date.', { status: 404 });
         const ids = Array.isArray(body.ids) ? body.ids.map(Number).filter(Boolean) : undefined;
         return Response.json({ ok: true, sent: await notifyWaitlist(db, ev, origin, ids) });
+      }
+      case 'email-save': {
+        const event = Number(body.event) || 0;
+        if (!EMAIL_KINDS.some(([k]) => k === body.kind)) return new Response('Unknown email', { status: 400 });
+        const e = ticketEmailFrom(body.email);
+        const off = body.kind === 'reminder' || body.kind === 'followUp' ? body.email?.off === true : false;
+        const q = locals.db.from('ticket_emails');
+        const { error } =
+          e.subject || e.design || e.text || off
+            ? await q.upsert({ entry_id: event, kind: body.kind, subject: e.subject ?? null, design: e.design ?? null, text: e.text ?? null, off }, { onConflict: 'entry_id,kind' })
+            : await q.delete().eq('entry_id', event).eq('kind', body.kind);
+        if (error) throw error;
+        return Response.json({ ok: true });
       }
       case 'waitlist-remove': {
         const { error } = await locals.db.from('ticket_waitlist').update({ status: 'removed' }).eq('id', id);

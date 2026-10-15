@@ -1,14 +1,19 @@
-// Ticket emails: the purchase confirmation, the reminder before the event and the follow-up after it,
-// and the copy of each order for the site's admin. Messages are plain text with merge tags (written
-// under Settings > Tickets or in the event's ticket settings); here they become email-safe HTML (a
-// 600px table, inline styles, links made clickable) with the order's details below the message.
-import { money, MERGE_TAGS, type EmailKind } from './config';
+// Ticket emails: the purchase confirmation, the reminder before the event, the follow-up after it and
+// the waitlist's notice, and the copy of each order for the site's admin: designed in the email builder
+// (src/forms/EmailBuilder.tsx; Settings > Tickets, or an event's own on its attendee list) and rendered
+// by the same code as form notifications (src/lib/forms/email.ts), here with the order's merge tags and
+// its Order details block. Runs in the browser (the builder's preview) and on the server.
+import { money } from './config';
+import { renderEmail, textVersion, type EmailContext, type EmailDoc } from '../forms/email';
 
 export interface OrderView {
+  /** '' for a waitlist email: no order yet. */
   code: string;
   name: string;
   email: string;
   phone?: string;
+  /** One line. */
+  address?: string;
   items: { name: string; price: number; quantity: number }[];
   amount: number;
   currency: string;
@@ -26,79 +31,106 @@ export interface EventView {
 }
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
-const linkify = (s: string) => s.replace(/https?:\/\/[^\s<]+[^\s<.,;:!?)]/g, (u) => `<a href="${u}" style="color:#1a56db">${u}</a>`);
 
 export const ticketsLine = (o: OrderView) => o.items.map((i) => `${i.quantity} × ${i.name}${i.price ? ` (${money(i.price, o.currency)})` : ''}`).join(', ');
 
-/** The merge tags' values for an order and its event. */
-export function tagValues(o: OrderView, ev: EventView, orderLink: string): Record<string, string> {
+/** The order summary's rows: [label, text]. */
+function summaryRows(o: OrderView, ev: EventView): [string, string][] {
+  return [
+    ['Event', ev.title],
+    ['When', `${ev.date}${ev.time}`],
+    ...(ev.venue.length ? [['Where', ev.venue.join(', ')] as [string, string]] : []),
+    ...(o.code ? ([['Order code', o.code], ['Tickets', ticketsLine(o)], ['Total', money(o.amount, o.currency)]] as [string, string][]) : []),
+    ...(o.answers ?? []),
+  ];
+}
+
+/** Where an email's links go: the buyer's order, and the event's attendee list (for the admin's copy). */
+export interface EmailLinks {
+  order: string;
+  attendees?: string;
+}
+
+/** The merge tags' values for an order and its event, as text. */
+export function tagValues(o: OrderView, ev: EventView, links: EmailLinks): Record<string, string> {
   return {
     '{name}': o.name,
     '{first_name}': o.name.split(/\s+/)[0] ?? o.name,
+    '{email}': o.email,
+    '{phone}': o.phone ?? '',
+    '{address}': o.address ?? '',
     '{event}': ev.title,
     '{date}': ev.date,
     '{time}': ev.time,
     '{venue}': ev.venue.join(', '),
-    '{tickets}': ticketsLine(o),
-    '{total}': money(o.amount, o.currency),
+    '{tickets}': o.code ? ticketsLine(o) : '',
+    '{total}': o.code ? money(o.amount, o.currency) : '',
     '{code}': o.code,
-    '{order_link}': orderLink,
+    '{answers}': (o.answers ?? []).map(([k, v]) => `${k}: ${v}`).join('\n'),
+    '{order_summary}': summaryRows(o, ev).map(([k, v]) => `${k}: ${v}`).join('\n'),
+    '{order_link}': o.code ? links.order : ev.link,
     '{event_link}': ev.link,
+    '{attendee_link}': links.attendees ?? '',
   };
 }
 
-export const merge = (text: string, values: Record<string, string>) => MERGE_TAGS.reduce((s, [tag]) => s.split(tag).join(values[tag] ?? ''), text);
+/** Merge tags filled in, in one pass (a value that looks like a tag stays as it is): HTML-escaped
+ *  values (line breaks kept) when `html`. Unknown tags are left as written. */
+export const merge = (text: string, values: Record<string, string>, html = false) =>
+  text.replace(/\{[a-z_]+\}/g, (tag) => (tag in values ? (html ? esc(values[tag]).replace(/\n/g, '<br>') : values[tag]) : tag));
 
-function summary(o: OrderView, ev: EventView, orderLink: string): string {
-  const row = (k: string, v: string) => `<tr><td style="padding:6px 0;color:#6b7280;width:120px;vertical-align:top">${esc(k)}</td><td style="padding:6px 0;vertical-align:top">${v}</td></tr>`;
+/** The Order details block: the summary as a table, or one detail, with or without its label. */
+function orderDetail(id: string, showLabel: boolean, o: OrderView, ev: EventView): string {
+  const p = (label: string, value: string) => (value ? `${showLabel ? `<p style="margin:0 0 4px 0;font-weight:600">${esc(label)}</p>` : ''}<p style="margin:0">${value}</p>` : '');
+  switch (id) {
+    case 'when':
+      return p('When', esc(`${ev.date}${ev.time}`));
+    case 'venue':
+      return p('Where', ev.venue.map(esc).join('<br>'));
+    case 'code':
+      return o.code ? p('Order code', `<strong style="font-size:20px;letter-spacing:0.08em">${esc(o.code)}</strong>`) : '';
+    case 'tickets':
+      return o.code ? p('Tickets', o.items.map((i) => `${i.quantity} × ${esc(i.name)}${i.price ? ` (${esc(money(i.price, o.currency))} each)` : ''}`).join('<br>')) : '';
+    case 'total':
+      return o.code ? p('Total', esc(money(o.amount, o.currency))) : '';
+    case 'contact':
+      return [p('Name', esc(o.name)), p('Email', `<a href="mailto:${esc(o.email)}">${esc(o.email)}</a>`), o.phone ? p('Phone', esc(o.phone)) : '', o.address ? p('Address', esc(o.address)) : ''].filter(Boolean).join('<div style="height:8px"></div>');
+    case 'answers':
+      return (o.answers ?? []).map(([k, v]) => p(k, esc(v).replace(/\n/g, '<br>'))).join('<div style="height:8px"></div>');
+  }
+  const rows = summaryRows(o, ev);
   return (
-    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:24px;border-top:1px solid #e5e7eb;font-size:14px;line-height:1.5">` +
-    row('Event', `<a href="${esc(ev.link)}" style="color:#1a56db">${esc(ev.title)}</a>`) +
-    row('When', esc(`${ev.date}${ev.time}`)) +
-    (ev.venue.length ? row('Where', ev.venue.map(esc).join('<br />')) : '') +
-    row('Order code', `<strong style="font-size:16px;letter-spacing:0.08em">${esc(o.code)}</strong>`) +
-    row('Tickets', o.items.map((i) => `${i.quantity} × ${esc(i.name)}${i.price ? ` <span style="color:#6b7280">(${esc(money(i.price, o.currency))} each)</span>` : ''}`).join('<br />')) +
-    row('Total', esc(money(o.amount, o.currency))) +
-    (o.answers ?? []).map(([k, v]) => row(k, esc(v))).join('') +
-    `</table>` +
-    `<p style="margin:24px 0 0"><a href="${esc(orderLink)}" style="display:inline-block;padding:10px 18px;border-radius:4px;background:#1f2937;color:#ffffff;text-decoration:none;font-weight:600">View your order</a></p>`
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-size:14px;line-height:1.5">` +
+    rows.map(([k, v]) => `<tr>${showLabel ? `<td style="padding:6px 12px 6px 0;color:#6b7280;width:120px;vertical-align:top;border-bottom:1px solid #e5e1dc">${esc(k)}</td>` : ''}<td style="padding:6px 0;vertical-align:top;border-bottom:1px solid #e5e1dc">${k === 'Order code' ? `<strong style="letter-spacing:0.08em">${esc(v)}</strong>` : esc(v)}</td></tr>`).join('') +
+    `</table>`
   );
 }
 
-function layout(title: string, body: string, siteName: string): string {
-  return (
-    `<!DOCTYPE html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width" /><title>${esc(title)}</title></head>` +
-    `<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#111827">` +
-    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6"><tr><td align="center" style="padding:24px 12px">` +
-    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:6px"><tr><td style="padding:32px 28px;font-size:15px;line-height:1.6">${body}</td></tr></table>` +
-    `<p style="margin:16px 0 0;color:#9ca3af;font-size:12px">${esc(siteName)}</p>` +
-    `</td></tr></table></body></html>`
-  );
+/** How the email builder's renderer fills in an order's email. */
+export function ticketEmailContext(o: OrderView, ev: EventView, links: EmailLinks, origin: string): EmailContext {
+  const values = tagValues(o, ev, links);
+  return { merge: (text, html) => merge(text, values, html), field: (id, showLabel) => orderDetail(id, showLabel, o, ev), origin };
 }
 
-/** The buyer's email of a kind: subject, HTML and text. */
-export function buyerEmail(kind: EmailKind, text: { subject: string; message: string }, o: OrderView, ev: EventView, orderLink: string, siteName: string) {
-  const values = tagValues(o, ev, orderLink);
-  const subject = merge(text.subject, values);
-  const message = merge(text.message, values);
-  const paragraphs = message
-    .split(/\n{2,}/)
-    .map((p) => `<p style="margin:0 0 14px">${linkify(esc(p.trim())).replace(/\n/g, '<br />')}</p>`)
-    .join('');
-  // The confirmation and reminder carry the order; the follow-up and the waitlist's email have none.
-  const withOrder = kind === 'confirmation' || kind === 'reminder';
-  const details = withOrder ? summary(o, ev, orderLink) : '';
-  const plain = `${message}\n\n${!withOrder ? '' : `${ev.title}\n${ev.date}${ev.time}\n${ev.venue.join(', ')}\nOrder code: ${o.code}\nTickets: ${ticketsLine(o)}\nTotal: ${money(o.amount, o.currency)}\n${orderLink}\n`}`;
-  return { subject, html: layout(subject, paragraphs + details, siteName), text: plain.trim() };
+/** An email for an order: subject, HTML and text (the email's own plain text, else made from the HTML). */
+export function ticketEmail(email: { subject: string; design: EmailDoc; text?: string }, o: OrderView, ev: EventView, links: EmailLinks, origin: string) {
+  const ctx = ticketEmailContext(o, ev, links, origin);
+  const values = tagValues(o, ev, links);
+  const subject = merge(email.subject, values);
+  const html = renderEmail(email.design, ctx, subject);
+  return { subject, html, text: email.text?.trim() ? merge(email.text, values) : textVersion(html) };
 }
 
-/** The admin's copy of a new order. */
-export function adminEmail(o: OrderView, ev: EventView, adminLink: string, siteName: string, extra: [string, string][]) {
-  const subject = `New ticket order ${o.code}: ${ev.title}`;
-  const rows: [string, string][] = [['Name', o.name], ['Email', o.email], ...(o.phone ? [['Phone', o.phone] as [string, string]] : []), ...extra];
-  const body =
-    `<p style="margin:0 0 14px">${esc(o.name)} ordered ${esc(ticketsLine(o))} for <strong>${esc(ev.title)}</strong> (${esc(`${ev.date}${ev.time}`)}). Total ${esc(money(o.amount, o.currency))}.</p>` +
-    `<table role="presentation" cellpadding="0" cellspacing="0" style="font-size:14px">${rows.map(([k, v]) => `<tr><td style="padding:4px 16px 4px 0;color:#6b7280;vertical-align:top">${esc(k)}</td><td style="padding:4px 0">${esc(v)}</td></tr>`).join('')}</table>` +
-    `<p style="margin:20px 0 0"><a href="${esc(adminLink)}" style="color:#1a56db">See the attendee list</a></p>`;
-  return { subject, html: layout(subject, body, siteName), text: `${o.name} <${o.email}> ordered ${ticketsLine(o)} for ${ev.title} (${ev.date}${ev.time}). Total ${money(o.amount, o.currency)}.\n${rows.map(([k, v]) => `${k}: ${v}`).join('\n')}\n${adminLink}` };
-}
+/** A made-up order, for the builder's preview. */
+export const SAMPLE_ORDER: OrderView = {
+  code: 'K7QZ-4MXA',
+  name: 'Alex Sample',
+  email: 'alex@example.com',
+  phone: '(716) 555-0100',
+  address: '12 Elm Street, Example Town, NY 14731',
+  items: [{ name: 'General admission', price: 2500, quantity: 2 }],
+  amount: 5000,
+  currency: 'usd',
+  answers: [['Dietary needs', 'Vegetarian']],
+};
+export const sampleEvent = (title = 'Sample event', origin = ''): EventView => ({ title, date: 'Saturday, October 24, 2026', time: ' at 7:00 pm', venue: ['Town Hall', '1 Main Street, Example Town'], link: `${origin}/event/sample/` });

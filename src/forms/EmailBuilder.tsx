@@ -1,60 +1,61 @@
-// The email builder for a form notification, full screen over the form builder. Visual: a Puck editor of
-// email blocks (src/lib/forms/email.ts renders them, here and when sending, so the canvas is the email).
-// Plain text: the text version, with field values; made from the design when empty. Preview: the email
-// as it would be sent for a stored submission or sample answers (/api/admin/forms/<id>/notification-preview).
+// The email builder, full screen over the screen that opens it. Visual: a Puck editor of email blocks
+// (src/lib/forms/email.ts renders them, here and when sending, so the canvas is the email). Plain
+// text: the text version, with merge tags; made from the design when empty. Preview: the email as it
+// would be sent. What fills an email in comes from the caller's kit (EmailKit): a form notification's
+// fields and submissions (src/forms/form-email.ts), or a ticket order's details (src/admin/ticket-email.ts).
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Puck, type Config, type Data } from '@puckeditor/core';
 import '@puckeditor/core/no-external.css'; // without its Inter webfont: the admin uses the system font
-import { EMAIL_DEFAULTS, defaultEmail, renderBlock, renderEmail, textVersion, type EmailContext, type EmailDoc, type EmailItem, type EmailRoot } from '../lib/forms/email';
-import { INPUT_TYPES } from '../lib/forms/logic';
-import type { FormDef, Notification } from '../lib/forms/types';
+import { EMAIL_DEFAULTS, renderBlock, renderEmail, textVersion, type EmailContext, type EmailDoc, type EmailItem, type EmailRoot } from '../lib/forms/email';
 import { MediaPicker } from '../puck/fields';
 import { MergeTags, RichMessage } from './rich-message';
 
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
-const fieldsOf = (form: FormDef) => form.fields.filter((f) => INPUT_TYPES.includes(f.type) && f.type !== 'hidden');
+/** An email as it would be sent, for the Preview tab. */
+export interface RenderedEmail {
+  to: string[];
+  replyTo?: string;
+  subject: string;
+  html: string;
+  text: string;
+  fromName?: string;
+}
 
-/** The canvas's stand-ins for what a submission fills in: tags shown as written, answers as their labels. */
-function canvasContext(form: FormDef): EmailContext {
-  const answer = (label: string) => `<span style="background:#fef3c7;color:#7a4a00;padding:0 3px;border-radius:2px">${esc(label)}</span>`;
-  return {
-    merge: (text) => text,
-    field: (id, showLabel) => {
-      if (id === 'all')
-        return `<table width="100%" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:14px">${fieldsOf(form)
-          .map((f) => `<tr><td style="background:#f5f3f0;font-weight:600;border-bottom:1px solid #e5e1dc">${esc(f.label)}</td></tr><tr><td style="padding-bottom:14px;border-bottom:1px solid #e5e1dc">${answer(`${f.label} answer`)}</td></tr>`)
-          .join('') || '<tr><td>(The form has no fields yet.)</td></tr>'}</table>`;
-      const f = form.fields.find((x) => x.id === id);
-      if (!f) return '<p style="margin:0;color:#b3261e">Choose a field.</p>';
-      return showLabel ? `<p style="margin:0 0 4px 0;font-weight:600">${esc(f.label)}</p><p style="margin:0">${answer(`${f.label} answer`)}</p>` : `<p style="margin:0">${answer(`${f.label} answer`)}</p>`;
-    },
-    origin: typeof window === 'undefined' ? '' : window.location.origin,
+/** What fills an email in, from whoever opens the builder. */
+export interface EmailKit {
+  /** The data block (stored as type FormField): its name ("Form field") and what it can show; `all` is its table. */
+  dataBlock: { label: string; options: [string, string][] };
+  /** Merge tags offered in Text blocks and the plain text: [tag, label]. */
+  tags: [string, string][];
+  /** The canvas's stand-ins for what is filled in when sending. */
+  canvas: EmailContext;
+  /** A data block in the plain text made from the design (usually its merge tag). */
+  textField: (id: string, showLabel: boolean) => string;
+  preview: {
+    /** What the preview can fill the email in from ("Answers from", "Sample answers"). */
+    pickLabel: string;
+    sampleLabel: string;
+    /** Real ones to pick from (submissions, orders), if any. */
+    choices?: () => Promise<{ id: string; label: string }[]>;
+    /** The email as sent, for a choice ('' for the sample). */
+    render: (email: { design: EmailDoc; text?: string }, pick: string) => Promise<RenderedEmail>;
   };
 }
 
-/** What the plain-text version starts from: the design, with field tags where answers go. */
-function textFromDesign(doc: EmailDoc, form: FormDef): string {
-  const html = renderEmail(doc, {
-    merge: (text) => text,
-    field: (id, showLabel) => {
-      if (id === 'all') return '{all_fields}';
-      const f = form.fields.find((x) => x.id === id);
-      return f ? `<p>${showLabel ? `${esc(f.label)}: ` : ''}{${esc(f.label)}:${f.id}}</p>` : '';
-    },
-    origin: window.location.origin,
-  });
+/** What the plain-text version starts from: the design, with tags where data blocks go. */
+function textFromDesign(doc: EmailDoc, kit: EmailKit): string {
+  const html = renderEmail(doc, { merge: (text) => text, field: kit.textField, origin: window.location.origin });
   return textVersion(html.replace(/<div style="display:none[^"]*">[\s\S]*?<\/div>/, ''));
 }
 
 // The document's settings, for the blocks rendered inside it.
 const RootProps = createContext<EmailRoot>({});
-const FormContext = createContext<FormDef | null>(null);
+const KitContext = createContext<EmailKit | null>(null);
 
 /** A leaf block: its email HTML, as sent. */
 function Leaf({ type, props }: { type: string; props: Record<string, any> }) {
   const root = useContext(RootProps);
-  const form = useContext(FormContext)!;
-  const html = renderBlock({ type, props: { id: '', ...props } } as EmailItem, canvasContext(form), root);
+  const kit = useContext(KitContext)!;
+  const html = renderBlock({ type, props: { id: '', ...props } } as EmailItem, kit.canvas, root);
   return <div dangerouslySetInnerHTML={{ __html: html || '<p style="margin:0;color:#94a3b8;font-size:13px">(empty)</p>' }} />;
 }
 
@@ -72,7 +73,7 @@ function ColorField({ label, value, onChange, fallback }: { label: string; value
 const color = (label: string, fallback: string) => ({ type: 'custom' as const, label, render: ({ value, onChange }: any) => <ColorField label={label} value={value} onChange={onChange} fallback={fallback} /> });
 const alignField = { type: 'radio' as const, label: 'Align', options: [{ label: 'Left', value: 'left' }, { label: 'Centre', value: 'center' }, { label: 'Right', value: 'right' }] };
 
-function emailConfig(form: FormDef): Config {
+function emailConfig(kit: EmailKit): Config {
   const leaf = (type: string) => (props: any) => <Leaf type={type} props={props} />;
   return {
     categories: {
@@ -119,7 +120,7 @@ function emailConfig(form: FormDef): Config {
       Text: {
         label: 'Text',
         fields: {
-          html: { type: 'custom', label: 'Text', render: ({ value, onChange }: any) => <RichMessage label="Text" value={value} form={form} onChange={onChange} /> },
+          html: { type: 'custom', label: 'Text', render: ({ value, onChange }: any) => <RichMessage label="Text" value={value} tags={kit.tags} onChange={onChange} /> },
           align: alignField,
           color: color('Colour', EMAIL_DEFAULTS.textColor),
         },
@@ -145,9 +146,9 @@ function emailConfig(form: FormDef): Config {
         render: leaf('Image'),
       },
       FormField: {
-        label: 'Form field',
+        label: kit.dataBlock.label,
         fields: {
-          field: { type: 'select', label: 'Field', options: [{ label: 'All fields (a table)', value: 'all' }, ...fieldsOf(form).map((f) => ({ label: f.label || f.id, value: f.id }))] },
+          field: { type: 'select', label: 'Shows', options: kit.dataBlock.options.map(([value, label]) => ({ label, value })) },
           showLabel: { type: 'radio', label: 'Show its label', options: [{ label: 'Yes', value: true }, { label: 'No', value: false }] },
         },
         defaultProps: { field: 'all', showLabel: true },
@@ -192,18 +193,18 @@ const EMAIL_VIEWPORTS = [
 
 const tabCls = (on: boolean) => `-mb-px border-b-2 px-4 py-2 text-sm font-medium ${on ? 'border-admin-accent text-admin-ink' : 'border-transparent text-admin-muted hover:text-admin-ink'}`;
 
-export default function EmailBuilder({ formId, form, notification, onChange, onClose }: { formId: number; form: FormDef; notification: Notification; onChange: (patch: Partial<Notification>) => void; onClose: () => void }) {
+export default function EmailBuilder({ title, kit, design: start, text, note, onChange, onClose }: { title: string; kit: EmailKit; design: EmailDoc; text?: string; note: string; onChange: (patch: { design?: EmailDoc; text?: string }) => void; onClose: () => void }) {
   const [tab, setTab] = useState<'visual' | 'text' | 'preview'>('visual');
-  const config = useMemo(() => emailConfig(form), [form]);
+  const config = useMemo(() => emailConfig(kit), [kit]);
   // Puck keeps its own state; it starts from the design and reports every change.
-  const initial = useRef<Data>((notification.design ?? defaultEmail()) as unknown as Data);
-  const design = (notification.design ?? (initial.current as unknown as EmailDoc)) as EmailDoc;
+  const initial = useRef<Data>(start as unknown as Data);
+  const [design, setDesign] = useState<EmailDoc>(start);
 
   return (
-    <div className="fixed inset-0 z-[900] flex flex-col bg-white" role="dialog" aria-modal="true" aria-label={`Email: ${notification.name || 'Notification'}`}>
+    <div className="fixed inset-0 z-[900] flex flex-col bg-white" role="dialog" aria-modal="true" aria-label={title}>
       <div className="flex items-center justify-between gap-4 border-b border-admin-ink/10 px-4">
         <div className="flex items-end gap-1">
-          <span className="mr-4 py-2 text-sm font-semibold">{notification.name || 'Notification'}: email</span>
+          <span className="mr-4 py-2 text-sm font-semibold">{title}</span>
           {(['visual', 'text', 'preview'] as const).map((t) => (
             <button key={t} type="button" className={tabCls(tab === t)} onClick={() => setTab(t)}>
               {t === 'visual' ? 'Visual' : t === 'text' ? 'Plain text' : 'Preview'}
@@ -211,7 +212,7 @@ export default function EmailBuilder({ formId, form, notification, onChange, onC
           ))}
         </div>
         <div className="flex items-center gap-3 py-2">
-          <span className="text-xs text-admin-muted">Changes are saved with the form.</span>
+          <span className="text-xs text-admin-muted">{note}</span>
           <button type="button" onClick={onClose} className="rounded-sm bg-admin-ink px-4 py-1.5 text-xs font-semibold tracking-wider text-white uppercase hover:bg-admin-accent">
             Done
           </button>
@@ -219,19 +220,29 @@ export default function EmailBuilder({ formId, form, notification, onChange, onC
       </div>
       <div className="min-h-0 flex-1">
         <div className={tab === 'visual' ? 'h-full' : 'hidden'}>
-          <FormContext.Provider value={form}>
-            {/* Changes go to the form as they are made (saved with it), so Puck's own Publish is left out. */}
-            <Puck config={config} data={initial.current} onChange={(d: Data) => onChange({ design: d as unknown as EmailDoc })} headerTitle={'\u200b'} overrides={{ headerActions: () => <></> }} viewports={EMAIL_VIEWPORTS} />
-          </FormContext.Provider>
+          <KitContext.Provider value={kit}>
+            {/* Changes go to the caller as they are made, so Puck's own Publish is left out. */}
+            <Puck
+              config={config}
+              data={initial.current}
+              onChange={(d: Data) => {
+                setDesign(d as unknown as EmailDoc);
+                onChange({ design: d as unknown as EmailDoc });
+              }}
+              headerTitle={'\u200b'}
+              overrides={{ headerActions: () => <></> }}
+              viewports={EMAIL_VIEWPORTS}
+            />
+          </KitContext.Provider>
         </div>
-        {tab === 'text' && <PlainText form={form} design={design} value={notification.text ?? ''} onChange={(text) => onChange({ text: text || undefined })} />}
-        {tab === 'preview' && <Preview formId={formId} form={form} notification={{ ...notification, design }} />}
+        {tab === 'text' && <PlainText kit={kit} design={design} value={text ?? ''} onChange={(t) => onChange({ text: t || undefined })} />}
+        {tab === 'preview' && <Preview kit={kit} design={design} text={text} />}
       </div>
     </div>
   );
 }
 
-function PlainText({ form, design, value, onChange }: { form: FormDef; design: EmailDoc; value: string; onChange: (v: string) => void }) {
+function PlainText({ kit, design, value, onChange }: { kit: EmailKit; design: EmailDoc; value: string; onChange: (v: string) => void }) {
   const area = useRef<HTMLTextAreaElement>(null);
   const insert = (tag: string) => {
     const el = area.current;
@@ -246,8 +257,8 @@ function PlainText({ form, design, value, onChange }: { form: FormDef; design: E
         The plain-text version, for mail apps that don't show HTML. Left empty, it is made from the visual design when the email is sent.
       </p>
       <div className="mb-2 flex flex-wrap items-center gap-3">
-        <MergeTags form={form} onInsert={insert} />
-        <button type="button" className="rounded border border-admin-ink/15 bg-white px-2.5 py-1 text-xs hover:border-admin-accent" onClick={() => (!value || confirm('Replace the plain text with one made from the visual design?')) && onChange(textFromDesign(design, form))}>
+        <MergeTags tags={kit.tags} onInsert={insert} />
+        <button type="button" className="rounded border border-admin-ink/15 bg-white px-2.5 py-1 text-xs hover:border-admin-accent" onClick={() => (!value || confirm('Replace the plain text with one made from the visual design?')) && onChange(textFromDesign(design, kit))}>
           Fill from the visual design
         </button>
         {value && (
@@ -261,50 +272,34 @@ function PlainText({ form, design, value, onChange }: { form: FormDef; design: E
   );
 }
 
-interface Rendered {
-  to: string[];
-  replyTo?: string;
-  subject: string;
-  html: string;
-  text: string;
-  fromName?: string;
-}
-
-function Preview({ formId, form, notification }: { formId: number; form: FormDef; notification: Notification }) {
-  const [subs, setSubs] = useState<{ id: number; created_at: string; summary: string }[] | null>(null);
+function Preview({ kit, design, text }: { kit: EmailKit; design: EmailDoc; text?: string }) {
+  const [choices, setChoices] = useState<{ id: string; label: string }[] | null>(null);
   const [pick, setPick] = useState('');
-  const [out, setOut] = useState<Rendered | null>(null);
+  const [out, setOut] = useState<RenderedEmail | null>(null);
   const [error, setError] = useState('');
   const [width, setWidth] = useState<'desktop' | 'phone'>('desktop');
   useEffect(() => {
-    fetch(`/api/admin/forms/${formId}/notification-preview`)
-      .then(async (r) => (r.ok ? r.json() : Promise.reject(new Error(await r.text()))))
-      .then(setSubs, (e) => setError(e.message));
-  }, [formId]);
+    kit.preview.choices?.().then(setChoices, (e) => setError(e.message));
+  }, [kit]);
   useEffect(() => {
     setError('');
-    fetch(`/api/admin/forms/${formId}/notification-preview`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ notification, definition: form, submissionId: pick ? Number(pick) : null }) })
-      .then(async (r) => (r.ok ? r.json() : Promise.reject(new Error(await r.text()))))
-      .then(setOut, (e) => setError(e.message));
-  }, [pick, formId]);
-  const when = (s: string) => new Date(s).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    kit.preview.render({ design, text }, pick).then(setOut, (e) => setError(e.message));
+  }, [pick, kit]);
   return (
     <div className="flex h-full min-h-0">
       <div className="flex min-w-0 flex-1 flex-col bg-admin-soft">
         <div className="flex flex-wrap items-center gap-3 border-b border-admin-ink/10 bg-white px-4 py-2 text-sm">
           <label className="flex items-center gap-2">
-            <span className="text-xs text-admin-muted">Answers from</span>
+            <span className="text-xs text-admin-muted">{kit.preview.pickLabel}</span>
             <select value={pick} onChange={(e) => setPick(e.target.value)} className="rounded border border-admin-ink/15 px-2 py-1 text-sm">
-              <option value="">Sample answers</option>
-              {(subs ?? []).map((s) => (
-                <option key={s.id} value={s.id}>
-                  {when(s.created_at)}
-                  {s.summary ? ` — ${s.summary}` : ''}
+              <option value="">{kit.preview.sampleLabel}</option>
+              {(choices ?? []).map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.label}
                 </option>
               ))}
             </select>
           </label>
-          {subs && !subs.length && <span className="text-xs text-admin-muted">No submissions yet.</span>}
           <span className="ml-auto flex gap-1 text-xs">
             {(['desktop', 'phone'] as const).map((w) => (
               <button key={w} type="button" onClick={() => setWidth(w)} className={`rounded px-2 py-1 ${width === w ? 'bg-admin-ink text-white' : 'bg-[#f1f5f9]'}`}>

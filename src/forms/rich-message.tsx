@@ -1,5 +1,6 @@
 // Rich text for email messages (with "Insert field value"), used by the form builder and the email
-// builder's Text block, and the merge tags a form offers.
+// builder's Text block, and the merge tags a form offers. The tags offered are the caller's: a form's
+// fields, or a ticket order's details.
 import { useEffect, useRef } from 'react';
 import { INPUT_TYPES } from '../lib/forms/logic';
 import type { FormDef } from '../lib/forms/types';
@@ -32,7 +33,7 @@ export const messageHtml = (v: string) =>
  * inserted where the cursor is. Stores HTML. Not inside a <label> (it would hand clicks to the first
  * toolbar button).
  */
-export function RichMessage({ label, value, form, onChange }: { label: string; value: string | undefined; form: FormDef; onChange: (v: string) => void }) {
+export function RichMessage({ label, value, tags, onChange }: { label: string; value: string | undefined; tags: [string, string][]; onChange: (v: string) => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const range = useRef<Range | null>(null);
   useEffect(() => {
@@ -78,7 +79,7 @@ export function RichMessage({ label, value, form, onChange }: { label: string; v
           <button type="button" className={`${tool} underline`} onMouseDown={(e) => { e.preventDefault(); keepRange(); const url = prompt('Link address'); if (url) { const sel = window.getSelection(); if (range.current) { sel?.removeAllRanges(); sel?.addRange(range.current); } cmd('createLink', url); } }} title="Link" aria-label="Link">Link</button>
           <button type="button" className={tool} onMouseDown={(e) => (e.preventDefault(), cmd('unlink'))} title="Remove link" aria-label="Remove link">Unlink</button>
           <span className="ml-auto">
-            <MergeTags form={form} onInsert={insertTag} />
+            <MergeTags tags={tags} onInsert={insertTag} />
           </span>
         </div>
         <div
@@ -99,11 +100,11 @@ export function RichMessage({ label, value, form, onChange }: { label: string; v
   );
 }
 
-export function MergeTags({ form, onInsert }: { form: FormDef; onInsert: (tag: string) => void }) {
+export function MergeTags({ tags, onInsert }: { tags: [string, string][]; onInsert: (tag: string) => void }) {
   return (
     <select className="mb-1 rounded border border-admin-ink/15 bg-white px-1.5 py-0.5 text-xs text-admin-muted" value="" onChange={(e) => e.target.value && onInsert(e.target.value)}>
       <option value="">Insert field value…</option>
-      {mergeTagOptions(form).map(([tag, l]) => (
+      {tags.map(([tag, l]) => (
         <option key={tag} value={tag}>
           {l}
         </option>

@@ -168,3 +168,26 @@ create policy "ticket waitlist editor update" on public.ticket_waitlist for upda
   using ((select public.is_editor())) with check ((select public.is_editor()));
 revoke all on public.ticket_waitlist from anon;
 revoke insert, delete on public.ticket_waitlist from authenticated;
+
+-- An event's own emails (its attendee list > Emails; the buyer's and the admin's copy), each replacing the site's email of that kind
+-- (Settings > Tickets): subject, email builder design and plain text; `off` turns the reminder or
+-- follow-up off for the event. Kept apart from the event's fields so saving the event in the editor
+-- never overwrites them.
+create table public.ticket_emails (
+  entry_id bigint not null references public.entries (id) on delete cascade,
+  kind text not null check (kind in ('confirmation', 'reminder', 'followUp', 'waitlist', 'admin')),
+  subject text,
+  design jsonb,
+  text text,
+  off boolean not null default false,
+  updated_at timestamptz not null default now(),
+  primary key (entry_id, kind)
+);
+
+create trigger ticket_emails_touch before update on public.ticket_emails
+  for each row execute function public.touch_updated_at();
+
+alter table public.ticket_emails enable row level security;
+create policy "ticket emails editor all" on public.ticket_emails for all to authenticated
+  using ((select public.is_editor())) with check ((select public.is_editor()));
+revoke all on public.ticket_emails from anon;

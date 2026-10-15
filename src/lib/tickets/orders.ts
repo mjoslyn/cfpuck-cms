@@ -10,9 +10,9 @@ import { defaultHorizon, expandEntry, localToUtc, recurrenceOf } from '../recurr
 import { permalink } from '../permalink';
 import { SITE_TZ, site } from '../site';
 import { sendMail } from '../forms/mail';
-import { emailText, localNow, maxFor, offSale, offeredTypes, remaining, ticketSettings, ticketsOf, timedEmail, DEFAULT_MAX_PER_ORDER, type EmailKind, type EventTickets, type TicketSettings } from './config';
+import { emailToSend, localNow, maxFor, offSale, offeredTypes, remaining, ticketEmailFrom, ticketSettings, ticketsOf, timedEmail, DEFAULT_MAX_PER_ORDER, type EmailKind, type EventEmail, type EventTickets, type TicketSettings } from './config';
 import { cancelCheckout, createCheckout, paymentState, providerReady, refundPayment, squarePayment } from './providers';
-import { adminEmail, buyerEmail, type EventView, type OrderView } from './email';
+import { ticketEmail, type EventView, type OrderView } from './email';
 
 const env = (k: string) => (import.meta.env?.[k] as string | undefined) ?? process.env[k];
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -82,6 +82,8 @@ export interface LoadedEvent {
   endUtc: number | null;
   path: string;
   venue?: Entry;
+  /** The event's own emails (table ticket_emails), by kind. */
+  emails: Partial<Record<EmailKind, EventEmail>>;
 }
 
 /** An event (and date, for a recurring one) as tickets see it. `published`: only a published event. */
@@ -109,7 +111,9 @@ export async function loadEvent(db: SupabaseClient, id: number, occurrence: stri
   let venue: Entry | undefined;
   const venueId = Number(series.fields?.venue) || 0;
   if (venueId) venue = (await db.from('entries').select(ENTRY_COLUMNS).eq('id', venueId).maybeSingle<Entry>()).data ?? undefined;
-  return { series, entry, tickets: ticketsOf(series.fields), tz, start, end, allDay, startUtc: utc(start), endUtc, path: permalink(entry), venue };
+  const { data: own } = await db.from('ticket_emails').select('kind, subject, design, text, off').eq('entry_id', series.id);
+  const emails = Object.fromEntries((own ?? []).map((r) => [r.kind, { ...ticketEmailFrom(r), off: r.off === true }]));
+  return { series, entry, tickets: ticketsOf(series.fields), tz, start, end, allDay, startUtc: utc(start), endUtc, path: permalink(entry), venue, emails };
 }
 
 
@@ -436,12 +440,12 @@ export async function notifyWaitlist(db: SupabaseClient, ev: LoadedEvent, origin
     budget = free == null ? Infinity : free - (told ?? []).reduce((n, r) => n + r.quantity, 0);
   }
   const settings = await siteTicketSettings(db);
-  const text = emailText('waitlist', settings, ev.tickets);
+  const email = emailToSend('waitlist', settings, ev.emails.waitlist);
   const view = eventView(ev, origin);
   let sent = 0;
   for (const p of (people ?? []) as WaitlistRow[]) {
     if (p.quantity > budget) continue;
-    const mail = buyerEmail('waitlist', text, { code: '', name: p.name, email: p.email, items: [], amount: 0, currency: settings.currency ?? 'usd' }, view, `${view.link}#tickets`, site.name);
+    const mail = ticketEmail(email, { code: '', name: p.name, email: p.email, phone: p.phone, items: [], amount: 0, currency: settings.currency ?? 'usd' }, view, { order: `${view.link}#tickets` }, origin);
     if (!(await sendMail({ to: [p.email], ...mail }))) throw new Error('No mail server is set up (SMTP_* in the environment).');
     await db.from('ticket_waitlist').update({ status: 'notified', notified_at: new Date().toISOString() }).eq('id', p.id);
     budget -= p.quantity;
@@ -463,14 +467,16 @@ export async function waitlistAfterRelease(db: SupabaseClient, entryId: number |
 
 function orderView(o: OrderRow, t: EventTickets): OrderView {
   const labels = new Map((t.questions ?? []).map((q) => [q.id, q.label]));
-  return { code: o.code, name: o.name, email: o.email, phone: o.phone, items: o.items, amount: o.amount, currency: o.currency, answers: Object.entries(o.answers ?? {}).map(([k, v]) => [labels.get(k) ?? k, v]) };
+  return { code: o.code, name: o.name, email: o.email, phone: o.phone, address: addressText(o.address) || undefined, items: o.items, amount: o.amount, currency: o.currency, answers: Object.entries(o.answers ?? {}).map(([k, v]) => [labels.get(k) ?? k, v]) };
 }
 
 const notifyAddress = () => env('TICKETS_NOTIFY_EMAIL') || env('FORMS_ADMIN_EMAIL') || site.adminEmail;
 
-async function sendBuyerEmail(kind: EmailKind, o: OrderRow, ev: LoadedEvent, settings: TicketSettings, origin: string) {
-  const mail = buyerEmail(kind, emailText(kind, settings, ev.tickets), orderView(o, ev.tickets), eventView(ev, origin), `${origin}${ev.path}?order=${o.token}#tickets`, site.name);
-  return sendMail({ to: [o.email], ...mail });
+/** An order's email of a kind: to the buyer, or (admin) to the site's admin address, replying to the buyer. */
+async function sendOrderEmail(kind: EmailKind, o: OrderRow, ev: LoadedEvent, settings: TicketSettings, origin: string) {
+  const links = { order: `${origin}${ev.path}?order=${o.token}#tickets`, attendees: `${origin}/admin/tickets/${ev.series.id}/${o.occurrence ? `?date=${o.occurrence}` : ''}` };
+  const mail = ticketEmail(emailToSend(kind, settings, ev.emails[kind]), orderView(o, ev.tickets), eventView(ev, origin), links, origin);
+  return kind === 'admin' ? sendMail({ to: [notifyAddress()], replyTo: o.email, ...mail }) : sendMail({ to: [o.email], ...mail });
 }
 
 /** The confirmation to the buyer, and a copy for the site's admin (unless turned off). */
@@ -481,11 +487,8 @@ export async function sendConfirmation(db: SupabaseClient, o: OrderRow, origin: 
   // Someone on the waitlist who bought is off it.
   await db.from('ticket_waitlist').update({ status: 'bought' }).eq('entry_id', ev.series.id).eq('occurrence', o.occurrence).ilike('email', o.email.replace(/[%_\\]/g, '\\$&')).in('status', ['waiting', 'notified']);
   try {
-    if (await sendBuyerEmail('confirmation', o, ev, settings, origin)) await db.from('ticket_orders').update({ emailed_at: new Date().toISOString() }).eq('id', o.id);
-    if (settings.notify) {
-      const extra: [string, string][] = [...(o.address ? [['Address', addressText(o.address)] as [string, string]] : []), ...(orderView(o, ev.tickets).answers ?? [])];
-      await sendMail({ to: [notifyAddress()], replyTo: o.email, ...adminEmail(orderView(o, ev.tickets), eventView(ev, origin), `${origin}/admin/tickets/${ev.series.id}/${o.occurrence ? `?date=${o.occurrence}` : ''}`, site.name, extra) });
-    }
+    if (await sendOrderEmail('confirmation', o, ev, settings, origin)) await db.from('ticket_orders').update({ emailed_at: new Date().toISOString() }).eq('id', o.id);
+    if (settings.notify) await sendOrderEmail('admin', o, ev, settings, origin);
   } catch (e) {
     // The order stands either way; the attendee list can send the confirmation again.
     console.error(`tickets: confirmation for ${o.code} failed: ${(e as Error).message}`);
@@ -498,7 +501,7 @@ export async function resendConfirmation(db: SupabaseClient, id: number, origin:
   if (!o || o.status !== 'paid') throw new Error('Only paid orders have a confirmation.');
   const ev = o.entry_id ? await loadEvent(db, o.entry_id, o.occurrence, false) : null;
   if (!ev) throw new Error('The event is gone.');
-  if (!(await sendBuyerEmail('confirmation', o, ev, await siteTicketSettings(db), siteOrigin(origin)))) throw new Error('No mail server is set up (SMTP_* in the environment).');
+  if (!(await sendOrderEmail('confirmation', o, ev, await siteTicketSettings(db), siteOrigin(origin)))) throw new Error('No mail server is set up (SMTP_* in the environment).');
   await db.from('ticket_orders').update({ emailed_at: new Date().toISOString() }).eq('id', id);
 }
 
@@ -534,22 +537,22 @@ export async function sendDueTicketEmails(origin = siteOrigin()): Promise<string
       // No event (or no date) to remind about.
       if (!ev) Object.assign(patch, { reminded_at: new Date().toISOString(), followed_up_at: new Date().toISOString() });
     } else {
-      const before = timedEmail('reminder', settings, ev.tickets);
+      const before = timedEmail('reminder', settings, ev.emails.reminder);
       if (!o.reminded_at) {
         const from = before != null ? ev.startUtc - before * 3600_000 : Infinity;
         if (now >= ev.startUtc) patch.reminded_at = new Date().toISOString();
         else if (now >= from) {
-          if (Date.parse(o.paid_at ?? o.created_at) < from && (await sendBuyerEmail('reminder', o, ev, settings, origin).catch((e) => (console.error(`tickets: reminder ${o.code}: ${e.message}`), false)))) reminders++;
+          if (Date.parse(o.paid_at ?? o.created_at) < from && (await sendOrderEmail('reminder', o, ev, settings, origin).catch((e) => (console.error(`tickets: reminder ${o.code}: ${e.message}`), false)))) reminders++;
           patch.reminded_at = new Date().toISOString();
         }
       }
-      const after = timedEmail('followUp', settings, ev.tickets);
+      const after = timedEmail('followUp', settings, ev.emails.followUp);
       const end = ev.endUtc ?? ev.startUtc;
       if (!o.followed_up_at && now >= end) {
         const at = end + (after ?? 0) * 3600_000;
         if (after == null || now >= at + 3 * 86400000) patch.followed_up_at = new Date().toISOString();
         else if (now >= at) {
-          if (await sendBuyerEmail('followUp', o, ev, settings, origin).catch((e) => (console.error(`tickets: follow-up ${o.code}: ${e.message}`), false))) followUps++;
+          if (await sendOrderEmail('followUp', o, ev, settings, origin).catch((e) => (console.error(`tickets: follow-up ${o.code}: ${e.message}`), false))) followUps++;
           patch.followed_up_at = new Date().toISOString();
         }
       }

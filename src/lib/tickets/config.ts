@@ -1,6 +1,8 @@
 // Tickets: what an event sells (its fields.tickets, edited in the event's settings) and the site's
-// ticket settings (settings.site.tickets, Settings > Tickets). Read by the renderer, the editor and the
-// server alike, so nothing here touches the database or the environment.
+// ticket settings (settings.site.tickets, Settings > Tickets), with the emails buyers get, designed in
+// the email builder (src/forms/EmailBuilder.tsx). Read by the renderer, the editor and the server
+// alike, so nothing here touches the database or the environment.
+import type { EmailDoc } from '../forms/email';
 
 /** A kind of ticket ("Adult", "Child", "VIP"). Prices are in the currency's smallest unit (cents). */
 export interface TicketType {
@@ -30,13 +32,21 @@ export interface TicketQuestion {
   help?: string;
 }
 
-/** An email's text: a subject and a message with merge tags ({name}, {event}...); empty: the default. */
+/** An email: its subject and design (email builder blocks), with merge tags ({name}, {event}...), and
+ *  its plain-text version (made from the design when empty). Anything empty takes the default. */
 export interface TicketEmail {
   subject?: string;
-  message?: string;
+  design?: EmailDoc;
+  text?: string;
 }
 
-export type EmailKind = 'confirmation' | 'reminder' | 'followUp' | 'waitlist';
+/** An event's own email of a kind (table ticket_emails), or just the reminder or follow-up turned off. */
+export interface EventEmail extends TicketEmail {
+  off?: boolean;
+}
+
+/** The buyer's emails, and the copy of each order for the site's admin. */
+export type EmailKind = 'confirmation' | 'reminder' | 'followUp' | 'waitlist' | 'admin';
 
 /** An event's tickets (fields.tickets). */
 export interface EventTickets {
@@ -55,8 +65,6 @@ export interface EventTickets {
   /** When sold out, visitors can join a waitlist. auto: when tickets free up, the people waiting are
    *  emailed in order (as many as the tickets free cover); manual: the attendee list's Notify does it. */
   waitlist?: 'off' | 'auto' | 'manual';
-  /** The event's own wording for its emails, and the reminder and follow-up turned off for it. */
-  emails?: Partial<Record<EmailKind, TicketEmail & { off?: boolean }>>;
 }
 
 export const TICKETS_KEY = 'tickets';
@@ -76,6 +84,7 @@ export interface TicketSettings {
     reminder?: TicketEmail & { on?: boolean; hours?: number };
     followUp?: TicketEmail & { on?: boolean; hours?: number };
     waitlist?: TicketEmail;
+    admin?: TicketEmail;
   };
 }
 
@@ -94,36 +103,94 @@ export const DEFAULT_HOLD = 30;
 export const DEFAULT_REMINDER_HOURS = 24;
 export const DEFAULT_FOLLOW_UP_HOURS = 24;
 
+export const EMAIL_KINDS: [EmailKind, string][] = [
+  ['confirmation', 'Confirmation'],
+  ['reminder', 'Reminder'],
+  ['followUp', 'Follow-up'],
+  ['waitlist', 'Waitlist: tickets available'],
+  ['admin', 'Copy to the admin'],
+];
+
 export const MERGE_TAGS: [string, string][] = [
   ['{name}', "Buyer's name"],
   ['{first_name}', 'First name'],
+  ['{email}', "Buyer's email"],
+  ['{phone}', "Buyer's phone"],
+  ['{address}', "Buyer's address"],
   ['{event}', 'Event title'],
   ['{date}', 'Event date'],
   ['{time}', 'Event time'],
   ['{venue}', 'Venue and address'],
   ['{tickets}', 'Tickets bought'],
   ['{total}', 'Total paid'],
-  ['{code}', 'Order code (not on waitlist emails)'],
+  ['{code}', 'Order code'],
+  ['{answers}', 'Answers to the questions'],
+  ['{order_summary}', 'Order summary'],
   ['{order_link}', 'Link to the order'],
   ['{event_link}', 'Link to the event'],
+  ['{attendee_link}', 'Link to the attendee list (for the admin)'],
 ];
 
-export const DEFAULT_EMAILS: Record<EmailKind, Required<TicketEmail>> = {
+/** What the email builder's Order details block can show ('all': the order summary as a table). */
+export const ORDER_DETAILS: [string, string][] = [
+  ['all', 'Order summary (a table)'],
+  ['when', 'Date and time'],
+  ['venue', 'Venue and address'],
+  ['code', 'Order code'],
+  ['tickets', 'Tickets bought'],
+  ['total', 'Total paid'],
+  ['answers', 'Answers to the questions'],
+  ['contact', "The buyer's name, email, phone and address"],
+];
+
+const block = (type: string, id: string, props: Record<string, unknown>) => ({ type, props: { id: `${type}-${id}`, ...props } });
+const doc = (...content: ReturnType<typeof block>[]): EmailDoc => ({ root: { props: {} }, content });
+
+/** Each email as it is until someone designs their own. */
+export const DEFAULT_EMAILS: Record<EmailKind, Required<Omit<TicketEmail, 'text'>>> = {
   confirmation: {
     subject: 'Your tickets for {event}',
-    message: "Hi {first_name},\n\nYou're all set for {event} on {date}{time}.\n\nShow your order code {code} at the door, on your phone or printed. Your order: {order_link}\n\nSee you there!",
+    design: doc(
+      block('Heading', 'h', { text: "You're going to {event}", level: 2 }),
+      block('Text', 't', { html: "<p>Hi {first_name},</p><p>You're all set for {event} on {date}{time}. Show your order code at the door, on your phone or printed.</p>" }),
+      block('FormField', 'f', { field: 'all', showLabel: true }),
+      block('Button', 'b', { label: 'View your order', url: '{order_link}' }),
+      block('Text', 'e', { html: '<p>See you there!</p>' }),
+    ),
   },
   reminder: {
     subject: 'Reminder: {event} is coming up',
-    message: 'Hi {first_name},\n\nThis is a reminder that {event} is on {date}{time}.\n\n{venue}\n\nYour order code is {code}. Event details: {event_link}',
+    design: doc(
+      block('Heading', 'h', { text: '{event} is coming up', level: 2 }),
+      block('Text', 't', { html: '<p>Hi {first_name},</p><p>This is a reminder that {event} is on {date}{time}.</p>' }),
+      block('FormField', 'f', { field: 'all', showLabel: true }),
+      block('Button', 'b', { label: 'Event details', url: '{event_link}' }),
+    ),
   },
   followUp: {
     subject: 'Thanks for coming to {event}',
-    message: 'Hi {first_name},\n\nThank you for coming to {event}. We hope you enjoyed it, and we hope to see you again soon.',
+    design: doc(
+      block('Heading', 'h', { text: 'Thanks for coming', level: 2 }),
+      block('Text', 't', { html: '<p>Hi {first_name},</p><p>Thank you for coming to {event}. We hope you enjoyed it, and we hope to see you again soon.</p>' }),
+    ),
   },
   waitlist: {
     subject: 'Tickets are available for {event}',
-    message: "Hi {first_name},\n\nGood news: tickets have become available for {event} on {date}{time}. You were on the waitlist, so we're letting you know first. They go to whoever buys first:\n\n{event_link}",
+    design: doc(
+      block('Heading', 'h', { text: 'Tickets are available', level: 2 }),
+      block('Text', 't', { html: "<p>Hi {first_name},</p><p>Good news: tickets have become available for {event} on {date}{time}. You were on the waitlist, so we're letting you know first. They go to whoever buys first.</p>" }),
+      block('Button', 'b', { label: 'Get tickets', url: '{event_link}' }),
+    ),
+  },
+  admin: {
+    subject: 'New ticket order {code}: {event}',
+    design: doc(
+      block('Heading', 'h', { text: 'New order: {event}', level: 2 }),
+      block('Text', 't', { html: '<p>{name} ordered {tickets} for {event} ({date}{time}). Total {total}.</p>' }),
+      block('FormField', 'c', { field: 'contact', showLabel: true }),
+      block('FormField', 'f', { field: 'all', showLabel: true }),
+      block('Button', 'b', { label: 'See the attendee list', url: '{attendee_link}' }),
+    ),
   },
 };
 
@@ -168,7 +235,6 @@ export function ticketsOf(fields: Record<string, any> | null | undefined): Event
     address: ['paid', 'always'].includes(t.address) ? t.address : 'off',
     questions,
     waitlist: ['auto', 'manual'].includes(t.waitlist) ? t.waitlist : 'off',
-    emails: t.emails && typeof t.emails === 'object' ? t.emails : undefined,
   };
 }
 
@@ -184,34 +250,45 @@ export function ticketSettings(site: Record<string, any> | null | undefined): Ti
   };
 }
 
+/** An email builder document as stored (its shape checked, at most 200 KB), or undefined. */
+export function emailDocFrom(v: unknown): EmailDoc | undefined {
+  const d = v as EmailDoc | undefined;
+  if (!d || typeof d !== 'object' || !Array.isArray(d.content) || typeof d.root !== 'object') return undefined;
+  return JSON.stringify(d).length <= 200_000 ? { root: { props: d.root?.props ?? {} }, content: d.content } : undefined;
+}
+
+/** An email as stored: subject, design and plain text (each only when set). */
+export function ticketEmailFrom(e: any): TicketEmail {
+  return { subject: str(e?.subject, 300) || undefined, design: emailDocFrom(e?.design), text: str(e?.text, 20_000) || undefined };
+}
+
 /** The settings as the settings API stores them (known keys only). */
 export function ticketSettingsFrom(v: unknown): TicketSettings | undefined {
   if (!v || typeof v !== 'object') return undefined;
   const s = ticketSettings({ tickets: v });
-  const email = (e: any, timed: boolean) => {
-    if (!e || typeof e !== 'object') return undefined;
-    const out: Record<string, unknown> = { subject: str(e.subject, 300) || undefined, message: str(e.message, 10_000) || undefined };
-    if (timed) Object.assign(out, { on: e.on === true, hours: Math.min(Math.max(num(e.hours) ?? 24, 1), 24 * 30) });
-    return out;
-  };
   const e = (v as TicketSettings).emails ?? {};
-  return { ...s, emails: { confirmation: email(e.confirmation, false), reminder: email(e.reminder, true), followUp: email(e.followUp, true), waitlist: email(e.waitlist, false) } };
+  const timed = (x: any) => ({ ...ticketEmailFrom(x), on: x?.on === true, hours: Math.min(Math.max(num(x?.hours) ?? 24, 1), 24 * 30) });
+  return { ...s, emails: { confirmation: ticketEmailFrom(e.confirmation), reminder: timed(e.reminder), followUp: timed(e.followUp), waitlist: ticketEmailFrom(e.waitlist), admin: ticketEmailFrom(e.admin) } };
 }
 
-/** An email's subject and message: the event's own, else the site's, else the default. */
-export function emailText(kind: EmailKind, site: TicketSettings, event: EventTickets): Required<TicketEmail> {
-  const own = event.emails?.[kind];
-  const siteText = site.emails?.[kind];
+/**
+ * The email that is sent: the event's own design (and its subject and text), else the site's, else the
+ * default. A subject left empty comes from the next one down.
+ */
+export function emailToSend(kind: EmailKind, site: TicketSettings, own?: EventEmail): { subject: string; design: EmailDoc; text?: string } {
+  const siteEmail = site.emails?.[kind];
+  const from = own?.design ? own : siteEmail?.design ? siteEmail : undefined;
   return {
-    subject: own?.subject?.trim() || siteText?.subject?.trim() || DEFAULT_EMAILS[kind].subject,
-    message: own?.message?.trim() || siteText?.message?.trim() || DEFAULT_EMAILS[kind].message,
+    subject: own?.subject?.trim() || siteEmail?.subject?.trim() || DEFAULT_EMAILS[kind].subject,
+    design: from?.design ?? DEFAULT_EMAILS[kind].design,
+    text: from?.text,
   };
 }
 
 /** Whether the reminder (or follow-up) goes out for this event, and how many hours before (after) it. */
-export function timedEmail(kind: 'reminder' | 'followUp', site: TicketSettings, event: EventTickets): number | null {
+export function timedEmail(kind: 'reminder' | 'followUp', site: TicketSettings, own?: EventEmail): number | null {
   const s = site.emails?.[kind];
-  if (!s?.on || event.emails?.[kind]?.off) return null;
+  if (!s?.on || own?.off) return null;
   return s.hours || (kind === 'reminder' ? DEFAULT_REMINDER_HOURS : DEFAULT_FOLLOW_UP_HOURS);
 }
 

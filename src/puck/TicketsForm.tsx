@@ -1,12 +1,11 @@
 // An event's tickets, in its settings (fields.tickets; src/lib/tickets/config.ts): on or off, the
 // ticket types with prices, capacities and sales windows, what buyers are asked (phone, address, the
-// event's own questions), the waitlist, and the event's own wording for its emails.
+// event's own questions) and the waitlist. Its emails are on its attendee list (Emails).
 import { useEffect, useRef, useState } from 'react';
 import { Num, Row, Select, Text, Toggle, inputClass } from './fields';
-import { DEFAULT_EMAILS, MERGE_TAGS, TICKETS_KEY, newId, parsePrice, type EmailKind, type EventTickets, type TicketQuestion, type TicketType } from '../lib/tickets/config';
+import { TICKETS_KEY, newId, parsePrice, type EventTickets, type TicketQuestion, type TicketType } from '../lib/tickets/config';
 
 const small = 'rounded-sm border border-admin-ink/20 px-2 py-1 text-xs font-semibold hover:border-admin-ink/50';
-const EMAIL_LABELS: Record<EmailKind, string> = { confirmation: 'Confirmation', reminder: 'Reminder', followUp: 'Follow-up', waitlist: 'Waitlist: tickets available' };
 
 /** A price typed as dollars and cents, kept as cents. */
 function PriceInput({ value, onChange }: { value: number; onChange: (cents: number) => void }) {
@@ -86,7 +85,6 @@ export function TicketsForm({ fields, onChange }: { fields: Record<string, any>;
   // The attendee list, for an event that has been saved (/admin/edit/<id>/).
   const [entryId, setEntryId] = useState<string | null>(null);
   useEffect(() => setEntryId(location.pathname.match(/\/admin\/edit\/(\d+)/)?.[1] ?? null), []);
-  const setEmail = (kind: EmailKind, patch: Record<string, unknown>) => set({ emails: { ...(t.emails ?? {}), [kind]: { ...(t.emails?.[kind] ?? {}), ...patch } } });
 
   return (
     <>
@@ -154,20 +152,17 @@ export function TicketsForm({ fields, onChange }: { fields: Record<string, any>;
             Add question
           </button>
 
-          <span className="mt-4 mb-1 block text-xs font-semibold tracking-wider text-admin-muted uppercase">Emails for this event</span>
-          <p className="mb-2 text-xs text-admin-muted">Empty: the wording under Settings &gt; Tickets, where reminders and follow-ups are turned on. Tags: {MERGE_TAGS.map(([tag]) => tag).join(' ')}</p>
-          {(Object.keys(EMAIL_LABELS) as EmailKind[]).map((kind) => (
-            <details key={kind} className="mb-1 rounded border border-admin-ink/10 bg-admin-bg">
-              <summary className="cursor-pointer px-2 py-1.5 text-sm">{EMAIL_LABELS[kind]}{t.emails?.[kind]?.off ? ' (off)' : t.emails?.[kind]?.message || t.emails?.[kind]?.subject ? ' (own wording)' : ''}</summary>
-              <div className="border-t border-admin-ink/10 bg-white p-2">
-                {(kind === 'reminder' || kind === 'followUp') && <Toggle title="Don't send it for this event" value={t.emails?.[kind]?.off} onChange={(off) => setEmail(kind, { off: off || undefined })} />}
-                <Text title="Subject" value={t.emails?.[kind]?.subject} placeholder={DEFAULT_EMAILS[kind].subject} onChange={(subject) => setEmail(kind, { subject: subject || undefined })} />
-                <Row title="Message">
-                  <textarea className={inputClass} rows={6} value={t.emails?.[kind]?.message ?? ''} placeholder={DEFAULT_EMAILS[kind].message} onChange={(e) => setEmail(kind, { message: e.target.value || undefined })} />
-                </Row>
-              </div>
-            </details>
-          ))}
+          <span className="mt-4 mb-1 block text-xs font-semibold tracking-wider text-admin-muted uppercase">Emails</span>
+          <p className="mb-3 text-xs text-admin-muted">
+            Buyers get the emails designed under Settings &gt; Tickets.{' '}
+            {entryId ? (
+              <a className="text-admin-accent underline" href={`/admin/tickets/${entryId}/?view=emails`} target="_blank" rel="noopener">
+                Give this event its own
+              </a>
+            ) : (
+              'Save the event to give it its own.'
+            )}
+          </p>
         </>
       )}
     </>

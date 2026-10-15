@@ -9,6 +9,8 @@ import { defaultHorizon, expandEntry, recurrenceOf } from '../../../lib/recurren
 import { money, ticketSettings, ticketsOf } from '../../../lib/tickets/config';
 import { addressText, type OrderRow, type WaitlistRow } from '../../../lib/tickets/orders';
 import type { Entry } from '../../../lib/types';
+import TicketEmails from '../../../admin/TicketEmails';
+import { ticketEmailFrom, type EmailKind, type EventEmail } from '../../../lib/tickets/config';
 
 const db = Astro.locals.db;
 const isAdmin = Astro.locals.user?.role === 'admin';
@@ -19,7 +21,7 @@ const t = ticketsOf(event.fields);
 const { data: settings } = await db.from('settings').select('value').eq('key', 'site').maybeSingle();
 const currency = ticketSettings(settings?.value).currency ?? 'usd';
 const params = Astro.url.searchParams;
-const view = params.get('view') === 'waitlist' ? 'waitlist' : 'attendees';
+const view = params.get('view') === 'waitlist' ? 'waitlist' : params.get('view') === 'emails' ? 'emails' : 'attendees';
 const status = params.get('status') ?? 'paid';
 const search = (params.get('q') ?? '').trim().toLowerCase();
 
@@ -50,6 +52,10 @@ for (const o of all ?? []) {
   if (o.status === 'refunded') counts.refunded++;
 }
 const { data: waitlist } = await allRows<WaitlistRow>(db.from('ticket_waitlist').select('*').eq('entry_id', id).eq('occurrence', date).in('status', ['waiting', 'notified', 'bought']).order('id'));
+
+// The event's own emails, for the Emails tab.
+const { data: ownRows } = await db.from('ticket_emails').select('kind, subject, design, text, off').eq('entry_id', id);
+const ownEmails = Object.fromEntries((ownRows ?? []).map((r) => [r.kind, { ...ticketEmailFrom(r), off: r.off || undefined }])) as Partial<Record<EmailKind, EventEmail>>;
 
 const labels = new Map((t.questions ?? []).map((q) => [q.id, q.label]));
 const when = (s: string | null) => (s ? new Date(s).toLocaleString('en-US', { timeZone: SITE_TZ, dateStyle: 'medium', timeStyle: 'short' }) : '');
@@ -105,6 +111,7 @@ const csv = `/api/admin/tickets/attendees.csv?event=${id}${recurring ? `&date=${
 
   <nav class="mt-6 flex flex-wrap gap-1 border-b border-admin-ink/10 text-sm print:hidden" aria-label="Lists">
     <a href={link({ view: '', status: '' })} aria-current={view === 'attendees' ? 'page' : undefined} class:list={['-mb-px border-b-2 px-3 py-2', view === 'attendees' ? 'border-admin-accent text-admin-ink' : 'border-transparent text-admin-muted hover:text-admin-ink']}>Orders</a>
+    <a href={link({ view: 'emails', status: '' })} aria-current={view === 'emails' ? 'page' : undefined} class:list={['-mb-px border-b-2 px-3 py-2', view === 'emails' ? 'border-admin-accent text-admin-ink' : 'border-transparent text-admin-muted hover:text-admin-ink']}>Emails{ownRows?.length ? ` (${ownRows.length} own)` : ''}</a>
     {t.waitlist !== 'off' || waitlist?.length ? (
       <a href={link({ view: 'waitlist', status: '' })} aria-current={view === 'waitlist' ? 'page' : undefined} class:list={['-mb-px border-b-2 px-3 py-2', view === 'waitlist' ? 'border-admin-accent text-admin-ink' : 'border-transparent text-admin-muted hover:text-admin-ink']}>Waitlist ({(waitlist ?? []).length})</a>
     ) : null}
@@ -246,6 +253,11 @@ const csv = `/api/admin/tickets/attendees.csv?event=${id}${recurring ? `&date=${
         </table>
       </div>
     </>
+  )}
+  {view === 'emails' && (
+    <div class="mt-4">
+      <TicketEmails client:load eventId={id} eventTitle={event.title} own={ownEmails} site={ticketSettings(settings?.value).emails} />
+    </div>
   )}
   <p id="ticket-status" role="status" class="mt-3 text-sm text-admin-muted"></p>
 </Admin>

@@ -9,9 +9,10 @@ import { FIELD_TYPES, defaultNotification, newField } from '../lib/forms/default
 import type { Choice, Confirmation, Field, FieldType, FormDef, Logic, Notification, Operator, Width } from '../lib/forms/types';
 import siteCss from '../styles/site.css?url';
 import { site } from '../lib/site';
-import { MergeTags } from './rich-message';
+import { MergeTags, mergeTagOptions } from './rich-message';
 import EmailBuilder from './EmailBuilder';
-import { emailFromMessage } from '../lib/forms/email';
+import { formEmailKit } from './form-email';
+import { defaultEmail, emailFromMessage } from '../lib/forms/email';
 
 const input = 'w-full rounded border border-admin-ink/15 bg-white px-2 py-1.5 text-sm outline-none focus:border-admin-accent';
 const labelCls = 'mb-1 block text-xs font-medium text-admin-muted';
@@ -514,6 +515,13 @@ export default function FormBuilder({ formId }: { formId: number }) {
   }, [formId]);
 
   const dirty = row != null && JSON.stringify(row) !== saved;
+  // The email builder's kit: the form's fields and tags; its preview reads the notification as it is then.
+  const latestRow = useRef(row);
+  latestRow.current = row;
+  const emailKit = useMemo(
+    () => (row && emailFor ? formEmailKit(row.id, row.definition, () => latestRow.current!.notifications.find((n) => n.id === emailFor)!) : null),
+    [emailFor, row?.id, row?.definition],
+  );
 
   useEffect(() => {
     const warn = (e: BeforeUnloadEvent) => {
@@ -638,7 +646,15 @@ export default function FormBuilder({ formId }: { formId: number }) {
   return (
     <div className="flex h-[calc(100vh-3.5rem)] flex-col">
       {emailIndex >= 0 && (
-        <EmailBuilder formId={row.id} form={form} notification={row.notifications[emailIndex]} onChange={(patch) => setNotification(emailIndex, patch)} onClose={() => setEmailFor(null)} />
+        <EmailBuilder
+          title={`${row.notifications[emailIndex].name || 'Notification'}: email`}
+          kit={emailKit!}
+          design={row.notifications[emailIndex].design ?? defaultEmail()}
+          text={row.notifications[emailIndex].text}
+          note="Changes are saved with the form."
+          onChange={(patch) => setNotification(emailIndex, patch)}
+          onClose={() => setEmailFor(null)}
+        />
       )}
       <div className="flex items-center gap-4 border-b border-admin-ink/10 bg-white px-4 py-2">
         <a href="/admin/forms/" className="text-sm text-admin-muted hover:text-admin-accent">
@@ -752,7 +768,7 @@ export default function FormBuilder({ formId }: { formId: number }) {
               <Pick label="After someone submits" value={confirmation.type} options={[['message', 'Show a message'], ['page', 'Go to a page'], ['redirect', 'Go to a web address']]} onChange={(v) => setConfirmation({ type: v })} />
               {confirmation.type === 'message' && (
                 <>
-                  <MergeTags form={form} onInsert={(tag) => setConfirmation({ message: `${confirmation.message ?? ''}${tag}` })} />
+                  <MergeTags tags={mergeTagOptions(form)} onInsert={(tag) => setConfirmation({ message: `${confirmation.message ?? ''}${tag}` })} />
                   <Area label="Message" value={confirmation.message} rows={8} onChange={(v) => setConfirmation({ message: v })} hint="Paragraphs are added automatically. HTML is allowed." />
                 </>
               )}
@@ -787,7 +803,7 @@ export default function FormBuilder({ formId }: { formId: number }) {
                     <TextIn label="Send to" value={n.to} hint="Addresses separated by commas. {admin_email} is the Chamber's address; a field tag like {Email:f3} sends to what the visitor entered." onChange={(v) => setNotification(i, { to: v })} />
                     <TextIn label="Reply-to" value={n.replyTo} placeholder="The visitor's email, if the form has one" onChange={(v) => setNotification(i, { replyTo: v || undefined })} />
                     <TextIn label="From name" value={n.fromName} placeholder={site.organization} onChange={(v) => setNotification(i, { fromName: v || undefined })} />
-                    <MergeTags form={form} onInsert={(tag) => setNotification(i, { subject: `${n.subject ?? ''}${tag}` })} />
+                    <MergeTags tags={mergeTagOptions(form)} onInsert={(tag) => setNotification(i, { subject: `${n.subject ?? ''}${tag}` })} />
                     <TextIn label="Subject" value={n.subject} onChange={(v) => setNotification(i, { subject: v })} />
                     <div className="mb-3">
                       <span className={labelCls}>Email</span>

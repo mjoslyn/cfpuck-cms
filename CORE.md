@@ -425,6 +425,9 @@ body, a preheader, columns stacking on phones; text kept to paragraphs, emphasis
 canvas included. Its Plain text tab (`Notification.text`, merge tags allowed) is the text part; empty,
 the text is made from the HTML. Its Preview tab renders the email as sent (`renderNotification`, the
 code that sends it) for a stored submission or sample answers (`/api/admin/forms/<id>/notification-preview`).
+The builder itself knows nothing of forms: its caller passes a kit (`EmailKit`: the data block's
+options, merge tags, canvas stand-ins, preview); a notification's is `formEmailKit`
+(`src/forms/form-email.ts`), ticket emails have their own.
 Notifications from before the builder send their message as before until opened there. Mail goes out over SMTP
 (`SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_PASS`/`SMTP_SECURE`, or one `SMTP_URL`; sender `MAIL_FROM`,
 default `mailFrom` in the site config).
@@ -461,11 +464,10 @@ An event sells tickets or takes free registrations when Tickets is on in its set
 ticket types (name, description, price in cents, capacity, most per order, sales window as local times
 in the event's timezone, hidden for past ones), the event's capacity (per date for a recurring event),
 most per order, phone (off, optional, required), address (off, for paid orders, always), the event's own
-questions (asked once per order), a waitlist (`off`, `auto`, `manual`) and its own wording for its
-emails. Settings > Tickets (`settings.site.tickets`, `ticketSettings`, `src/admin/TicketSettings.tsx`):
-the payment provider (Stripe or Square; keys in the environment, `providerReady`), currency, how long an
-unpaid order holds its tickets (30-120 minutes), the admin's copy of orders, and each email's wording and
-the reminder's and follow-up's timing.
+questions (asked once per order) and a waitlist (`off`, `auto`, `manual`). Settings > Tickets
+(`settings.site.tickets`, `ticketSettings`, `src/admin/TicketSettings.tsx`): the payment provider (Stripe
+or Square; keys in the environment, `providerReady`), currency, how long an unpaid order holds its
+tickets (30-120 minutes), and the emails with the reminder's and follow-up's timing.
 
 - Rendering: `src/render/c/tickets.ts`. The Event details block shows the form below the content and a
   Tickets box in its sidebar, unless the page has a `tickets` block (offered on events and in templates).
@@ -489,11 +491,18 @@ the reminder's and follow-up's timing.
   shown when every type on sale is sold out. `notifyWaitlist` emails people in order as far as the free
   tickets go, counting those told in the last day as still deciding; `auto` runs it after a cancellation
   or refund and hourly. Buying moves a person to `bought`.
-- Emails (`src/lib/tickets/email.ts`, sent with `sendMail`): confirmation, reminder (hours before),
-  follow-up (hours after, for up to three days), waitlist. `netlify/functions/ticket-emails.mts` runs
+- Emails: confirmation, reminder (hours before), follow-up (hours after, for up to three days),
+  waitlist, and the admin's copy of each order (`notify`). Each is a subject, an email builder design
+  and an optional plain text (`TicketEmail`), with ticket merge tags (`MERGE_TAGS`) and an Order details
+  block (`ORDER_DETAILS`: the summary table, date, venue, code, tickets, total, answers, the buyer's
+  contact). Sent: the event's own (table `ticket_emails`, its attendee list > Emails,
+  `src/admin/TicketEmails.tsx`; kept out of the event's fields so editor saves can't overwrite it), else
+  the site's, else `DEFAULT_EMAILS` (`emailToSend`). `src/lib/tickets/email.ts` renders them with the
+  forms' renderer (`renderEmail`); the builder's kit is `src/admin/ticket-email.ts`, its preview a sample
+  order rendered in the browser. `netlify/functions/ticket-emails.mts` runs
   `sendDueTicketEmails` hourly (deployed site only): reminders, follow-ups, expired holds, auto waitlists.
   Links use `SITE_URL`, else Netlify's `URL`.
-- Orders and waitlists aren't synced or backed up: they stay on the copy where they were made.
+- Orders, waitlists and events' own emails aren't synced or backed up: they stay on the copy where they were made.
 
 ## Editor
 
