@@ -13,6 +13,7 @@ import { MediaPicker } from '../puck/fields';
 import { MergeTags, RichMessage } from './rich-message';
 import { EventsQueryField, useEmailEvents } from './email-events';
 import { typeDef } from '../lib/site';
+import { useEventsOn } from '../puck/member-settings';
 
 /** An email as it would be sent, for the Preview tab. */
 export interface RenderedEmail {
@@ -103,11 +104,11 @@ function ColorField({ label, value, onChange, fallback }: { label: string; value
 const color = (label: string, fallback: string) => ({ type: 'custom' as const, label, render: ({ value, onChange }: any) => <ColorField label={label} value={value} onChange={onChange} fallback={fallback} /> });
 const alignField = { type: 'radio' as const, label: 'Align', options: [{ label: 'Left', value: 'left' }, { label: 'Centre', value: 'center' }, { label: 'Right', value: 'right' }] };
 
-function emailConfig(kit: EmailKit): Config {
+function emailConfig(kit: EmailKit, events: boolean): Config {
   const leaf = (type: string) => (props: any) => <Leaf type={type} props={props} />;
   return {
     categories: {
-      content: { title: 'Content', components: ['Heading', 'Text', 'Button', 'Image', 'FormField', ...(kit.payment ? ['Payment'] : []), ...(typeDef('event') ? ['Events'] : [])] },
+      content: { title: 'Content', components: ['Heading', 'Text', 'Button', 'Image', 'FormField', ...(kit.payment ? ['Payment'] : []), ...(events ? ['Events'] : [])] },
       layout: { title: 'Layout', components: ['Section', 'Columns', 'Divider', 'Spacer'] },
     },
     root: {
@@ -250,7 +251,9 @@ const tabCls = (on: boolean) => `-mb-px border-b-2 px-4 py-2 text-sm font-medium
 
 export default function EmailBuilder({ title, kit, design: start, text, note, onChange, onClose }: { title: string; kit: EmailKit; design: EmailDoc; text?: string; note: string; onChange: (patch: { design?: EmailDoc; text?: string }) => void; onClose: () => void }) {
   const [tab, setTab] = useState<'visual' | 'text' | 'preview'>('visual');
-  const config = useMemo(() => emailConfig(kit), [kit]);
+  // The Events block while the site's events are on (Settings > Events).
+  const eventsAreOn = useEventsOn();
+  const config = useMemo(() => emailConfig(kit, !!typeDef('event') && eventsAreOn !== false), [kit, eventsAreOn]);
   // Puck keeps its own state; it starts from the design and reports every change.
   const initial = useRef<Data>(start as unknown as Data);
   const [design, setDesign] = useState<EmailDoc>(start);

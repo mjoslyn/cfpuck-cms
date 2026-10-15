@@ -7,6 +7,7 @@ import { Loader, PUBLIC_SCOPE } from '../data';
 import { downsize, mediaUrl } from '../media/image';
 import { permalink } from '../permalink';
 import { typeDef } from '../site';
+import { eventsOnIn } from './on';
 import type { Entry } from '../types';
 import type { EmailDoc, EmailEvent, EmailItem } from '../forms/email';
 import { eventWhen, excerptOf, toCalEvent, venueIdOf, venueLines } from './model';
@@ -86,7 +87,7 @@ const cache = new Map<string, { at: number; events: Promise<EmailEvent[]> }>();
 /** Each Events block's events, by block id (empty when the document has none or the site has no events). */
 export async function emailEvents(db: SupabaseClient, doc: EmailDoc | null | undefined, origin: string): Promise<Record<string, EmailEvent[]>> {
   const blocks = eventBlocks(doc?.content);
-  if (!blocks.length || !typeDef('event')) return {};
+  if (!blocks.length || !typeDef('event') || !(await eventsOnIn(db))) return {};
   const now = Date.now();
   for (const [k, v] of cache) if (now - v.at > 60_000) cache.delete(k);
   const out: Record<string, EmailEvent[]> = {};

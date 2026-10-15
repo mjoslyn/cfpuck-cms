@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, type DragEvent } from 'react';
 import { MediaModal } from '../puck/fields';
 import type { PuckItem } from '../lib/puck/types';
 import { COMPOSABLE_TYPES } from '../lib/site';
+import { useEventsOn } from '../puck/member-settings';
 import { outline, isComposed } from '../lib/compose/outline';
 import { inline } from '../lib/compose/build';
 
@@ -79,6 +80,8 @@ export interface ComposerProps {
 
 export default function Composer({ entryId, live, selection, onClose, pinned, onPin }: ComposerProps) {
   const [sessionId, setSessionId] = useState<string | null>(null);
+  // A new conversation doesn't create events while they're off (Settings > Events).
+  const eventsAreOn = useEventsOn();
   /** Id prefix of the blocks this conversation built (they are replaced on each update). */
   const [prefix, setPrefix] = useState('');
   const [turns, setTurns] = useState<ChatTurn[]>([]);
@@ -432,7 +435,7 @@ export default function Composer({ entryId, live, selection, onClose, pinned, on
             <label className="flex items-center gap-1 text-admin-muted" title="The content type Claude creates">
               Create as
               <select className="rounded border border-admin-ink/15 px-1 py-1 text-admin-ink" value={type} onChange={(e) => setType(e.target.value)}>
-                {COMPOSABLE_TYPES.map((c) => (
+                {COMPOSABLE_TYPES.filter((c) => c.type !== 'event' || eventsAreOn !== false).map((c) => (
                   <option key={c.type} value={c.type}>
                     {c.singular}
                   </option>

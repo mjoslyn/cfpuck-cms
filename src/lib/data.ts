@@ -50,6 +50,8 @@ const searchWords = (search?: string) => (search ?? '').replace(/[%_,()]/g, ' ')
 export interface LoaderScope {
   published: true;
   viewer?: Viewer | null;
+  /** Events are off (Settings > Events): no event entries. */
+  noEvents?: boolean;
 }
 
 /** The site's view for anyone: published entries, none of them members-only. */
@@ -59,7 +61,8 @@ export const PUBLIC_SCOPE: LoaderScope = { published: true };
 export function visibleTo<Q>(query: Q, scope: LoaderScope | undefined): Q {
   if (!scope) return query;
   // Typed loosely: the builder's own types are too deep to pass through a generic helper.
-  const q = (query as any).eq('status', 'publish');
+  let q = (query as any).eq('status', 'publish');
+  if (scope.noEvents) q = q.neq('type', 'event');
   const v = scope.viewer;
   if (v?.editor) return q;
   const open = 'fields->access->>members.is.null,fields->access->>members.neq.true';

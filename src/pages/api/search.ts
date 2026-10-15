@@ -7,6 +7,7 @@
 import { BROWSER_CACHE_CONTROL, PAGE_CACHE_TAG } from '../../lib/cache';
 import type { APIRoute } from 'astro';
 import { siteDb } from '../../lib/supabase';
+import { eventsOn } from '../../lib/events/on';
 import { Loader, PUBLIC_SCOPE } from '../../lib/data';
 import { permalink, termLink } from '../../lib/permalink';
 import { COMPOSABLE_TYPES, isTaxonomy, searchTypes, taxonomySingular, typeDef } from '../../lib/site';
@@ -32,7 +33,9 @@ export const GET: APIRoute = async ({ url, cache }) => {
   };
   const none = { q, total: 0, results: [], terms: [] };
   if (q.length < 2) return new Response(JSON.stringify(none), { headers });
-  const loader = new Loader(siteDb(), undefined, PUBLIC_SCOPE);
+  const loader = new Loader(siteDb(), undefined, { ...PUBLIC_SCOPE });
+  // Events off (Settings > Events): none found.
+  loader.scope!.noEvents = !eventsOn((await loader.settings()).site);
   const types = asked.length ? asked : searchTypes((await loader.settings()).site);
 
   // Terms of the taxonomy whose names hold the words, in use, by name.

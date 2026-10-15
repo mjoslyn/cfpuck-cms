@@ -495,6 +495,18 @@ Feeds (`src/lib/events/ical.ts`): `/events.ics` (same `q`, `month`, `past` filte
 (`src/lib/events/timezone.ts`) and are cached at the CDN like pages. The month and day views link no
 further than the first and last event (and today); a view outside that range is noindex.
 
+Events can be turned off (admins, Settings > Events: `settings.site.events.enabled`, on unless set to
+false; `eventsOn`, `src/lib/events/on.ts`; the tab shows on sites with an event type). Off, nothing is
+deleted and events stay under Content to edit (their tab marked "off"), but the site shows none:
+`resolve` answers Not found for the event listing, calendar views, event pages and occurrences and the
+term pages of taxonomies that list events; the feeds, ticket checkout, waitlist and availability
+endpoints answer 404; the loader's scope leaves event entries out (`noEvents`: collections, search,
+menus); `EVENT_BLOCKS` render nothing (a note in the editor) and load nothing; email Events blocks list
+none; and the hourly ticket emails don't run. The editor doesn't offer event and ticket blocks, the
+email Events block or the event type in collections and Compose, and the admin hides Tickets and
+Settings > Tickets. The checkout's return and the payment webhooks still work for orders already
+placed.
+
 The site timezone (`SITE_TZ`) is set by admins under Settings (`settings.site.timezone`; the config's
 `timezone` is the default). It is a live binding in `src/lib/site`: the middleware and compose jobs
 refresh it from the settings (`src/lib/site/timezone.ts`, cached a minute), admin pages pass it to
