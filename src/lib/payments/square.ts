@@ -18,7 +18,10 @@ async function call(method: 'GET' | 'POST' | 'DELETE', path: string, body?: unkn
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ProviderError(`Square ${res.status}: ${data?.errors?.map((e: { detail?: string; code?: string }) => e.detail || e.code).join('; ') || res.statusText}`);
+  if (!res.ok) {
+    const errors: { detail?: string; code?: string; field?: string }[] = data?.errors ?? [];
+    throw Object.assign(new ProviderError(`Square ${res.status}: ${errors.map((e) => e.detail || e.code).join('; ') || res.statusText}`), { fields: errors.map((e) => e.field) });
+  }
   return data;
 }
 
@@ -26,7 +29,7 @@ async function create(req: CheckoutRequest) {
   const location = env('SQUARE_LOCATION_ID');
   if (!location) throw new ProviderError('Square is not set up (SQUARE_LOCATION_ID).');
   const currency = req.currency.toUpperCase();
-  const { payment_link } = await call('POST', '/online-checkout/payment-links', {
+  const body = (email?: string) => ({
     idempotency_key: req.idempotencyKey.slice(0, 45),
     order: {
       location_id: location,
@@ -34,9 +37,18 @@ async function create(req: CheckoutRequest) {
       line_items: req.items.map((it) => ({ name: it.name.slice(0, 500), quantity: String(it.quantity), base_price_money: { amount: it.unit, currency } })),
     },
     checkout_options: { redirect_url: req.returnUrl, ask_for_shipping_address: false },
-    ...(req.email ? { pre_populated_data: { buyer_email: req.email } } : {}),
+    ...(email ? { pre_populated_data: { buyer_email: email } } : {}),
     ...(req.description ? { payment_note: req.description.slice(0, 500) } : {}),
   });
+  let payment_link;
+  try {
+    ({ payment_link } = await call('POST', '/online-checkout/payment-links', body(req.email)));
+  } catch (e) {
+    // Square refuses addresses it judges invalid (example.org, some it can't verify); the buyer then
+    // types one on its page.
+    if (!req.email || !(e as { fields?: string[] }).fields?.includes('pre_populated_data.buyer_email')) throw e;
+    ({ payment_link } = await call('POST', '/online-checkout/payment-links', { ...body(), idempotency_key: `${req.idempotencyKey.slice(0, 42)}-ne` }));
+  }
   return { ref: String(payment_link.id), order: String(payment_link.order_id), url: String(payment_link.url) };
 }
 
