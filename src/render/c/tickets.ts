@@ -1,11 +1,17 @@
-// Tickets on an event page: the event's ticket types with quantities, the buyer's details and the
-// event's own questions, posting to /api/tickets/checkout; a waitlist form when it's sold out; the
-// buyer's order when they come back (?order=<token>); and the outcome of a checkout (?tickets=<reason>).
-// The Event details block shows it below the event's content, unless the page has a Tickets block of
-// its own. public/assets/js/tickets.js adds the running total and live availability; without it the
-// form still works and the server checks everything.
+// Tickets for an event: its ticket types with quantities, the buyer's details and the event's own
+// questions, posting to /api/tickets/checkout; a waitlist form when it's sold out; the buyer's order when
+// they come back (?order=<token>); and the outcome of a checkout (?tickets=<reason>&event=<id>). The
+// Event details block shows the page's event's below its content, unless the page has a Tickets block
+// for it. The Tickets block goes on any page or template: it shows the event it names (`event`, and
+// `date` for one date of a recurring event, else its next), else the page's own event. The form posts
+// the page it is on, so the buyer comes back there (src/lib/tickets/orders.ts ticketsAt).
+// public/assets/js/tickets.js adds the running total and live availability; without it the form still
+// works and the server checks everything.
 import type { Env, Renderer, RenderCtx } from '../env';
 import type { Entry } from '../../lib/types';
+import { defaultHorizon, expandEntry, recurrenceOf } from '../../lib/recurrence';
+import { permalink } from '../../lib/permalink';
+import { eventTimes, eventWhen } from '../../lib/events/model';
 import { esc } from '../html';
 import { SITE_TZ } from '../../lib/site';
 import {
@@ -43,21 +49,55 @@ interface TicketsData {
   order?: TicketOrderStatus | null;
 }
 
-/** The event shown and its ticket data's key ("tickets:<series id>:<date>"). */
-function eventOf(env: Env): { e: Entry; id: number; occurrence: string } | null {
-  const e = env.ctx.queried.entry;
-  if (!e || e.type !== 'event') return null;
-  return { e, id: e.series_id ?? e.id, occurrence: e.occurrence ?? '' };
+/** An event (one date of a recurring one) whose tickets are shown; `own`: the page's own event. */
+export interface TicketsTarget {
+  e: Entry;
+  id: number;
+  occurrence: string;
+  own: boolean;
 }
-const dataKey = (id: number, occurrence: string) => `tickets:${id}:${occurrence}`;
 
-/** Loads what's taken and the buyer's order (prepare.ts, for the Tickets and Event details blocks). */
-export async function prepareTickets(ctx: RenderCtx) {
+const targetOf = (e: Entry, own: boolean): TicketsTarget => ({ e, id: e.series_id ?? e.id, occurrence: e.occurrence ?? '', own });
+
+/** The page's own event. */
+function pageEvent(ctx: RenderCtx): TicketsTarget | null {
   const e = ctx.queried.entry;
-  if (!e || e.type !== 'event' || !ticketsOf(e.fields).enabled) return;
-  const id = e.series_id ?? e.id;
-  const occurrence = e.occurrence ?? '';
-  const key = dataKey(id, occurrence);
+  return e && e.type === 'event' ? targetOf(e, true) : null;
+}
+const dataKey = (t: Pick<TicketsTarget, 'id' | 'occurrence'>) => `tickets:${t.id}:${t.occurrence}`;
+const blockKey = (blockId: string) => `tickets-target:${blockId}`;
+
+/** An event a Tickets block names: its date `date`, or (recurring) its next date. Published only, outside the editor. */
+async function namedEvent(ctx: RenderCtx, id: number, date: string): Promise<Entry | null> {
+  const [series] = await ctx.loader.entriesByIds([id]);
+  if (!series || series.type !== 'event' || (series.status !== 'publish' && !ctx.editor)) return null;
+  if (!recurrenceOf(series)) return series;
+  const dates = expandEntry(series, defaultHorizon());
+  if (date) return dates.find((o) => o.occurrence === date) ?? null;
+  const now = Date.now();
+  return dates.find((o) => o.event_start && Date.parse(o.event_start) >= now) ?? dates[dates.length - 1] ?? null;
+}
+
+/** A Tickets block's event (prepare.ts): the one it names, else the page's own. Returns it, if any. */
+export async function prepareTicketsBlock(ctx: RenderCtx, blockId: string, attrs: Record<string, any>): Promise<TicketsTarget | null> {
+  const page = pageEvent(ctx);
+  const id = Number(attrs.event) || 0;
+  let target = page;
+  if (id) {
+    const e = await namedEvent(ctx, id, /^\d{4}-\d{2}-\d{2}$/.test(String(attrs.date ?? '')) ? attrs.date : '');
+    target = e ? targetOf(e, !!page && page.id === (e.series_id ?? e.id) && page.occurrence === (e.occurrence ?? '')) : null;
+  }
+  if (!target) return null;
+  ctx.data.set(blockKey(blockId), target);
+  await prepareTickets(ctx, target);
+  return target;
+}
+
+/** Loads what's taken and the buyer's order (for the Tickets and Event details blocks). */
+export async function prepareTickets(ctx: RenderCtx, target = pageEvent(ctx)) {
+  if (!target || !ticketsOf(target.e.fields).enabled) return;
+  const { id, occurrence } = target;
+  const key = dataKey(target);
   if (ctx.data.has(key) || id <= 0) return;
   const data: TicketsData = { sold: {} };
   const { data: sold } = await ctx.loader.db.rpc('ticket_sold', { p_entry: id, p_occurrence: occurrence });
@@ -77,6 +117,13 @@ const when = (local: string) => {
   const d = new Date(`${local.slice(0, 16)}:00Z`);
   return d.toLocaleString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }).replace(' AM', ' am').replace(' PM', ' pm');
 };
+
+/** "Saturday, October 24, 2026 at 7:00 pm". */
+function eventDateText(e: Entry): string {
+  const { start, end, allDay } = eventTimes(e);
+  const { date, time } = eventWhen(start, end, allDay);
+  return date + time;
+}
 
 /** The event's end as a local "Y-m-dTH:i" (all day: the end of its last day). */
 function endsAt(e: Entry): string {
@@ -158,12 +205,12 @@ function addressFields(t: EventTickets, uid: string): string {
 
 const HONEYPOT = (uid: string) => `<div class="c-field is-hp" aria-hidden="true"><label for="${uid}-hp">Leave this empty</label><input id="${uid}-hp" name="_hp" type="text" tabindex="-1" autocomplete="off" /></div>`;
 
-function waitlistForm(t: EventTickets, id: number, occurrence: string, uid: string): string {
+function waitlistForm(t: EventTickets, id: number, occurrence: string, uid: string, pageInput: string): string {
   const max = t.maxPerOrder || DEFAULT_MAX_PER_ORDER;
   return (
     `<div class="c-form c-tickets__waitlist"><p class="c-tickets__note">Join the waitlist and we'll email you if tickets become available.</p>` +
     `<form class="c-form__form" method="post" action="/api/tickets/waitlist">` +
-    `<input type="hidden" name="event" value="${id}" /><input type="hidden" name="occurrence" value="${esc(occurrence)}" />` +
+    `<input type="hidden" name="event" value="${id}" /><input type="hidden" name="occurrence" value="${esc(occurrence)}" />${pageInput}` +
     `<div class="c-form__fields">${contactFields(t, `${uid}-w`)}` +
     `<div class="c-field span-6"><label class="c-field__label" for="${uid}-w-quantity">Tickets wanted</label><select class="c-input" id="${uid}-w-quantity" name="quantity">${Array.from({ length: max }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('')}</select></div>` +
     `${HONEYPOT(`${uid}-w`)}</div>` +
@@ -171,20 +218,27 @@ function waitlistForm(t: EventTickets, id: number, occurrence: string, uid: stri
   );
 }
 
-/** The tickets section for the event being shown ('' when it doesn't sell tickets). */
-export function ticketsSection(env: Env, heading?: string): string {
-  const ev = eventOf(env);
-  if (!ev) return '';
-  const { e, id, occurrence } = ev;
+/** The tickets section for an event, the page's own by default ('' when it doesn't sell tickets). */
+export function ticketsSection(env: Env, heading?: string, target = pageEvent(env.ctx)): string {
+  if (!target) return '';
+  const { e, id, occurrence } = target;
   const t = ticketsOf(e.fields);
   if (!t.enabled) return '';
-  const data = (env.ctx.data.get(dataKey(id, occurrence)) as TicketsData | undefined) ?? { sold: {} };
+  const data = (env.ctx.data.get(dataKey(target)) as TicketsData | undefined) ?? { sold: {} };
   const currency = ticketSettings(env.ctx.settings.site).currency ?? 'usd';
   const uid = `tickets-${id}${occurrence ? `-${occurrence}` : ''}`;
-  const reason = env.ctx.queried.url.searchParams.get('tickets') ?? '';
+  const params = env.ctx.queried.url.searchParams;
+  // A checkout's outcome shows on the section of the event it was for.
+  const reason = !params.get('event') || params.get('event') === String(id) ? (params.get('tickets') ?? '') : '';
   const message = CHECKOUT_MESSAGES[reason] ? `<p class="c-tickets__message${reason === 'waitlisted' || reason === 'cancelled' ? '' : ' is-error'}" role="${reason === 'waitlisted' ? 'status' : 'alert'}" tabindex="-1" data-focus>${esc(CHECKOUT_MESSAGES[reason])}</p>` : '';
   const order = data.order ? orderView(data.order) : '';
-  const head = `<section class="c-tickets" id="tickets" aria-labelledby="${uid}-title"><h2 class="c-tickets__heading" id="${uid}-title">${esc(heading || t.heading || 'Tickets')}</h2>${message}${order}`;
+  // The anchor the server sends buyers back to (ticketsAt in src/lib/tickets/orders.ts).
+  const anchor = target.own ? 'tickets' : `tickets-${id}`;
+  const title = heading || t.heading || 'Tickets';
+  // Another event than the page's: which one, and when.
+  const named = target.own ? '' : `<p class="c-tickets__event"><a href="${esc(permalink(e))}">${esc(e.title)}</a><br /><span class="c-tickets__muted">${esc(eventDateText(e))}</span></p>`;
+  const head = `<section class="c-tickets${target.own ? '' : ' is-other'}" id="${anchor}" aria-labelledby="${uid}-title"><h2 class="c-tickets__heading" id="${uid}-title">${esc(title)}</h2>${named}${message}${order}`;
+  const pageInput = `<input type="hidden" name="page" value="${esc(env.ctx.queried.url.pathname)}" />`;
   const close = (body: string) => `${head}${body}</section>`;
 
   const tz = e.fields?.timezone || SITE_TZ;
@@ -200,7 +254,7 @@ export function ticketsSection(env: Env, heading?: string): string {
     return close(`<p class="c-tickets__note">${next ? `Tickets go on sale ${esc(when(next))}.` : 'Ticket sales for this event have closed.'}</p>`);
   }
   const soldOut = open.every((x) => left.types[x.id] === 0);
-  if (soldOut) return close(`<p class="c-tickets__note is-sold-out">Sold out.</p>${t.waitlist !== 'off' ? waitlistForm(t, id, occurrence, uid) : ''}`);
+  if (soldOut) return close(`<p class="c-tickets__note is-sold-out">Sold out.</p>${t.waitlist !== 'off' ? waitlistForm(t, id, occurrence, uid, pageInput) : ''}`);
 
   const rows = types
     .map((x) => {
@@ -219,7 +273,7 @@ export function ticketsSection(env: Env, heading?: string): string {
   const anyPaid = open.some((x) => x.price > 0);
   return close(
     `<div class="c-form c-tickets__buy"><form class="c-form__form c-tickets__form" method="post" action="/api/tickets/checkout" data-tickets data-event="${id}" data-date="${esc(occurrence)}" data-currency="${esc(currency)}" data-max="${t.maxPerOrder || DEFAULT_MAX_PER_ORDER}">` +
-      `<input type="hidden" name="event" value="${id}" /><input type="hidden" name="occurrence" value="${esc(occurrence)}" />` +
+      `<input type="hidden" name="event" value="${id}" /><input type="hidden" name="occurrence" value="${esc(occurrence)}" />${pageInput}` +
       `<ul class="c-tickets__types">${rows}</ul>` +
       `<p class="c-tickets__total" data-tickets-total hidden></p>` +
       `<div class="c-form__fields">${contactFields(t, uid)}${addressFields(t, uid)}${(t.questions ?? []).map((q) => question(q, uid)).join('')}${HONEYPOT(uid)}</div>` +
@@ -231,7 +285,7 @@ export function ticketsSection(env: Env, heading?: string): string {
 
 /** "From $25" / "Free" / "$10 – $40", for the event's details sidebar. */
 export function ticketPriceSummary(env: Env): string {
-  const ev = eventOf(env);
+  const ev = pageEvent(env.ctx);
   if (!ev) return '';
   const t = ticketsOf(ev.e.fields);
   const types = offeredTypes(t);
@@ -245,5 +299,9 @@ export function ticketPriceSummary(env: Env): string {
 }
 
 export const TICKETS_RENDERERS: Record<string, Renderer> = {
-  tickets: (b, env) => ticketsSection(env, b.attrs.heading),
+  tickets: (b, env) => {
+    const target = env.ctx.data.get(blockKey(b.id)) as TicketsTarget | undefined;
+    if (target) return ticketsSection(env, b.attrs.heading, target);
+    return env.ctx.editor ? `<p class="c-tickets__note">${b.attrs.event ? 'That event isn’t there, or has no such date.' : 'Choose an event in this block’s settings (on an event’s own page it shows that event).'}</p>` : '';
+  },
 };

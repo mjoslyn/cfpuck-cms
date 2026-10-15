@@ -123,7 +123,7 @@ interface EntryRow { id: number; title: string; slug: string; status: string; fi
 const summary = (e: EntryRow) => [e.fields?.address, e.fields?.city, e.fields?.state].filter(Boolean).join(', ');
 
 /** A single entry reference (an event's venue): pick one by searching, clear it, or add a new one inline. */
-function EntryField({ title, entryType, create, value, onChange }: { title: string; entryType: string; create?: FieldDef[]; value: unknown; onChange: (v: number | null) => void }) {
+export function EntryField({ title, entryType, create, value, onChange }: { title: string; entryType: string; create?: FieldDef[]; value: unknown; onChange: (v: number | null) => void }) {
   const id = Number(value) || 0;
   const noun = title.toLowerCase();
   const [current, setCurrent] = useState<EntryRow | null>(null);

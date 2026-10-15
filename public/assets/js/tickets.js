@@ -89,6 +89,8 @@
   }
 
   // Messages and confirmations take focus, so screen readers announce them.
-  const focus = document.querySelector('.c-tickets [data-focus]');
-  if (focus && location.hash === '#tickets') focus.focus();
+  // The section is #tickets on an event's own page, #tickets-<event id> for another event's.
+  const section = /^#tickets(-\d+)?$/.test(location.hash) ? document.getElementById(location.hash.slice(1)) : null;
+  const focus = section?.querySelector('[data-focus]');
+  if (focus) focus.focus();
 })();

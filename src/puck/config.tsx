@@ -1,7 +1,8 @@
 // Puck configuration: one component per block type, rendered through BlockView.
 import type { Config, Fields } from '@puckeditor/core';
 import { BlockView } from './BlockView';
-import { JsonAttrs, Select, Text, Toggle, type Attrs } from './fields';
+import { JsonAttrs, Row, Select, Text, Toggle, inputClass, type Attrs } from './fields';
+import { EntryField } from './entry-fields';
 import { SITE_BLOCKS } from '../lib/site/render';
 import { taxonomiesOf } from '../lib/site';
 import { SITE_EDITOR } from '../lib/site/editor';
@@ -34,8 +35,16 @@ const PANELS: Record<string, Panel> = {
 Object.assign(PANELS, {
   tickets: (a: Attrs, set: (p: Attrs) => void) => (
     <>
+      <EntryField title="Event" entryType="event" value={a.event} onChange={(id) => set({ event: id || undefined, date: undefined })} />
+      {a.event ? (
+        <Row title="Date (a recurring event's; empty: its next)">
+          <input type="date" className={inputClass} value={a.date ?? ''} onChange={(e) => set({ date: e.target.value || undefined })} />
+        </Row>
+      ) : (
+        <p className="mb-3 text-xs text-admin-muted">With no event chosen, it shows the tickets of the event whose page it is on (in an event template, each event's own).</p>
+      )}
       <Text title="Heading" value={a.heading} placeholder="Tickets (or the event's own)" onChange={(v) => set({ heading: v || undefined })} />
-      <p className="mb-2 text-xs text-admin-muted">The event's ticket types, prices and questions are in its settings, under Tickets. The Event details block shows tickets on its own; use this block in templates without it.</p>
+      <p className="mb-2 text-xs text-admin-muted">The event's ticket types, prices and questions are in its settings, under Tickets. On an event's page the Event details block shows them on its own, unless a Tickets block for that event is on the page.</p>
     </>
   ),
   'form': (a: Attrs, set: (p: Attrs) => void) => (
@@ -155,7 +164,6 @@ const withSite = (category: BlockCategory, core: string[]) => [...core, ...Objec
 const APPLIES_TO: Record<string, string[]> = {
   'event-details': ['event'],
   'event-schedule': ['event'],
-  tickets: ['event'],
   ...Object.fromEntries(Object.entries(SITE_BLOCKS).flatMap(([t, d]) => (d.types ? [[t, d.types]] : []))),
 };
 

@@ -72,7 +72,8 @@ export function tagValues(o: OrderView, ev: EventView, links: EmailLinks): Recor
     '{answers}': (o.answers ?? []).map(([k, v]) => `${k}: ${v}`).join('\n'),
     '{order_summary}': summaryRows(o, ev).map(([k, v]) => `${k}: ${v}`).join('\n'),
     '{payment_summary}': o.payment ? textVersion(paymentTable(o.payment)) : '',
-    '{order_link}': o.code ? links.order : ev.link,
+    // A waitlist email's: the tickets where they joined the waitlist.
+    '{order_link}': links.order,
     '{event_link}': ev.link,
     '{attendee_link}': links.attendees ?? '',
   };

@@ -23,7 +23,14 @@ In the event's settings, under Tickets (stored in `fields.tickets`, `src/lib/tic
   or always); and questions of your own (short or long text, a choice, a checkbox, a number).
 
 The ticket form shows below the event's content in the Event details block, with the prices in its
-sidebar. A template without Event details can place the **Tickets** block instead.
+sidebar.
+
+The **Tickets** block puts an event's ticket form on any page or template. Choose the event in its
+settings (and, for a recurring event, a date; empty: its next date), and it shows that event's name and
+date over the form. With no event chosen it shows the tickets of the event whose page it is on, so an
+event template can place it instead of relying on Event details (which then leaves its own form out).
+Buyers come back to the page they ordered on, and their emails link there; people on a waitlist are
+sent back to where they joined.
 
 ## Buying
 
@@ -32,8 +39,8 @@ sidebar. A template without Event details can place the **Tickets** block instea
    the event and date so two buyers can't both take the last ticket.
 2. A free order is confirmed at once. A paid one is held (30 minutes by default) and the buyer goes to
    Stripe Checkout or a Square payment link.
-3. Back from paying (`/api/tickets/return`), the payment is checked with the provider and the event page
-   shows the order (`?order=<token>`, never cached). The provider's webhook confirms it too, whichever
+3. Back from paying (`/api/tickets/return`), the payment is checked with the provider and the page the
+   order was placed on shows it (`?order=<token>`, never cached). The provider's webhook confirms it too, whichever
    comes first.
 4. The confirmation goes to the buyer, with a copy to the site's admin address.
 
@@ -62,7 +69,8 @@ Five emails, each designed in the same email builder as form notifications: the 
 **reminder** before the event, a **follow-up** after it, the **waitlist** notice, and the **copy to the
 admin** of each order. Besides the usual blocks they have:
 
-- merge tags such as `{first_name}`, `{event}`, `{date}`, `{code}`, `{order_link}`, `{attendee_link}`
+- merge tags such as `{first_name}`, `{event}`, `{date}`, `{code}`, `{order_link}` (the order, on the
+  page it was placed on; in the waitlist email, the tickets where they joined), `{attendee_link}`
 - an **Order details** block: the order summary as a table, or one detail (date, venue, code, tickets,
   total, answers, the buyer's contact details)
 - the **Payment** block, as in form notifications: the order's tickets, total, provider, payment ID and

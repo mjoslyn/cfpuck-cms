@@ -123,7 +123,7 @@ export const MERGE_TAGS: [string, string][] = [
   ['{answers}', 'Answers to the questions'],
   ['{order_summary}', 'Order summary'],
   ['{payment_summary}', 'Payment: items, total and details (paid orders)'],
-  ['{order_link}', 'Link to the order'],
+  ['{order_link}', 'Link to the order (waitlist: to the tickets)'],
   ['{event_link}', 'Link to the event'],
   ['{attendee_link}', 'Link to the attendee list (for the admin)'],
 ];
@@ -176,7 +176,7 @@ export const DEFAULT_EMAILS: Record<EmailKind, Required<Omit<TicketEmail, 'text'
     design: doc(
       block('Heading', 'h', { text: 'Tickets are available', level: 2 }),
       block('Text', 't', { html: "<p>Hi {first_name},</p><p>Good news: tickets have become available for {event} on {date}{time}. You were on the waitlist, so we're letting you know first. They go to whoever buys first.</p>" }),
-      block('Button', 'b', { label: 'Get tickets', url: '{event_link}' }),
+      block('Button', 'b', { label: 'Get tickets', url: '{order_link}' }),
     ),
   },
   admin: {

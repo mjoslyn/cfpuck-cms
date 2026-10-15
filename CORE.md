@@ -521,9 +521,16 @@ with neither, only free tickets, and the payment settings are hidden), currency,
 tickets (30-120 minutes), and the emails with the reminder's and follow-up's timing.
 
 - Rendering: `src/render/c/tickets.ts`. The Event details block shows the form below the content and a
-  Tickets box in its sidebar, unless the page has a `tickets` block (offered on events and in templates).
-  `prepareTickets` loads what's taken (`ticket_sold`) and, with `?order=<token>`, the buyer's order
-  (`ticket_order_status`; both functions anon may call). `?tickets=<reason>` shows a checkout's outcome.
+  Tickets box in its sidebar, unless the page has a `tickets` block for its event. The `tickets` block
+  goes on any page or template: it shows the event it names (`attrs.event`, and `attrs.date` for one
+  date of a recurring event, else its next; with the event's name and date over the form), else the
+  page's own event (`prepareTicketsBlock`). The form posts the page it is on (`page`): the order and a
+  waitlist place keep it (`ticket_orders.page`, `ticket_waitlist.page`), and the buyer is sent back
+  there, to the section's anchor (`ticketsAt`: `#tickets` on the event's own page, else
+  `#tickets-<event id>`); emails' `{order_link}` goes there too (a waitlist's: the tickets where they
+  joined). `prepareTickets` loads what's taken (`ticket_sold`) and, with `?order=<token>`, the buyer's
+  order (`ticket_order_status`; both functions anon may call), shown in its event's section.
+  `?tickets=<reason>&event=<id>` shows a checkout's outcome in that event's section.
   Pages with either are never cached. `public/assets/js/tickets.js` adds the total, the address only
   for paid orders, and what's left now (`GET /api/tickets/availability`).
 - Orders (`ticket_orders`, editors read, the site writes with the service key; `src/lib/tickets/orders.ts`):

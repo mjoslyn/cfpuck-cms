@@ -778,14 +778,30 @@ a.c-cal__arrow:hover {
   text-decoration: underline;
 }
 
-/* Tickets (src/render/c/tickets.ts): on an event page, below its content. */
+/* Tickets (src/render/c/tickets.ts): on an event page, below its content; for another event (a Tickets
+   block on any page), on its own, naming the event. */
 .c-tickets {
   margin-top: var(--space-50);
   padding-top: var(--space-50);
   border-top: 1px solid var(--color-surface-alt);
 }
+.c-tickets.is-other {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
 .c-tickets__heading {
   margin: 0 0 1rem;
+}
+.c-tickets__event {
+  margin: -0.5rem 0 1rem;
+  font-weight: 600;
+}
+.c-tickets__event a {
+  color: inherit;
+}
+.c-tickets__event .c-tickets__muted {
+  font-weight: 400;
 }
 .c-tickets__note {
   margin: 0 0 1rem;

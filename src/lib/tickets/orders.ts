@@ -32,6 +32,8 @@ export interface OrderRow {
   entry_id: number | null;
   occurrence: string;
   event_title: string;
+  /** The page the order was placed on ('': the event's own). */
+  page: string;
   status: OrderStatus;
   provider: 'free' | 'stripe' | 'square';
   provider_ref: string | null;
@@ -152,6 +154,26 @@ export async function expireStale(db: SupabaseClient) {
 
 const field = (data: FormData, k: string, max = 300) => String(data.get(k) ?? '').trim().slice(0, max);
 
+/** The page a ticket form was posted from: a path on this site, else '' (the event's own page). */
+const postedPage = (data: FormData) => {
+  const p = field(data, 'page', 500);
+  return /^\/(?![\/\\])[^\s?#\\]*$/.test(p) ? p : '';
+};
+
+/**
+ * Where an event's tickets show: the page the form was on (a Tickets block can be on any page), else
+ * the event's own; and the section's anchor there (#tickets on the event's own page, else
+ * #tickets-<event id>, as src/render/c/tickets.ts names it).
+ */
+export function ticketsAt(ev: Pick<LoadedEvent, 'path' | 'series'>, page = ''): { path: string; anchor: string } {
+  const path = page || ev.path;
+  return { path, anchor: path === ev.path ? '#tickets' : `#tickets-${ev.series.id}` };
+}
+const backTo = (ev: LoadedEvent, page: string) => {
+  const at = ticketsAt(ev, page);
+  return (reason: string) => `${at.path}?tickets=${reason}&event=${ev.series.id}${at.anchor}`;
+};
+
 /**
  * A ticket form posted (/api/tickets/checkout): where to send the buyer next. A free order is
  * confirmed at once; a paid one holds its tickets and goes to the provider's checkout. Problems go
@@ -161,7 +183,8 @@ export async function startCheckout(data: FormData, origin: string): Promise<str
   const db = serviceClient();
   const ev = await loadEvent(db, Number(data.get('event')), field(data, 'occurrence', 10));
   if (!ev) return null;
-  const back = (reason: string) => `${ev.path}?tickets=${reason}#tickets`;
+  const page = postedPage(data);
+  const back = backTo(ev, page);
   const t = ev.tickets;
   if (field(data, '_hp')) return back('invalid');
   if (!t.enabled || (ev.endUtc != null && ev.endUtc < Date.now())) return back('closed');
@@ -213,7 +236,7 @@ export async function startCheckout(data: FormData, origin: string): Promise<str
   const limits = { total: t.capacity || null, types: Object.fromEntries(t.types.map((x) => [x.id, x.capacity || null])) };
   const { data: made, error } = await db.rpc('ticket_order_create', {
     p_order: {
-      token, code, entry_id: ev.series.id, occurrence: (ev.entry as { occurrence?: string }).occurrence ?? '', event_title: ev.series.title,
+      token, code, entry_id: ev.series.id, occurrence: (ev.entry as { occurrence?: string }).occurrence ?? '', event_title: ev.series.title, page,
       status: free ? 'paid' : 'pending', provider: free ? 'free' : providerName, name, email, phone, address, answers, items, amount, currency,
       // A paid order holds its tickets a little longer than the checkout takes payment.
       expires_at: free ? null : new Date(Date.now() + hold + 2 * 60_000).toISOString(),
@@ -223,7 +246,8 @@ export async function startCheckout(data: FormData, origin: string): Promise<str
   });
   if (error) throw error;
   if (!made?.ok) return back('sold-out');
-  const orderLink = `${ev.path}?order=${token}#tickets`;
+  const at = ticketsAt(ev, page);
+  const orderLink = `${at.path}?order=${token}${at.anchor}`;
   const { data: order } = await db.from('ticket_orders').select('*').eq('id', made.id).single<OrderRow>();
   if (free) {
     await sendConfirmation(db, order!, siteOrigin(origin), ev, settings);
@@ -257,7 +281,7 @@ export async function returnFromCheckout(token: string, cancelled: boolean): Pro
   const { data: order } = await db.from('ticket_orders').select('*').eq('token', token).maybeSingle<OrderRow>();
   if (!order) return null;
   const ev = order.entry_id ? await loadEvent(db, order.entry_id, order.occurrence, false) : null;
-  const path = ev?.path ?? '/';
+  const { path, anchor } = ev ? ticketsAt(ev, order.page) : { path: '/', anchor: '' };
   if (cancelled && order.status === 'pending') {
     // Paid after all (the buyer pressed back after paying): keep it.
     const state = await paymentState(order).catch((): CheckoutState => ({ status: 'pending' }));
@@ -265,7 +289,7 @@ export async function returnFromCheckout(token: string, cancelled: boolean): Pro
     else {
       await closeCheckout(order.provider, order.provider_ref);
       await db.from('ticket_orders').update({ status: 'cancelled' }).eq('id', order.id).eq('status', 'pending');
-      return `${path}?tickets=cancelled#tickets`;
+      return `${path}?tickets=cancelled&event=${order.entry_id}${anchor}`;
     }
   } else if (order.status === 'pending' || order.status === 'expired') {
     try {
@@ -276,7 +300,7 @@ export async function returnFromCheckout(token: string, cancelled: boolean): Pro
       console.warn(`tickets: checking order ${order.code}: ${(e as Error).message}`);
     }
   }
-  return `${path}?order=${token}#tickets`;
+  return `${path}?order=${token}${anchor}`;
 }
 
 /** Where an order's payment stands at its provider. */
@@ -373,6 +397,8 @@ export interface WaitlistRow {
   email: string;
   phone: string;
   quantity: number;
+  /** The page they joined on ('': the event's own). */
+  page: string;
   status: 'waiting' | 'notified' | 'bought' | 'removed';
   notified_at: string | null;
   created_at: string;
@@ -386,7 +412,8 @@ export async function joinWaitlist(data: FormData): Promise<string | null> {
   const db = serviceClient();
   const ev = await loadEvent(db, Number(data.get('event')), field(data, 'occurrence', 10));
   if (!ev) return null;
-  const back = (reason: string) => `${ev.path}?tickets=${reason}#tickets`;
+  const page = postedPage(data);
+  const back = backTo(ev, page);
   const t = ev.tickets;
   if (field(data, '_hp')) return back('invalid');
   if (!t.enabled || t.waitlist === 'off' || (ev.endUtc != null && ev.endUtc < Date.now())) return back('closed');
@@ -399,7 +426,7 @@ export async function joinWaitlist(data: FormData): Promise<string | null> {
   const { count } = await db.from('ticket_waitlist').select('id', { count: 'exact', head: true }).eq('entry_id', ev.series.id).gte('created_at', new Date(Date.now() - 60_000).toISOString());
   if ((count ?? 0) >= MAX_PER_MINUTE) return back('busy');
   // Joining again keeps one place: the new details, waiting again.
-  const { error } = await db.from('ticket_waitlist').upsert({ entry_id: ev.series.id, occurrence, name, email: email.toLowerCase(), phone, quantity, status: 'waiting', notified_at: null }, { onConflict: 'entry_id,occurrence,email' });
+  const { error } = await db.from('ticket_waitlist').upsert({ entry_id: ev.series.id, occurrence, name, email: email.toLowerCase(), phone, quantity, page, status: 'waiting', notified_at: null }, { onConflict: 'entry_id,occurrence,email' });
   if (error) throw error;
   return back('waitlisted');
 }
@@ -440,13 +467,19 @@ export async function notifyWaitlist(db: SupabaseClient, ev: LoadedEvent, origin
   let sent = 0;
   for (const p of (people ?? []) as WaitlistRow[]) {
     if (p.quantity > budget) continue;
-    const mail = ticketEmail(email, { code: '', name: p.name, email: p.email, phone: p.phone, items: [], amount: 0, currency: settings.currency ?? 'usd' }, view, { order: `${view.link}#tickets` }, origin, events);
+    const mail = ticketEmail(email, { code: '', name: p.name, email: p.email, phone: p.phone, items: [], amount: 0, currency: settings.currency ?? 'usd' }, view, { order: waitlistLink(ev, p.page, origin) }, origin, events);
     if (!(await sendMail({ to: [p.email], ...mail }))) throw new Error('No mail server is set up (SMTP_* in the environment).');
     await db.from('ticket_waitlist').update({ status: 'notified', notified_at: new Date().toISOString() }).eq('id', p.id);
     budget -= p.quantity;
     sent++;
   }
   return sent;
+}
+
+/** Where a waitlist email sends people: the tickets where they joined. */
+function waitlistLink(ev: LoadedEvent, page: string, origin: string) {
+  const at = ticketsAt(ev, page);
+  return `${origin}${at.path}${at.anchor}`;
 }
 
 /** After tickets free up (a cancellation or refund): the waitlist told, when the event does that itself. */
@@ -487,7 +520,8 @@ const notifyAddress = () => env('TICKETS_NOTIFY_EMAIL') || env('FORMS_ADMIN_EMAI
 
 /** An order's email of a kind: to the buyer, or (admin) to the site's admin address, replying to the buyer. */
 async function sendOrderEmail(kind: EmailKind, o: OrderRow, ev: LoadedEvent, settings: TicketSettings, origin: string) {
-  const links = { order: `${origin}${ev.path}?order=${o.token}#tickets`, attendees: `${origin}/admin/tickets/${ev.series.id}/${o.occurrence ? `?date=${o.occurrence}` : ''}` };
+  const at = ticketsAt(ev, o.page);
+  const links = { order: `${origin}${at.path}?order=${o.token}${at.anchor}`, attendees: `${origin}/admin/tickets/${ev.series.id}/${o.occurrence ? `?date=${o.occurrence}` : ''}` };
   const email = emailToSend(kind, settings, ev.emails[kind]);
   const mail = ticketEmail(email, orderView(o, ev.tickets), eventView(ev, origin), links, origin, await emailEvents(serviceClient(), email.design, origin));
   return kind === 'admin' ? sendMail({ to: [notifyAddress()], replyTo: o.email, ...mail }) : sendMail({ to: [o.email], ...mail });

@@ -24,7 +24,7 @@ export function ticketEmailKit(kind: EmailKind, subject: () => string, eventTitl
   // A waitlist email has no order yet.
   const order = kind === 'waitlist' ? { ...SAMPLE_ORDER, code: '', items: [], amount: 0, answers: [], payment: null } : SAMPLE_ORDER;
   const event = sampleEvent(eventTitle, origin);
-  const links = { order: `${event.link}?order=sample#tickets`, attendees: `${origin}/admin/tickets/` };
+  const links = { order: kind === 'waitlist' ? `${event.link}#tickets` : `${event.link}?order=sample#tickets`, attendees: `${origin}/admin/tickets/` };
   const sample = ticketEmailContext(order, event, links, origin);
   return {
     dataBlock: { label: 'Order details', options: ORDER_DETAILS },
