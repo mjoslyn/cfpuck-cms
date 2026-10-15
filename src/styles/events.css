@@ -777,3 +777,123 @@ a.c-cal__arrow:hover {
 .c-event-cal__more a:hover {
   text-decoration: underline;
 }
+
+/* Tickets (src/render/c/tickets.ts): on an event page, below its content. */
+.c-tickets {
+  margin-top: var(--space-50);
+  padding-top: var(--space-50);
+  border-top: 1px solid var(--color-surface-alt);
+}
+.c-tickets__heading {
+  margin: 0 0 1rem;
+}
+.c-tickets__note {
+  margin: 0 0 1rem;
+}
+.c-tickets__note.is-sold-out {
+  font-weight: 600;
+}
+.c-tickets__message {
+  margin: 0 0 1rem;
+  padding: 0.875rem 1rem;
+  border-left: 3px solid var(--color-accent);
+  background: var(--color-surface-soft);
+  color: var(--color-text);
+}
+.c-tickets__message.is-error {
+  border-left-color: #b42318;
+}
+.c-tickets__order {
+  margin: 0 0 1.5rem;
+  padding: 1rem 1.25rem;
+  border-radius: 6px;
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+}
+.c-tickets__order p {
+  margin: 0 0 0.5rem;
+}
+.c-tickets__order.is-paid {
+  border-left: 3px solid var(--color-accent);
+}
+.c-tickets__order-title {
+  font-weight: 600;
+}
+.c-tickets__code {
+  letter-spacing: 0.08em;
+}
+.c-tickets__lines {
+  margin: 0.5rem 0;
+  padding-left: 1.25rem;
+}
+.c-tickets__muted {
+  color: var(--color-muted);
+}
+.c-tickets__fine {
+  margin: 0.75rem 0 0;
+  font-size: 0.8125rem;
+}
+.c-tickets__types {
+  margin: 0 0 1.25rem;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--color-surface-alt);
+}
+.c-tickets__type {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 5.5rem;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.875rem 0;
+  border-bottom: 1px solid var(--color-surface-alt);
+}
+.c-tickets__type p {
+  margin: 0;
+}
+.c-tickets__name {
+  color: var(--color-text);
+  font-weight: 600;
+}
+.c-tickets__desc,
+.c-tickets__left {
+  color: var(--color-muted);
+  font-size: 0.875rem;
+}
+.c-tickets__left {
+  color: var(--color-accent);
+  font-weight: 500;
+}
+.c-tickets__price {
+  color: var(--color-text);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.c-tickets__qty {
+  text-align: right;
+}
+.c-tickets__state {
+  color: var(--color-muted);
+  font-size: 0.8125rem;
+}
+.c-tickets__total {
+  margin: 0 0 1.25rem;
+  color: var(--color-text);
+  font-weight: 600;
+}
+.c-tickets__address .c-form__fields {
+  margin-top: 0.25rem;
+}
+.c-tickets__address[hidden] {
+  display: none;
+}
+.c-tickets__waitlist {
+  margin-top: 0.5rem;
+}
+@media (max-width: 520px) {
+  .c-tickets__type {
+    grid-template-columns: minmax(0, 1fr) 5rem;
+  }
+  .c-tickets__price {
+    grid-row: 2;
+  }
+}

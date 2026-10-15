@@ -144,8 +144,10 @@ follow the config. `CORE.md` describes each option.
 3. **Netlify.**
    - Create a site from your repository. The build settings are in `netlify.toml`.
    - Set the same environment variables as `.env`: the Supabase URL and keys, plus the optional
-     Compose and SMTP ones.
+     Compose, SMTP and ticket payment (Stripe or Square) ones.
    - Add your domain.
+   - Selling paid tickets: add the payment provider's webhook (`/api/tickets/webhook/stripe` or
+     `/square`; events in the docs' Tickets page).
 
    Compose runs long jobs in the background function `netlify/functions/compose-background.mts`,
    which Netlify deploys with the site.

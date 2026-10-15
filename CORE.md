@@ -375,7 +375,7 @@ Text materials count toward the budget of what is sent in full (`MATERIAL_BUDGET
   in Netlify's durable cache (shared by its edge servers), tagged `pages`. A successful admin write
   (POST, PUT, PATCH or DELETE under `/api/admin/`) clears that tag from the middleware
   (`cache.invalidate`; a 2xx answer, or the 303 a form post such as a bulk action answers with), so edits show at once; previews, Claude drafting, accessibility marks,
-  submissions, users and sync requests other than a sync into this copy or a restore don't
+  submissions, users, the attendee list and sync requests other than a sync into this copy or a restore don't
   (`changesPages`). A failed purge is logged and the edit shows within the minute. Under `astro dev`
   nothing is cached. The first cover or hero image on a page loads at high priority (`optimizeImages`).
   Signed-in editors get an editor bar
@@ -453,6 +453,47 @@ the event sidebar. Occurrences are virtual entries (negative ids, own `event_sta
 only when a recurring event exists (for an upcoming list, only series and events still to start are
 loaded). A series is expanded to the horizon (two years ahead); of a long
 one the newest 1,100 occurrences are kept. Saving an event rewrites the `start`/`end` fields the views read.
+
+## Tickets
+
+An event sells tickets or takes free registrations when Tickets is on in its settings
+(`fields.tickets`, `src/puck/TicketsForm.tsx`; read with `ticketsOf`, `src/lib/tickets/config.ts`):
+ticket types (name, description, price in cents, capacity, most per order, sales window as local times
+in the event's timezone, hidden for past ones), the event's capacity (per date for a recurring event),
+most per order, phone (off, optional, required), address (off, for paid orders, always), the event's own
+questions (asked once per order), a waitlist (`off`, `auto`, `manual`) and its own wording for its
+emails. Settings > Tickets (`settings.site.tickets`, `ticketSettings`, `src/admin/TicketSettings.tsx`):
+the payment provider (Stripe or Square; keys in the environment, `providerReady`), currency, how long an
+unpaid order holds its tickets (30-120 minutes), the admin's copy of orders, and each email's wording and
+the reminder's and follow-up's timing.
+
+- Rendering: `src/render/c/tickets.ts`. The Event details block shows the form below the content and a
+  Tickets box in its sidebar, unless the page has a `tickets` block (offered on events and in templates).
+  `prepareTickets` loads what's taken (`ticket_sold`) and, with `?order=<token>`, the buyer's order
+  (`ticket_order_status`; both functions anon may call). `?tickets=<reason>` shows a checkout's outcome.
+  Pages with either are never cached. `public/assets/js/tickets.js` adds the total, the address only
+  for paid orders, and what's left now (`GET /api/tickets/availability`).
+- Orders (`ticket_orders`, editors read, the site writes with the service key; `src/lib/tickets/orders.ts`):
+  `POST /api/tickets/checkout` checks the order and holds its tickets in `ticket_order_create`, which takes
+  an advisory lock per event and date and counts paid orders and unexpired holds against the capacities.
+  A free order is paid at once; a paid one goes to Stripe Checkout or a Square payment link
+  (`src/lib/tickets/providers.ts`, their REST APIs, no SDK). `/api/tickets/return` checks the payment with
+  the provider and shows the order; the webhooks (`/api/tickets/webhook/stripe`, `/square`, signatures
+  checked) confirm payments, expiries and refunds. `markPaid` is idempotent and sends the confirmation
+  once. An expired hold that is paid anyway (a Square link used late) is still marked paid.
+- Attendee list (`/admin/tickets/`, `/admin/tickets/<id>/[?date=]`; actions `POST /api/admin/tickets`,
+  `GET /api/admin/tickets/attendees.csv`): check-in, resend, cancel (unpaid, free or fully refunded),
+  refund (admins; part or all, at the provider; all of it frees the tickets), the waitlist with Notify.
+  Its writes don't clear the page cache.
+- Waitlist (`ticket_waitlist`, one place per email per event and date; `POST /api/tickets/waitlist`):
+  shown when every type on sale is sold out. `notifyWaitlist` emails people in order as far as the free
+  tickets go, counting those told in the last day as still deciding; `auto` runs it after a cancellation
+  or refund and hourly. Buying moves a person to `bought`.
+- Emails (`src/lib/tickets/email.ts`, sent with `sendMail`): confirmation, reminder (hours before),
+  follow-up (hours after, for up to three days), waitlist. `netlify/functions/ticket-emails.mts` runs
+  `sendDueTicketEmails` hourly (deployed site only): reminders, follow-ups, expired holds, auto waitlists.
+  Links use `SITE_URL`, else Netlify's `URL`.
+- Orders and waitlists aren't synced or backed up: they stay on the copy where they were made.
 
 ## Editor
 

@@ -1,0 +1,76 @@
+---
+// Events that sell tickets: what each has sold, its takings and its waitlist, linking to its attendee list.
+import Admin from '../../../layouts/Admin.astro';
+import { SITE_TZ } from '../../../lib/site';
+import { allRows } from '../../../lib/rows';
+import { money, ticketSettings, ticketsOf } from '../../../lib/tickets/config';
+import { recurrenceOf } from '../../../lib/recurrence';
+
+const db = Astro.locals.db;
+const { data: events, error } = await db.from('entries').select('id, title, status, fields, event_start').eq('type', 'event').eq('fields->tickets->>enabled', 'true').order('event_start', { ascending: false });
+if (error) throw error;
+const { data: settings } = await db.from('settings').select('value').eq('key', 'site').maybeSingle();
+const currency = ticketSettings(settings?.value).currency ?? 'usd';
+const { data: orders } = await allRows(db.from('ticket_orders').select('entry_id, quantity, amount, refunded_amount, status').in('status', ['paid', 'refunded']).order('id'));
+const { data: waiting } = await allRows(db.from('ticket_waitlist').select('entry_id').eq('status', 'waiting').order('id'));
+const sums = new Map<number, { sold: number; takings: number; orders: number }>();
+for (const o of orders ?? []) {
+  const s = sums.get(o.entry_id) ?? { sold: 0, takings: 0, orders: 0 };
+  if (o.status === 'paid') {
+    s.sold += o.quantity;
+    s.orders++;
+  }
+  s.takings += o.amount - o.refunded_amount;
+  sums.set(o.entry_id, s);
+}
+const waitlist = new Map<number, number>();
+for (const w of waiting ?? []) waitlist.set(w.entry_id, (waitlist.get(w.entry_id) ?? 0) + 1);
+const when = (s: string | null) => (s ? new Date(s).toLocaleDateString('en-US', { timeZone: SITE_TZ, month: 'short', day: 'numeric', year: 'numeric' }) : '-');
+---
+<Admin title="Tickets">
+  <h1 class="text-3xl font-normal">Tickets</h1>
+  <p class="mt-1 text-sm text-admin-muted">Events that sell tickets or take registrations. Turn tickets on in an event's settings, under Tickets; payments and emails are under <a class="underline hover:text-admin-accent" href="/admin/settings/#tickets">Settings &gt; Tickets</a>.</p>
+  <div class="mt-6 overflow-hidden rounded bg-white shadow-[0_0_0_1px_rgba(26,26,46,0.08)]">
+    <table class="w-full text-sm">
+      <thead class="border-b border-admin-ink/10 text-left text-xs text-admin-muted">
+        <tr>
+          <th class="px-4 py-2 font-medium">Event</th>
+          <th class="px-4 py-2 font-medium">Date</th>
+          <th class="px-4 py-2 font-medium">Sold</th>
+          <th class="px-4 py-2 font-medium">Orders</th>
+          <th class="px-4 py-2 font-medium">Takings</th>
+          <th class="px-4 py-2 font-medium">Waitlist</th>
+          <th class="px-4 py-2"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {(events ?? []).map((e) => {
+          const t = ticketsOf(e.fields);
+          const s = sums.get(e.id);
+          return (
+            <tr class="border-b border-admin-ink/5 last:border-0 hover:bg-admin-bg">
+              <td class="px-4 py-3">
+                <a href={`/admin/tickets/${e.id}/`} class="font-medium hover:text-admin-accent">{e.title || '(untitled)'}</a>
+                {e.status !== 'publish' && <span class="ml-2 rounded bg-[#f1f5f9] px-2 py-0.5 text-xs text-admin-muted">Draft</span>}
+              </td>
+              <td class="px-4 py-3 text-admin-muted">{recurrenceOf(e as any) ? 'Repeats' : when(e.event_start)}</td>
+              <td class="px-4 py-3">{s?.sold ?? 0}{t.capacity && !recurrenceOf(e as any) ? ` of ${t.capacity}` : ''}</td>
+              <td class="px-4 py-3 text-admin-muted">{s?.orders ?? 0}</td>
+              <td class="px-4 py-3 text-admin-muted">{money(s?.takings ?? 0, currency, '-')}</td>
+              <td class="px-4 py-3 text-admin-muted">{t.waitlist === 'off' ? '-' : waitlist.get(e.id) ?? 0}</td>
+              <td class="px-4 py-3 text-right whitespace-nowrap">
+                <a href={`/admin/tickets/${e.id}/`} class="text-xs text-admin-muted hover:text-admin-accent">Attendees</a>
+                <a href={`/admin/edit/${e.id}/`} class="ml-3 text-xs text-admin-muted hover:text-admin-accent">Edit event</a>
+              </td>
+            </tr>
+          );
+        })}
+        {!events?.length && (
+          <tr>
+            <td colspan="7" class="px-4 py-10 text-center text-admin-muted">No events sell tickets yet.</td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  </div>
+</Admin>

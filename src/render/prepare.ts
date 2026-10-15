@@ -21,6 +21,7 @@ import type { Overrides } from '../lib/content/linked-patterns';
 import { applyFilters, filterSpec, findFilters } from './c/filters';
 import { prepareMap } from './c/map';
 import { prepareNavigation } from './c/navigation';
+import { prepareTickets } from './c/tickets';
 
 interface WalkState {
   /** Counter for unique ids (sliders, content feeds). */
@@ -233,9 +234,15 @@ async function walk(items: PuckItem[], ctx: RenderCtx, state: WalkState) {
         if (!ctx.headScripts.includes(tag)) ctx.headScripts.push(tag);
         break;
       }
+      case 'tickets':
+        // The Event details block leaves the tickets to this one.
+        ctx.data.set('tickets-block', true);
+        await prepareTickets(ctx);
+        break;
       case 'event-details': {
         const e = ctx.queried.entry;
         if (!e) break;
+        await prepareTickets(ctx);
         const venue = Number(e.fields?.venue) || 0;
         if (venue) await ctx.loader.entriesByIds([venue]);
         await loadDoc(ctx, `content:${e.id}`, async () => e.content?.content as PuckItem[], state);
