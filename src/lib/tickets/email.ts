@@ -5,7 +5,7 @@
 // its Order details block, and the Payment block forms use too. Runs in the browser (the builder's
 // preview) and on the server.
 import { money } from './config';
-import { paymentTable, renderEmail, textVersion, type EmailContext, type EmailDoc, type EmailPayment } from '../forms/email';
+import { paymentTable, renderEmail, textVersion, type EmailContext, type EmailDoc, type EmailEvent, type EmailPayment } from '../forms/email';
 
 export interface OrderView {
   /** '' for a waitlist email: no order yet. */
@@ -117,9 +117,10 @@ export function ticketEmailContext(o: OrderView, ev: EventView, links: EmailLink
   return { merge: (text, html) => merge(text, values, html, rich), field: (id, showLabel) => orderDetail(id, showLabel, o, ev), origin, payment: o.payment };
 }
 
-/** An email for an order: subject, HTML and text (the email's own plain text, else made from the HTML). */
-export function ticketEmail(email: { subject: string; design: EmailDoc; text?: string }, o: OrderView, ev: EventView, links: EmailLinks, origin: string) {
-  const ctx = ticketEmailContext(o, ev, links, origin);
+/** An email for an order: subject, HTML and text (the email's own plain text, else made from the HTML).
+ *  `events`: its Events blocks' events (src/lib/events/email.ts). */
+export function ticketEmail(email: { subject: string; design: EmailDoc; text?: string }, o: OrderView, ev: EventView, links: EmailLinks, origin: string, events?: Record<string, EmailEvent[]>) {
+  const ctx = { ...ticketEmailContext(o, ev, links, origin), events };
   const values = tagValues(o, ev, links);
   const subject = merge(email.subject, values);
   const html = renderEmail(email.design, ctx, subject);

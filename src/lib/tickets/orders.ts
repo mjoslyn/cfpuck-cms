@@ -8,6 +8,8 @@ import { serviceClient } from '../supabase';
 import { ENTRY_COLUMNS, type Entry } from '../types';
 import { defaultHorizon, expandEntry, localToUtc, recurrenceOf } from '../recurrence';
 import { permalink } from '../permalink';
+import { eventWhen, venueLines } from '../events/model';
+import { emailEvents } from '../events/email';
 import { SITE_TZ, site } from '../site';
 import { sendMail } from '../forms/mail';
 import { emailToSend, localNow, maxFor, offSale, offeredTypes, remaining, ticketEmailFrom, ticketSettings, ticketsOf, timedEmail, DEFAULT_MAX_PER_ORDER, type EmailKind, type EventEmail, type EventTickets, type TicketSettings } from './config';
@@ -119,22 +121,9 @@ export async function loadEvent(db: SupabaseClient, id: number, occurrence: stri
 }
 
 
-const dayText = (s: string, o: Intl.DateTimeFormatOptions) => new Date(`${s.slice(0, 10)}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', ...o });
-const timeText = (s: string) => {
-  const [h, m] = s.slice(11, 16).split(':').map(Number);
-  return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'am' : 'pm'}`;
-};
-
 /** The event as emails show it. */
 export function eventView(ev: LoadedEvent, origin: string): EventView {
-  const long = { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' } as const;
-  const valid = /^\d{4}-\d{2}-\d{2}/.test(ev.start);
-  const sameDay = ev.start.slice(0, 10) === ev.end.slice(0, 10);
-  const date = !valid ? 'Date to be announced' : sameDay ? dayText(ev.start, long) : `${dayText(ev.start, { month: 'long', day: 'numeric' })} – ${dayText(ev.end, long)}`;
-  const time = valid && !ev.allDay ? ` at ${timeText(ev.start)}` : '';
-  const f = ev.venue?.fields ?? {};
-  const venue = ev.venue ? [ev.venue.title, f.address, [f.city, [f.state, f.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ')].filter(Boolean) : [];
-  return { title: ev.series.title, date, time, venue, link: `${origin}${ev.path}` };
+  return { title: ev.series.title, ...eventWhen(ev.start, ev.end, ev.allDay), venue: venueLines(ev.venue), link: `${origin}${ev.path}` };
 }
 
 /** Tickets taken per type for an event and date. */
@@ -447,10 +436,11 @@ export async function notifyWaitlist(db: SupabaseClient, ev: LoadedEvent, origin
   const settings = await siteTicketSettings(db);
   const email = emailToSend('waitlist', settings, ev.emails.waitlist);
   const view = eventView(ev, origin);
+  const events = await emailEvents(db, email.design, origin);
   let sent = 0;
   for (const p of (people ?? []) as WaitlistRow[]) {
     if (p.quantity > budget) continue;
-    const mail = ticketEmail(email, { code: '', name: p.name, email: p.email, phone: p.phone, items: [], amount: 0, currency: settings.currency ?? 'usd' }, view, { order: `${view.link}#tickets` }, origin);
+    const mail = ticketEmail(email, { code: '', name: p.name, email: p.email, phone: p.phone, items: [], amount: 0, currency: settings.currency ?? 'usd' }, view, { order: `${view.link}#tickets` }, origin, events);
     if (!(await sendMail({ to: [p.email], ...mail }))) throw new Error('No mail server is set up (SMTP_* in the environment).');
     await db.from('ticket_waitlist').update({ status: 'notified', notified_at: new Date().toISOString() }).eq('id', p.id);
     budget -= p.quantity;
@@ -498,7 +488,8 @@ const notifyAddress = () => env('TICKETS_NOTIFY_EMAIL') || env('FORMS_ADMIN_EMAI
 /** An order's email of a kind: to the buyer, or (admin) to the site's admin address, replying to the buyer. */
 async function sendOrderEmail(kind: EmailKind, o: OrderRow, ev: LoadedEvent, settings: TicketSettings, origin: string) {
   const links = { order: `${origin}${ev.path}?order=${o.token}#tickets`, attendees: `${origin}/admin/tickets/${ev.series.id}/${o.occurrence ? `?date=${o.occurrence}` : ''}` };
-  const mail = ticketEmail(emailToSend(kind, settings, ev.emails[kind]), orderView(o, ev.tickets), eventView(ev, origin), links, origin);
+  const email = emailToSend(kind, settings, ev.emails[kind]);
+  const mail = ticketEmail(email, orderView(o, ev.tickets), eventView(ev, origin), links, origin, await emailEvents(serviceClient(), email.design, origin));
   return kind === 'admin' ? sendMail({ to: [notifyAddress()], replyTo: o.email, ...mail }) : sendMail({ to: [o.email], ...mail });
 }
 

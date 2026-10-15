@@ -3,13 +3,16 @@
 // text: the text version, with merge tags; made from the design when empty. Preview: the email as it
 // would be sent. What fills an email in comes from the caller's kit (EmailKit): a form notification's
 // fields and submissions (src/forms/form-email.ts), or a ticket order's details (src/admin/ticket-email.ts).
-// Both offer the Payment block (the payment's items, total and details; the canvas shows the kit's sample).
+// Both offer the Payment block (the payment's items, total and details; the canvas shows the kit's sample)
+// and, on a site with events, the Events block (upcoming or picked events; the canvas shows the real ones).
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Puck, type Config, type Data } from '@puckeditor/core';
 import '@puckeditor/core/no-external.css'; // without its Inter webfont: the admin uses the system font
 import { EMAIL_DEFAULTS, renderBlock, renderEmail, textVersion, type EmailContext, type EmailDoc, type EmailItem, type EmailRoot } from '../lib/forms/email';
 import { MediaPicker } from '../puck/fields';
 import { MergeTags, RichMessage } from './rich-message';
+import { EventsQueryField, useEmailEvents } from './email-events';
+import { typeDef } from '../lib/site';
 
 /** An email as it would be sent, for the Preview tab. */
 export interface RenderedEmail {
@@ -65,12 +68,25 @@ function textFromDesign(doc: EmailDoc, kit: EmailKit): string {
 const RootProps = createContext<EmailRoot>({});
 const KitContext = createContext<EmailKit | null>(null);
 
+const placeholder = (text: string) => `<p style="margin:0;color:#94a3b8;font-size:13px">${esc(text)}</p>`;
+
 /** A leaf block: its email HTML, as sent. */
 function Leaf({ type, props }: { type: string; props: Record<string, any> }) {
   const root = useContext(RootProps);
   const kit = useContext(KitContext)!;
   const html = renderBlock({ type, props: { id: '', ...props } } as EmailItem, kit.canvas, root);
-  return <div dangerouslySetInnerHTML={{ __html: html || '<p style="margin:0;color:#94a3b8;font-size:13px">(empty)</p>' }} />;
+  return <div dangerouslySetInnerHTML={{ __html: html || placeholder('(empty)') }} />;
+}
+
+/** The Events block, with the site's events as they are now. */
+function EventsLeaf(props: Record<string, any>) {
+  const root = useContext(RootProps);
+  const kit = useContext(KitContext)!;
+  const { events, error } = useEmailEvents(props.query);
+  if (!events) return <div dangerouslySetInnerHTML={{ __html: placeholder('Loading events…') }} />;
+  const item = { type: 'Events', props: { ...props, id: 'canvas' } } as EmailItem;
+  const html = renderBlock(item, { ...kit.canvas, events: { canvas: events } }, root);
+  return <div dangerouslySetInnerHTML={{ __html: html || placeholder(error || 'No events to show now, so the block shows nothing.') }} />;
 }
 
 function ColorField({ label, value, onChange, fallback }: { label: string; value?: string; onChange: (v: string | undefined) => void; fallback: string }) {
@@ -91,7 +107,7 @@ function emailConfig(kit: EmailKit): Config {
   const leaf = (type: string) => (props: any) => <Leaf type={type} props={props} />;
   return {
     categories: {
-      content: { title: 'Content', components: ['Heading', 'Text', 'Button', 'Image', 'FormField', ...(kit.payment ? ['Payment'] : [])] },
+      content: { title: 'Content', components: ['Heading', 'Text', 'Button', 'Image', 'FormField', ...(kit.payment ? ['Payment'] : []), ...(typeDef('event') ? ['Events'] : [])] },
       layout: { title: 'Layout', components: ['Section', 'Columns', 'Divider', 'Spacer'] },
     },
     root: {
@@ -178,6 +194,20 @@ function emailConfig(kit: EmailKit): Config {
         },
         defaultProps: { heading: 'Payment', showItems: true, showDetails: true },
         render: leaf('Payment'),
+      },
+      Events: {
+        label: 'Events',
+        fields: {
+          heading: { type: 'text', label: 'Heading (optional)' },
+          query: { type: 'custom', label: 'Shows', render: ({ value, onChange }: any) => <EventsQueryField value={value} onChange={onChange} /> },
+          showImage: { type: 'radio', label: 'Image', options: [{ label: 'Show', value: true }, { label: 'Hide', value: false }] },
+          showVenue: { type: 'radio', label: 'Venue', options: [{ label: 'Show', value: true }, { label: 'Hide', value: false }] },
+          showExcerpt: { type: 'radio', label: 'Short description', options: [{ label: 'Show', value: true }, { label: 'Hide', value: false }] },
+          linkLabel: { type: 'text', label: 'Link text under each (empty: the title is the link)' },
+          empty: { type: 'text', label: 'When there are none (empty: the block shows nothing)' },
+        },
+        defaultProps: { heading: 'Coming up', query: { source: 'upcoming', count: 3 }, showImage: true, showVenue: true, showExcerpt: true, linkLabel: 'Details', empty: '' },
+        render: (props: any) => <EventsLeaf {...props} />,
       },
       Divider: { label: 'Divider', fields: { color: color('Colour', '#e5e1dc') }, defaultProps: {}, render: leaf('Divider') },
       Spacer: { label: 'Spacer', fields: { height: { type: 'number', label: 'Height (px)', min: 4, max: 200 } }, defaultProps: { height: 24 }, render: leaf('Spacer') },

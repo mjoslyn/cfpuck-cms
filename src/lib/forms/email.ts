@@ -35,6 +35,21 @@ export interface EmailContext {
   origin: string;
   /** The submission's payment, for the Payment block (none: the block shows nothing). */
   payment?: EmailPayment | null;
+  /** Each Events block's events, by block id (src/lib/events/email.ts loads them; none: its empty text). */
+  events?: Record<string, EmailEvent[]>;
+}
+
+/** An event as the Events block shows it. */
+export interface EmailEvent {
+  title: string;
+  link: string;
+  /** "Saturday, October 24, 2026 at 7:00 pm". */
+  when: string;
+  venue?: string;
+  /** The featured image's address. */
+  image?: string;
+  alt?: string;
+  excerpt?: string;
 }
 
 /** A payment as the Payment block and {payment_summary} show it. */
@@ -137,6 +152,26 @@ export function emailText(html: string, root: Required<Omit<EmailRoot, 'preheade
     .replace(/<p style="[^"]*">\s*<\/p>/g, '');
 }
 
+/** One event of an Events block: its image beside the text (above it on phones), a line under all but the
+ *  last. The image isn't a link: in the plain text made from the HTML it would be a bare address. */
+function eventRow(ev: EmailEvent, p: Record<string, any>, root: Required<Omit<EmailRoot, 'preheader'>>, first: boolean, last: boolean): string {
+  const link = esc(ev.link);
+  const muted = 'margin:0;font-size:14px;line-height:1.45;color:#64748b';
+  const text = [
+    `<p style="margin:0 0 4px 0;font-size:17px;line-height:1.3;font-weight:700"><a href="${link}" style="color:${root.textColor};text-decoration:none">${esc(ev.title)}</a></p>`,
+    `<p style="${muted}">${esc(ev.when)}</p>`,
+    p.showVenue !== false && ev.venue ? `<p style="${muted}">${esc(ev.venue)}</p>` : '',
+    p.showExcerpt !== false && ev.excerpt ? `<p style="margin:8px 0 0 0;font-size:15px;line-height:1.5">${esc(ev.excerpt)}</p>` : '',
+    p.linkLabel ? `<p style="margin:8px 0 0 0;font-size:15px"><a href="${link}" style="color:${root.linkColor};font-weight:600;text-decoration:underline">${esc(p.linkLabel)}</a></p>` : '',
+  ].join('');
+  const image =
+    p.showImage !== false && ev.image
+      ? `<td class="email-col" width="160" valign="top" style="width:160px;vertical-align:top;padding-right:16px"><img src="${esc(ev.image)}" alt="${esc(ev.alt ?? '')}" width="160" style="display:block;width:100%;max-width:160px;height:auto;border:0;border-radius:4px;margin:0 0 8px 0" /></td>`
+      : '';
+  const pad = `padding:${first ? 0 : 14}px 0 ${last ? 0 : 14}px 0;${last ? '' : 'border-bottom:1px solid #e5e1dc;'}`;
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="${pad}"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>${image}<td${image ? ' class="email-col"' : ''} valign="top" style="vertical-align:top;font-family:${root.fontFamily};color:${root.textColor}">${text}</td></tr></table></td></tr></table>`;
+}
+
 /** Each block in a full-width table row, so spacing holds in Outlook too. */
 const row = (inner: string, td = '') => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td${td}>${inner}</td></tr></table>`;
 
@@ -182,6 +217,12 @@ export function renderBlock(item: EmailItem, ctx: EmailContext, rootIn: EmailRoo
       if (!ctx.payment) return '';
       const heading = p.heading ? `<p style="margin:0 0 8px 0;font-weight:700">${ctx.merge(esc(p.heading), true)}</p>` : '';
       return row(`<div style="${font}font-size:16px;line-height:1.55;color:${root.textColor}">${heading}${paymentTable(ctx.payment, { items: p.showItems !== false, details: p.showDetails !== false })}</div>`, ' style="padding:0 0 12px 0"');
+    }
+    case 'Events': {
+      const list = ctx.events?.[p.id] ?? [];
+      const heading = p.heading ? `<h3 style="margin:0 0 12px 0;${font}font-size:20px;line-height:1.25;font-weight:700;color:${root.textColor}">${ctx.merge(esc(p.heading), true)}</h3>` : '';
+      if (!list.length) return p.empty ? row(`${heading}<p style="margin:0;${font}font-size:15px;color:#64748b">${ctx.merge(esc(p.empty), true)}</p>`, ' style="padding:0 0 16px 0"') : '';
+      return row(heading + list.map((ev, i) => eventRow(ev, p, root, i === 0, i === list.length - 1)).join(''), ' style="padding:0 0 16px 0"');
     }
     case 'Section': {
       const bg = color(p.background, 'transparent');
@@ -270,6 +311,7 @@ export function textVersion(html: string): string {
     .replace(/&#0?39;/g, "'")
     .replace(/&amp;/g, '&')
     .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n[ \t]+/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }

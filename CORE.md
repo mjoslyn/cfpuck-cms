@@ -374,7 +374,7 @@ Text materials count toward the budget of what is sent in full (`MATERIAL_BUDGET
   provider; `src/lib/cache.ts`): fresh for 60s, then served stale for up to a week while they refresh,
   in Netlify's durable cache (shared by its edge servers), tagged `pages`. A successful admin write
   (POST, PUT, PATCH or DELETE under `/api/admin/`) clears that tag from the middleware
-  (`cache.invalidate`; a 2xx answer, or the 303 a form post such as a bulk action answers with), so edits show at once; previews, Claude drafting, accessibility marks,
+  (`cache.invalidate`; a 2xx answer, or the 303 a form post such as a bulk action answers with), so edits show at once; previews (and the email builder's event lookups), Claude drafting, accessibility marks,
   submissions, users, the attendee list and sync requests other than a sync into this copy or a restore don't
   (`changesPages`). A failed purge is logged and the edit shows within the minute. Under `astro dev`
   nothing is cached. The first cover or hero image on a page loads at high priority (`optimizeImages`).
@@ -420,13 +420,18 @@ form takes 20 submissions a minute, then answers 429), storage, notifications to
 `FORMS_ADMIN_EMAIL` / the config's `adminEmail`). A notification's email is built in the email builder
 (`src/forms/EmailBuilder.tsx`, opened by Edit email): a Puck document (`Notification.design`) of email
 blocks (Heading, Text, Button, Image, Form field (one answer, or all as a table), Payment (the
-submission's items, total, status, provider, payment id and date; nothing without a payment), Section,
+submission's items, total, status, provider, payment id and date; nothing without a payment), Events
+(on a site with events: the next upcoming ones, of some categories or featured only, or events picked by
+hand, each at its next date, past ones left out; with image, date, venue, excerpt and a link), Section,
 Two columns, Divider, Spacer) that `src/lib/forms/email.ts` renders to email-safe HTML (tables, inline styles, a 600px
 body, a preheader, columns stacking on phones; text kept to paragraphs, emphasis, links and lists), the
 canvas included. Its Plain text tab (`Notification.text`, merge tags allowed) is the text part; empty,
 the text is made from the HTML. Its Preview tab renders the email as sent (`renderNotification`, the
 code that sends it) for a stored submission or sample answers (`/api/admin/forms/<id>/notification-preview`).
-The builder itself knows nothing of forms: its caller passes a kit (`EmailKit`: the data block's
+The Events block's events are loaded when an email is sent (`emailEvents`, `src/lib/events/email.ts`, by
+block id onto the render's `events`, each query loaded once a minute), since the renderer is synchronous;
+the canvas and the ticket emails' preview fetch them from `POST /api/admin/email-events`. A plain text of
+one's own doesn't list them. The builder itself knows nothing of forms: its caller passes a kit (`EmailKit`: the data block's
 options, merge tags, canvas stand-ins, preview); a notification's is `formEmailKit`
 (`src/forms/form-email.ts`), ticket emails have their own.
 Notifications from before the builder send their message as before until opened there. Mail goes out over SMTP

@@ -12,11 +12,11 @@ export const PAGE_CACHE = { maxAge: 60, swr: 604800, tags: [PAGE_CACHE_TAG] };
 /** Browsers always revalidate a page (the CDN holds the copy). */
 export const BROWSER_CACHE_CONTROL = 'public, max-age=0, must-revalidate';
 
-// Admin endpoints whose writes don't change a public page: previews, Claude drafting text for review,
+// Admin endpoints whose writes don't change a public page: previews (an email's events too), Claude drafting text for review,
 // accessibility marks, form submissions, users and the attendee list (tickets a cancellation frees
 // show within the minute, and the ticket form checks what's left as it loads). Everything else under
 // /api/admin that succeeds with POST, PUT, PATCH or DELETE clears the pages.
-const NO_PURGE = ['/api/admin/a11y', '/api/admin/compose', '/api/admin/excerpt', '/api/admin/meta-compose', '/api/admin/seo', '/api/admin/submissions', '/api/admin/tickets', '/api/admin/users'];
+const NO_PURGE = ['/api/admin/a11y', '/api/admin/compose', '/api/admin/email-events', '/api/admin/excerpt', '/api/admin/meta-compose', '/api/admin/seo', '/api/admin/submissions', '/api/admin/tickets', '/api/admin/users'];
 // Settings > Sync: only syncing into this copy and restoring a backup here change its content.
 const SYNC_WRITES = ['apply', 'restoreBackup'];
 

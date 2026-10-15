@@ -4,6 +4,7 @@
 import type { EmailKit } from '../forms/EmailBuilder';
 import { MERGE_TAGS, ORDER_DETAILS, type EmailKind } from '../lib/tickets/config';
 import { SAMPLE_ORDER, sampleEvent, ticketEmail, ticketEmailContext } from '../lib/tickets/email';
+import { fetchEmailEvents } from '../forms/email-events';
 
 /** The plain text made from a design: each Order details block as its merge tags. */
 const DETAIL_TAGS: Record<string, [string, string]> = {
@@ -39,7 +40,7 @@ export function ticketEmailKit(kind: EmailKind, subject: () => string, eventTitl
       pickLabel: 'Filled in with',
       sampleLabel: kind === 'waitlist' ? 'A sample person on the waitlist' : 'A sample order',
       render: async ({ design, text }) => {
-        const mail = ticketEmail({ subject: subject(), design, text }, order, event, links, origin);
+        const mail = ticketEmail({ subject: subject(), design, text }, order, event, links, origin, await fetchEmailEvents(design));
         return { to: [kind === 'admin' ? "The site's admin address" : order.email], replyTo: kind === 'admin' ? order.email : undefined, ...mail };
       },
     },

@@ -67,6 +67,8 @@ admin** of each order. Besides the usual blocks they have:
   total, answers, the buyer's contact details)
 - the **Payment** block, as in form notifications: the order's tickets, total, provider, payment ID and
   date (nothing for free orders)
+- the **Events** block, as in form notifications: upcoming or picked events (in a follow-up, say, what's
+  on next)
 - a Preview filled in with a sample order
 
 Settings > Tickets holds the site's emails, when the reminder (hours before the event) and follow-up

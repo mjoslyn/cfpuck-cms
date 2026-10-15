@@ -1,9 +1,11 @@
 // A notification's preview, from the email builder (src/forms/EmailBuilder.tsx).
 // GET: the form's recent submissions, to pick one. POST { notification, definition?, submissionId? }:
 // the email as it would be sent for that submission, or for sample answers without one (recipients,
-// reply-to, subject, HTML, text); `definition` lets unsaved form changes show. Nothing is sent.
+// reply-to, subject, HTML, text; Events blocks list the events as they are now); `definition` lets
+// unsaved form changes show. Nothing is sent.
 import type { APIRoute } from 'astro';
 import { renderNotification } from '../../../../../lib/forms/submit';
+import { emailEvents } from '../../../../../lib/events/email';
 import { INPUT_TYPES } from '../../../../../lib/forms/logic';
 import type { FormDef, FormRow, Notification, SubmissionPayment, Values } from '../../../../../lib/forms/types';
 import { currencyOf, defaultProductValue, lineItems, totalOf } from '../../../../../lib/forms/payment';
@@ -65,5 +67,6 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
     const items = lineItems(row.definition, values);
     payment = { provider: row.definition.payment.provider, status: 'paid', amount: totalOf(items), currency: currencyOf(row.definition), items, payment_id: 'sample-payment-id', token: '', page: '', origin: '' };
   }
-  return Response.json(renderNotification(row, n, values, new URL(request.url).origin, payment));
+  const origin = new URL(request.url).origin;
+  return Response.json(renderNotification(row, n, values, origin, payment, await emailEvents(locals.db, n.design, origin)));
 };

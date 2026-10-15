@@ -46,6 +46,7 @@ editor like the page editor with blocks made for email:
 | Image | An image from the media library, optionally linked |
 | Form field | One answer, with or without its label, or every answer as a table |
 | Payment | The submission's payment: each item and its amount, the total, then its status, provider, payment ID and date (either part can be left out). Nothing on a submission without a payment |
+| Events | Events from the site's calendar: the next upcoming ones (how many, optionally of some categories or featured only), or events picked by hand, each at its next date. Each shows its title (linked), date, and optionally its image, venue, short description and a link. Listed as they are when each email is sent; events that are over are left out. A heading and a message for when there are none are optional |
 | Section | A box with a background and padding, holding other blocks |
 | Two columns | Blocks side by side, stacked on phones |
 | Divider, Spacer | A line, or space |
@@ -57,7 +58,8 @@ What the builder shows is what is sent: email-safe HTML laid out with tables and
 wide, with text kept to what mail apps show the same.
 
 - **Plain text**: the text version, for mail apps that don't show HTML, with field values. Left empty,
-  it is made from the visual design. **Fill from the visual design** starts from it.
+  it is made from the visual design. **Fill from the visual design** starts from it. A plain text of
+  your own doesn't list an Events block's events.
 - **Preview**: the email as it would be sent (recipients, reply-to, subject, the HTML at desktop and
   phone widths, and the text) for any stored submission, or for sample answers.
 

@@ -119,3 +119,25 @@ export function siteNow(now = new Date()): string {
 }
 
 export { addDays };
+
+const dayText = (s: string, o: Intl.DateTimeFormatOptions) => new Date(`${s.slice(0, 10)}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', ...o });
+const timeText = (s: string) => {
+  const [h, m] = s.slice(11, 16).split(':').map(Number);
+  return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'am' : 'pm'}`;
+};
+
+/** An event's local start and end written out, as emails show them: "Saturday, October 24, 2026" and " at 7:00 pm" (or ""). */
+export function eventWhen(start: string, end: string, allDay: boolean): { date: string; time: string } {
+  const long = { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' } as const;
+  const valid = /^\d{4}-\d{2}-\d{2}/.test(start);
+  const sameDay = start.slice(0, 10) === end.slice(0, 10);
+  const date = !valid ? 'Date to be announced' : sameDay ? dayText(start, long) : `${dayText(start, { month: 'long', day: 'numeric' })} – ${dayText(end, long)}`;
+  return { date, time: valid && !allDay ? ` at ${timeText(start)}` : '' };
+}
+
+/** A venue's name, street and town, as lines. */
+export function venueLines(venue?: Entry): string[] {
+  if (!venue) return [];
+  const f = venue.fields ?? {};
+  return [venue.title, f.address, [f.city, [f.state, f.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ')].filter(Boolean);
+}

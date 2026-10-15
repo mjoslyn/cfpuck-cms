@@ -8,7 +8,8 @@ import { MAX_QUANTITY, currencyOf, lineItems, totalOf } from './payment';
 import { startCheckout } from './checkout';
 import { formatMoney } from '../payments/money';
 import { sendMail, textVersion } from './mail';
-import { emailPayment, paymentTable, renderEmail } from './email';
+import { emailPayment, paymentTable, renderEmail, type EmailEvent } from './email';
+import { emailEvents } from '../events/email';
 import { Loader } from '../data';
 import { permalink } from '../permalink';
 import { serviceClient } from '../supabase';
@@ -186,8 +187,9 @@ function fieldHtml(def: FormDef, values: Values, id: string, showLabel: boolean)
   return showLabel ? `<p style="margin:0 0 4px 0;font-weight:600">${escHtml(f.label)}</p><p style="margin:0">${v}</p>` : `<p style="margin:0">${v}</p>`;
 }
 
-/** A notification as it would be sent for these values: recipients, reply-to, subject, HTML and text. */
-export function renderNotification(row: FormRow, n: Notification, values: Values, origin: string, payment?: SubmissionPayment | null) {
+/** A notification as it would be sent for these values: recipients, reply-to, subject, HTML and text
+ *  (`events`: its Events blocks' events, from emailEvents). */
+export function renderNotification(row: FormRow, n: Notification, values: Values, origin: string, payment?: SubmissionPayment | null, events?: Record<string, EmailEvent[]>) {
   const adminEmail = env('FORMS_ADMIN_EMAIL') || site.adminEmail;
   const tags = { adminEmail, payment };
   const visitorEmail = row.definition.fields.find((f) => f.type === 'email' && typeof values[f.id] === 'string');
@@ -205,6 +207,7 @@ export function renderNotification(row: FormRow, n: Notification, values: Values
           merge: (text, html) => mergeTags(text, row, values, { ...tags, html }),
           field: (id, showLabel) => fieldHtml(row.definition, values, id, showLabel),
           payment: payment ? emailPayment(payment, SITE_TZ) : null,
+          events,
           origin,
         },
         subject,
@@ -217,9 +220,9 @@ export function renderNotification(row: FormRow, n: Notification, values: Values
 export async function notify(row: FormRow, values: Values, origin: string, payment?: SubmissionPayment | null) {
   for (const n of (row.notifications ?? []) as Notification[]) {
     if (n.active === false) continue;
-    const mail = renderNotification(row, n, values, origin, payment);
-    if (!mail.to.length) continue;
     try {
+      const mail = renderNotification(row, n, values, origin, payment, await emailEvents(serviceClient(), n.design, origin));
+      if (!mail.to.length) continue;
       await sendMail(mail);
     } catch (e) {
       // The submission is stored either way; a mail outage shouldn't lose it or show the visitor an error.
