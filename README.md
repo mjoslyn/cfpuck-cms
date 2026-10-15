@@ -17,7 +17,10 @@ What you get:
   sliders, load more)
 - Events with recurrence, a calendar (list, month, day) and `.ics` feeds
 - Media library with focal points, standard crops and AVIF/WebP copies
-- Form builder with conditional logic and email notifications
+- Form builder with conditional logic, email notifications and payments (Stripe or Square)
+- Event tickets and free registrations: ticket types with prices, capacities and sales windows,
+  a waitlist, an attendee list with check-in and refunds, and confirmation, reminder and follow-up
+  emails
 - Compose: pages and edits written by Claude from your materials
 - Roles: editor and admin, with invitations
 
@@ -26,7 +29,8 @@ What you get:
 - Node 22.12 or later
 - Docker (Docker Desktop or OrbStack), for the local Supabase stack
 - For hosting: a Supabase project and a Netlify site
-- Optional: an Anthropic API key (Compose) and an SMTP account (form notifications)
+- Optional: an Anthropic API key (Compose), an SMTP account (form notifications and ticket emails)
+  and a Stripe or Square account (paid forms and tickets)
 
 The Supabase CLI runs through `npx`, so you don't need to install it.
 
@@ -95,6 +99,18 @@ The Supabase CLI runs through `npx`, so you don't need to install it.
   site config. Without SMTP, submissions are stored but no mail is sent.
   Locally, `SMTP_URL=smtp://127.0.0.1:56525` sends to the Supabase stack's mail catcher (inbox at
   http://127.0.0.1:56524).
+- **Tickets.** Needs the `event` content type in `src/site/config.ts`. Turn Tickets on in an event's
+  settings and add ticket types; the Event details block shows the form, or place a Tickets block on
+  any page or template. Free tickets need nothing else. For paid ones, set one provider's keys:
+  - Stripe: `STRIPE_SECRET_KEY` (`sk_test_...` to test) and `STRIPE_WEBHOOK_SECRET`.
+  - Square: `SQUARE_ACCESS_TOKEN`, `SQUARE_LOCATION_ID`, `SQUARE_ENVIRONMENT=sandbox` to test,
+    `SQUARE_WEBHOOK_SIGNATURE_KEY` and `SQUARE_WEBHOOK_URL`.
+
+  With both set, choose one under Settings > Tickets, which also has the currency, how long an
+  unpaid order holds its tickets, and the emails. Ticket emails need SMTP; their links use
+  `SITE_URL` (default Netlify's `URL`), and the copy of each order goes to `TICKETS_NOTIFY_EMAIL`
+  (default `FORMS_ADMIN_EMAIL`, then `adminEmail`). Orders and the waitlist are at `/admin/tickets/`.
+  The same keys take payments on forms (a form's Payment tab).
 
 ## Make it your site
 
@@ -146,11 +162,17 @@ follow the config. `CORE.md` describes each option.
    - Set the same environment variables as `.env`: the Supabase URL and keys, plus the optional
      Compose, SMTP and ticket payment (Stripe or Square) ones.
    - Add your domain.
-   - Taking payments (forms or tickets): add the payment provider's webhook (`/api/payments/stripe` or
-     `/api/payments/square`; one serves both; events in `.env.example` and the docs' Forms page).
+   - Taking payments (forms or tickets): add the payment provider's webhook. One endpoint serves both:
+     - Stripe: `https://<your-domain>/api/payments/stripe`, with the `checkout.session.*`,
+       `charge.refunded` and `charge.refund.updated` events.
+     - Square: `https://<your-domain>/api/payments/square`, with `payment.created`,
+       `payment.updated`, `refund.created` and `refund.updated`; set `SQUARE_WEBHOOK_URL` to that
+       exact address.
 
-   Compose runs long jobs in the background function `netlify/functions/compose-background.mts`,
-   which Netlify deploys with the site.
+   Netlify deploys the site's functions with it: `compose-background.mts` (Compose jobs),
+   `restore-background.mts` (backup restores), `scheduled-snapshot.mts` (daily snapshots) and
+   `ticket-emails.mts`, which runs hourly to send ticket reminders and follow-ups, release expired
+   holds and notify the waitlist.
 4. **Invite editors** from `/admin/users/`.
 
 ## Updating the core
