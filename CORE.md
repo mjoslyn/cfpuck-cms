@@ -522,7 +522,9 @@ tickets (30-120 minutes), and the emails with the reminder's and follow-up's tim
   an advisory lock per event and date and counts paid orders and unexpired holds against the capacities.
   A free order is paid at once; a paid one goes to Stripe Checkout or a Square payment link (the shared
   payments code, see Forms > Payments). `/api/tickets/return` checks the payment with the provider and
-  shows the order; the webhooks (`ticketsWebhook`) confirm payments, expiries and refunds. `markPaid` is idempotent and sends the confirmation
+  shows the order; the webhooks (`ticketsWebhook`) confirm payments, expiries and refunds. A refund
+  is counted while pending; the refunded total is the provider's (`refunded`, read again on each refund
+  event), so one that fails comes off the order, and a fully refunded order is paid again (`recordRefund`). `markPaid` is idempotent and sends the confirmation
   once. An expired hold that is paid anyway (a Square link used late) is still marked paid.
 - Attendee list (`/admin/tickets/`, `/admin/tickets/<id>/[?date=]`; actions `POST /api/admin/tickets`,
   `GET /api/admin/tickets/attendees.csv`): check-in, resend, cancel (unpaid, free or fully refunded),

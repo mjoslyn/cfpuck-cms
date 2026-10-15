@@ -45,7 +45,7 @@ export interface CheckoutState {
 /**
  * What a webhook reports, in terms both features share: a checkout to look at again (found by `ref`, or
  * Square's `order`), with `failed` or `expired` when it won't be paid; or a payment's refunds (`refunded`,
- * the total so far).
+ * the total so far as the provider has it now, which drops when a refund fails).
  */
 export type PaymentEvent =
   | { kind: 'checkout'; ref?: string; order?: string; failed?: boolean; expired?: boolean }
@@ -66,7 +66,7 @@ export interface Provider {
   close(ref: string): Promise<void>;
   /** Give back `amount` of a payment; `key` makes a retried refund count once. */
   refund(paymentId: string, amount: number, currency: string, key: string): Promise<void>;
-  /** How much of a payment has been refunded so far. */
+  /** How much of a payment has been refunded so far, pending refunds included and failed ones not. */
   refunded(paymentId: string): Promise<number>;
   /** A webhook's event if it is signed by the provider; null if not. */
   webhookEvent(body: string, headers: Headers, url: string): Promise<any | null>;

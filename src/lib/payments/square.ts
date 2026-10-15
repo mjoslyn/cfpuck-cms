@@ -70,6 +70,16 @@ async function close(ref: string) {
   await call('DELETE', `/online-checkout/payment-links/${encodeURIComponent(ref)}`);
 }
 
+/** Refunded so far: completed refunds and those still pending, so a refund that fails later drops out. */
+async function refunded(paymentId: string) {
+  let total = 0;
+  for (const id of (await payment(paymentId)).refund_ids ?? []) {
+    const { refund } = await call('GET', `/refunds/${encodeURIComponent(id)}`);
+    if (refund?.status === 'COMPLETED' || refund?.status === 'PENDING') total += Number(refund.amount_money?.amount ?? 0);
+  }
+  return total;
+}
+
 async function refund(paymentId: string, amount: number, currency: string, key: string) {
   await call('POST', '/refunds', { idempotency_key: `refund-${key}`.slice(0, 45), payment_id: paymentId, amount_money: { amount, currency: currency.toUpperCase() } });
 }
@@ -94,7 +104,7 @@ export const provider: Provider = {
   check,
   close,
   refund,
-  refunded: async (id) => Number((await payment(id)).refunded_money?.amount ?? 0),
+  refunded,
   async webhookEvent(body, headers, url) {
     const key = env('SQUARE_WEBHOOK_SIGNATURE_KEY');
     return key && (await verifySquareSignature(body, headers.get('x-square-hmacsha256-signature') ?? '', env('SQUARE_WEBHOOK_URL') || url, key)) ? JSON.parse(body) : null;
@@ -107,8 +117,9 @@ export const provider: Provider = {
         return obj.payment?.order_id ? { kind: 'checkout', order: String(obj.payment.order_id) } : null;
       case 'refund.created':
       case 'refund.updated': {
+        // Any status: a refund that fails or is rejected comes off the total.
         const r = obj.refund ?? {};
-        return r.status === 'COMPLETED' && r.payment_id ? { kind: 'refund', payment: String(r.payment_id), refunded: Number((await payment(r.payment_id)).refunded_money?.amount ?? 0) } : null;
+        return r.payment_id ? { kind: 'refund', payment: String(r.payment_id), refunded: await refunded(String(r.payment_id)) } : null;
       }
     }
     return null;

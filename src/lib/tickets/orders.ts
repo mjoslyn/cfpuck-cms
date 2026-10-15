@@ -307,10 +307,16 @@ export async function markPaid(db: SupabaseClient, order: Pick<OrderRow, 'id'>, 
   if (data) await sendConfirmation(db, data, siteOrigin());
 }
 
-/** A refund the provider reports (made here or in its dashboard): `refunded` is the payment's total refunded. */
+/**
+ * Refunds the provider reports (made here or in its dashboard): `refunded` is the payment's total as the
+ * provider has it now, so a refund that failed comes off again (and a fully refunded order whose refund
+ * failed is paid again).
+ */
 export async function recordRefund(db: SupabaseClient, order: OrderRow, refunded: number) {
-  const total = Math.max(order.refunded_amount ?? 0, refunded);
-  await db.from('ticket_orders').update({ refunded_amount: total, ...(total >= order.amount && order.status === 'paid' ? { status: 'refunded' } : {}) }).eq('id', order.id);
+  const status = refunded >= order.amount ? (order.status === 'paid' ? 'refunded' : order.status) : order.status === 'refunded' ? 'paid' : order.status;
+  if (refunded === order.refunded_amount && status === order.status) return;
+  if (status !== order.status) console.warn(`tickets: order ${order.code} ${order.status} -> ${status}: ${refunded} of ${order.amount} refunded at the provider`);
+  await db.from('ticket_orders').update({ refunded_amount: refunded, status }).eq('id', order.id).eq('status', order.status);
 }
 
 // ---- Webhooks --------------------------------------------------------------------------------

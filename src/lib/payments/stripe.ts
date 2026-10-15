@@ -99,7 +99,9 @@ export const provider: Provider = {
     if (type.startsWith('checkout.session.') && o.object === 'checkout.session' && o.id) {
       return { kind: 'checkout', ref: String(o.id), failed: type === 'checkout.session.async_payment_failed', expired: type === 'checkout.session.expired' };
     }
-    if (type === 'charge.refunded' && o.payment_intent) return { kind: 'refund', payment: id(o.payment_intent)!, refunded: Number(o.amount_refunded) || 0 };
+    // charge.refunded, and a refund's updates (one that fails comes off the charge's amount_refunded).
+    const refundEvent = type === 'charge.refunded' || type === 'charge.refund.updated' || type === 'refund.updated' || type === 'refund.failed';
+    if (refundEvent && o.payment_intent) return { kind: 'refund', payment: id(o.payment_intent)!, refunded: await refunded(id(o.payment_intent)!) };
     return null;
   },
 };

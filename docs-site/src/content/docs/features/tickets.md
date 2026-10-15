@@ -52,7 +52,8 @@ attendee list (`/admin/tickets/<id>/`):
 - the event's own **Emails**
 - **Export CSV** and **Print**
 
-Refunds made in the Stripe or Square dashboard are recorded too, through the webhook.
+Refunds made in the Stripe or Square dashboard are recorded too, through the webhook, and a refund that
+fails later comes off the order again.
 
 ## Emails
 
