@@ -692,6 +692,12 @@ export default function FormBuilder({ formId }: { formId: number }) {
   const setConfirmation = (patch: Partial<Confirmation>) => setForm({ confirmation: { ...confirmation, ...patch } });
   const payment = form.payment ?? null;
   const setPayment = (patch: Partial<PaymentSettings>) => setForm({ payment: { ...(payment ?? { provider: 'stripe' }), ...patch } });
+  // Providers with keys in the environment; payment options show only when there is one.
+  const ready = providers ? (Object.keys(providers) as PaymentProvider[]).filter((p) => providers[p].configured) : [];
+  const providerLabel = (p: PaymentProvider) => `${providers?.[p]?.label ?? p}${providers?.[p]?.sandbox ? ' (test mode)' : ''}`;
+  // The provider a payment goes through (pickProvider on the server): the form's, else the one set up.
+  const takenBy = payment ? (ready.includes(payment.provider) ? payment.provider : ready[0]) : undefined;
+  const canPay = ready.length > 0 || !!payment || productsOf(form).length > 0;
   const emailFields = form.fields.filter((f) => f.type === 'email');
   // From the latest row: the email builder reports changes quickly, and several can come in one turn.
   const setNotification = (i: number, patch: Partial<Notification>) => setRow((r) => r && { ...r, notifications: r.notifications.map((n, j) => (j === i ? { ...n, ...patch } : n)) });
@@ -700,7 +706,7 @@ export default function FormBuilder({ formId }: { formId: number }) {
     ['build', 'Fields'],
     ['settings', 'Settings'],
     ['confirmation', 'Confirmation'],
-    ['payment', payment ? 'Payment (on)' : 'Payment'],
+    ...(canPay ? ([['payment', payment ? 'Payment (on)' : 'Payment']] as [Tab, string][]) : []),
     ['notifications', `Notifications (${row.notifications.length})`],
   ];
 
@@ -747,7 +753,7 @@ export default function FormBuilder({ formId }: { formId: number }) {
       <div className="flex min-h-0 flex-1">
         {tab === 'build' && (
           <aside className="w-56 shrink-0 overflow-y-auto border-r border-admin-ink/10 bg-admin-bg p-3">
-            {(['Standard', 'Advanced', 'Pricing', 'Layout'] as const).map((group) => (
+            {(['Standard', 'Advanced', ...(canPay ? (['Pricing'] as const) : []), 'Layout'] as const).map((group) => (
               <div key={group} className="mb-4">
                 <div className="mb-2 text-[11px] font-semibold tracking-wider text-admin-muted uppercase">{group}</div>
                 <div className="grid grid-cols-1 gap-1">
@@ -852,24 +858,26 @@ export default function FormBuilder({ formId }: { formId: number }) {
 
           {tab === 'payment' && (
             <>
-              <Labelled label="Take payment with">
-                <select
-                  className={input}
-                  value={payment?.provider ?? ''}
-                  onChange={(e) => setForm({ payment: e.target.value ? { ...(payment ?? {}), provider: e.target.value as PaymentProvider } : null })}
-                >
-                  <option value="">No payment</option>
-                  {(['stripe', 'square'] as PaymentProvider[]).map((p) => (
-                    <option key={p} value={p}>
-                      {providers?.[p]?.label ?? p}
-                      {providers && !providers[p].configured ? ' (not set up)' : providers?.[p]?.sandbox ? ' (test mode)' : ''}
-                    </option>
-                  ))}
-                </select>
-              </Labelled>
-              {payment && providers && !providers[payment.provider].configured && (
+              <Check
+                label="Take payment"
+                value={!!payment}
+                onChange={(on) => setForm({ payment: on ? { ...(payment ?? {}), provider: payment?.provider ?? ready[0] ?? 'stripe' } : null })}
+              />
+              {payment && ready.length > 1 && (
+                <Labelled label="Take payment with">
+                  <select className={input} value={takenBy} onChange={(e) => setPayment({ provider: e.target.value as PaymentProvider })}>
+                    {ready.map((p) => (
+                      <option key={p} value={p}>
+                        {providerLabel(p)}
+                      </option>
+                    ))}
+                  </select>
+                </Labelled>
+              )}
+              {payment && ready.length === 1 && <p className="mb-3 text-xs text-admin-muted">Payments go through {providerLabel(ready[0])}.</p>}
+              {payment && providers && !ready.length && (
                 <p className="mb-3 rounded bg-[#fef3f2] p-2 text-xs text-[#b42318]">
-                  {providers[payment.provider].label} needs {providers[payment.provider].missing.join(' and ')} in the site's environment. Until then the form refuses submissions that have something to pay.
+                  No payment provider is set up: Stripe needs {providers.stripe.missing.join(' and ')}, Square needs {providers.square.missing.join(' and ')} in the site's environment. Until then the form refuses submissions that have something to pay.
                 </p>
               )}
               {payment && (
@@ -889,10 +897,10 @@ export default function FormBuilder({ formId }: { formId: number }) {
                   </Labelled>
                   {!productsOf(form).length && <p className="mb-3 rounded bg-admin-soft p-2 text-xs text-admin-muted">Add Product fields (Fields, Pricing) for what the form charges; their total is the payment.</p>}
                   <div className="space-y-2 text-xs leading-relaxed text-admin-muted">
-                    <p>Visitors pay on {providers?.[payment.provider]?.label ?? 'the provider'}'s checkout page after they submit, then come back to the confirmation. A submission with nothing to pay is sent right away.</p>
+                    <p>Visitors pay on {(takenBy && providers?.[takenBy]?.label) ?? 'the provider'}'s checkout page after they submit, then come back to the confirmation. A submission with nothing to pay is sent right away.</p>
                     <p>Notifications are sent once the payment is complete. Submissions list unpaid checkouts as Unpaid.</p>
                     <p>
-                      Webhook address (for visitors who pay and don't come back): <code>{location.origin}/api/payments/{payment.provider}</code>
+                      Webhook address (for visitors who pay and don't come back): <code>{location.origin}/api/payments/{takenBy ?? payment.provider}</code>
                     </p>
                   </div>
                 </>

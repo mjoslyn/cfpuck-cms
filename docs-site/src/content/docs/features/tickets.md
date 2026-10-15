@@ -6,7 +6,8 @@ sidebar:
 ---
 
 An event sells tickets (or takes free registrations) when **Tickets** is on in its settings. Free
-tickets need nothing else; paid ones go through Stripe or Square, chosen under **Settings > Tickets**.
+tickets need nothing else; paid ones go through Stripe or Square, whichever has its keys set (chosen
+under **Settings > Tickets** when both do).
 
 ## An event's tickets
 

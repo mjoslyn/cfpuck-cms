@@ -14,6 +14,18 @@ export type PaymentProvider = 'stripe' | 'square';
 
 export const PROVIDERS: Record<PaymentProvider, Provider> = { stripe: stripe.provider, square: square.provider };
 
+/** The providers whose keys are set here. */
+export const configuredProviders = () => (Object.keys(PROVIDERS) as PaymentProvider[]).filter((k) => PROVIDERS[k].configured());
+
+/**
+ * The provider a payment goes through: the one chosen (a form's, Settings > Tickets') if its keys are
+ * set, else the first that is set up; none when neither is.
+ */
+export function pickProvider(chosen?: PaymentProvider | null): PaymentProvider | undefined {
+  const ready = configuredProviders();
+  return chosen && ready.includes(chosen) ? chosen : ready[0];
+}
+
 /** The provider named, if it is one ('free' ticket orders have none). */
 export const providerOf = (name: string | null | undefined): Provider | undefined => (name === 'stripe' || name === 'square' ? PROVIDERS[name] : undefined);
 

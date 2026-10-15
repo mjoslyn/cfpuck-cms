@@ -93,6 +93,7 @@ export type { PaymentProvider };
 
 /** Taking payment for a form: its Product fields add up to the total charged at checkout. */
 export interface PaymentSettings {
+  /** The provider chosen; when its keys aren't set, the one that is (pickProvider). */
   provider: PaymentProvider;
   /** ISO 4217 code (CURRENCIES in src/lib/payments/money.ts); USD by default. */
   currency?: string;

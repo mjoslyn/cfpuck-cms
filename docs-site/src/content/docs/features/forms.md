@@ -66,14 +66,16 @@ the builder, which turns it into blocks.
 
 ## Payments
 
-A form can take payment with **Stripe** or **Square**. Visitors pay on the provider's own checkout
-page, so no card details reach the site.
+A form can take payment with **Stripe** or **Square**, whichever has its keys set (see Setting up the
+providers); until one does, the builder shows no payment options. Visitors pay on the provider's own
+checkout page, so no card details reach the site.
 
 1. Add **Product** fields (the Pricing group in the builder). A product has one price, a choice of
    priced options (a dropdown or multiple choice), or an amount the visitor enters (a donation, with
    an optional smallest and largest amount). One price or a choice can also take a quantity.
-2. In the **Payment** tab, choose the provider, the currency, a description for the checkout page and
-   receipt (merge tags allowed) and the email field the receipt goes to.
+2. In the **Payment** tab, tick **Take payment** and choose the currency, a description for the
+   checkout page and receipt (merge tags allowed) and the email field the receipt goes to. With both
+   providers set up, choose which one the form uses; with one, it is used.
 
 The form shows its total above the submit button and updates it as the visitor answers. Products that
 conditional logic hides aren't charged, so a fee can depend on an answer.
@@ -106,8 +108,9 @@ Forms and tickets share them, and one webhook per provider serves both.
 | `SQUARE_ENVIRONMENT` | `sandbox` to test; production otherwise |
 | `SQUARE_WEBHOOK_SIGNATURE_KEY`, `SQUARE_WEBHOOK_URL` | A webhook subscription to `payment.created`, `payment.updated`, `refund.created` and `refund.updated` at `<site>/api/payments/square`: its signature key, and that exact address (when the site sees another) |
 
-The Payment tab and Settings > Tickets show which providers are set up, what they still need, and mark
-test and sandbox keys. In Square's sandbox a payment link opens Square's testing panel rather than a card
+Set up Stripe, Square or both. The Payment tab and Settings > Tickets offer only the providers whose
+keys are set, and mark test and sandbox keys; with neither, they show what to set. A form or the
+tickets setting that names a provider whose keys are gone uses the other one, if it is set up. In Square's sandbox a payment link opens Square's testing panel rather than a card
 form: **Next**, then **Test Payment** pays the order, and the last step links back to the site.
 
 ## Mail

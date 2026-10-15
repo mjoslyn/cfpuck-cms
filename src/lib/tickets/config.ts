@@ -73,7 +73,7 @@ export const TICKETS_KEY = 'tickets';
 
 /** The site's ticket settings (settings.site.tickets). */
 export interface TicketSettings {
-  /** Who takes payments: Stripe or Square (their keys in the environment). Free tickets need neither. */
+  /** Who takes payments when both Stripe and Square have keys in the environment (else the one that does). Free tickets need neither. */
   provider?: PaymentProvider;
   /** ISO code, lower case (default usd). */
   currency?: string;

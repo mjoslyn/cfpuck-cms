@@ -62,8 +62,13 @@ try {
 
   // Payment tab.
   await page.click('nav button:has-text("Payment")');
-  out.providerOptions = await page.locator('label:has-text("Take payment with") select option').allTextContents();
-  await page.locator('label:has-text("Take payment with") select').selectOption(provider);
+  await page.locator('label:has-text("Take payment") input[type=checkbox]').check();
+  // The provider picker shows only when both providers have keys; with one, it is used.
+  const picker = page.locator('label:has-text("Take payment with") select');
+  const options = await picker.locator('option').allTextContents();
+  out.providerOptions = options;
+  if (options.length) await picker.selectOption(provider);
+  else out.providerNote = await page.locator('text=Payments go through').textContent().catch(() => null);
   await page.fill('label:has-text("Description of the payment") input', 'Example Town: {form_title}');
   await page.screenshot({ path: shot('payment-tab') });
   out.paymentWarning = await page.locator('text=in the site\'s environment').textContent().catch(() => null);

@@ -4,7 +4,7 @@
 // with when the reminder and follow-up go out. Saved with the other settings; an event can have its own
 // emails (its attendee list > Emails).
 import { useEffect, useState } from 'react';
-import { Num, Select, Toggle } from '../puck/fields';
+import { Num, Segmented, Select, Toggle } from '../puck/fields';
 import type { PaymentProvider, ProviderStatus } from '../lib/payments';
 import { CURRENCIES, DEFAULT_FOLLOW_UP_HOURS, DEFAULT_HOLD, DEFAULT_REMINDER_HOURS, EMAIL_KINDS, type EmailKind, type TicketEmail, type TicketSettings } from '../lib/tickets/config';
 import { TicketEmailCard } from './TicketEmailCard';
@@ -21,22 +21,22 @@ export default function TicketSettingsPanel({ value, providers, onChange }: { va
   const set = (patch: Partial<TicketSettings>) => onChange({ ...value, ...patch });
   const emails = (value.emails ?? {}) as Record<EmailKind, (TicketEmail & { on?: boolean; hours?: number }) | undefined>;
   const setEmail = (kind: EmailKind, patch: TicketEmail & { on?: boolean; hours?: number }) => set({ emails: { ...emails, [kind]: { ...(emails[kind] ?? {}), ...patch } } });
-  const provider = value.provider;
+  // Providers with keys in the environment; the one payments go through is the chosen one if it has
+  // them, else the one that does (pickProvider on the server).
+  const ready = (Object.keys(providers) as PaymentProvider[]).filter((p) => providers[p].configured);
+  const provider = value.provider && ready.includes(value.provider) ? value.provider : ready[0];
+  const label = (p: PaymentProvider) => `${providers[p].label}${providers[p].sandbox ? ' (test mode)' : ''}`;
   // The site's address, once in the browser (the server renders without it).
   const [origin, setOrigin] = useState('');
   useEffect(() => setOrigin(location.origin), []);
   return (
     <>
       <p className="mb-3 text-xs text-admin-muted">An event sells tickets when Tickets is on in its settings. Free tickets need no payment provider.</p>
-      <Select
-        title="Payments"
-        value={provider}
-        options={(['stripe', 'square'] as const).map((p) => [p, `${providers[p].label}${!providers[p].configured ? ' (keys not set)' : providers[p].sandbox ? ' (test mode)' : ''}`])}
-        onChange={(v) => set({ provider: (v as TicketSettings['provider']) || undefined })}
-      />
-      {provider && !providers[provider].configured && (
-        <p className="-mt-2 mb-3 text-xs text-[#b3261e]">
-          {providers[provider].label} needs {providers[provider].missing.join(' and ')} in the site's environment. Until then only free tickets can be ordered.
+      {ready.length > 1 && <Segmented title="Payments" value={provider!} options={ready.map((p) => [p, label(p)] as [string, string])} onChange={(v) => set({ provider: v as PaymentProvider })} />}
+      {ready.length === 1 && <p className="mb-3 text-xs text-admin-muted">Payments go through {label(ready[0])}.</p>}
+      {!ready.length && (
+        <p className="mb-3 rounded bg-admin-soft p-2 text-xs text-admin-muted">
+          To sell paid tickets, set up Stripe ({providers.stripe.missing.join(' and ')}) or Square ({providers.square.missing.join(' and ')}) in the site's environment.
         </p>
       )}
       {provider && (
@@ -44,8 +44,12 @@ export default function TicketSettingsPanel({ value, providers, onChange }: { va
           Webhook address: <code>{origin}/api/payments/{provider}</code> (shared with forms that take payment)
         </p>
       )}
-      <Select title="Currency" value={value.currency} options={CURRENCIES} onChange={(currency) => set({ currency: currency || undefined })} />
-      <Num title={`Minutes an unpaid order holds its tickets (30 to 120, default ${DEFAULT_HOLD})`} value={value.hold} min={30} max={120} onChange={(hold) => set({ hold })} />
+      {ready.length > 0 && (
+        <>
+          <Select title="Currency" value={value.currency} options={CURRENCIES} onChange={(currency) => set({ currency: currency || undefined })} />
+          <Num title={`Minutes an unpaid order holds its tickets (30 to 120, default ${DEFAULT_HOLD})`} value={value.hold} min={30} max={120} onChange={(hold) => set({ hold })} />
+        </>
+      )}
 
       <span className="mt-4 mb-1 block text-xs font-semibold tracking-wider text-admin-muted uppercase">Emails</span>
       <p className="mb-2 text-xs text-admin-muted">Designed in the email builder, with the order's details as merge tags and an Order details block. An event can have its own, on its attendee list.</p>

@@ -11,7 +11,7 @@ import { permalink } from '../permalink';
 import { SITE_TZ, site } from '../site';
 import { sendMail } from '../forms/mail';
 import { emailToSend, localNow, maxFor, offSale, offeredTypes, remaining, ticketEmailFrom, ticketSettings, ticketsOf, timedEmail, DEFAULT_MAX_PER_ORDER, type EmailKind, type EventEmail, type EventTickets, type TicketSettings } from './config';
-import { PROVIDERS, ProviderError, closeCheckout, providerOf, type CheckoutState, type PaymentEvent, type PaymentProvider } from '../payments';
+import { PROVIDERS, ProviderError, closeCheckout, pickProvider, providerOf, type CheckoutState, type PaymentEvent, type PaymentProvider } from '../payments';
 import { ticketEmail, type EventView, type OrderView } from './email';
 import type { EmailPayment } from '../forms/email';
 import { formatMoney } from '../payments/money';
@@ -210,7 +210,8 @@ export async function startCheckout(data: FormData, origin: string): Promise<str
   }
 
   const settings = await siteTicketSettings(db);
-  if (amount > 0 && !(settings.provider && PROVIDERS[settings.provider].configured())) return back('payments-off');
+  const providerName = amount > 0 ? pickProvider(settings.provider) : undefined;
+  if (amount > 0 && !providerName) return back('payments-off');
   const { count } = await db.from('ticket_orders').select('id', { count: 'exact', head: true }).eq('entry_id', ev.series.id).gte('created_at', new Date(Date.now() - 60_000).toISOString());
   if ((count ?? 0) >= MAX_PER_MINUTE) return back('busy');
   await expireStale(db).catch((e) => console.warn(`tickets: expiring holds: ${e.message}`));
@@ -224,7 +225,7 @@ export async function startCheckout(data: FormData, origin: string): Promise<str
   const { data: made, error } = await db.rpc('ticket_order_create', {
     p_order: {
       token, code, entry_id: ev.series.id, occurrence: (ev.entry as { occurrence?: string }).occurrence ?? '', event_title: ev.series.title,
-      status: free ? 'paid' : 'pending', provider: free ? 'free' : settings.provider, name, email, phone, address, answers, items, amount, currency,
+      status: free ? 'paid' : 'pending', provider: free ? 'free' : providerName, name, email, phone, address, answers, items, amount, currency,
       // A paid order holds its tickets a little longer than the checkout takes payment.
       expires_at: free ? null : new Date(Date.now() + hold + 2 * 60_000).toISOString(),
       paid_at: free ? new Date().toISOString() : null,
@@ -242,7 +243,7 @@ export async function startCheckout(data: FormData, origin: string): Promise<str
   try {
     const label = (n: string) => `${ev.series.title}${(ev.entry as { occurrence?: string }).occurrence ? ` (${eventView(ev, origin).date})` : ''}: ${n}`;
     const returnUrl = `${origin}/api/tickets/return?order=${token}`;
-    const checkout = await PROVIDERS[settings.provider!].create({
+    const checkout = await PROVIDERS[providerName!].create({
       reference: code,
       idempotencyKey: `checkout-${token}`,
       email,

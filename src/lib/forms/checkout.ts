@@ -8,7 +8,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { FormResult, FormRow, SubmissionPayment, Values } from './types';
 import { MAX_CHARGE, currencyOf, totalOf, type LineItem } from './payment';
 import { MIN_CHARGE, formatMoney } from '../payments/money';
-import { PROVIDERS, type PaymentEvent, type PaymentProvider } from '../payments';
+import { PROVIDERS, pickProvider, type PaymentEvent, type PaymentProvider } from '../payments';
 import { env, sameString } from '../payments/common';
 import { confirmationResult, mergeTags, notify } from './submit';
 import { site } from '../site';
@@ -30,11 +30,12 @@ interface Stored {
 /** Store the submission as pending and start a checkout for it; the visitor is sent to `url`. */
 export async function startCheckout(db: SupabaseClient, form: FormRow, data: Stored, items: LineItem[], request: Request): Promise<{ url: string } | { error: string }> {
   const settings = form.definition.payment!;
-  const provider = PROVIDERS[settings.provider];
+  const name = pickProvider(settings.provider);
+  const provider = name && PROVIDERS[name];
   const amount = totalOf(items);
   const currency = currencyOf(form.definition);
-  if (!provider?.configured()) {
-    console.error(`form ${form.id}: payment by ${settings.provider} is not set up`);
+  if (!name || !provider) {
+    console.error(`form ${form.id}: no payment provider is set up`);
     return { error: 'This form can’t take payments at the moment, so it wasn’t sent. Please try again later or contact us.' };
   }
   if (amount < MIN_CHARGE) return { error: `The total is below the smallest amount we can take (${formatMoney(MIN_CHARGE, currency)}).` };
@@ -42,7 +43,7 @@ export async function startCheckout(db: SupabaseClient, form: FormRow, data: Sto
 
   const url = new URL(request.url);
   const payment: SubmissionPayment = {
-    provider: settings.provider,
+    provider: name,
     status: 'pending',
     amount,
     currency,

@@ -434,7 +434,8 @@ Notifications from before the builder send their message as before until opened 
 default `mailFrom` in the site config).
 
 Payments: a form's Payment tab (`FormDef.payment`: Stripe or Square, currency, a description with merge
-tags, the email field for the receipt) and **Product** fields (`type: 'product'`; `priceMode` one price,
+tags, the email field for the receipt; shown, with the Pricing fields, only when a provider has its keys
+or the form already takes payment; the provider picker only when both do) and **Product** fields (`type: 'product'`; `priceMode` one price,
 a choice of priced options (`choices[].price`, dropdown or radio) or an amount the visitor enters
 (`min`/`max`); optional quantity up to `maxQuantity`, posted as `f1[qty]`). Their answers become line
 items and a total (`src/lib/forms/payment.ts`; a product hidden by conditional logic isn't charged);
@@ -461,7 +462,9 @@ Sessions) and `square.ts` (payment links, an order each), over their REST APIs w
 `refund`, `refunded`, `webhookEvent` with the signature checked, `parseEvent` turning it into a
 `PaymentEvent` both features read: a checkout to look at again, or a payment's refunds; `returnLag`, a
 wait before a second look at a checkout the buyer just came back from), `providerStatus()` for the admin
-screens (configured, test or sandbox keys, the variables still missing) and `money.ts` (`CURRENCIES`,
+screens (configured, test or sandbox keys, the variables still missing), `pickProvider` (the provider
+a payment goes through: the one a form or Settings > Tickets chose if its keys are set, else the one
+that has them) and `money.ts` (`CURRENCIES`,
 `formatMoney`, `toMinor`, `MIN_CHARGE`; safe in the browser). A checkout's `ref` is the Stripe session
 or Square payment link, `order` Square's order (which its payment is on). One webhook per provider
 serves both features, `/api/payments/stripe` and `/api/payments/square`
@@ -508,7 +511,8 @@ in the event's timezone, hidden for past ones), the event's capacity (per date f
 most per order, phone (off, optional, required), address (off, for paid orders, always), the event's own
 questions (asked once per order) and a waitlist (`off`, `auto`, `manual`). Settings > Tickets
 (`settings.site.tickets`, `ticketSettings`, `src/admin/TicketSettings.tsx`): the payment provider (Stripe
-or Square; keys in the environment, `providerStatus`), currency, how long an unpaid order holds its
+or Square, offered only when both have keys in the environment, `providerStatus`; with one, it is used;
+with neither, only free tickets, and the payment settings are hidden), currency, how long an unpaid order holds its
 tickets (30-120 minutes), and the emails with the reminder's and follow-up's timing.
 
 - Rendering: `src/render/c/tickets.ts`. The Event details block shows the form below the content and a
