@@ -7,20 +7,6 @@ sidebar:
 
 Defining `event` and `venue` types in the config turns on the calendar.
 
-## Turning events on and off
-
-Admins turn a site's events on and off under **Settings > Events** (on by default). While they're off,
-nothing is deleted and events stay under Content to edit (their tab is marked "off"), but the site shows
-none of them:
-
-- event pages, the calendar and its views, event category pages and the calendar feeds are Not found
-- collections, search and menus leave events out, and email Events blocks list none
-- event and ticket blocks show nothing, and the editor doesn't offer them
-- tickets aren't sold, and reminders, follow-ups and waitlist notices aren't sent; Tickets and Settings >
-  Tickets are hidden
-
-Orders already placed still complete: buyers coming back from paying and the payment webhooks work.
-
 ## Data
 
 Events use `start` and `end` (wall-clock times in `timezone`), `all_day`, `cost`, `website`, `venue`

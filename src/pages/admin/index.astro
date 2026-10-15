@@ -4,7 +4,6 @@ import { SITE_TZ } from '../../lib/site';
 import { COMPOSABLE_TYPES, CONTENT_TYPES, PAGELESS_TYPES, RECORD_TYPES, site, taxonomiesOf } from '../../lib/site';
 import Terms from '../../admin/Terms.astro';
 import { permalink } from '../../lib/permalink';
-import { eventsOn } from '../../lib/events/on';
 
 const db = Astro.locals.db;
 const params = Astro.url.searchParams;
@@ -88,10 +87,6 @@ const record = RECORD_TYPES.has(type);
 const pageless = PAGELESS_TYPES.has(type);
 const tagError = params.get('error');
 const place = (f: Record<string, any> | null) => [f?.address, f?.city, f?.state].filter(Boolean).join(', ');
-// Events on or off (Settings > Events, src/lib/events/on.ts): marked on their tab while off.
-const { data: siteRow } = await db.from('settings').select('value').eq('key', 'site').maybeSingle();
-const eventsAreOn = eventsOn(siteRow?.value);
-const isAdmin = Astro.locals.user?.role === 'admin';
 const decode = (s: string) => s.replace(/&#8217;/g, '’').replace(/&#038;|&amp;/g, '&').replace(/&#8211;/g, '–');
 ---
 <Admin title={current.label}>
@@ -114,20 +109,13 @@ const decode = (s: string) => s.replace(/&#8217;/g, '’').replace(/&#038;|&amp;
   <nav class="mt-6 flex flex-wrap gap-1 border-b border-admin-ink/10 text-sm">
     {CONTENT_TYPES.map((c) => (
       <a href={`/admin/?type=${c.type}`} class:list={['-mb-px border-b-2 px-3 py-2', c.type === type ? 'border-admin-accent text-admin-ink' : 'border-transparent text-admin-muted hover:text-admin-ink']}>
-        {c.label} <span class="text-xs text-admin-muted">{counts.get(c.type)}</span>{c.type === 'event' && !eventsAreOn && <span class="ml-1 rounded bg-admin-ink/10 px-1.5 text-xs text-admin-muted">off</span>}
+        {c.label} <span class="text-xs text-admin-muted">{counts.get(c.type)}</span>
       </a>
     ))}
     <a href="/admin/?type=terms" class:list={['-mb-px ml-auto border-b-2 px-3 py-2', tagsView ? 'border-admin-accent text-admin-ink' : 'border-transparent text-admin-muted hover:text-admin-ink']}>
       Taxonomies
     </a>
   </nav>
-
-  {type === 'event' && !tagsView && !eventsAreOn && (
-    <p class="mt-4 rounded bg-admin-soft px-4 py-3 text-sm">
-      Events are off: the site shows no events, calendar or ticket sales. They stay here to edit.
-      {isAdmin ? <> Turn them on under <a class="underline" href="/admin/settings/#events">Settings &gt; Events</a>.</> : ' An admin can turn them on under Settings.'}
-    </p>
-  )}
 
   {tagsView ? (
     <Terms taxonomy={taxonomyTab} error={tagError} notice={params.get('notice')} />

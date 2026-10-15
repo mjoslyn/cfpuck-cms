@@ -1,34 +1,20 @@
-// The site settings the editor needs, read once per page: Members (on or off, its levels: the entry
-// settings' access, member ticket prices, the Members only block) and whether events are on (event and
-// ticket blocks, the event type in pickers).
+// The member settings in the editor (Settings > Members): whether Members is on and its levels, for the
+// entry settings' access, member ticket prices and the Members only block. Read once per page.
 import { useEffect, useState } from 'react';
 import { browserClient } from '../lib/supabase-browser';
 import { memberSettings, type MemberSettings } from '../lib/members/config';
-import { eventsOn } from '../lib/events/on';
 
-let loading: Promise<Record<string, any> | null> | null = null;
+let loading: Promise<MemberSettings> | null = null;
 
-function useSite(): Record<string, any> | null | undefined {
-  const [site, setSite] = useState<Record<string, any> | null | undefined>(undefined);
+export function useMemberSettings(): MemberSettings | null {
+  const [s, setS] = useState<MemberSettings | null>(null);
   useEffect(() => {
-    loading ??= Promise.resolve(browserClient().from('settings').select('value').eq('key', 'site').maybeSingle()).then(({ data }) => data?.value ?? null, () => null);
+    loading ??= Promise.resolve(browserClient().from('settings').select('value').eq('key', 'site').maybeSingle()).then(({ data }) => memberSettings(data?.value));
     let live = true;
-    loading.then((v) => live && setSite(v));
+    loading.then((v) => live && setS(v), () => live && setS(memberSettings(null)));
     return () => {
       live = false;
     };
   }, []);
-  return site;
-}
-
-/** The member settings (null while loading). */
-export function useMemberSettings(): MemberSettings | null {
-  const site = useSite();
-  return site === undefined ? null : memberSettings(site);
-}
-
-/** Whether events are on (null while loading). */
-export function useEventsOn(): boolean | null {
-  const site = useSite();
-  return site === undefined ? null : eventsOn(site);
+  return s;
 }

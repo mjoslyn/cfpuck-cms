@@ -4,7 +4,6 @@ import { BlockView } from './BlockView';
 import { JsonAttrs, Row, Select, Text, Toggle, inputClass, type Attrs } from './fields';
 import { EntryField } from './entry-fields';
 import { MembersPanel } from './MembersPanel';
-import { EVENT_BLOCKS } from '../lib/events/on';
 import { SITE_BLOCKS } from '../lib/site/render';
 import { taxonomiesOf } from '../lib/site';
 import { SITE_EDITOR } from '../lib/site/editor';
@@ -187,9 +186,8 @@ const APPLIES_TO: Record<string, string[]> = {
  * The editor's blocks. With `entryType` (editing an entry), the block list leaves out blocks that don't
  * apply to that type; they stay defined, so any already on the page still show and can be edited.
  */
-export function buildConfig(types: string[], entryType?: string, opts: { members?: boolean; events?: boolean } = {}): Config {
-  // Event and ticket blocks are offered while events are on (Settings > Events).
-  const applies = (t: string) => (!entryType || !APPLIES_TO[t] || APPLIES_TO[t].includes(entryType)) && (opts.events !== false || !EVENT_BLOCKS.includes(t));
+export function buildConfig(types: string[], entryType?: string, opts: { members?: boolean } = {}): Config {
+  const applies = (t: string) => !entryType || !APPLIES_TO[t] || APPLIES_TO[t].includes(entryType);
   const offered = (cats: Record<string, { title?: string; components?: string[]; visible?: boolean }>) =>
     Object.fromEntries(Object.entries(cats).map(([k, c]) => [k, c.components ? { ...c, components: c.components.filter(applies) } : c]));
   const components: Config['components'] = {};

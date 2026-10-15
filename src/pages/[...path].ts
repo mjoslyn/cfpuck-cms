@@ -4,7 +4,6 @@ import { renderRequest, type PageResult } from '../render/page';
 import { serverClient } from '../lib/supabase';
 import { viewerOf } from '../lib/members/viewer';
 import { ACCOUNT_PATH, type Viewer } from '../lib/members/config';
-import { eventsOnIn } from '../lib/events/on';
 import { handleFormPost } from '../lib/forms/submit';
 import { RETURN_PARAM, paymentReturn } from '../lib/forms/checkout';
 import { serviceClient, siteDb } from '../lib/supabase';
@@ -30,8 +29,6 @@ export const GET: APIRoute = async ({ url, request, cache, cookies }) => {
   const moved = movedPath(url.pathname);
   if (moved) return Response.redirect(new URL(`${moved}${url.search}`, url), 301);
   // Calendar feeds: all events, or one event (or occurrence).
-  // Events off (Settings > Events): no feeds.
-  if ((url.pathname === '/events.ics' || /\/event\.ics$/.test(url.pathname)) && !(await eventsOnIn(siteDb()))) return new Response('Not found', { status: 404 });
   if (url.pathname === '/events.ics') {
     // Cached like pages: calendar apps poll feeds, and each build loads every event.
     if (cache.enabled) cache.set(PAGE_CACHE);

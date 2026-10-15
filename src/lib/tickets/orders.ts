@@ -9,7 +9,6 @@ import { ENTRY_COLUMNS, type Entry } from '../types';
 import { defaultHorizon, expandEntry, localToUtc, recurrenceOf } from '../recurrence';
 import { permalink } from '../permalink';
 import { eventWhen, venueLines } from '../events/model';
-import { eventsOnIn } from '../events/on';
 import { isActive, type MemberRow } from '../members/config';
 import { emailEvents } from '../events/email';
 import { SITE_TZ, site } from '../site';
@@ -568,8 +567,6 @@ export async function resendConfirmation(db: SupabaseClient, id: number, origin:
 export async function sendDueTicketEmails(origin = siteOrigin()): Promise<string> {
   const db = serviceClient();
   await expireStale(db).catch(() => {});
-  // Events off (Settings > Events): their pages are gone, so no reminders, follow-ups or waitlist notices.
-  if (!(await eventsOnIn(db))) return 'events are off';
   const settings = await siteTicketSettings(db);
   const { data: orders, error } = await db
     .from('ticket_orders')

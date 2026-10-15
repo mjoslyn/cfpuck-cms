@@ -24,7 +24,7 @@ import type { Env, RenderCtx } from '../render/env';
 import type { PuckItem } from '../lib/puck/types';
 import type { Entry } from '../lib/types';
 import { buildConfig, EDITABLE_TYPES } from './config';
-import { useEventsOn, useMemberSettings } from './member-settings';
+import { useMemberSettings } from './member-settings';
 import { EnvContext, StaticHtml } from './BlockView';
 import { EntryForm, type EntryState } from './entry-fields';
 import { inlinePatterns } from './patterns';
@@ -245,9 +245,8 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
   // Editing an entry, the block list offers only blocks that apply to its type; templates get them all.
   const entryType = entry?.type;
   const members = useMemberSettings();
-  const eventsAreOn = useEventsOn();
   const config = useMemo(() => {
-    const c = buildConfig(EDITABLE_TYPES, entryType, { members: !!members?.enabled, events: eventsAreOn !== false });
+    const c = buildConfig(EDITABLE_TYPES, entryType, { members: !!members?.enabled });
     c.root = {
       fields: state
         ? {
@@ -262,7 +261,7 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
       render: ({ children, ...props }: { children: ReactNode } & Record<string, any>) => <ChromeFromContext content={children} slots={props} />,
     } as any;
     return c;
-  }, [state === null, entryType, areaList.join(), !!members?.enabled, eventsAreOn !== false]);
+  }, [state === null, entryType, areaList.join(), !!members?.enabled]);
 
   // Compose panel: docked beside the editor; pinned keeps it open (per browser).
   const puckRef = useRef<ReturnType<typeof useGetPuck> | null>(null);

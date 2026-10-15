@@ -17,7 +17,6 @@ import BackupsTab from '../admin/Backups';
 import TicketSettingsPanel from '../admin/TicketSettings';
 import MemberSettingsPanel from '../admin/MemberSettings';
 import type { MemberSettings } from '../lib/members/config';
-import { eventsOn } from '../lib/events/on';
 import type { TicketSettings } from '../lib/tickets/config';
 import type { Redirect } from '../lib/redirects';
 import { MENU_FIELDS } from '../lib/navigation';
@@ -25,7 +24,7 @@ import type { TaxonomyMeta } from '../lib/page-meta';
 import { ADMIN_THEME_DEFAULTS, ADMIN_THEME_FIELDS, adminThemeVars, contrast, type AdminTheme } from '../lib/admin-theme';
 
 interface Props {
-  site: { name?: string; description?: string; front_page_id?: number | null; timezone?: string; search_types?: string[]; social?: { network: string; url: string }[]; share_image?: number; share_image_url?: string; templates?: TemplateMap; taxonomy_templates?: Record<string, string>; taxonomy_pages_off?: string[]; taxonomy_meta?: Record<string, TaxonomyMeta>; listing_meta?: Record<string, TaxonomyMeta>; listings_off?: string[]; icons?: Record<string, string>; icon_media_id?: number | null; icon_preview?: string; admin_theme?: AdminTheme; tickets?: TicketSettings; members?: Partial<MemberSettings>; events?: { enabled?: boolean } };
+  site: { name?: string; description?: string; front_page_id?: number | null; timezone?: string; search_types?: string[]; social?: { network: string; url: string }[]; share_image?: number; share_image_url?: string; templates?: TemplateMap; taxonomy_templates?: Record<string, string>; taxonomy_pages_off?: string[]; taxonomy_meta?: Record<string, TaxonomyMeta>; listing_meta?: Record<string, TaxonomyMeta>; listings_off?: string[]; icons?: Record<string, string>; icon_media_id?: number | null; icon_preview?: string; admin_theme?: AdminTheme; tickets?: TicketSettings; members?: Partial<MemberSettings> };
   options: Record<string, any>;
   pages: { id: number; title: string }[];
   templates: TemplateInfo[];
@@ -222,28 +221,11 @@ export default function SiteSettings({ site: initialSite, options: initialOption
         </>
       ),
     },
-    // Events on or off (src/lib/events/on.ts), on sites with an event type; their tickets while on.
-    ...(typeDef('event')
-      ? [
-          {
-            id: 'events',
-            label: 'Events',
-            panel: (
-              <>
-                <Toggle title="Events on" value={eventsOn(site)} onChange={(on) => setSite((s) => ({ ...s, events: on ? undefined : { enabled: false } }))} />
-                <p className="text-xs text-admin-muted">
-                  {eventsOn(site)
-                    ? 'The site shows events: their pages, the calendar, feeds and ticket sales, in lists, search, menus and emails.'
-                    : 'The site shows no events: their pages, the calendar and feeds are Not found, lists, search, menus and emails leave them out, tickets aren’t sold and reminders aren’t sent. The editor offers no event or ticket blocks. Events stay under Content to edit, and nothing is deleted.'}
-                </p>
-              </>
-            ),
-          },
-        ]
-      : []),
-    ...(eventsOn(site)
-      ? [{ id: 'tickets', label: 'Tickets', panel: <TicketSettingsPanel value={site.tickets ?? {}} providers={ticketProviders} onChange={(tickets) => setSite((s) => ({ ...s, tickets }))} /> }]
-      : []),
+    {
+      id: 'tickets',
+      label: 'Tickets',
+      panel: <TicketSettingsPanel value={site.tickets ?? {}} providers={ticketProviders} onChange={(tickets) => setSite((s) => ({ ...s, tickets }))} />,
+    },
     {
       id: 'members',
       label: 'Members',
