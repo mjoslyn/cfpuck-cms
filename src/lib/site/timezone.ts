@@ -2,14 +2,14 @@
 // Read at most once a minute per server instance, before a request is handled (src/middleware.ts) and
 // before a compose job runs.
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { supabase } from '../supabase';
+import { siteDb } from '../supabase';
 import { localToUtc } from '../recurrence';
 import { allRows } from '../rows';
 import { SITE_TZ, setSiteTimezone } from './index';
 
 let checked = 0;
 
-export async function refreshSiteTimezone(db: SupabaseClient = supabase, force = false): Promise<string> {
+export async function refreshSiteTimezone(db: SupabaseClient = siteDb(), force = false): Promise<string> {
   if (!force && Date.now() - checked < 60_000) return SITE_TZ;
   checked = Date.now();
   const { data } = await db.from('settings').select('value').eq('key', 'site').maybeSingle();

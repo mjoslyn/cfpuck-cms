@@ -6,8 +6,8 @@
 // (those in use), so a filter can offer them.
 import { BROWSER_CACHE_CONTROL, PAGE_CACHE_TAG } from '../../lib/cache';
 import type { APIRoute } from 'astro';
-import { supabase } from '../../lib/supabase';
-import { Loader } from '../../lib/data';
+import { siteDb } from '../../lib/supabase';
+import { Loader, PUBLIC_SCOPE } from '../../lib/data';
 import { permalink, termLink } from '../../lib/permalink';
 import { COMPOSABLE_TYPES, isTaxonomy, searchTypes, taxonomySingular, typeDef } from '../../lib/site';
 import { decodeEntities } from '../../lib/text/entities';
@@ -32,7 +32,7 @@ export const GET: APIRoute = async ({ url, cache }) => {
   };
   const none = { q, total: 0, results: [], terms: [] };
   if (q.length < 2) return new Response(JSON.stringify(none), { headers });
-  const loader = new Loader(supabase);
+  const loader = new Loader(siteDb(), undefined, PUBLIC_SCOPE);
   const types = asked.length ? asked : searchTypes((await loader.settings()).site);
 
   // Terms of the taxonomy whose names hold the words, in use, by name.

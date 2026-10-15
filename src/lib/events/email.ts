@@ -3,13 +3,12 @@
 // next date. The renderer is synchronous, so they are loaded here before an email is rendered, by
 // block id. Past events are left out: an email can go out long after it was designed. Server only.
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { Loader } from '../data';
+import { Loader, PUBLIC_SCOPE } from '../data';
 import { downsize, mediaUrl } from '../media/image';
 import { permalink } from '../permalink';
 import { typeDef } from '../site';
 import type { Entry } from '../types';
 import type { EmailDoc, EmailEvent, EmailItem } from '../forms/email';
-import { accessOf } from '../members/config';
 import { eventWhen, excerptOf, toCalEvent, venueIdOf, venueLines } from './model';
 
 /** What an Events block lists (its `query` setting). */
@@ -34,7 +33,8 @@ function eventBlocks(items: EmailItem[] = []): EmailItem[] {
 const ids = (v: unknown) => (Array.isArray(v) ? v.map(Number).filter((n) => Number.isInteger(n) && n > 0) : []);
 
 async function load(db: SupabaseClient, q: EmailEventsQuery, origin: string): Promise<EmailEvent[]> {
-  const loader = new Loader(db);
+  // Emails can go to anyone: published events that aren't members-only.
+  const loader = new Loader(db, undefined, PUBLIC_SCOPE);
   const picked = q.source === 'picked';
   const include = ids(q.include).slice(0, 50);
   if (picked && !include.length) return [];
@@ -50,8 +50,7 @@ async function load(db: SupabaseClient, q: EmailEventsQuery, origin: string): Pr
     ...(!picked && terms.length ? { terms: { any: terms } } : {}),
     ...(!picked && q.featured ? { featuredOnly: true } : {}),
   });
-  // Members-only events stay out of emails: they can go to anyone (the service key sees them all).
-  let entries = result.ids.map((id) => loader.entries.get(id)!).filter((e) => e && !accessOf(e.fields).members);
+  let entries = result.ids.map((id) => loader.entries.get(id)!).filter(Boolean);
   if (picked) {
     const next = new Map<number, Entry>();
     for (const e of entries) if (!next.has(e.series_id ?? e.id)) next.set(e.series_id ?? e.id, e);

@@ -223,8 +223,13 @@ export interface PreviewOverride {
 }
 
 export async function renderRequest(url: URL, db: SupabaseClient, form?: FormResult, preview?: PreviewOverride, viewer?: Viewer | null): Promise<PageResult> {
-  const loader = new Loader(db);
+  // The site's view: published entries, members-only ones for whoever may see them. Previews read with
+  // the editor's own session, whose database policies decide instead.
+  const loader = new Loader(db, undefined, preview ? undefined : { published: true, viewer });
   const settings = await loader.settings();
+  // A member counts as one only while Members is on.
+  const who = viewer && !memberSettings(settings.site).enabled ? { ...viewer, member: null } : viewer;
+  if (loader.scope) loader.scope.viewer = who;
   const queried: Queried = preview ? { kind: 'singular', entry: preview.entry, page: 1, url, isFront: settings.site?.front_page_id === preview.entry.id } : await resolve(url, loader);
   if (queried.redirect) return { status: 302, html: '', location: queried.redirect };
   if (queried.kind === '404' && url.pathname !== '/__not-found__/') {
@@ -238,8 +243,6 @@ export async function renderRequest(url: URL, db: SupabaseClient, form?: FormRes
     const guess = await guess404(url, loader);
     if (guess && guess !== url.pathname) return { status: 301, html: '', location: guess };
   }
-  // A member counts as one only while Members is on.
-  const who = viewer && !memberSettings(settings.site).enabled ? { ...viewer, member: null } : viewer;
   const ctx: RenderCtx = { loader, queried, settings, queries: new Map(), docs: new Map(), css: [], assets: new Set(), data: new Map(), scripts: [], rendered: [], viewer: who ?? null };
 
   if (form) ctx.data.set('form-result', form);

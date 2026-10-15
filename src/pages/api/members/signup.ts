@@ -3,7 +3,7 @@
 // project asks addresses to be confirmed, they confirm by email first (the link signs them in on the
 // account page). The site's admin address is told of each sign-up.
 import type { APIRoute } from 'astro';
-import { serverClient, serviceClient, supabase } from '../../../lib/supabase';
+import { serverClient, serviceClient, siteDb } from '../../../lib/supabase';
 import { EMAIL, accountUrl, loadMemberSettings, safeNext } from '../../../lib/members/account';
 import { sendMail } from '../../../lib/forms/mail';
 import { site } from '../../../lib/site';
@@ -15,7 +15,7 @@ export const POST: APIRoute = async ({ request, cookies, redirect, url }) => {
   const form = await request.formData();
   const next = safeNext(form.get('next'));
   const back = (error: string) => redirect(accountUrl({ error, next }), 303);
-  const settings = await loadMemberSettings(supabase);
+  const settings = await loadMemberSettings(siteDb());
   if (!settings.enabled || settings.signup === 'off') return back('Accounts are made by our staff. Get in touch to join.');
   if (String(form.get('_hp') ?? '')) return back('Something went wrong. Please try again.');
   const name = String(form.get('name') ?? '').trim().slice(0, 100);

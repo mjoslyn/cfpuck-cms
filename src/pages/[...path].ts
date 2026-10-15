@@ -1,17 +1,15 @@
 import type { APIRoute } from 'astro';
-import { supabase } from '../lib/supabase';
 import type { AstroCookies } from 'astro';
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { renderRequest, type PageResult } from '../render/page';
 import { serverClient } from '../lib/supabase';
 import { viewerOf } from '../lib/members/viewer';
 import { ACCOUNT_PATH, type Viewer } from '../lib/members/config';
 import { handleFormPost } from '../lib/forms/submit';
 import { RETURN_PARAM, paymentReturn } from '../lib/forms/checkout';
-import { serviceClient } from '../lib/supabase';
+import { serviceClient, siteDb } from '../lib/supabase';
 import { eventsFeed, eventFile } from '../lib/events/ical';
 import { SITE_RENDER } from '../lib/site/render';
-import { Loader } from '../lib/data';
+import { Loader, PUBLIC_SCOPE } from '../lib/data';
 import { movedPath } from '../lib/paths';
 import { ignoredNotFound, normalizePath } from '../lib/redirects';
 import { BROWSER_CACHE_CONTROL, PAGE_CACHE } from '../lib/cache';
@@ -20,10 +18,10 @@ import { BROWSER_CACHE_CONTROL, PAGE_CACHE } from '../lib/cache';
  * The page, rendered again as the signed-in visitor sees it when it depends on who views it (members-only
  * content, member prices, the account page). Anyone else gets the first render. Either way it isn't cached.
  */
-async function asViewer(first: PageResult, request: Request, cookies: AstroCookies, render: (db: SupabaseClient, viewer: Viewer) => Promise<PageResult>): Promise<PageResult> {
+async function asViewer(first: PageResult, request: Request, cookies: AstroCookies, render: (viewer: Viewer) => Promise<PageResult>): Promise<PageResult> {
   if (!first.personal) return first;
-  const who = await viewerOf(request, cookies);
-  return who ? { ...(await render(who.db, who.viewer)), personal: true } : first;
+  const viewer = await viewerOf(request, cookies);
+  return viewer ? { ...(await render(viewer)), personal: true } : first;
 }
 
 export const GET: APIRoute = async ({ url, request, cache, cookies }) => {
@@ -34,11 +32,11 @@ export const GET: APIRoute = async ({ url, request, cache, cookies }) => {
   if (url.pathname === '/events.ics') {
     // Cached like pages: calendar apps poll feeds, and each build loads every event.
     if (cache.enabled) cache.set(PAGE_CACHE);
-    return eventsFeed(new Loader(supabase), { q: url.searchParams.get('q') ?? '', month: url.searchParams.get('month') ?? '', past: url.searchParams.has('past') }, url.origin);
+    return eventsFeed(new Loader(siteDb(), undefined, PUBLIC_SCOPE), { q: url.searchParams.get('q') ?? '', month: url.searchParams.get('month') ?? '', past: url.searchParams.has('past') }, url.origin);
   }
   const single = url.pathname.match(/^\/event\/([^/]+)\/(?:(\d{4}-\d{2}-\d{2})\/)?event\.ics$/);
   if (single) {
-    const loader = new Loader(supabase);
+    const loader = new Loader(siteDb(), undefined, PUBLIC_SCOPE);
     const entry = await loader.entry('event', single[1], false);
     const res = entry && (await eventFile(loader, entry.id, single[2], url.origin));
     if (res && cache.enabled) cache.set(PAGE_CACHE);
@@ -67,10 +65,10 @@ export const GET: APIRoute = async ({ url, request, cache, cookies }) => {
     if (form?.redirect) return new Response(null, { status: 303, headers: { Location: new URL(form.redirect, url).toString(), 'Cache-Control': 'no-store' } });
     const page = new URL(url);
     page.searchParams.delete(RETURN_PARAM);
-    const { status, html } = await renderRequest(page, supabase, form ?? undefined);
+    const { status, html } = await renderRequest(page, siteDb(), form ?? undefined);
     return new Response(html, { status, headers: { 'Content-Type': 'text/html; charset=UTF-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' } });
   }
-  const result = await asViewer(await renderRequest(url, supabase), request, cookies, (db, viewer) => renderRequest(url, db, undefined, undefined, viewer));
+  const result = await asViewer(await renderRequest(url, siteDb()), request, cookies, (viewer) => renderRequest(url, siteDb(), undefined, undefined, viewer));
   const { status, html, location } = result;
   // A buyer's own order (?order=<token>), a checkout's outcome (?tickets=) and pages that depend on who
   // views them are never cached.
@@ -81,7 +79,7 @@ export const GET: APIRoute = async ({ url, request, cache, cookies }) => {
     return new Response(null, { status, headers: { Location: new URL(location, url).toString(), 'Cache-Control': BROWSER_CACHE_CONTROL } });
   }
   // Addresses still not found are logged for the redirects screen.
-  if (status === 404 && !ignoredNotFound(url.pathname)) await supabase.rpc('not_found_hit', { hit_path: normalizePath(url.pathname), hit_referrer: request.headers.get('referer') ?? '' }).then(() => {}, () => {});
+  if (status === 404 && !ignoredNotFound(url.pathname)) await siteDb().rpc('not_found_hit', { hit_path: normalizePath(url.pathname), hit_referrer: request.headers.get('referer') ?? '' }).then(() => {}, () => {});
   return new Response(html, {
     status,
     headers: {
@@ -101,6 +99,6 @@ export const POST: APIRoute = async ({ url, request, cookies }) => {
   const form = await handleFormPost(data, request);
   if (form?.busy) return new Response('This form is receiving too many submissions. Please go back and try again in a minute.', { status: 429, headers: { 'Retry-After': '60' } });
   if (form?.redirect) return Response.redirect(new URL(form.redirect, url), 303);
-  const { status, html } = await asViewer(await renderRequest(url, supabase, form ?? undefined), request, cookies, (db, viewer) => renderRequest(url, db, form ?? undefined, undefined, viewer));
+  const { status, html } = await asViewer(await renderRequest(url, siteDb(), form ?? undefined), request, cookies, (viewer) => renderRequest(url, siteDb(), form ?? undefined, undefined, viewer));
   return new Response(html, { status: form ? 200 : status, headers: { 'Content-Type': 'text/html; charset=UTF-8', 'Cache-Control': 'no-store' } });
 };

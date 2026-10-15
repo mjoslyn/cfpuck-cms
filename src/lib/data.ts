@@ -7,6 +7,7 @@ import { RECURRENCE_KEY, expandEntry, defaultHorizon } from './recurrence';
 import type { FormRow } from './forms/types';
 import { allRows } from './rows';
 import { uniqueAreas } from './content/areas';
+import { isActive, type Viewer } from './members/config';
 
 /** Ids in groups small enough for one `in` filter (and one response). */
 const chunks = (ids: number[], size = 200) => Array.from({ length: Math.ceil(ids.length / size) }, (_, i) => ids.slice(i * size, (i + 1) * size));
@@ -40,6 +41,34 @@ export interface QueryResult {
  *  so "(annual)" finds "Annual Report". */
 const searchWords = (search?: string) => (search ?? '').replace(/[%_,()]/g, ' ').split(/\s+/).filter(Boolean);
 
+/**
+ * What a Loader may read for whom. `published`: the site's view, for the server's key (which the
+ * database doesn't filter): published entries only, and members-only ones (fields.access) only for an
+ * editor or a member of their levels (`viewer`). Without it (an editor's own session: the editor's
+ * canvas, previews) the database's policies decide.
+ */
+export interface LoaderScope {
+  published: true;
+  viewer?: Viewer | null;
+}
+
+/** The site's view for anyone: published entries, none of them members-only. */
+export const PUBLIC_SCOPE: LoaderScope = { published: true };
+
+/** An entries query (a PostgREST filter builder) limited to what a scope's viewer may see. */
+export function visibleTo<Q>(query: Q, scope: LoaderScope | undefined): Q {
+  if (!scope) return query;
+  // Typed loosely: the builder's own types are too deep to pass through a generic helper.
+  const q = (query as any).eq('status', 'publish');
+  const v = scope.viewer;
+  if (v?.editor) return q;
+  const open = 'fields->access->>members.is.null,fields->access->>members.neq.true';
+  // A member also sees entries for any level, and for theirs (level ids are slugs: safe in the filter).
+  return isActive(v?.member) && /^[a-z0-9-]+$/.test(v!.member!.level)
+    ? q.or(`${open},fields->access->levels.is.null,fields->access->levels.eq.[],fields->access->levels.cs.["${v!.member!.level}"]`)
+    : q.or(open);
+}
+
 export class Loader {
   entries = new Map<number, Entry>();
   media = new Map<number, Media>();
@@ -50,7 +79,11 @@ export class Loader {
   private recurring?: Promise<boolean>;
   private formsCache?: Promise<FormRow[]>;
 
-  constructor(public db: SupabaseClient, public now = new Date()) {}
+  constructor(public db: SupabaseClient, public now = new Date(), public scope?: LoaderScope) {}
+
+  private visible<Q>(q: Q): Q {
+    return visibleTo(q, this.scope);
+  }
 
   async settings(): Promise<Record<string, any>> {
     if (!this.settingsCache) {
@@ -105,7 +138,7 @@ export class Loader {
 
   async entry(type: string | string[], slug: string, withContent = true): Promise<Entry | null> {
     const cols = `${ENTRY_COLUMNS}${withContent ? ', content' : ''}, entry_terms(term_id, sort)`;
-    let q = this.db.from('entries').select(cols).eq('slug', slug).eq('status', 'publish');
+    let q = this.visible(this.db.from('entries').select(cols).eq('slug', slug).eq('status', 'publish'));
     q = Array.isArray(type) ? q.in('type', type) : q.eq('type', type);
     const { data: rows, error } = await q;
     if (error) throw error;
@@ -117,13 +150,24 @@ export class Loader {
   }
 
   /**
-   * A members-only entry this client may not read (RLS hides it): what anyone may know of it, for its
-   * page's sign-in prompt (members_entry). Null when there is no such entry.
+   * A published members-only entry this scope's viewer may not see: what anyone may know of it, for its
+   * page's sign-in prompt (its address, title, excerpt, featured image, template, search settings and
+   * access; never its content or other fields). Null when there is no such entry, or no scope.
    */
   async lockedEntry(types: string[], slug: string): Promise<Entry | null> {
-    const { data, error } = await this.db.rpc('members_entry', { p_types: types, p_slug: slug });
-    if (error || !data) return null;
-    const e = { ...(data as Entry), content: null, event_start: null, event_end: null, event_all_day: null, term_ids: [], locked: true };
+    if (!this.scope) return null;
+    const { data: rows, error } = await this.db
+      .from('entries')
+      .select('id, type, slug, title, title_rendered, excerpt, excerpt_rendered, status, template, parent_id, menu_order, featured_media_id, published_at, updated_at, access:fields->access, seo:fields->seo')
+      .eq('slug', slug)
+      .eq('status', 'publish')
+      .in('type', types)
+      .eq('fields->access->>members', 'true');
+    if (error) throw error;
+    const row = types.map((t) => (rows as any[]).find((r) => r.type === t)).find(Boolean);
+    if (!row) return null;
+    const { access, seo, ...rest } = row;
+    const e: Entry = { ...rest, fields: { access, seo }, content: null, event_start: null, event_end: null, event_all_day: null, term_ids: [], locked: true };
     this.entries.set(e.id, e);
     return e;
   }
@@ -131,11 +175,11 @@ export class Loader {
   async entryById(id: number, withContent = true): Promise<Entry | null> {
     const cached = this.entries.get(id);
     if (cached && (!withContent || cached.content !== undefined)) return cached;
-    const { data, error } = await this.db
+    const q = this.db
       .from('entries')
       .select(`${ENTRY_COLUMNS}${withContent ? ', content' : ''}, entry_terms(term_id, sort)`)
-      .eq('id', id)
-      .maybeSingle();
+      .eq('id', id);
+    const { data, error } = await this.visible(q).maybeSingle();
     if (error) throw error;
     if (data) this.remember([data]);
     return this.entries.get(id) ?? null;
@@ -144,7 +188,7 @@ export class Loader {
   async entriesByIds(ids: number[]): Promise<Entry[]> {
     const need = [...new Set(ids.filter((id) => id && !this.entries.has(id)))];
     for (const chunk of chunks(need)) {
-      const { data, error } = await this.db.from('entries').select(`${ENTRY_COLUMNS}, entry_terms(term_id, sort)`).in('id', chunk);
+      const { data, error } = await this.visible(this.db.from('entries').select(`${ENTRY_COLUMNS}, entry_terms(term_id, sort)`).in('id', chunk));
       if (error) throw error;
       this.remember(data ?? []);
     }
@@ -186,7 +230,10 @@ export class Loader {
   /** Published-entry counts per term (to hide empty terms). */
   async termCounts(taxonomy: string): Promise<Map<number, number>> {
     const ids = (await this.allTerms()).filter((t) => t.taxonomy === taxonomy).map((t) => t.id);
-    const { data, error } = await allRows(this.db.from('entry_terms').select('entry_id, term_id, entries!inner(status)').in('term_id', ids).eq('entries.status', 'publish').order('entry_id').order('term_id'));
+    let q = this.db.from('entry_terms').select('entry_id, term_id, entries!inner(status)').in('term_id', ids).eq('entries.status', 'publish');
+    // The site's counts leave members-only entries out.
+    if (this.scope && !this.scope.viewer?.editor) q = q.or('fields->access->>members.is.null,fields->access->>members.neq.true', { referencedTable: 'entries' });
+    const { data, error } = await allRows(q.order('entry_id').order('term_id'));
     if (error) throw error;
     const counts = new Map<number, number>();
     for (const r of data ?? []) counts.set(r.term_id, (counts.get(r.term_id) ?? 0) + 1);
@@ -211,7 +258,7 @@ export class Loader {
     if (matchIds && !matchIds.length) return { ids: [], total: 0, pages: 0 };
     const select = `${ENTRY_COLUMNS}, entry_terms(term_id, sort)${args.orderBy === 'relevance' ? ', body_text' : ''}`;
 
-    let q = this.db.from('entries').select(select, { count: 'exact' }).eq('status', 'publish').in('type', types);
+    let q = this.visible(this.db.from('entries').select(select, { count: 'exact' }).eq('status', 'publish').in('type', types));
     if (matchIds) q = q.in('id', matchIds);
     // Search: every word must appear in the title, excerpt or text.
     for (const word of searchWords(args.search)) {

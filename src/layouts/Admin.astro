@@ -2,7 +2,7 @@
 import { SITE_TZ, site } from '../lib/site';
 import AdminTheme from './AdminTheme.astro';
 import { loadAdminTheme } from '../lib/admin-theme';
-import { supabase } from '../lib/supabase';
+import { siteDb } from '../lib/supabase';
 import { memberSettings } from '../lib/members/config';
 // Admin chrome. Tailwind only; the public site's CSS never loads here.
 import '../styles/tailwind.css';
@@ -16,9 +16,9 @@ const { title, wide = false } = Astro.props;
 const user = Astro.locals.user;
 const path = Astro.url.pathname;
 const isAdmin = user?.role === 'admin';
-const theme = await loadAdminTheme(Astro.locals.db ?? supabase);
+const theme = await loadAdminTheme(Astro.locals.db ?? siteDb());
 // Members, while it is on (Settings > Members).
-const membersOn = isAdmin && memberSettings((await (Astro.locals.db ?? supabase).from('settings').select('value').eq('key', 'site').maybeSingle()).data?.value).enabled;
+const membersOn = isAdmin && memberSettings((await (Astro.locals.db ?? siteDb()).from('settings').select('value').eq('key', 'site').maybeSingle()).data?.value).enabled;
 const nav = [
   { href: '/admin/', label: 'Content' },
   { href: '/admin/templates/', label: 'Templates' },

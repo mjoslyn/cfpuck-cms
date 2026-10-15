@@ -51,7 +51,7 @@ Settings writes are admin-only in row-level security (`is_admin()`).
 | Table | Holds |
 | --- | --- |
 | `media` | Uploads, focal points, crop focals |
-| `forms` | Form definitions; notification settings in a column anon can't read |
+| `forms` | Form definitions and notification settings |
 | `redirects`, `not_found` | Redirect rules and the addresses not found |
 | `compose_sessions`, `compose_jobs` | Compose conversations and their running turns |
 | `profiles` | Users' roles: `editor`, `admin`, `viewer` |

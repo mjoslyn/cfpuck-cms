@@ -10,7 +10,7 @@ import { formatMoney } from '../payments/money';
 import { sendMail, textVersion } from './mail';
 import { emailPayment, paymentTable, renderEmail, type EmailEvent } from './email';
 import { emailEvents } from '../events/email';
-import { Loader } from '../data';
+import { Loader, PUBLIC_SCOPE } from '../data';
 import { permalink } from '../permalink';
 import { serviceClient } from '../supabase';
 import { SITE_TZ, site } from '../site';
@@ -286,7 +286,7 @@ export async function confirmationResult(db: SupabaseClient, form: FormRow, entr
   const tags = { adminEmail: env('FORMS_ADMIN_EMAIL') || site.adminEmail, payment };
   if (confirmation.type === 'redirect' && confirmation.url) return { formId, ok: true, message: '', errors: {}, values: {}, redirect: mergeTags(confirmation.url, form, entry, { ...tags, html: false }) };
   if (confirmation.type === 'page' && confirmation.pageId) {
-    const page = await new Loader(db).entryById(Number(confirmation.pageId));
+    const page = await new Loader(db, undefined, PUBLIC_SCOPE).entryById(Number(confirmation.pageId));
     if (page) return { formId, ok: true, message: '', errors: {}, values: {}, redirect: permalink(page) };
   }
   return { formId, ok: true, message: mergeTags(confirmation.message || 'Thanks for contacting us! We will get in touch with you shortly.', form, entry, { ...tags, html: true }), errors: {}, values: {} };

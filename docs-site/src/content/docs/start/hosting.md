@@ -27,6 +27,14 @@ Hosted projects don't grant the API roles access to new tables the way the local
 Migration 0019 grants them and sets default privileges; row-level security does the rest.
 :::
 
+:::caution[The database API is for editors only]
+The anon key is public (the browser needs it to sign in), so the database's API is closed to everyone
+but editors (migration `*_closed_api.sql`): anonymous requests and signed-in accounts that aren't
+editors, such as members, get nothing from it. The site reads on the server with the service_role key
+and shows visitors only published, permitted content. Keep `SUPABASE_SERVICE_ROLE_KEY` out of anything
+the browser loads (only `PUBLIC_` variables reach it).
+:::
+
 ## 2. Seed and create an admin
 
 Point a copy of `.env` at the hosted project (its URL, anon key and service_role key, from

@@ -1,12 +1,12 @@
 ---
 // The admin colors chosen under Settings > Admin (src/lib/admin-theme.ts).
 import { adminThemeCss, loadAdminTheme, type AdminTheme } from '../lib/admin-theme';
-import { supabase } from '../lib/supabase';
+import { siteDb } from '../lib/supabase';
 
 interface Props {
   /** The saved theme, when the page has loaded it already. */
   theme?: AdminTheme;
 }
-const css = adminThemeCss(Astro.props.theme ?? (await loadAdminTheme(Astro.locals.db ?? supabase)));
+const css = adminThemeCss(Astro.props.theme ?? (await loadAdminTheme(Astro.locals.db ?? siteDb())));
 ---
 {css && <style is:inline id="admin-theme" set:html={css} />}

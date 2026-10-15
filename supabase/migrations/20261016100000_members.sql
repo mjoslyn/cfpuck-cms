@@ -1,5 +1,6 @@
 -- Members (Settings > Members; src/lib/members/): site visitors with an account and a membership level,
--- for members-only pages and blocks and member ticket prices. A member is an auth user with a row here
+-- for members-only pages and blocks and member ticket prices (members-only entries: fields.access, which
+-- the site's loader enforces; the database API is closed to everyone but editors, *_closed_api.sql). A member is an auth user with a row here
 -- (their profile stays role 'viewer': no admin access). Admins add and manage them (/admin/members/);
 -- visitors can sign up when the settings allow it.
 create table public.members (
@@ -23,64 +24,13 @@ create trigger members_touch before update on public.members
   for each row execute function public.touch_updated_at();
 
 alter table public.members enable row level security;
--- A member reads their own row; editors read all (the attendee list, member prices); admins manage them.
-create policy "members own or editor read" on public.members for select to authenticated
-  using (user_id = (select auth.uid()) or (select public.is_editor()));
+-- Editors read them (the attendee list, member prices); admins manage them. Members themselves don't
+-- reach the database: the server reads their row with the service key (src/lib/members/viewer.ts).
+create policy "members editor read" on public.members for select to authenticated
+  using ((select public.is_editor()));
 create policy "members admin write" on public.members for all to authenticated
   using ((select public.is_admin())) with check ((select public.is_admin()));
 grant select, insert, update, delete on public.members to authenticated, service_role;
-
--- Whether the signed-in user is an active member (of one of `levels`, a JSON array of level ids; none
--- or empty: any level), while Members is on (Settings > Members).
-create or replace function public.member_can(levels jsonb)
-returns boolean
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select exists (
-    select 1 from public.members m
-    where m.user_id = auth.uid() and m.status = 'active'
-      and coalesce((select s.value->'members'->>'enabled' from public.settings s where s.key = 'site'), '') = 'true'
-      and (m.expires_on is null or m.expires_on >= current_date)
-      and (levels is null or jsonb_typeof(levels) <> 'array' or jsonb_array_length(levels) = 0 or levels ? m.level)
-  );
-$$;
-grant execute on function public.member_can(jsonb) to anon, authenticated, service_role;
-
--- Members-only entries (fields.access.members = true; fields.access.levels: the levels that may see
--- them, none for any) are hidden from everyone else, so their content and text can't be read through
--- the API either. Editors see everything.
-drop policy "entries public read" on public.entries;
-create policy "entries public read" on public.entries for select
-  using (
-    (status = 'publish' and (coalesce(fields->'access'->>'members', '') <> 'true' or public.member_can(fields->'access'->'levels')))
-    or (select public.is_editor())
-  );
-
--- What anyone may know of a members-only entry, for its page's sign-in prompt: its address, title,
--- excerpt, featured image, template, search settings and who may see it. Never its content or fields.
-create or replace function public.members_entry(p_types text[], p_slug text)
-returns jsonb
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select jsonb_build_object(
-    'id', e.id, 'type', e.type, 'slug', e.slug, 'title', e.title, 'title_rendered', e.title_rendered,
-    'excerpt', e.excerpt, 'excerpt_rendered', e.excerpt_rendered, 'status', e.status, 'template', e.template,
-    'parent_id', e.parent_id, 'menu_order', e.menu_order, 'featured_media_id', e.featured_media_id,
-    'published_at', e.published_at, 'updated_at', e.updated_at,
-    'fields', jsonb_build_object('access', e.fields->'access', 'seo', e.fields->'seo')
-  )
-  from public.entries e
-  where e.status = 'publish' and e.type = any(p_types) and e.slug = p_slug and e.fields->'access'->>'members' = 'true'
-  order by array_position(p_types, e.type)
-  limit 1;
-$$;
-grant execute on function public.members_entry(text[], text) to anon, authenticated, service_role;
 
 -- The member who placed a ticket order (member prices and members-only tickets), if any.
 alter table public.ticket_orders add column member_id uuid references auth.users on delete set null;

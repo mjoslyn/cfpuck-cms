@@ -13,7 +13,7 @@ The form builder is at `/admin/forms/` (`src/forms/FormBuilder.tsx`). Forms live
 - fields with ids like `f1`, and widths on a 12-column grid
 - conditional logic
 - a confirmation message
-- notification settings, in a column anon can't read
+- notification settings, read by editors and the site's server only
 
 Place a form on a page with the `form` block.
 

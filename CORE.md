@@ -412,7 +412,7 @@ with. Re-crops rewrite only the cropped sizes, which can be made again from the 
 
 Form builder at `/admin/forms/` (`src/forms/FormBuilder.tsx`). Forms live in the `forms` table
 (`src/lib/forms/types.ts`: fields with ids like `f1`, widths on a 12-column grid, conditional logic,
-confirmation), notification settings in a column anon can't read. The markup comes from
+confirmation; editors read them, the site with its key). The markup comes from
 `src/render/forms/form.ts` (styles `src/styles/forms.css`; `public/assets/js/forms.js` runs conditional
 logic, US phone formatting and character counters; everything is validated on the server). Place forms
 with the `form` block. Submissions POST back to the page (`src/lib/forms/submit.ts`: validation that
@@ -534,7 +534,7 @@ tickets (30-120 minutes), and the emails with the reminder's and follow-up's tim
   there, to the section's anchor (`ticketsAt`: `#tickets` on the event's own page, else
   `#tickets-<event id>`); emails' `{order_link}` goes there too (a waitlist's: the tickets where they
   joined). `prepareTickets` loads what's taken (`ticket_sold`) and, with `?order=<token>`, the buyer's
-  order (`ticket_order_status`; both functions anon may call), shown in its event's section.
+  order (`ticket_order_status`; both read with the site's key), shown in its event's section.
   `?tickets=<reason>&event=<id>` shows a checkout's outcome in that event's section.
   Pages with either are never cached. `public/assets/js/tickets.js` adds the total, the address only
   for paid orders, and what's left now (`GET /api/tickets/availability`).
@@ -574,28 +574,28 @@ An optional feature, on under Settings > Members (`settings.site.members`, `memb
 `src/lib/members/config.ts`, `src/admin/MemberSettings.tsx`): levels (id and name), sign-ups (`off`: admins
 add members; `approve`: visitors sign up and wait for an admin; `open`: they join at once, at
 `signupLevel`) and the message members-only things show to everyone else. Off, nobody counts as a
-member (`member_can` checks it), and the editor offers no member blocks.
+member (`renderRequest` drops the viewer's membership), and the editor offers no member blocks.
 
 - A member is an auth user with a row in `members` (level, status `pending`/`active`/`suspended`,
   `expires_on`, notes; migration `*_members.sql`); their profile stays role `viewer`, so no admin access.
   `isActive`: active and not past its expiry. Members aren't synced or backed up (accounts are per copy);
   the levels are, with the settings.
 - **Members only pages**: an entry's settings (Members) set `fields.access` ({ members, levels }; `access`
-  is a reserved field key), applied when it is published. RLS hides such entries from everyone but
-  members of those levels and editors (`member_can`), so their content and text can't be read through
-  the API, and lists, search and email Events blocks leave them out for others. Their address still
-  resolves: `members_entry` (security definer) gives anyone the title, excerpt, featured image, template,
-  SEO and access of a members-only entry (`Loader.lockedEntry`, `Entry.locked`), and the page renders
-  with its Page content block as a sign-in prompt (`lockedContent`, `src/render/c/members.ts`).
+  is a reserved field key), applied when it is published. The site's loader (`LoaderScope`, `visibleTo`
+  in `src/lib/data.ts`) leaves them out for everyone but members of those levels and editors: lists,
+  search, feeds, term counts and email Events blocks. Their address still resolves: `Loader.lockedEntry`
+  reads its title, excerpt, featured image, template, SEO and access only (`Entry.locked`), and the page
+  renders with its Page content block as a sign-in prompt (`lockedContent`, `src/render/c/members.ts`).
 - **Members only block** (`members`, a container): its blocks for members (of `attrs.levels`), editors
   and the editor's canvas; for everyone else `attrs.message` (else the settings' message) and a sign-in
-  link, or nothing (`attrs.hide`). Its blocks are part of the page's content, which the API serves like
-  any published page: it hides them on the page, it doesn't keep them secret.
+  link, or nothing (`attrs.hide`). The database API is closed to everyone but editors (see Database
+  access), so the page's stored content can't be read around it.
 - **Personal pages**: what depends on the viewer (a locked entry, a Members only or Member account
   block, tickets with member prices) sets `RenderCtx.personal`. The catch-all route then doesn't cache
   the page (`private, no-store`) and, for a visitor with a sign-in cookie, renders it again as them
-  (`asViewer`: `viewerOf` in `src/lib/members/viewer.ts` reads the session, profile and membership,
-  and the second render uses their client, so RLS shows what they may see; `RenderCtx.viewer`). Pages
+  (`asViewer`: `viewerOf` in `src/lib/members/viewer.ts` checks the session with Supabase Auth and reads
+  the profile and membership with the site's key; the second render's loader scope carries them,
+  `RenderCtx.viewer`). Pages
   that don't depend on the viewer render once, anonymously, and stay cached and shared. Previews
   render as an editor.
 - **Account page** (`ACCOUNT_PATH`, `/account/`): a page with that address, else a built-in one holding
@@ -647,7 +647,7 @@ accent, soft background, the bar's text) on every admin page, and Puck's blue sc
 accent (`src/styles/admin.css`). The admin uses the system font (`--font-admin`).
 
 Saving: **Save draft** keeps changes to a published page aside (table `entry_drafts`, editors only:
-published rows of `entries` are public) with the live page
+like everything else, they're read through the editor's session) with the live page
 unchanged; unpublished pages save in place as drafts. **Publish** / **Publish changes** makes them live;
 the header also offers Discard changes and Unpublish (`PUT /api/admin/entries/:id` with `action`).
 **Preview** opens `/admin/preview/<id>/` with the editor's current state (POST) or the saved draft
@@ -664,12 +664,34 @@ them (`src/puck/RecordEditor.tsx`) with the entries that use them. An `entry` fi
 /api/admin/entries` creates entries (form post from the list: untitled draft; JSON from pickers:
 titled, returns the id).
 
+## Database access
+
+The database API (Supabase's REST API, reached with the public key the browser has for signing in)
+answers editors only (migration `*_closed_api.sql`). Anonymous requests have no grants on our tables,
+sequences or functions; signed-in accounts that aren't editors (members, sign-ups) get nothing back,
+since every table's policies check `is_editor()` / `is_admin()`, and the server's functions
+(`not_found_hit`, `redirect_hit`, `ticket_order_status`, `sync_*`, `ticket_order_create`) are
+revoked; `ticket_sold` runs with the caller's rights, so only editors see counts through it.
+
+- The editor and admin screens read and write through the editor's own session (`browserClient`,
+  `locals.db`), as the policies allow.
+- The site reads on the server with the service key, `siteDb()` (`src/lib/supabase.ts`), which the
+  database doesn't filter: public pages, feeds, search, ticket availability, member endpoints, the admin
+  login page's theme. Its `Loader`s take a scope (`PUBLIC_SCOPE`, or `{ published, viewer }` from
+  `renderRequest`) that limits entries to published ones and members-only ones to who may see them
+  (`visibleTo`: `entry`, `entryById`, `entriesByIds`, `query`, `termCounts`, `lockedEntry`). Code that
+  queries entries for visitors without a Loader applies `visibleTo` itself. Previews render with the
+  editor's session and no scope.
+- New tables get no anonymous grants (default privileges); give them policies that check
+  `is_editor()`. A new function that editors call through the API needs `grant execute ... to
+  authenticated` and its own check; anything else is for the server's key.
+
 ## Hosting
 
 Netlify, with a hosted Supabase project (`npx supabase link`). Migrations: `npx supabase db push
 --linked`; SQL: `npx supabase db query --linked`. Hosted projects don't grant the API roles access to
 new tables (the local stack does): migration 0019 grants them and sets default privileges, and RLS
-does the rest. `scripts/copy-storage.ts` copies storage objects from the local stack to a hosted
+does the rest (see Database access). `scripts/copy-storage.ts` copies storage objects from the local stack to a hosted
 project (resumable). Editors set their password at `/admin/set-password/` (invitation and reset links
 land there), so Supabase Auth's Site URL and redirect URLs must include the site's domain. Env:
 `.env.example`.

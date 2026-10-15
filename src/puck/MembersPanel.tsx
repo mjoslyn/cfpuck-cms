@@ -22,8 +22,7 @@ export function MembersPanel({ a, set }: { a: Attrs; set: (patch: Attrs) => void
       <Toggle title="Show nothing to everyone else" value={a.hide} onChange={(hide) => set({ hide: hide || undefined })} />
       {!a.hide && <Text title="Message for everyone else" value={a.message} placeholder={s?.message || 'This is for members.'} onChange={(v) => set({ message: v || undefined })} />}
       <p className="mb-2 text-xs text-admin-muted">
-        Put blocks inside it. Members (and editors) see them; everyone else sees the message and a sign-in link. The page isn't cached, since it depends on who is looking. These blocks are part of the page's
-        data, which the site's database API shares like any published page; for anything confidential, make the whole page members only (its settings).
+        Put blocks inside it. Members (and editors) see them; everyone else sees the message and a sign-in link. The page isn't cached, since it depends on who is looking.
       </p>
     </>
   );
