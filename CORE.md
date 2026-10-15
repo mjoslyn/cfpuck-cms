@@ -549,6 +549,9 @@ request.
 `scripts/safety-e2e.ts` (uploads, form limits, shared addresses, stale saves, tags, search, roles, restore as a job) and
 `scripts/sync-e2e.ts` (a sync stopped by a row made since Compare; undoing a half-finished sync; needs
 a second local stack as `SYNC_REMOTE_*`) use the running site without a browser and remove what they make.
+`scripts/payments-e2e.ts [stripe|square]` builds a form with Product fields and a payment provider in the
+browser, submits it and reports whether it reached the provider's checkout (that needs the provider's
+test keys and network access to it).
 
 The e2e scripts (`scripts/*-e2e.ts`, `scripts/checks/compose.ts`) sign in as `LOCAL_ADMIN_EMAIL` /
 `LOCAL_ADMIN_PASSWORD` and were written against a site with content (pages, events, venues, members);

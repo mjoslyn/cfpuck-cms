@@ -13,6 +13,6 @@ export function embedForm(env: Env, row: FormRow, opts: { title?: boolean; descr
     action: env.ctx.queried.url.pathname,
     title: opts.title,
     description: opts.description,
-    state: mine && !mine.ok ? { values: mine.values, errors: mine.errors } : undefined,
+    state: mine && !mine.ok ? { values: mine.values, errors: mine.errors, notice: mine.notice } : undefined,
   });
 }
