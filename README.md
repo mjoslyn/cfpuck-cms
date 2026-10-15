@@ -21,8 +21,9 @@ What you get:
 - Event tickets and free registrations: ticket types with prices, capacities and sales windows,
   a waitlist, an attendee list with check-in and refunds, and confirmation, reminder and follow-up
   emails
+- Members: levels, sign-ups, members-only pages and blocks, and member ticket prices
 - Compose: pages and edits written by Claude from your materials
-- Roles: editor and admin, with invitations
+- Roles: editor and admin, with invitations; the database API answers editors only
 
 ## Requirements
 
@@ -111,6 +112,17 @@ The Supabase CLI runs through `npx`, so you don't need to install it.
   `SITE_URL` (default Netlify's `URL`), and the copy of each order goes to `TICKETS_NOTIFY_EMAIL`
   (default `FORMS_ADMIN_EMAIL`, then `adminEmail`). Orders and the waitlist are at `/admin/tickets/`.
   The same keys take payments on forms (a form's Payment tab).
+- **Members.** Turn it on under Settings > Members (admins): membership levels, how people join
+  (admins add them, sign up and wait for approval, or sign up and join at once) and the message
+  shown to visitors who can't see something. Then:
+  - make a page members only in its settings (Members), or wrap blocks in a **Members only** block;
+  - give ticket types member prices or make them members only (an event's Tickets settings);
+  - manage members at `/admin/members/`. Members sign in, sign up and reset their password at
+    `/account/`; to design that page, make a page with that address and put the **Member account**
+    block on it.
+
+  Members' emails (confirming an address, resetting a password, invitations) go through Supabase
+  Auth; locally they arrive in the mail catcher.
 
 ## Make it your site
 
@@ -150,6 +162,8 @@ follow the config. `CORE.md` describes each option.
    - Under Authentication > URL Configuration, set the **Site URL** to your domain.
    - Add `https://<your-domain>/admin/set-password/` to the **Redirect URLs**. Invitation and
      password-reset links land on that page.
+   - Using Members: also add `https://<your-domain>/account/**`, where members' sign-up,
+     invitation and password links land.
 2. **Seed and create an admin.** Point a copy of `.env` at the hosted project: its URL, anon key and
    service_role key, from Project Settings > API. Then run the same two commands as locally:
    ```

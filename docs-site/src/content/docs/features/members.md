@@ -22,7 +22,8 @@ Under **Settings > Members**:
 
 Members sign in, sign up and reset their password at **/account/**. Make a page with that address to
 design it yourself, with the **Member account** block on it. The links in members' emails go there,
-so Supabase Auth's redirect URLs must include the site's address.
+so Supabase Auth's redirect URLs must include `https://<your-domain>/account/**` (see
+[Hosting](../../start/hosting/)).
 
 ## Managing members
 

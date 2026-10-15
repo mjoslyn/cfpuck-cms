@@ -10,7 +10,8 @@ sidebar:
 - Node 22.12 or later
 - Docker (Docker Desktop or OrbStack), for the local Supabase stack
 - For hosting: a Supabase project and a Netlify site
-- Optional: an Anthropic API key (Compose) and an SMTP account (form notifications)
+- Optional: an Anthropic API key (Compose), an SMTP account (form notifications and ticket emails)
+  and a Stripe or Square account (paid forms and tickets)
 
 The Supabase CLI runs through `npx`, so you don't need to install it.
 
@@ -86,6 +87,29 @@ submissions are stored but no mail is sent.
 
 Locally, `SMTP_URL=smtp://127.0.0.1:56525` sends to the Supabase stack's mail catcher, whose inbox is
 at http://127.0.0.1:56524.
+
+### Payments and tickets
+
+Needs the `event` content type in `src/site/config.ts`. Turn Tickets on in an event's
+settings and add ticket types; the Event details block shows the form, or place a Tickets block on
+any page or template. Free tickets need nothing else. For paid ones, set one provider's keys:
+
+- Stripe: `STRIPE_SECRET_KEY` (`sk_test_...` to test) and `STRIPE_WEBHOOK_SECRET`.
+- Square: `SQUARE_ACCESS_TOKEN`, `SQUARE_LOCATION_ID`, `SQUARE_ENVIRONMENT=sandbox` to test,
+  `SQUARE_WEBHOOK_SIGNATURE_KEY` and `SQUARE_WEBHOOK_URL`.
+
+With both set, choose one under **Settings > Tickets**, which also has the currency, how long an
+unpaid order holds its tickets, and the emails. Ticket emails need SMTP; their links use `SITE_URL`
+(default Netlify's `URL`), and the copy of each order goes to `TICKETS_NOTIFY_EMAIL` (default
+`FORMS_ADMIN_EMAIL`, then `adminEmail`). The same keys take payments on forms. See
+[Tickets](../../features/tickets/) and [Forms](../../features/forms/).
+
+### Members
+
+Turn it on under **Settings > Members** (admins): the levels, how people join and the message
+visitors see. Members sign in at `/account/`; their emails (confirming an address, resetting a
+password, invitations) go through Supabase Auth and, locally, arrive in the mail catcher. See
+[Members](../../features/members/).
 
 ## Troubleshooting
 

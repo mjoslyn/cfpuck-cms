@@ -66,3 +66,7 @@ settings (`src/lib/site/timezone.ts`, cached a minute), and admin pages pass it 
 
 Changing it moves events that were on the old timezone to the new one with their local times kept
 (`moveEventsToTimezone`). Events with their own timezone stay.
+
+## Tickets
+
+An event can sell tickets or take free registrations: see [Tickets](../tickets/).

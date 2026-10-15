@@ -20,7 +20,9 @@ Under **Authentication > URL Configuration**:
 
 - set the **Site URL** to your domain;
 - add `https://<your-domain>/admin/set-password/` to the **Redirect URLs**. Invitation and
-  password-reset links land on that page.
+  password-reset links land on that page;
+- using [Members](../../features/members/), also add `https://<your-domain>/account/**`, where
+  members' sign-up, invitation and password links land.
 
 :::note
 Hosted projects don't grant the API roles access to new tables the way the local stack does.
@@ -50,12 +52,34 @@ To move local media to the hosted storage bucket, use `scripts/copy-storage.ts` 
 ## 3. Netlify
 
 - Create a site from your repository. The build settings are in `netlify.toml`.
-- Set the same environment variables as `.env`: the Supabase URL and keys, plus the optional Compose
-  and SMTP ones.
+- Set the same environment variables as `.env`: the Supabase URL and keys, plus the optional Compose,
+  SMTP and payment ones.
 - Add your domain.
 
-Compose runs long jobs in the background function `netlify/functions/compose-background.mts`, which
-Netlify deploys with the site.
+Netlify deploys the site's functions with it:
+
+| Function | What it does |
+| --- | --- |
+| `compose-background.mts` | Runs Compose jobs (up to 15 minutes) |
+| `restore-background.mts` | Runs backup restores |
+| `scheduled-snapshot.mts` | Takes scheduled snapshots, daily at 07:00 UTC |
+| `ticket-emails.mts` | Hourly: ticket reminders and follow-ups, expired holds, automatic waitlists |
+
+## Payments
+
+To take payments on forms or tickets, set one provider's keys and add its webhook. One endpoint per
+provider serves both:
+
+- **Stripe**: `https://<your-domain>/api/payments/stripe`, with the `checkout.session.*`,
+  `charge.refunded` and `charge.refund.updated` events; its signing secret is
+  `STRIPE_WEBHOOK_SECRET`.
+- **Square**: `https://<your-domain>/api/payments/square`, with `payment.created`,
+  `payment.updated`, `refund.created` and `refund.updated`; its signature key is
+  `SQUARE_WEBHOOK_SIGNATURE_KEY`, and `SQUARE_WEBHOOK_URL` must be that exact address (the
+  signature covers it).
+
+Free tickets need no provider. See [Tickets](../../features/tickets/) and
+[Forms](../../features/forms/).
 
 ## 4. Invite editors
 
@@ -70,6 +94,10 @@ Admins invite editors from `/admin/users/`. See [Editor and roles](../../feature
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE` or `SMTP_URL` | Outgoing mail |
 | `MAIL_FROM` | Sender, overriding the config's `mailFrom` |
 | `FORMS_ADMIN_EMAIL` | Where form notifications go when a form doesn't say |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Stripe payments |
+| `SQUARE_ACCESS_TOKEN`, `SQUARE_LOCATION_ID`, `SQUARE_ENVIRONMENT`, `SQUARE_WEBHOOK_SIGNATURE_KEY`, `SQUARE_WEBHOOK_URL` | Square payments |
+| `TICKETS_NOTIFY_EMAIL` | Where the copy of each ticket order goes (default `FORMS_ADMIN_EMAIL`, then `adminEmail`) |
+| `SITE_URL` | The site's address for links in ticket emails (default Netlify's `URL`) |
 | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | Compose |
 | `ANTHROPIC_SEO_MODEL` | SEO text generation (default Haiku 4.5) |
 | `LOCAL_ADMIN_EMAIL`, `LOCAL_ADMIN_PASSWORD` | The admin the e2e scripts sign in as |
