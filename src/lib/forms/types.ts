@@ -15,6 +15,7 @@ export type FieldType =
   | 'name'
   | 'date'
   | 'consent'
+  | 'product'
   | 'section'
   | 'html'
   | 'hidden';
@@ -23,6 +24,8 @@ export interface Choice {
   label: string;
   value: string;
   selected?: boolean;
+  /** product: the choice's price, in the form's currency (25 or 12.5). */
+  price?: number;
 }
 
 export type NamePart = 'prefix' | 'first' | 'middle' | 'last' | 'suffix';
@@ -71,7 +74,31 @@ export interface Field {
   html?: string;
   /** name: which parts show, and their labels. First and last always show. */
   nameParts?: Partial<Record<NamePart, { show?: boolean; label?: string }>>;
+  /** product: one price, a choice of priced options, or an amount the visitor enters (min, max). */
+  priceMode?: PriceMode;
+  /** product (fixed): the price, in the form's currency. */
+  price?: number;
+  /** product (choice): shown as a dropdown or as radio buttons. */
+  choiceDisplay?: 'select' | 'radio';
+  /** product (fixed, choice): the visitor picks how many, up to `maxQuantity` (default 100). */
+  quantity?: boolean;
+  maxQuantity?: number;
   logic?: Logic | null;
+}
+
+export type PriceMode = 'fixed' | 'choice' | 'amount';
+
+export type PaymentProvider = 'stripe' | 'square';
+
+/** Taking payment for a form: its Product fields add up to the total charged at checkout. */
+export interface PaymentSettings {
+  provider: PaymentProvider;
+  /** ISO 4217 code (CURRENCIES in ./payment.ts); USD by default. */
+  currency?: string;
+  /** Shown with the charge on the checkout page and the receipt; merge tags allowed. */
+  description?: string;
+  /** The email field whose address fills in checkout and gets the provider's receipt; else the first one. */
+  emailField?: string;
 }
 
 export interface Confirmation {
@@ -110,6 +137,8 @@ export interface FormDef {
   honeypot?: boolean;
   className?: string;
   confirmation?: Confirmation;
+  /** Payment at checkout (src/lib/forms/checkout.ts); none when unset. */
+  payment?: PaymentSettings | null;
   /** Next number for new field ids. */
   nextId?: number;
 }
@@ -125,14 +154,22 @@ export interface FormRow {
   updated_at?: string;
 }
 
-/** Submitted values by field id: text, a list (checkboxes) or parts (names). */
-export type Value = string | string[] | Partial<Record<NamePart, string>>;
+/** A product's answer: the choice or amount (`value`) and the quantity (`qty`). */
+export interface ProductValue {
+  value?: string;
+  qty?: string;
+}
+
+/** Submitted values by field id: text, a list (checkboxes) or parts (names, products). */
+export type Value = string | string[] | Partial<Record<NamePart, string>> | ProductValue;
 export type Values = Record<string, Value>;
 
 /** A form's state when re-shown after a failed submission. */
 export interface FormState {
   values: Values;
   errors: Record<string, string>;
+  /** A message above the form that isn't about one field (a payment that wasn't completed). */
+  notice?: string;
 }
 
 /** Outcome of a submission, handed to the page render. */
@@ -145,4 +182,29 @@ export interface FormResult {
   redirect?: string;
   /** Refused: the form took too many submissions in the last minute. */
   busy?: true;
+  /** Shown above a form that is shown again (FormState.notice). */
+  notice?: string;
+}
+
+/** form_submissions.payment: a submission's charge and where it stands. */
+export interface SubmissionPayment {
+  provider: PaymentProvider;
+  /** pending: sent to checkout; processing: paid by a method that takes days (bank debits); paid;
+   * failed: such a payment didn't go through; cancelled: the checkout expired unpaid. */
+  status: 'pending' | 'processing' | 'paid' | 'failed' | 'cancelled';
+  /** In minor units (cents). */
+  amount: number;
+  currency: string;
+  items: { name: string; unit: number; quantity: number }[];
+  /** The provider's checkout: a Stripe Checkout Session id, or a Square order id. */
+  ref?: string;
+  /** The provider's payment id, once paid. */
+  payment_id?: string;
+  /** Secret part of the return address, so only the visitor's browser can come back to this submission. */
+  token: string;
+  /** The page the form was on, and the site's address (for notifications sent from a webhook). */
+  page: string;
+  origin: string;
+  paid_at?: string;
+  sandbox?: boolean;
 }

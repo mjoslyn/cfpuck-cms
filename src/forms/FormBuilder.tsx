@@ -1,12 +1,13 @@
 // Form builder (/admin/forms/<id>/). The preview is the real form markup from the site renderer, shown
 // in an iframe with the site stylesheet: click a field to edit it, drag fields to reorder, drag or
-// click palette items to add. Fields, settings, confirmation and notifications save together.
+// click palette items to add. Fields, settings, confirmation, payment and notifications save together.
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { browserClient } from '../lib/supabase-browser';
 import { renderForm } from '../render/forms/form';
 import { INPUT_TYPES, NAME_LABELS, NAME_PARTS, logicOf } from '../lib/forms/logic';
 import { FIELD_TYPES, defaultNotification, newField } from '../lib/forms/defaults';
-import type { Choice, Confirmation, Field, FieldType, FormDef, Logic, Notification, Operator, Width } from '../lib/forms/types';
+import type { Choice, Confirmation, Field, FieldType, FormDef, Logic, Notification, Operator, PaymentProvider, PaymentSettings, PriceMode, Width } from '../lib/forms/types';
+import { CURRENCIES, MAX_QUANTITY, productsOf } from '../lib/forms/payment';
 import siteCss from '../styles/site.css?url';
 import { site } from '../lib/site';
 import { MergeTags } from './rich-message';
@@ -25,7 +26,9 @@ interface Row {
   is_active: boolean;
 }
 
-type Tab = 'build' | 'settings' | 'confirmation' | 'notifications';
+type Tab = 'build' | 'settings' | 'confirmation' | 'payment' | 'notifications';
+
+type Providers = Record<PaymentProvider, { label: string; configured: boolean; sandbox: boolean }>;
 
 // Small controls ---------------------------------------------------------------------------
 
@@ -102,6 +105,8 @@ function ChoicesEditor({ form, field, onChange }: { form: FormDef; field: Field;
   const choices: Choice[] = field.choices ?? [];
   const [bulk, setBulk] = useState<string | null>(null);
   const multi = field.type === 'checkbox';
+  // A product's choices carry prices ("Label | 25" as a list) and store their labels.
+  const priced = field.type === 'product';
   const commit = (next: Choice[]) => onChange({ choices: next });
   const set = (i: number, patch: Partial<Choice>) =>
     commit(
@@ -126,14 +131,14 @@ function ChoicesEditor({ form, field, onChange }: { form: FormDef; field: Field;
     <div className="mb-3">
       <div className="mb-1 flex items-center justify-between">
         <span className={labelCls}>Choices</span>
-        <button type="button" className="text-xs text-admin-muted underline" onClick={() => setBulk(bulk == null ? choices.map((c) => (field.choiceValues && c.value !== c.label ? `${c.label} | ${c.value}` : c.label)).join('\n') : null)}>
+        <button type="button" className="text-xs text-admin-muted underline" onClick={() => setBulk(bulk == null ? choices.map((c) => (priced ? `${c.label} | ${c.price ?? 0}` : field.choiceValues && c.value !== c.label ? `${c.label} | ${c.value}` : c.label)).join('\n') : null)}>
           {bulk == null ? 'Edit as list' : 'Cancel'}
         </button>
       </div>
       {bulk != null ? (
         <>
           <textarea className={input} rows={6} value={bulk} onChange={(e) => setBulk(e.target.value)} />
-          {field.choiceValues && <p className="mt-1 text-xs text-admin-muted">One per line; "Label | value" for a value different from the label.</p>}
+          {priced ? <p className="mt-1 text-xs text-admin-muted">One per line, as "Label | price".</p> : field.choiceValues && <p className="mt-1 text-xs text-admin-muted">One per line; "Label | value" for a value different from the label.</p>}
           <button
             type="button"
             className={`${btn} mt-1`}
@@ -146,6 +151,11 @@ function ChoicesEditor({ form, field, onChange }: { form: FormDef; field: Field;
                   .map((t) => t.trim())
                   .filter(Boolean)
                   .map((line) => {
+                    if (priced) {
+                      const [label, price] = line.split('|', 2).map((x) => x.trim());
+                      const had = choices.find((c) => c.label === label);
+                      return { ...had, label, value: label, price: num(String(price ?? '').replace(/^\$/, '')) ?? had?.price ?? 0 };
+                    }
                     const [label, value] = field.choiceValues && line.includes('|') ? line.split('|', 2).map((x) => x.trim()) : [line, undefined];
                     const had = choices.find((c) => c.label === label);
                     return { ...had, label, value: value || (field.choiceValues ? had?.value : undefined) || label };
@@ -163,7 +173,8 @@ function ChoicesEditor({ form, field, onChange }: { form: FormDef; field: Field;
             <div key={i} className="flex items-center gap-1">
               <input type={multi ? 'checkbox' : 'radio'} title="Selected by default" checked={!!c.selected} onChange={(e) => set(i, { selected: e.target.checked || undefined })} onClick={() => !multi && c.selected && set(i, { selected: undefined })} />
               <input className={`${input} py-1`} value={c.label} onChange={(e) => set(i, { label: e.target.value })} onBlur={() => c.label !== c.label.trim() && set(i, { label: c.label.trim() })} />
-              {field.choiceValues && <input className={`${input} w-24 py-1`} placeholder="Value" value={c.value} onChange={(e) => set(i, { value: e.target.value })} onBlur={() => c.value !== c.value.trim() && set(i, { value: c.value.trim() })} />}
+              {priced && <input className={`${input} w-20 py-1`} type="number" min="0" step="0.01" title="Price" placeholder="Price" value={c.price ?? ''} onChange={(e) => set(i, { price: num(e.target.value) })} />}
+              {field.choiceValues && !priced && <input className={`${input} w-24 py-1`} placeholder="Value" value={c.value} onChange={(e) => set(i, { value: e.target.value })} onBlur={() => c.value !== c.value.trim() && set(i, { value: c.value.trim() })} />}
               <button type="button" className="px-1 text-xs text-admin-muted disabled:opacity-30" disabled={i === 0} onClick={() => move(i, -1)} title="Move up">
                 Up
               </button>
@@ -175,14 +186,16 @@ function ChoicesEditor({ form, field, onChange }: { form: FormDef; field: Field;
               </button>
             </div>
           ))}
-          <button type="button" className={btn} onClick={() => commit([...choices, { label: `Choice ${choices.length + 1}`, value: `Choice ${choices.length + 1}` }])}>
+          <button type="button" className={btn} onClick={() => commit([...choices, { label: `Choice ${choices.length + 1}`, value: `Choice ${choices.length + 1}`, ...(priced ? { price: 0 } : {}) }])}>
             Add choice
           </button>
         </div>
       )}
-      <div className="mt-2">
-        <Check label="Store different values from the labels (e.g. codes)" value={field.choiceValues} onChange={(v) => onChange({ choiceValues: v || undefined })} />
-      </div>
+      {!priced && (
+        <div className="mt-2">
+          <Check label="Store different values from the labels (e.g. codes)" value={field.choiceValues} onChange={(v) => onChange({ choiceValues: v || undefined })} />
+        </div>
+      )}
     </div>
   );
 }
@@ -291,8 +304,9 @@ const WIDTHS: [Width, string][] = [
 function FieldSettings({ form, field, onChange }: { form: FormDef; field: Field; onChange: (patch: Partial<Field>) => void }) {
   const t = field.type;
   const takesInput = INPUT_TYPES.includes(t);
-  const hasPlaceholder = ['text', 'textarea', 'email', 'phone', 'number', 'url', 'select'].includes(t);
-  const hasDefault = ['text', 'textarea', 'email', 'phone', 'number', 'url', 'hidden', 'date'].includes(t);
+  const mode = field.priceMode ?? 'fixed';
+  const hasPlaceholder = ['text', 'textarea', 'email', 'phone', 'number', 'url', 'select'].includes(t) || (t === 'product' && (mode === 'amount' || (mode === 'choice' && field.choiceDisplay !== 'radio')));
+  const hasDefault = ['text', 'textarea', 'email', 'phone', 'number', 'url', 'hidden', 'date'].includes(t) || (t === 'product' && mode === 'amount');
   return (
     <div>
       {t !== 'html' && <TextIn label={t === 'hidden' ? 'Name (only you see this)' : t === 'section' ? 'Heading' : 'Label'} value={field.label} onChange={(v) => onChange({ label: v })} />}
@@ -300,6 +314,45 @@ function FieldSettings({ form, field, onChange }: { form: FormDef; field: Field;
       {t !== 'hidden' && t !== 'html' && <Area label={t === 'section' ? 'Text under the heading' : 'Description'} value={field.description} rows={2} onChange={(v) => onChange({ description: v || undefined })} />}
       {t === 'consent' && <Area label="Checkbox text" value={field.consentText} rows={2} onChange={(v) => onChange({ consentText: v })} />}
       {(t === 'select' || t === 'radio' || t === 'checkbox') && <ChoicesEditor form={form} field={field} onChange={onChange} />}
+      {t === 'product' && (
+        <>
+          {!form.payment && <p className="mb-3 rounded bg-admin-soft p-2 text-xs text-admin-muted">This form doesn't take payment yet: choose how in the Payment tab.</p>}
+          <Pick<PriceMode>
+            label="Price"
+            value={mode}
+            options={[['fixed', 'One price'], ['choice', 'A choice of prices'], ['amount', 'An amount the visitor enters']]}
+            onChange={(v) =>
+              onChange({
+                priceMode: v,
+                ...(v === 'choice' && !field.choices?.length ? { choices: [['Option one', 10], ['Option two', 20]].map(([label, price]) => ({ label: String(label), value: String(label), price: Number(price) })) } : {}),
+                ...(v === 'amount' ? { quantity: undefined } : {}),
+              })
+            }
+          />
+          {mode === 'fixed' && <TextIn label="Price" value={field.price} placeholder="25.00" onChange={(v) => onChange({ price: num(v.replace(/^\$/, '')) })} />}
+          {mode === 'choice' && (
+            <>
+              <Pick label="Show as" value={field.choiceDisplay ?? 'select'} options={[['select', 'Dropdown'], ['radio', 'Multiple choice']]} onChange={(v) => onChange({ choiceDisplay: v === 'select' ? undefined : v })} />
+              <ChoicesEditor form={form} field={field} onChange={onChange} />
+            </>
+          )}
+          {mode === 'amount' && (
+            <div className="grid grid-cols-2 gap-2">
+              <TextIn label="Smallest amount" value={field.min} onChange={(v) => onChange({ min: num(v) })} />
+              <TextIn label="Largest amount" value={field.max} onChange={(v) => onChange({ max: num(v) })} />
+            </div>
+          )}
+          {mode !== 'amount' && <Check label="The visitor chooses a quantity" value={field.quantity} onChange={(v) => onChange({ quantity: v || undefined })} />}
+          {mode !== 'amount' && field.quantity && <TextIn label="Most they can choose" value={field.maxQuantity} placeholder={String(MAX_QUANTITY)} onChange={(v) => onChange({ maxQuantity: num(v) })} />}
+          <p className="mb-3 text-[11px] text-[#94a3b8]">
+            {mode === 'fixed' && !field.quantity
+              ? 'Charged whenever this field shows (conditional logic can hide it).'
+              : field.required
+                ? 'Required: the visitor must choose something here.'
+                : 'Optional: nothing is charged for it unless the visitor chooses.'}
+          </p>
+        </>
+      )}
       {t === 'name' && (
         <div className="mb-3">
           <span className={labelCls}>Parts (and their labels)</span>
@@ -320,7 +373,7 @@ function FieldSettings({ form, field, onChange }: { form: FormDef; field: Field;
           })}
         </div>
       )}
-      {takesInput && t !== 'hidden' && <Check label="Required" value={field.required} onChange={(v) => onChange({ required: v || undefined })} />}
+      {takesInput && t !== 'hidden' && !(t === 'product' && mode === 'fixed' && !field.quantity) && <Check label="Required" value={field.required} onChange={(v) => onChange({ required: v || undefined })} />}
 
       {(hasPlaceholder || hasDefault) && (
         <Section title="Input">
@@ -494,6 +547,7 @@ export default function FormBuilder({ formId }: { formId: number }) {
   const [status, setStatus] = useState<{ kind: 'ok' | 'error' | 'busy'; text: string } | null>(null);
   const [pages, setPages] = useState<{ id: number; title: string }[]>([]);
   const [submissions, setSubmissions] = useState<number | null>(null);
+  const [providers, setProviders] = useState<Providers | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -510,6 +564,8 @@ export default function FormBuilder({ formId }: { formId: number }) {
       ]);
       setPages(p ?? []);
       setSubmissions(count ?? 0);
+      const res = await fetch('/api/admin/forms/payments');
+      if (res.ok) setProviders(await res.json());
     })();
   }, [formId]);
 
@@ -624,6 +680,9 @@ export default function FormBuilder({ formId }: { formId: number }) {
 
   const confirmation: Confirmation = form.confirmation ?? { type: 'message', message: '' };
   const setConfirmation = (patch: Partial<Confirmation>) => setForm({ confirmation: { ...confirmation, ...patch } });
+  const payment = form.payment ?? null;
+  const setPayment = (patch: Partial<PaymentSettings>) => setForm({ payment: { ...(payment ?? { provider: 'stripe' }), ...patch } });
+  const emailFields = form.fields.filter((f) => f.type === 'email');
   // From the latest row: the email builder reports changes quickly, and several can come in one turn.
   const setNotification = (i: number, patch: Partial<Notification>) => setRow((r) => r && { ...r, notifications: r.notifications.map((n, j) => (j === i ? { ...n, ...patch } : n)) });
 
@@ -631,6 +690,7 @@ export default function FormBuilder({ formId }: { formId: number }) {
     ['build', 'Fields'],
     ['settings', 'Settings'],
     ['confirmation', 'Confirmation'],
+    ['payment', payment ? 'Payment (on)' : 'Payment'],
     ['notifications', `Notifications (${row.notifications.length})`],
   ];
 
@@ -669,7 +729,7 @@ export default function FormBuilder({ formId }: { formId: number }) {
       <div className="flex min-h-0 flex-1">
         {tab === 'build' && (
           <aside className="w-56 shrink-0 overflow-y-auto border-r border-admin-ink/10 bg-admin-bg p-3">
-            {(['Standard', 'Advanced', 'Layout'] as const).map((group) => (
+            {(['Standard', 'Advanced', 'Pricing', 'Layout'] as const).map((group) => (
               <div key={group} className="mb-4">
                 <div className="mb-2 text-[11px] font-semibold tracking-wider text-admin-muted uppercase">{group}</div>
                 <div className="grid grid-cols-1 gap-1">
@@ -772,9 +832,56 @@ export default function FormBuilder({ formId }: { formId: number }) {
             </>
           )}
 
+          {tab === 'payment' && (
+            <>
+              <Labelled label="Take payment with">
+                <select
+                  className={input}
+                  value={payment?.provider ?? ''}
+                  onChange={(e) => setForm({ payment: e.target.value ? { ...(payment ?? {}), provider: e.target.value as PaymentProvider } : null })}
+                >
+                  <option value="">No payment</option>
+                  {(['stripe', 'square'] as PaymentProvider[]).map((p) => (
+                    <option key={p} value={p}>
+                      {providers?.[p]?.label ?? p}
+                      {providers && !providers[p].configured ? ' (not set up)' : providers?.[p]?.sandbox ? ' (test mode)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </Labelled>
+              {payment && providers && !providers[payment.provider].configured && (
+                <p className="mb-3 rounded bg-[#fef3f2] p-2 text-xs text-[#b42318]">
+                  {payment.provider === 'stripe' ? 'Stripe needs STRIPE_SECRET_KEY' : 'Square needs SQUARE_ACCESS_TOKEN and SQUARE_LOCATION_ID'} in the site's environment. Until then the form refuses submissions that have something to pay.
+                </p>
+              )}
+              {payment && (
+                <>
+                  <Pick label="Currency" value={payment.currency ?? 'USD'} options={CURRENCIES.map(([code, name]) => [code, `${code}: ${name}`] as [string, string])} onChange={(v) => setPayment({ currency: v === 'USD' ? undefined : v })} />
+                  <MergeTags form={form} onInsert={(tag) => setPayment({ description: `${payment.description ?? ''}${tag}` })} />
+                  <TextIn label="Description of the payment" value={payment.description} placeholder={form.title} hint="Shown at checkout and on the receipt." onChange={(v) => setPayment({ description: v || undefined })} />
+                  <Labelled label="Receipt email" hint="Filled in at checkout; the payment provider sends its receipt there.">
+                    <select className={input} value={payment.emailField ?? ''} onChange={(e) => setPayment({ emailField: e.target.value || undefined })}>
+                      <option value="">{emailFields.length ? `The first email field (${emailFields[0].label})` : 'None (the form has no email field)'}</option>
+                      {emailFields.map((f) => (
+                        <option key={f.id} value={f.id}>
+                          {f.label}
+                        </option>
+                      ))}
+                    </select>
+                  </Labelled>
+                  {!productsOf(form).length && <p className="mb-3 rounded bg-admin-soft p-2 text-xs text-admin-muted">Add Product fields (Fields, Pricing) for what the form charges; their total is the payment.</p>}
+                  <div className="space-y-2 text-xs leading-relaxed text-admin-muted">
+                    <p>Visitors pay on {providers?.[payment.provider]?.label ?? 'the provider'}'s checkout page after they submit, then come back to the confirmation. A submission with nothing to pay is sent right away.</p>
+                    <p>Notifications are sent once the payment is complete. Submissions list unpaid checkouts as Unpaid.</p>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+
           {tab === 'notifications' && (
             <>
-              <p className="mb-3 text-xs text-admin-muted">Emails sent when the form is submitted.</p>
+              <p className="mb-3 text-xs text-admin-muted">{payment ? 'Emails sent when the form is submitted and paid for.' : 'Emails sent when the form is submitted.'}</p>
               {row.notifications.map((n, i) => (
                 <details key={n.id} open={row.notifications.length === 1} className="mb-3 rounded border border-admin-ink/10 p-3">
                   <summary className="cursor-pointer text-sm font-medium">

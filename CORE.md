@@ -429,6 +429,28 @@ Notifications from before the builder send their message as before until opened 
 (`SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_PASS`/`SMTP_SECURE`, or one `SMTP_URL`; sender `MAIL_FROM`,
 default `mailFrom` in the site config).
 
+Payments: a form's Payment tab (`FormDef.payment`: Stripe or Square, currency, a description with merge
+tags, the email field for the receipt) and **Product** fields (`type: 'product'`; `priceMode` one price,
+a choice of priced options (`choices[].price`, dropdown or radio) or an amount the visitor enters
+(`min`/`max`); optional quantity up to `maxQuantity`, posted as `f1[qty]`). Their answers become line
+items and a total (`src/lib/forms/payment.ts`; a product hidden by conditional logic isn't charged);
+the form shows the total above the button, kept live by `forms.js`, while the server's total is what is
+charged. A submission with a total is stored as pending (`form_submissions.payment`, `SubmissionPayment`)
+and the visitor goes to the provider's hosted checkout (`src/lib/forms/checkout.ts`,
+`src/lib/payments/`: Stripe Checkout Sessions, Square payment links, over their REST APIs). They come
+back to the form's page with `?form_payment=<submission id>.<token>` (uncached): once paid, the form's
+confirmation; otherwise the form again with their answers and a note. Webhooks
+(`/api/payments/stripe`, `/api/payments/square`, signature checked) catch visitors who don't come back.
+Neither the return nor a webhook is trusted as to the outcome: the site asks the provider where the
+checkout stands, and the update that marks a submission paid is the one that sends its notifications,
+so they go once, after payment (`{payment_total}`, `{payment_id}` merge tags; `{all_fields}` adds the
+total). A total of zero is sent at once without checkout; under 50 cents is refused. Keys are
+environment variables, never settings (settings sync between copies): `STRIPE_SECRET_KEY`,
+`STRIPE_WEBHOOK_SECRET`, `SQUARE_ACCESS_TOKEN`, `SQUARE_LOCATION_ID`, `SQUARE_ENVIRONMENT`,
+`SQUARE_WEBHOOK_SIGNATURE_KEY`, `SQUARE_WEBHOOK_URL`; the builder shows which are set
+(`/api/admin/forms/payments`) and test or sandbox mode. Submissions show each payment's status, items
+and payment id; the CSV export adds payment columns.
+
 ## Events
 
 `src/lib/events/model.ts` loads events (occurrences included) as `CalEvent`s;

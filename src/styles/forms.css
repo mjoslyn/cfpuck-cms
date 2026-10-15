@@ -200,3 +200,58 @@ select.c-input {
 .c-field.is-hidden-input {
   display: none !important;
 }
+/* Products and the total (forms that take payment). */
+.c-product__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+.c-product__row > :first-child {
+  flex: 1 1 12rem;
+}
+.c-product__row > p.c-product__price {
+  flex: 0 1 auto;
+  padding-top: 0.75rem;
+}
+.c-subfield.is-qty {
+  flex: 0 0 6.5rem;
+}
+.c-product__price {
+  margin: 0;
+  color: var(--color-text);
+  font-weight: 600;
+}
+.c-choice .c-product__price {
+  margin-left: 0.25rem;
+  color: var(--color-muted);
+  font-weight: 400;
+}
+.c-product__amount {
+  position: relative;
+}
+.c-product__currency {
+  position: absolute;
+  top: 50%;
+  left: 0.875rem;
+  transform: translateY(-50%);
+  color: var(--color-muted);
+  pointer-events: none;
+}
+.c-product__amount .c-input {
+  padding-left: 2.25rem;
+}
+.c-form__total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: 0 0 1.25rem;
+  padding: 0.875rem 0;
+  border-top: 1px solid rgba(26, 26, 46, 0.12);
+  border-bottom: 1px solid rgba(26, 26, 46, 0.12);
+  color: var(--color-text);
+  font-weight: 600;
+}
+.c-form__total output {
+  font-size: 1.25rem;
+}

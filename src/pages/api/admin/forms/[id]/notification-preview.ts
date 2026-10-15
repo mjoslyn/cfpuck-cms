@@ -5,7 +5,8 @@
 import type { APIRoute } from 'astro';
 import { renderNotification } from '../../../../../lib/forms/submit';
 import { INPUT_TYPES } from '../../../../../lib/forms/logic';
-import type { FormDef, FormRow, Notification, Values } from '../../../../../lib/forms/types';
+import type { FormDef, FormRow, Notification, SubmissionPayment, Values } from '../../../../../lib/forms/types';
+import { currencyOf, defaultProductValue, lineItems, totalOf } from '../../../../../lib/forms/payment';
 
 /** Sample answers: something plausible for each field, so every part of the email shows. */
 function sampleValues(def: FormDef): Values {
@@ -24,6 +25,7 @@ function sampleValues(def: FormDef): Values {
       case 'checkbox': values[f.id] = (f.choices ?? []).slice(0, 2).map((c) => c.value || c.label); break;
       case 'select':
       case 'radio': if (first) values[f.id] = first.value || first.label; break;
+      case 'product': values[f.id] = { ...defaultProductValue(f), ...(f.priceMode === 'choice' && first ? { value: first.value } : {}), ...(f.priceMode === 'amount' ? { value: '25' } : {}), ...(f.quantity ? { qty: '2' } : {}) }; break;
       default: values[f.id] = `Sample ${f.label}`.trim();
     }
   }
@@ -52,10 +54,16 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
   const n = body.notification as Notification | undefined;
   if (!n || typeof n !== 'object') return new Response('No notification.', { status: 400 });
   let values: Values = sampleValues(row.definition);
+  let payment: SubmissionPayment | null = null;
   if (body.submissionId) {
-    const { data: sub } = await locals.db.from('form_submissions').select('data').eq('id', Number(body.submissionId)).eq('form_id', id).maybeSingle();
+    const { data: sub } = await locals.db.from('form_submissions').select('data, payment').eq('id', Number(body.submissionId)).eq('form_id', id).maybeSingle();
     if (!sub) return new Response('That submission no longer exists.', { status: 404 });
     values = ((sub as any).data?.entry ?? {}) as Values;
+    payment = (sub as any).payment ?? null;
+  } else if (row.definition.payment) {
+    // A sample payment, so {payment_total} and {payment_id} show.
+    const items = lineItems(row.definition, values);
+    payment = { provider: row.definition.payment.provider, status: 'paid', amount: totalOf(items), currency: currencyOf(row.definition), items, payment_id: 'sample-payment-id', token: '', page: '', origin: '' };
   }
-  return Response.json(renderNotification(row, n, values, new URL(request.url).origin));
+  return Response.json(renderNotification(row, n, values, new URL(request.url).origin, payment));
 };

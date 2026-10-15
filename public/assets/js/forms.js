@@ -1,5 +1,6 @@
 // Forms: conditional logic (same rules as src/lib/forms/logic.ts), US phone formatting, character
-// counters, and focus on the error summary or confirmation after a submission.
+// counters, the total of a form that takes payment (as src/lib/forms/payment.ts works it out; the
+// server's is what is charged), and focus on the error summary or confirmation after a submission.
 (function () {
   function values(form) {
     var out = {};
@@ -7,6 +8,8 @@
       var m = k.match(/^([a-z0-9]+)(?:\[(\w*)\])?$/i);
       if (!m) return;
       var id = m[1];
+      // A product's quantity isn't part of what its rules compare.
+      if (m[2] === 'qty') return;
       if (m[2] === '') (out[id] = out[id] || []).push(String(v));
       else if (m[2]) out[id] = ((out[id] || '') + ' ' + v).trim();
       else out[id] = String(v);
@@ -69,6 +72,35 @@
     if (out) out.textContent = input.value.length + ' of ' + input.maxLength + ' characters';
   }
 
+  // Products that conditional logic hides (or that sit in a hidden section) don't count.
+  function total(form) {
+    var sum = 0;
+    form.querySelectorAll('.c-field.is-product').forEach(function (el) {
+      if (el.hidden) return;
+      var unit = 0;
+      var amount = el.querySelector('[data-amount]');
+      var select = el.querySelector('select');
+      var radio = el.querySelector('input[type="radio"]:checked');
+      var fixed = el.querySelector('p.c-product__price[data-price]');
+      if (amount) unit = Math.round((parseFloat(amount.value) || 0) * 100);
+      else if (select) unit = Number(select.options[select.selectedIndex] && select.options[select.selectedIndex].getAttribute('data-price')) || 0;
+      else if (radio) unit = Number(radio.getAttribute('data-price')) || 0;
+      else if (fixed) unit = Number(fixed.getAttribute('data-price')) || 0;
+      var q = el.querySelector('[data-qty]');
+      var qty = q ? Math.max(0, Math.floor(Number(q.value) || 0)) : 1;
+      if (unit > 0) sum += unit * qty;
+    });
+    return sum;
+  }
+
+  function money(minor, currency) {
+    try {
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency }).format(minor / 100);
+    } catch (e) {
+      return (minor / 100).toFixed(2) + ' ' + currency;
+    }
+  }
+
   function init() {
     document.querySelectorAll('.c-form__form').forEach(function (form) {
       var logic = form.getAttribute('data-logic');
@@ -78,6 +110,14 @@
         form.addEventListener('input', run);
         form.addEventListener('change', run);
         run();
+      }
+      var out = form.querySelector('[data-total]');
+      if (out) {
+        // After conditional logic (added first), so hidden products are already hidden.
+        var sum = function () { out.textContent = money(total(form), out.getAttribute('data-currency') || 'USD'); };
+        form.addEventListener('input', sum);
+        form.addEventListener('change', sum);
+        sum();
       }
       form.querySelectorAll('[data-mask="us-phone"]').forEach(function (i) {
         i.addEventListener('input', function () { formatPhone(i); });

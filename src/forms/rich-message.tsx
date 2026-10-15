@@ -14,6 +14,7 @@ export function mergeTagOptions(form: FormDef): [string, string][] {
     ['{form_title}', 'Form title'],
     ['{admin_email}', 'Chamber email'],
     ['{date}', 'Date'],
+    ...(form.payment ? ([['{payment_total}', 'Payment total'], ['{payment_id}', 'Payment ID']] as [string, string][]) : []),
     ...form.fields.filter((f) => INPUT_TYPES.includes(f.type)).map((f) => [`{${f.label}:${f.id}}`, f.label] as [string, string]),
   ];
 }

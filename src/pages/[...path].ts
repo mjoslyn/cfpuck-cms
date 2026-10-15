@@ -2,6 +2,8 @@ import type { APIRoute } from 'astro';
 import { supabase } from '../lib/supabase';
 import { renderRequest } from '../render/page';
 import { handleFormPost } from '../lib/forms/submit';
+import { RETURN_PARAM, paymentReturn } from '../lib/forms/checkout';
+import { serviceClient } from '../lib/supabase';
 import { eventsFeed, eventFile } from '../lib/events/ical';
 import { SITE_RENDER } from '../lib/site/render';
 import { Loader } from '../lib/data';
@@ -34,6 +36,16 @@ export const GET: APIRoute = async ({ url, request, cache }) => {
   // The site's old URLs (src/site/render.ts redirect).
   const old = SITE_RENDER.redirect?.(url);
   if (old) return Response.redirect(new URL(old, url), 301);
+  // Back from a form's checkout: its confirmation or the form again, for this visitor only (never cached).
+  const paid = url.searchParams.get(RETURN_PARAM);
+  if (paid) {
+    const form = await paymentReturn(serviceClient(), paid);
+    if (form?.redirect) return new Response(null, { status: 303, headers: { Location: new URL(form.redirect, url).toString(), 'Cache-Control': 'no-store' } });
+    const page = new URL(url);
+    page.searchParams.delete(RETURN_PARAM);
+    const { status, html } = await renderRequest(page, supabase, form ?? undefined);
+    return new Response(html, { status, headers: { 'Content-Type': 'text/html; charset=UTF-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' } });
+  }
   const { status, html, location } = await renderRequest(url, supabase);
   // Cached at the CDN and cleared after edits (src/lib/cache.ts).
   if (cache.enabled) cache.set(location ? { ...PAGE_CACHE, swr: undefined } : PAGE_CACHE);

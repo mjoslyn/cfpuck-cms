@@ -23,7 +23,7 @@ export const defaultNotification = (): Notification => ({
   design: defaultEmail(),
 });
 
-export const FIELD_TYPES: { type: FieldType; label: string; group: 'Standard' | 'Advanced' | 'Layout' }[] = [
+export const FIELD_TYPES: { type: FieldType; label: string; group: 'Standard' | 'Advanced' | 'Pricing' | 'Layout' }[] = [
   { type: 'text', label: 'Single line text', group: 'Standard' },
   { type: 'textarea', label: 'Paragraph text', group: 'Standard' },
   { type: 'select', label: 'Dropdown', group: 'Standard' },
@@ -37,6 +37,7 @@ export const FIELD_TYPES: { type: FieldType; label: string; group: 'Standard' | 
   { type: 'url', label: 'Website', group: 'Advanced' },
   { type: 'date', label: 'Date', group: 'Advanced' },
   { type: 'consent', label: 'Consent', group: 'Advanced' },
+  { type: 'product', label: 'Product', group: 'Pricing' },
   { type: 'section', label: 'Section heading', group: 'Layout' },
   { type: 'html', label: 'HTML content', group: 'Layout' },
 ];
@@ -57,6 +58,8 @@ export function newField(type: FieldType, n: number): Field {
       return { ...base, label: 'Consent', consentText: 'I agree to the privacy policy.' };
     case 'html':
       return { ...base, label: 'HTML content', html: '<p>Some text for visitors.</p>' };
+    case 'product':
+      return { ...base, priceMode: 'fixed', price: 10, required: true };
     default:
       return base;
   }

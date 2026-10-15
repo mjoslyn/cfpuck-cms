@@ -63,6 +63,47 @@ wide, with text kept to what mail apps show the same.
 Notifications from before the builder keep sending their message as it was until they are opened in
 the builder, which turns it into blocks.
 
+## Payments
+
+A form can take payment with **Stripe** or **Square**. Visitors pay on the provider's own checkout
+page, so no card details reach the site.
+
+1. Add **Product** fields (the Pricing group in the builder). A product has one price, a choice of
+   priced options (a dropdown or multiple choice), or an amount the visitor enters (a donation, with
+   an optional smallest and largest amount). One price or a choice can also take a quantity.
+2. In the **Payment** tab, choose the provider, the currency, a description for the checkout page and
+   receipt (merge tags allowed) and the email field the receipt goes to.
+
+The form shows its total above the submit button and updates it as the visitor answers. Products that
+conditional logic hides aren't charged, so a fee can depend on an answer.
+
+When someone submits a form with something to pay:
+
+1. The submission is stored as **Unpaid** and the visitor goes to checkout.
+2. After paying they come back to the form's page and see its confirmation. If they come back without
+   paying, the form shows again with their answers and a note that it wasn't sent.
+3. The site asks the provider whether the checkout was paid (it never takes the visitor's return, or
+   a webhook, as proof). Once paid, the submission is marked **Paid** and its notifications are sent,
+   once. Webhooks catch visitors who pay and close the tab.
+
+A submission with nothing to pay is sent at once, without checkout. Notifications can use
+`{payment_total}` and `{payment_id}`, and `{all_fields}` ends with the total. Submissions show each
+payment's status, items and payment id, and the CSV export has payment columns.
+
+### Setting up the providers
+
+Keys are environment variables, never settings, so a local copy can't charge with production's keys.
+
+| Variable | |
+| --- | --- |
+| `STRIPE_SECRET_KEY` | A secret key; `sk_test_...` for test mode |
+| `STRIPE_WEBHOOK_SECRET` | The signing secret of a webhook endpoint at `<site>/api/payments/stripe` for `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed` and `checkout.session.expired` |
+| `SQUARE_ACCESS_TOKEN`, `SQUARE_LOCATION_ID` | The account's access token and the location payments go to |
+| `SQUARE_ENVIRONMENT` | `sandbox` to test; production otherwise |
+| `SQUARE_WEBHOOK_SIGNATURE_KEY`, `SQUARE_WEBHOOK_URL` | A webhook subscription to `payment.created` and `payment.updated` at `<site>/api/payments/square`: its signature key, and that exact address |
+
+The Payment tab shows which providers are set up, and marks test and sandbox keys.
+
 ## Mail
 
 Mail goes out over SMTP: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE`, or one

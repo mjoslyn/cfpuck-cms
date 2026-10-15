@@ -1,14 +1,15 @@
 ---
 import Admin from '../../../layouts/Admin.astro';
 import { SITE_TZ } from '../../../lib/site';
-import { INPUT_TYPES, displayValue } from '../../../lib/forms/logic';
-import type { FormDef } from '../../../lib/forms/types';
+import { INPUT_TYPES, PAYMENT_STATUS, displayValue, formatMoney } from '../../../lib/forms/logic';
+import { currencyOf } from '../../../lib/forms/payment';
+import type { FormDef, SubmissionPayment } from '../../../lib/forms/types';
 
 const db = Astro.locals.db;
 const formId = Number(Astro.url.searchParams.get('form')) || null;
 const { data: forms } = await db.from('forms').select('id, title, definition').order('title');
 const current = forms?.find((f) => f.id === formId);
-let q = db.from('form_submissions').select('id, form, form_id, data, created_at').order('created_at', { ascending: false }).limit(500);
+let q = db.from('form_submissions').select('id, form, form_id, data, payment, created_at').order('created_at', { ascending: false }).limit(500);
 if (formId) q = q.eq('form_id', formId);
 const { data, error } = await q;
 if (error) throw error;
@@ -21,9 +22,21 @@ const byId = new Map((forms ?? []).map((f) => [f.id, f.definition as FormDef]));
 function rows(s: { form_id: number | null; data: any }): [string, string][] {
   const def = s.form_id ? byId.get(s.form_id) : undefined;
   const entry = s.data?.entry;
-  if (def && entry) return def.fields.filter((f) => INPUT_TYPES.includes(f.type)).map((f) => [f.label, displayValue(f, entry)]);
+  if (def && entry) return def.fields.filter((f) => INPUT_TYPES.includes(f.type)).map((f) => [f.label, displayValue(f, entry, currencyOf(def))]);
   return Object.entries(s.data?.values ?? {}).map(([k, v]) => [k, show(v)]);
 }
+/** A submission's payment as rows: status and amount, provider, its payment id, when paid. */
+function paymentRows(p: SubmissionPayment | null): [string, string][] {
+  if (!p) return [];
+  const out: [string, string][] = [['Payment', `${PAYMENT_STATUS[p.status] ?? p.status}: ${formatMoney(p.amount, p.currency)}${p.sandbox ? ' (test)' : ''}`]];
+  for (const it of p.items ?? []) out.push([`  ${it.name}`, `${formatMoney(it.unit, p.currency)}${it.quantity > 1 ? ` x ${it.quantity}` : ''}`]);
+  out.push(['Paid with', p.provider === 'stripe' ? 'Stripe' : 'Square']);
+  if (p.payment_id) out.push(['Payment ID', p.payment_id]);
+  if (p.paid_at) out.push(['Paid', when(p.paid_at)]);
+  return out;
+}
+const badge: Record<string, string> = { paid: 'bg-[#ecfdf3] text-[#067647]', processing: 'bg-[#fffaeb] text-[#b54708]', pending: 'bg-admin-soft text-admin-muted', failed: 'bg-[#fef3f2] text-[#b42318]', cancelled: 'bg-admin-soft text-admin-muted' };
+
 /** One-line summary: the first two answers. */
 const summary = (s: { form_id: number | null; data: any }) => rows(s).map(([, v]) => v).filter(Boolean).slice(0, 2).join(' · ');
 ---
@@ -52,6 +65,7 @@ const summary = (s: { form_id: number | null; data: any }) => rows(s).map(([, v]
         <summary class="flex cursor-pointer items-center gap-4 px-4 py-3 text-sm">
           {!current && <span class="w-48 shrink-0 truncate font-medium">{s.form}</span>}
           <span class="min-w-0 flex-1 truncate text-admin-ink">{summary(s) || '(empty)'}</span>
+          {s.payment && <span class={`shrink-0 rounded px-2 py-0.5 text-xs font-medium ${badge[s.payment.status] ?? ''}`}>{PAYMENT_STATUS[s.payment.status] ?? s.payment.status} {formatMoney(s.payment.amount, s.payment.currency)}</span>}
           <span class="shrink-0 text-admin-muted">{when(s.created_at)}</span>
         </summary>
         <dl class="grid grid-cols-[14rem_1fr] gap-x-4 gap-y-2 border-t border-admin-ink/5 px-4 py-3 text-sm">
@@ -59,6 +73,12 @@ const summary = (s: { form_id: number | null; data: any }) => rows(s).map(([, v]
             <>
               <dt class="text-admin-muted">{k}</dt>
               <dd class="whitespace-pre-wrap">{v || '-'}</dd>
+            </>
+          ))}
+          {paymentRows(s.payment).map(([k, v]) => (
+            <>
+              <dt class="whitespace-pre text-admin-muted">{k}</dt>
+              <dd>{v}</dd>
             </>
           ))}
           {s.data?.referrer && (
