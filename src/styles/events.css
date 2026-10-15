@@ -809,6 +809,12 @@ a.c-cal__arrow:hover {
 .c-tickets__note.is-sold-out {
   font-weight: 600;
 }
+.c-tickets__note.c-tickets__sample {
+  padding: 0.5rem 0.75rem;
+  border: 1px dashed var(--color-muted);
+  color: var(--color-muted);
+  font-size: 0.875em;
+}
 .c-tickets__message {
   margin: 0 0 1rem;
   padding: 0.875rem 1rem;

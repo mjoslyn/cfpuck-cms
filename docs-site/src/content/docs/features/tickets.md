@@ -29,6 +29,10 @@ The **Tickets** block puts an event's ticket form on any page or template. Choos
 settings (and, for a recurring event, a date; empty: its next date), and it shows that event's name and
 date over the form. With no event chosen it shows the tickets of the event whose page it is on, so an
 event template can place it instead of relying on Event details (which then leaves its own form out).
+A page can have several. For an event that doesn't sell tickets (Tickets off, or no ticket types) the
+block shows nothing, so a template's Tickets block appears only on events that sell them. In the editor
+the block shows the whole form; without an event that sells tickets, with sample ticket types and a note
+saying why (a template's block on such an event's page shows nothing there, as on the site).
 Buyers come back to the page they ordered on, and their emails link there; people on a waitlist are
 sent back to where they joined.
 

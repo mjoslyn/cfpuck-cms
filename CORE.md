@@ -524,7 +524,11 @@ tickets (30-120 minutes), and the emails with the reminder's and follow-up's tim
   Tickets box in its sidebar, unless the page has a `tickets` block for its event. The `tickets` block
   goes on any page or template: it shows the event it names (`attrs.event`, and `attrs.date` for one
   date of a recurring event, else its next; with the event's name and date over the form), else the
-  page's own event (`prepareTicketsBlock`). The form posts the page it is on (`page`): the order and a
+  page's own event (`prepareTicketsBlock`); a page can have several. An event that doesn't sell tickets
+  (Tickets off, or no ticket types) shows nothing. In the editor the block shows the full form: with no
+  event that sells tickets, sample ticket types and a note saying why, when the block is part of what is
+  being edited (the page's own content, or a template being edited; a template's block on such an
+  event's page shows nothing, as on the site). The form posts the page it is on (`page`): the order and a
   waitlist place keep it (`ticket_orders.page`, `ticket_waitlist.page`), and the buyer is sent back
   there, to the section's anchor (`ticketsAt`: `#tickets` on the event's own page, else
   `#tickets-<event id>`); emails' `{order_link}` goes there too (a waitlist's: the tickets where they
