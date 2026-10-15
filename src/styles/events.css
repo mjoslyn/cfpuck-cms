@@ -919,3 +919,10 @@ a.c-cal__arrow:hover {
     grid-row: 2;
   }
 }
+/* A ticket's member price (Members): under its price. */
+.c-tickets__member {
+  display: block;
+  color: var(--color-muted);
+  font-size: 0.8125em;
+  font-weight: 400;
+}

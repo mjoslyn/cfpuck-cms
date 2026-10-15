@@ -4,15 +4,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { Num, Row, Select, Text, Toggle, inputClass } from './fields';
 import { TICKETS_KEY, newId, parsePrice, type EventTickets, type TicketQuestion, type TicketType } from '../lib/tickets/config';
+import type { MemberLevel } from '../lib/members/config';
+import { useMemberSettings } from './member-settings';
 
 const small = 'rounded-sm border border-admin-ink/20 px-2 py-1 text-xs font-semibold hover:border-admin-ink/50';
 
 /** A price typed as dollars and cents, kept as cents. */
-function PriceInput({ value, onChange }: { value: number; onChange: (cents: number) => void }) {
-  const [text, setText] = useState(value ? (value / 100).toFixed(2) : '');
+function PriceInput({ value, onChange, title = 'Price (empty or 0: free)', optional }: { value: number | undefined; onChange: (cents: number | undefined) => void; title?: string; optional?: boolean }) {
+  const [text, setText] = useState(value ? (value / 100).toFixed(2) : optional && value === 0 ? '0.00' : '');
   const bad = text.trim() !== '' && parsePrice(text) == null;
   return (
-    <Row title="Price (empty or 0: free)">
+    <Row title={title}>
       <input
         className={inputClass}
         inputMode="decimal"
@@ -22,7 +24,7 @@ function PriceInput({ value, onChange }: { value: number; onChange: (cents: numb
         onChange={(e) => {
           setText(e.target.value);
           const cents = parsePrice(e.target.value);
-          if (cents != null || !e.target.value.trim()) onChange(cents ?? 0);
+          if (cents != null || !e.target.value.trim()) onChange(cents ?? (optional ? undefined : 0));
         }}
       />
       {bad && <span className="mt-1 block text-xs text-[#b3261e]">Write a price like 25 or 12.50.</span>}
@@ -79,7 +81,40 @@ const DateTime = ({ title, value, onChange }: { title: string; value?: string; o
   </Row>
 );
 
+/** Members' prices by level, and whether only members (of some levels) may buy a ticket type. */
+function MemberPricing({ type, levels, onChange }: { type: TicketType; levels: MemberLevel[]; onChange: (patch: Partial<TicketType>) => void }) {
+  const prices = type.memberPrices ?? {};
+  const setPrice = (level: string, cents: number | undefined) => {
+    const next = { ...prices };
+    if (cents == null) delete next[level];
+    else next[level] = cents;
+    onChange({ memberPrices: Object.keys(next).length ? next : undefined });
+  };
+  const chosen = type.levels ?? [];
+  return (
+    <div className="mb-3 rounded border border-admin-ink/10 p-2">
+      <span className="mb-1 block text-xs font-medium text-admin-muted">Members</span>
+      {levels.map((l) => (
+        <PriceInput key={l.id} title={`${l.name} price (empty: the price above)`} value={prices[l.id]} optional onChange={(cents) => setPrice(l.id, cents)} />
+      ))}
+      <Toggle title="Members only" value={type.membersOnly} onChange={(membersOnly) => onChange({ membersOnly: membersOnly || undefined })} />
+      {type.membersOnly && levels.length > 1 && (
+        <fieldset className="mb-2">
+          <legend className="mb-1 text-xs text-admin-muted">Levels that may buy it (none ticked: all)</legend>
+          {levels.map((l) => (
+            <label key={l.id} className="mr-3 inline-flex items-center gap-1 text-sm">
+              <input type="checkbox" checked={chosen.includes(l.id)} onChange={(e) => onChange({ levels: e.target.checked ? [...chosen, l.id] : chosen.filter((x) => x !== l.id) })} />
+              {l.name}
+            </label>
+          ))}
+        </fieldset>
+      )}
+    </div>
+  );
+}
+
 export function TicketsForm({ fields, onChange }: { fields: Record<string, any>; onChange: (fields: Record<string, any>) => void }) {
+  const members = useMemberSettings();
   const t: EventTickets = { types: [], ...(fields[TICKETS_KEY] ?? {}) };
   const set = (patch: Partial<EventTickets>) => onChange({ ...fields, [TICKETS_KEY]: { ...t, ...patch } });
   // The attendee list, for an event that has been saved (/admin/edit/<id>/).
@@ -108,7 +143,8 @@ export function TicketsForm({ fields, onChange }: { fields: Record<string, any>;
                 <Row title="Description">
                   <textarea className={inputClass} rows={2} value={x.description ?? ''} onChange={(e) => setType({ description: e.target.value || undefined })} />
                 </Row>
-                <PriceInput value={x.price} onChange={(price) => setType({ price })} />
+                <PriceInput value={x.price} onChange={(price) => setType({ price: price ?? 0 })} />
+                {members?.enabled && members.levels.length > 0 && <MemberPricing type={x} levels={members.levels} onChange={setType} />}
                 <Num title="How many (empty: no limit of its own)" value={x.capacity ?? undefined} min={0} onChange={(capacity) => setType({ capacity: capacity ?? null })} />
                 <Num title="Most in one order" value={x.maxPerOrder ?? undefined} min={1} onChange={(maxPerOrder) => setType({ maxPerOrder: maxPerOrder ?? null })} />
                 <DateTime title="On sale from (empty: now)" value={x.salesStart} onChange={(salesStart) => setType({ salesStart })} />

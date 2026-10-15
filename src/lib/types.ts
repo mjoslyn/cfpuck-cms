@@ -74,6 +74,8 @@ export interface Entry {
   occurrence?: string;
   /** Occurrence of a recurring event: the series' entry id. */
   series_id?: number;
+  /** A members-only entry the viewer may not see (Loader.lockedEntry): its title, excerpt, image and access only. */
+  locked?: boolean;
 }
 
 export const ENTRY_COLUMNS =

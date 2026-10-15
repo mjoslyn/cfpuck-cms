@@ -9,10 +9,11 @@ import { ENTRY_COLUMNS, type Entry } from '../types';
 import { defaultHorizon, expandEntry, localToUtc, recurrenceOf } from '../recurrence';
 import { permalink } from '../permalink';
 import { eventWhen, venueLines } from '../events/model';
+import { isActive, type MemberRow } from '../members/config';
 import { emailEvents } from '../events/email';
 import { SITE_TZ, site } from '../site';
 import { sendMail } from '../forms/mail';
-import { emailToSend, localNow, maxFor, offSale, offeredTypes, remaining, ticketEmailFrom, ticketSettings, ticketsOf, timedEmail, DEFAULT_MAX_PER_ORDER, type EmailKind, type EventEmail, type EventTickets, type TicketSettings } from './config';
+import { emailToSend, mayBuy, priceFor, localNow, maxFor, offSale, offeredTypes, remaining, ticketEmailFrom, ticketSettings, ticketsOf, timedEmail, DEFAULT_MAX_PER_ORDER, type EmailKind, type EventEmail, type EventTickets, type TicketSettings } from './config';
 import { PROVIDERS, ProviderError, closeCheckout, pickProvider, providerOf, type CheckoutState, type PaymentEvent, type PaymentProvider } from '../payments';
 import { ticketEmail, type EventView, type OrderView } from './email';
 import type { EmailPayment } from '../forms/email';
@@ -34,6 +35,8 @@ export interface OrderRow {
   event_title: string;
   /** The page the order was placed on ('': the event's own). */
   page: string;
+  /** The member who placed it (member prices, members-only tickets), if any. */
+  member_id: string | null;
   status: OrderStatus;
   provider: 'free' | 'stripe' | 'square';
   provider_ref: string | null;
@@ -179,7 +182,7 @@ const backTo = (ev: LoadedEvent, page: string) => {
  * confirmed at once; a paid one holds its tickets and goes to the provider's checkout. Problems go
  * back to the event with ?tickets=<reason>. Null when there is no such event.
  */
-export async function startCheckout(data: FormData, origin: string): Promise<string | null> {
+export async function startCheckout(data: FormData, origin: string, member: MemberRow | null = null): Promise<string | null> {
   const db = serviceClient();
   const ev = await loadEvent(db, Number(data.get('event')), field(data, 'occurrence', 10));
   if (!ev) return null;
@@ -196,7 +199,9 @@ export async function startCheckout(data: FormData, origin: string): Promise<str
     if (q <= 0) continue;
     if (offSale(type, now)) return back('closed');
     if (q > maxFor(type, t)) return back('invalid');
-    items.push({ type: type.id, name: type.name, price: type.price, quantity: q });
+    if (!mayBuy(type, member)) return back('members-only');
+    // A member pays their level's price (checked here: the form's prices are only shown).
+    items.push({ type: type.id, name: type.name, price: priceFor(type, member), quantity: q });
   }
   const quantity = items.reduce((n, i) => n + i.quantity, 0);
   const amount = items.reduce((n, i) => n + i.price * i.quantity, 0);
@@ -236,7 +241,7 @@ export async function startCheckout(data: FormData, origin: string): Promise<str
   const limits = { total: t.capacity || null, types: Object.fromEntries(t.types.map((x) => [x.id, x.capacity || null])) };
   const { data: made, error } = await db.rpc('ticket_order_create', {
     p_order: {
-      token, code, entry_id: ev.series.id, occurrence: (ev.entry as { occurrence?: string }).occurrence ?? '', event_title: ev.series.title, page,
+      token, code, entry_id: ev.series.id, occurrence: (ev.entry as { occurrence?: string }).occurrence ?? '', event_title: ev.series.title, page, member_id: isActive(member) ? member.user_id : null,
       status: free ? 'paid' : 'pending', provider: free ? 'free' : providerName, name, email, phone, address, answers, items, amount, currency,
       // A paid order holds its tickets a little longer than the checkout takes payment.
       expires_at: free ? null : new Date(Date.now() + hold + 2 * 60_000).toISOString(),

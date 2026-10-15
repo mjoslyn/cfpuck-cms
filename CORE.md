@@ -376,7 +376,8 @@ Text materials count toward the budget of what is sent in full (`MATERIAL_BUDGET
   (POST, PUT, PATCH or DELETE under `/api/admin/`) clears that tag from the middleware
   (`cache.invalidate`; a 2xx answer, or the 303 a form post such as a bulk action answers with), so edits show at once; previews (and the email builder's event lookups), Claude drafting, accessibility marks,
   submissions, users, the attendee list and sync requests other than a sync into this copy or a restore don't
-  (`changesPages`). A failed purge is logged and the edit shows within the minute. Under `astro dev`
+  (`changesPages`). A failed purge is logged and the edit shows within the minute. Pages that depend on
+  who views them (see Members) aren't cached. Under `astro dev`
   nothing is cached. The first cover or hero image on a page loads at high priority (`optimizeImages`).
   Signed-in editors get an editor bar
   (`public/assets/js/editor-bar.js`, `/api/admin/me`) added in the browser, so cached pages stay shared.
@@ -566,6 +567,59 @@ tickets (30-120 minutes), and the emails with the reminder's and follow-up's tim
   `sendDueTicketEmails` hourly (deployed site only): reminders, follow-ups, expired holds, auto waitlists.
   Links use `SITE_URL`, else Netlify's `URL`.
 - Orders, waitlists and events' own emails aren't synced or backed up: they stay on the copy where they were made.
+
+## Members
+
+An optional feature, on under Settings > Members (`settings.site.members`, `memberSettings`,
+`src/lib/members/config.ts`, `src/admin/MemberSettings.tsx`): levels (id and name), sign-ups (`off`: admins
+add members; `approve`: visitors sign up and wait for an admin; `open`: they join at once, at
+`signupLevel`) and the message members-only things show to everyone else. Off, nobody counts as a
+member (`member_can` checks it), and the editor offers no member blocks.
+
+- A member is an auth user with a row in `members` (level, status `pending`/`active`/`suspended`,
+  `expires_on`, notes; migration `*_members.sql`); their profile stays role `viewer`, so no admin access.
+  `isActive`: active and not past its expiry. Members aren't synced or backed up (accounts are per copy);
+  the levels are, with the settings.
+- **Members only pages**: an entry's settings (Members) set `fields.access` ({ members, levels }; `access`
+  is a reserved field key), applied when it is published. RLS hides such entries from everyone but
+  members of those levels and editors (`member_can`), so their content and text can't be read through
+  the API, and lists, search and email Events blocks leave them out for others. Their address still
+  resolves: `members_entry` (security definer) gives anyone the title, excerpt, featured image, template,
+  SEO and access of a members-only entry (`Loader.lockedEntry`, `Entry.locked`), and the page renders
+  with its Page content block as a sign-in prompt (`lockedContent`, `src/render/c/members.ts`).
+- **Members only block** (`members`, a container): its blocks for members (of `attrs.levels`), editors
+  and the editor's canvas; for everyone else `attrs.message` (else the settings' message) and a sign-in
+  link, or nothing (`attrs.hide`). Its blocks are part of the page's content, which the API serves like
+  any published page: it hides them on the page, it doesn't keep them secret.
+- **Personal pages**: what depends on the viewer (a locked entry, a Members only or Member account
+  block, tickets with member prices) sets `RenderCtx.personal`. The catch-all route then doesn't cache
+  the page (`private, no-store`) and, for a visitor with a sign-in cookie, renders it again as them
+  (`asViewer`: `viewerOf` in `src/lib/members/viewer.ts` reads the session, profile and membership,
+  and the second render uses their client, so RLS shows what they may see; `RenderCtx.viewer`). Pages
+  that don't depend on the viewer render once, anonymously, and stay cached and shared. Previews
+  render as an editor.
+- **Account page** (`ACCOUNT_PATH`, `/account/`): a page with that address, else a built-in one holding
+  the **Member account** block (`member-account`): sign in, forgot password and (when sign-ups are on)
+  create an account; signed in, the member's name, level, status and expiry, change password and sign out.
+  Endpoints in `src/pages/api/members/`: `login` (back to a `next` path on the site), `signup` (an auth
+  account and a membership, emailing the site's admin address), `logout`, `forgot` and `password`;
+  `session` stores an invitation link's session (from the address's fragment, by
+  `public/assets/js/member-account.js`); `me` answers the **Member sign-in link** block (`member-link`),
+  whose label `public/assets/js/member-link.js` switches in the browser, so pages with it stay cached. Links
+  in members' emails (confirm an address, reset a password) bring a `code` the route exchanges on
+  `/account/`, so Supabase Auth's redirect URLs must include the site.
+- **Members screen** (`/admin/members/`, admins; `POST /api/admin/members`): members by status (waiting
+  for approval first), each one's name, level, status, expiry and notes; Approve, Send password link,
+  Remove (the membership, and the account unless it edits the site), and Add a member (an existing
+  account joins; a new address is invited to set a password on the account page). The Users screen
+  leaves members out.
+- **Tickets**: a ticket type can have members' prices by level (`memberPrices`, in cents) and be for
+  members only (`membersOnly`, of `levels`; none: any level), set in the event's Tickets settings
+  (`MemberPricing`, `src/puck/TicketsForm.tsx`). `priceFor` and `mayBuy` (`src/lib/tickets/config.ts`)
+  decide; the form shows a member their price ("Member price") and everyone else what members pay and
+  a sign-in link, and members-only types as "Members only". The checkout reads the buyer's session and
+  charges the same way (`startCheckout`'s `member`; a members-only ticket without a membership goes
+  back with `members-only`), and the order records `member_id`.
 
 ## Editor
 

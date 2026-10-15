@@ -19,6 +19,8 @@ In the event's settings, under Tickets (stored in `fields.tickets`, `src/lib/tic
 - **Capacity**: all types together. A recurring event sells each date separately, with the same capacity
   for each.
 - **Waitlist**: off; on, emailing people as tickets free up; or on, notified by hand from the attendee list.
+- **Members** (when Members is on): a price per membership level, and members-only types. See
+  [Members](../members/).
 - **Buyers are asked**: name and email always; phone (optional or required); address (for paid orders,
   or always); and questions of your own (short or long text, a choice, a checkbox, a number).
 

@@ -34,7 +34,9 @@ async function render(db: any, id: number, origin: string, override?: { content?
     if (e.type === 'event' && form.event_start) Object.assign(e, eventDates(form, e.fields));
   }
   const path = settings.site?.front_page_id === e.id ? '/' : permalink(e);
-  const { status, html } = await renderRequest(new URL(path, origin), db, undefined, { entry: e, template: override?.template });
+  // Shown as an editor sees the site: members-only pages and blocks included.
+  const viewer = { id: '', email: '', name: '', editor: true, member: null };
+  const { status, html } = await renderRequest(new URL(path, origin), db, undefined, { entry: e, template: override?.template }, viewer);
   const live = base.status === 'publish';
   const bar =
     `<div style="position:sticky;top:0;z-index:100000;display:flex;gap:1rem;align-items:center;justify-content:center;padding:.5rem 1rem;background:#b87333;color:#fff;font:600 13px/1.4 system-ui,sans-serif">` +

@@ -116,6 +116,18 @@ export class Loader {
     return this.entries.get((data as any).id)!;
   }
 
+  /**
+   * A members-only entry this client may not read (RLS hides it): what anyone may know of it, for its
+   * page's sign-in prompt (members_entry). Null when there is no such entry.
+   */
+  async lockedEntry(types: string[], slug: string): Promise<Entry | null> {
+    const { data, error } = await this.db.rpc('members_entry', { p_types: types, p_slug: slug });
+    if (error || !data) return null;
+    const e = { ...(data as Entry), content: null, event_start: null, event_end: null, event_all_day: null, term_ids: [], locked: true };
+    this.entries.set(e.id, e);
+    return e;
+  }
+
   async entryById(id: number, withContent = true): Promise<Entry | null> {
     const cached = this.entries.get(id);
     if (cached && (!withContent || cached.content !== undefined)) return cached;

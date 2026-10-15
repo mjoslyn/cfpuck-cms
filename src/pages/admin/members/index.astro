@@ -1,0 +1,148 @@
+---
+// Members (admins; Settings > Members turns them on): everyone with a membership, by status, with their
+// level, expiry and notes to change; sign-ups waiting for approval first. Actions post to /api/admin/members.
+import Admin from '../../../layouts/Admin.astro';
+import { SITE_TZ } from '../../../lib/site';
+import { serviceClient } from '../../../lib/supabase';
+import { isActive, memberSettings, type MemberRow } from '../../../lib/members/config';
+
+const db = Astro.locals.db;
+const { data: siteRow } = await db.from('settings').select('value').eq('key', 'site').maybeSingle();
+const settings = memberSettings(siteRow?.value);
+const { data: rows } = await db.from('members').select('*').order('created_at', { ascending: false });
+const all = (rows ?? []) as MemberRow[];
+// Sign-in times come from Supabase Auth (service key; this page is admins only).
+const { data: list } = await serviceClient().auth.admin.listUsers({ perPage: 1000 });
+const auth = new Map((list?.users ?? []).map((u) => [u.id, u]));
+
+const state = (m: MemberRow) => (m.status === 'active' && !isActive(m) ? 'expired' : m.status);
+const TABS: [string, string][] = [['all', 'All'], ['pending', 'Waiting for approval'], ['active', 'Active'], ['expired', 'Expired'], ['suspended', 'Suspended']];
+const tab = TABS.some(([k]) => k === Astro.url.searchParams.get('status')) ? Astro.url.searchParams.get('status')! : 'all';
+const q = (Astro.url.searchParams.get('q') ?? '').trim().toLowerCase();
+const count = (k: string) => (k === 'all' ? all.length : all.filter((m) => state(m) === k).length);
+const shown = all
+  .filter((m) => tab === 'all' || state(m) === tab)
+  .filter((m) => !q || `${m.name} ${m.email}`.toLowerCase().includes(q))
+  .sort((a, b) => Number(b.status === 'pending') - Number(a.status === 'pending'));
+const ret = new URLSearchParams({ ...(tab !== 'all' ? { status: tab } : {}), ...(q ? { q } : {}) }).toString();
+const ok = Astro.url.searchParams.get('ok');
+const error = Astro.url.searchParams.get('error');
+const when = (s?: string | null) => (s ? new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: SITE_TZ }) : '');
+const levelName = (id: string) => settings.levels.find((l) => l.id === id)?.name ?? (id || 'No level');
+const input = 'rounded border border-admin-ink/15 bg-white px-2 py-1 text-sm outline-none focus:border-admin-accent';
+const STATUS_LABELS: Record<string, string> = { pending: 'Waiting', active: 'Active', suspended: 'Suspended' };
+---
+<Admin title="Members">
+  <div class="flex flex-wrap items-end justify-between gap-6">
+    <div>
+      <h1 class="text-3xl font-normal">Members</h1>
+      <p class="mt-1 text-sm text-admin-muted">
+        {settings.enabled ? 'People with a membership: they see members-only pages and blocks, and pay member prices for tickets.' : 'Members is off: turn it on under Settings > Members.'}
+        {' '}Levels and sign-ups are under <a class="underline" href="/admin/settings/#members">Settings &gt; Members</a>.
+      </p>
+    </div>
+  </div>
+  {ok && <p class="mt-4 rounded bg-[#6db56d]/15 px-3 py-2 text-sm text-[#3f7a3f]">{ok}</p>}
+  {error && <p class="mt-4 rounded bg-[#c4592a]/10 px-3 py-2 text-sm text-[#c4592a]">{error}</p>}
+
+  <details class="mt-6 rounded bg-white p-4 shadow-[0_0_0_1px_rgba(26,26,46,0.08)]" open={!all.length}>
+    <summary class="cursor-pointer text-sm font-semibold">Add a member</summary>
+    <form method="post" action="/api/admin/members" class="mt-3 flex flex-wrap items-end gap-3">
+      <input type="hidden" name="action" value="add" />
+      <label class="text-xs text-admin-muted">Email<br /><input name="email" type="email" required class={`${input} w-64`} /></label>
+      <label class="text-xs text-admin-muted">Name<br /><input name="name" class={`${input} w-48`} /></label>
+      <label class="text-xs text-admin-muted">Level<br />
+        <select name="level" class={input}>{settings.levels.map((l) => <option value={l.id}>{l.name}</option>)}{!settings.levels.length && <option value="">No levels yet</option>}</select>
+      </label>
+      <label class="text-xs text-admin-muted">Expires (empty: never)<br /><input name="expires_on" type="date" class={input} /></label>
+      <button class="rounded-sm bg-admin-ink px-4 py-2 text-xs font-semibold tracking-wider text-white uppercase hover:bg-admin-accent">Add</button>
+    </form>
+    <p class="mt-2 text-xs text-admin-muted">Someone without an account gets an invitation to set a password on the site's account page; someone with one becomes a member at once.</p>
+  </details>
+
+  <div class="mt-6 flex flex-wrap items-center gap-4">
+    <nav class="flex flex-wrap gap-1 text-sm" aria-label="Status">
+      {TABS.map(([k, label]) => (
+        <a href={`/admin/members/${k === 'all' ? '' : `?status=${k}`}`} class={`rounded px-3 py-1 ${tab === k ? 'bg-admin-ink text-white' : 'hover:bg-admin-soft'}`} aria-current={tab === k ? 'page' : undefined}>{label} ({count(k)})</a>
+      ))}
+    </nav>
+    <form method="get" class="ml-auto flex gap-2">
+      {tab !== 'all' && <input type="hidden" name="status" value={tab} />}
+      <input name="q" value={q} type="search" placeholder="Search names and emails" class={`${input} w-64`} />
+    </form>
+  </div>
+
+  <table class="mt-4 w-full border-collapse overflow-hidden rounded bg-white text-sm shadow-[0_0_0_1px_rgba(26,26,46,0.08)]">
+    <thead class="bg-admin-soft text-left text-xs tracking-wider text-admin-muted uppercase">
+      <tr>
+        <th class="px-4 py-2.5 font-semibold">Member</th>
+        <th class="px-4 py-2.5 font-semibold">Membership</th>
+        <th class="px-4 py-2.5 font-semibold">Signed in</th>
+        <th class="px-4 py-2.5 font-semibold"><span class="sr-only">Actions</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      {shown.map((m) => {
+        const u = auth.get(m.user_id);
+        const form = `member-${m.user_id}`;
+        return (
+          <tr class="border-t border-admin-ink/5 align-top">
+            <td class="px-4 py-2.5">
+              <input form={form} name="name" value={m.name} aria-label={`Name of ${m.email}`} class={`${input} mb-1 w-56`} />
+              <div class="text-xs text-admin-muted">{m.email}</div>
+              <div class="text-xs text-admin-muted">Joined {when(m.created_at)}</div>
+            </td>
+            <td class="px-4 py-2.5">
+              <div class="flex flex-wrap gap-2">
+                <select form={form} name="level" aria-label={`Level of ${m.email}`} class={input}>
+                  {!settings.levels.some((l) => l.id === m.level) && <option value="" selected>{levelName(m.level)}</option>}
+                  {settings.levels.map((l) => <option value={l.id} selected={l.id === m.level}>{l.name}</option>)}
+                </select>
+                <select form={form} name="status" aria-label={`Status of ${m.email}`} class={input}>
+                  {Object.entries(STATUS_LABELS).map(([k, label]) => <option value={k} selected={k === m.status}>{label}</option>)}
+                </select>
+                <input form={form} name="expires_on" type="date" value={m.expires_on ?? ''} aria-label={`Expiry of ${m.email}`} class={input} />
+              </div>
+              {state(m) === 'expired' && <div class="mt-1 text-xs text-[#c4592a]">Expired {when(`${m.expires_on}T12:00:00Z`)}</div>}
+              <textarea form={form} name="notes" rows="1" placeholder="Notes" aria-label={`Notes on ${m.email}`} class={`${input} mt-2 w-full`}>{m.notes}</textarea>
+            </td>
+            <td class="px-4 py-2.5 text-admin-muted">{u?.last_sign_in_at ? when(u.last_sign_in_at) : u?.invited_at ? 'Invited, not signed in yet' : 'Not yet'}</td>
+            <td class="px-4 py-2.5 whitespace-nowrap">
+              <form id={form} method="post" action="/api/admin/members" class="inline">
+                <input type="hidden" name="action" value="update" />
+                <input type="hidden" name="id" value={m.user_id} />
+                <input type="hidden" name="return" value={ret} />
+                <button class="rounded-sm bg-admin-ink px-3 py-1 text-xs font-semibold text-white hover:bg-admin-accent">Save</button>
+              </form>
+              {m.status === 'pending' && (
+                <form method="post" action="/api/admin/members" class="ml-1 inline">
+                  <input type="hidden" name="action" value="approve" />
+                  <input type="hidden" name="id" value={m.user_id} />
+                  <input type="hidden" name="return" value={ret} />
+                  <button class="rounded-sm border border-admin-accent px-3 py-1 text-xs font-semibold text-admin-accent hover:bg-admin-accent hover:text-white">Approve</button>
+                </form>
+              )}
+              <div class="mt-2 flex gap-3 text-xs">
+                <form method="post" action="/api/admin/members">
+                  <input type="hidden" name="action" value="reset" />
+                  <input type="hidden" name="id" value={m.user_id} />
+                  <input type="hidden" name="return" value={ret} />
+                  <button class="underline hover:text-admin-accent">Send password link</button>
+                </form>
+                <form method="post" action="/api/admin/members" onsubmit={`return confirm(${JSON.stringify(`Remove ${m.email}? Their membership goes, and their account unless they edit the site.`)})`}>
+                  <input type="hidden" name="action" value="remove" />
+                  <input type="hidden" name="id" value={m.user_id} />
+                  <input type="hidden" name="return" value={ret} />
+                  <button class="text-[#c4592a] underline">Remove</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        );
+      })}
+      {!shown.length && (
+        <tr><td colspan="4" class="px-4 py-6 text-center text-admin-muted">{all.length ? 'No members match.' : 'No members yet.'}</td></tr>
+      )}
+    </tbody>
+  </table>
+</Admin>

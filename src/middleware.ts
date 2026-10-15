@@ -6,7 +6,7 @@ import { refreshSiteTimezone } from './lib/site/timezone';
 import { changesPages, PAGE_CACHE_TAG } from './lib/cache';
 
 const PUBLIC_ADMIN = ['/admin/login/', '/admin/set-password/', '/api/auth/login', '/api/auth/logout'];
-const ADMIN_ONLY = ['/admin/settings', '/admin/users', '/api/admin/redirects', '/api/admin/settings', '/api/admin/sync', '/api/admin/users'];
+const ADMIN_ONLY = ['/admin/settings', '/admin/users', '/admin/members', '/api/admin/redirects', '/api/admin/settings', '/api/admin/sync', '/api/admin/users', '/api/admin/members'];
 
 export const onRequest = defineMiddleware(async (context, next) => {
   await refreshSiteTimezone();

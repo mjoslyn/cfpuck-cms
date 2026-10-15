@@ -5,6 +5,7 @@
 import type { EmailDoc } from '../forms/email';
 import type { PaymentProvider } from '../payments';
 import { CURRENCIES as PAYMENT_CURRENCIES, formatMoney } from '../payments/money';
+import { isActive, type MemberRow } from '../members/config';
 
 /** A kind of ticket ("Adult", "Child", "VIP"). Prices are in the currency's smallest unit (cents). */
 export interface TicketType {
@@ -21,6 +22,11 @@ export interface TicketType {
   salesEnd?: string;
   /** Kept for past orders, no longer offered. */
   hidden?: boolean;
+  /** Members' prices by level id, in cents (Members, src/lib/members/); a level without one pays `price`. */
+  memberPrices?: Record<string, number>;
+  /** Only members may buy it: of `levels`, or any level when none. */
+  membersOnly?: boolean;
+  levels?: string[];
 }
 
 /** One of an event's own questions, asked once per order. */
@@ -195,6 +201,22 @@ const num = (v: unknown): number | null => (v === '' || v == null || Number.isNa
 const str = (v: unknown, max = 500) => (typeof v === 'string' ? v.slice(0, max) : '');
 const localTime = (v: unknown) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(v) ? v : undefined);
 
+function memberPricesOf(v: unknown): Record<string, number> | undefined {
+  if (!v || typeof v !== 'object') return undefined;
+  const out = Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, p]) => [k.slice(0, 40), num(p)]).filter(([, p]) => p != null)) as Record<string, number>;
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** What a ticket costs a buyer: their level's member price, else its price. */
+export const priceFor = (t: TicketType, member: MemberRow | null | undefined) => (isActive(member) && t.memberPrices?.[member.level] != null ? t.memberPrices[member.level] : t.price);
+
+/** Whether a buyer may buy a ticket: anyone, or for a members-only one an active member of its levels. */
+export const mayBuy = (t: TicketType, member: MemberRow | null | undefined) =>
+  !t.membersOnly || (isActive(member) && (!t.levels?.length || t.levels.includes(member.level)));
+
+/** Whether an event's tickets depend on who buys them (member prices, members-only types). */
+export const forMembers = (t: EventTickets) => t.types.some((x) => x.membersOnly || (x.memberPrices && Object.keys(x.memberPrices).length));
+
 /** An event's tickets as stored, cleaned up (anything missing takes its default). */
 export function ticketsOf(fields: Record<string, any> | null | undefined): EventTickets {
   const t = fields?.[TICKETS_KEY];
@@ -211,6 +233,9 @@ export function ticketsOf(fields: Record<string, any> | null | undefined): Event
       salesStart: localTime(x.salesStart),
       salesEnd: localTime(x.salesEnd),
       hidden: x.hidden === true || undefined,
+      memberPrices: memberPricesOf(x.memberPrices),
+      membersOnly: x.membersOnly === true || undefined,
+      levels: Array.isArray(x.levels) ? x.levels.filter((l: unknown) => typeof l === 'string' && l).slice(0, 50) : undefined,
     }));
   const questions: TicketQuestion[] = (Array.isArray(t.questions) ? t.questions : [])
     .filter((q: any) => q && typeof q.id === 'string' && q.id && str(q.label))
@@ -344,4 +369,5 @@ export const CHECKOUT_MESSAGES: Record<string, string> = {
   cancelled: 'Your payment was cancelled and nothing was charged. You can try again below.',
   expired: 'Your order expired before it was paid. Please start again.',
   waitlisted: "You're on the waitlist. We'll email you if tickets become available.",
+  'members-only': 'Some of those tickets are for members. Sign in to buy them.',
 };

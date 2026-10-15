@@ -19,6 +19,7 @@ import { listingImageId, termImageId } from '../../lib/page-meta';
 import { ARCHIVE_PATHS, typeDef } from '../../lib/site';
 import type { Env } from '../env';
 import type { Term } from '../../lib/types';
+import { lockedContent } from './members';
 
 const esc = (s: unknown) => String(s ?? '').replace(/&(?!(?:#\d+|#x[0-9a-f]+|[a-z][a-z0-9]*);)/gi, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -178,6 +179,8 @@ export const entryContent: Renderer = (b, env) => {
   const a = b.attrs;
   const area = areaName(a.area);
   const editing = env.contentSlot && post.id === ctx.queried.entry?.id;
+  // A members-only page the viewer may not see: the sign-in prompt in its place.
+  if (post.locked && !editing) return `<div ${root(a, ['c-entry-content'])}>${lockedContent(env, post)}</div>`;
   // In the editor each area is a drop zone (the marker says which); on the site, the area's blocks.
   const inner = editing
     ? env.contentSlot!.replace('<cms-content>', `<cms-content data-area="${area}">`)

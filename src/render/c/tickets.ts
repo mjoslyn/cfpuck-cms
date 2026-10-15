@@ -12,6 +12,7 @@ import type { Entry } from '../../lib/types';
 import { defaultHorizon, expandEntry, recurrenceOf } from '../../lib/recurrence';
 import { permalink } from '../../lib/permalink';
 import { eventTimes, eventWhen } from '../../lib/events/model';
+import { ACCOUNT_PATH, isActive, memberSettings } from '../../lib/members/config';
 import { esc } from '../html';
 import { SITE_TZ } from '../../lib/site';
 import {
@@ -23,6 +24,9 @@ import {
   offSale,
   offeredTypes,
   remaining,
+  forMembers,
+  mayBuy,
+  priceFor,
   ticketSettings,
   ticketsOf,
   type EventTickets,
@@ -126,7 +130,10 @@ export async function prepareTicketsBlock(ctx: RenderCtx, blockId: string, attrs
 
 /** Loads what's taken and the buyer's order (for the Tickets and Event details blocks). */
 export async function prepareTickets(ctx: RenderCtx, target = pageEvent(ctx)) {
-  if (!target || !ticketsOf(target.e.fields).enabled) return;
+  const tickets = target ? ticketsOf(target.e.fields) : null;
+  if (!target || !tickets?.enabled) return;
+  // Member prices and members-only tickets depend on who is buying.
+  if (forMembers(tickets) && memberSettings(ctx.settings.site).enabled) ctx.personal = true;
   const { id, occurrence } = target;
   const key = dataKey(target);
   if (ctx.data.has(key) || id <= 0) return;
@@ -285,6 +292,11 @@ export function ticketsSection(env: Env, heading?: string, target = pageEvent(en
     return close(`<p class="c-tickets__note">${next ? `Tickets go on sale ${esc(when(next))}.` : 'Ticket sales for this event have closed.'}</p>`);
   }
   const soldOut = open.every((x) => left.types[x.id] === 0);
+  // Member prices and members-only tickets: the buyer's membership (RenderCtx.viewer; none when Members is off).
+  const member = env.ctx.viewer?.member ?? null;
+  const members = memberSettings(env.ctx.settings.site);
+  const buyable = open.filter((x) => mayBuy(x, member));
+  const signIn = members.enabled ? ` <a href="${esc(`${ACCOUNT_PATH}?next=${encodeURIComponent(env.ctx.queried.url.pathname)}`)}">Sign in</a>` : '';
   if (soldOut) return close(`<p class="c-tickets__note is-sold-out">Sold out.</p>${t.waitlist !== 'off' ? waitlistForm(t, id, occurrence, uid, pageInput) : ''}`);
 
   const rows = types
@@ -292,17 +304,29 @@ export function ticketsSection(env: Env, heading?: string, target = pageEvent(en
       const own = left.types[x.id];
       const off = offSale(x, now);
       const max = Math.min(maxFor(x, t), own ?? Infinity);
+      const price = priceFor(x, member);
       const pick =
         off === 'not-yet' ? `<span class="c-tickets__state">On sale ${esc(when(x.salesStart!))}</span>`
         : off === 'ended' ? '<span class="c-tickets__state">Sales ended</span>'
         : own === 0 ? '<span class="c-tickets__state">Sold out</span>'
-        : `<label class="c-sr-only" for="${uid}-q-${esc(x.id)}">${esc(x.name)}: how many</label><select class="c-input c-tickets__select" id="${uid}-q-${esc(x.id)}" name="q[${esc(x.id)}]" data-price="${x.price}">${Array.from({ length: max + 1 }, (_, i) => `<option value="${i}"${i === 1 && open.length === 1 ? ' selected' : ''}>${i}</option>`).join('')}</select>`;
+        : !mayBuy(x, member) ? `<span class="c-tickets__state">Members only</span>`
+        : `<label class="c-sr-only" for="${uid}-q-${esc(x.id)}">${esc(x.name)}: how many</label><select class="c-input c-tickets__select" id="${uid}-q-${esc(x.id)}" name="q[${esc(x.id)}]" data-price="${price}">${Array.from({ length: max + 1 }, (_, i) => `<option value="${i}"${i === 1 && buyable.length === 1 ? ' selected' : ''}>${i}</option>`).join('')}</select>`;
       const few = own != null && own > 0 && own <= 10 && !off ? `<p class="c-tickets__left">${own} left</p>` : '';
-      return `<li class="c-tickets__type" data-type="${esc(x.id)}"><div class="c-tickets__info"><p class="c-tickets__name">${esc(x.name)}</p>${x.description ? `<p class="c-tickets__desc">${esc(x.description)}</p>` : ''}${few}</div><p class="c-tickets__price">${esc(money(x.price, currency))}</p><div class="c-tickets__qty">${pick}</div></li>`;
+      // A member's own price, or what members pay (the lowest of their prices) for everyone else.
+      const memberPrices = Object.entries(x.memberPrices ?? {}).filter(([level]) => members.levels.some((l) => l.id === level)).map(([, p]) => p);
+      const memberNote = !members.enabled ? ''
+        : price !== x.price ? '<span class="c-tickets__member">Member price</span>'
+        : !isActive(member) && memberPrices.length && Math.min(...memberPrices) < x.price ? `<span class="c-tickets__member">Members: ${esc(money(Math.min(...memberPrices), currency))}</span>`
+        : '';
+      return `<li class="c-tickets__type" data-type="${esc(x.id)}"><div class="c-tickets__info"><p class="c-tickets__name">${esc(x.name)}</p>${x.description ? `<p class="c-tickets__desc">${esc(x.description)}</p>` : ''}${few}</div><p class="c-tickets__price">${esc(money(price, currency))}${memberNote}</p><div class="c-tickets__qty">${pick}</div></li>`;
     })
     .join('');
-  const anyPaid = open.some((x) => x.price > 0);
+  // Every ticket on sale is for members: the list, and how to sign in.
+  if (!buyable.length) return close(`<ul class="c-tickets__types">${rows}</ul><p class="c-tickets__note">These tickets are for members.${isActive(member) ? ' Your membership doesn’t include them.' : signIn}</p>`);
+  const anyPaid = buyable.some((x) => priceFor(x, member) > 0);
+  const membersNote = buyable.length < open.length && !isActive(member) && signIn ? `<p class="c-tickets__note">Members: ${signIn.trim()} for members’ tickets and prices.</p>` : '';
   return close(
+    membersNote +
     `<div class="c-form c-tickets__buy"><form class="c-form__form c-tickets__form" method="post" action="/api/tickets/checkout" data-tickets data-event="${id}" data-date="${esc(occurrence)}" data-currency="${esc(currency)}" data-max="${t.maxPerOrder || DEFAULT_MAX_PER_ORDER}">` +
       `<input type="hidden" name="event" value="${id}" /><input type="hidden" name="occurrence" value="${esc(occurrence)}" />${pageInput}` +
       `<ul class="c-tickets__types">${rows}</ul>` +

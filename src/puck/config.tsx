@@ -3,6 +3,7 @@ import type { Config, Fields } from '@puckeditor/core';
 import { BlockView } from './BlockView';
 import { JsonAttrs, Row, Select, Text, Toggle, inputClass, type Attrs } from './fields';
 import { EntryField } from './entry-fields';
+import { MembersPanel } from './MembersPanel';
 import { SITE_BLOCKS } from '../lib/site/render';
 import { taxonomiesOf } from '../lib/site';
 import { SITE_EDITOR } from '../lib/site/editor';
@@ -45,6 +46,17 @@ Object.assign(PANELS, {
       )}
       <Text title="Heading" value={a.heading} placeholder="Tickets (or the event's own)" onChange={(v) => set({ heading: v || undefined })} />
       <p className="mb-2 text-xs text-admin-muted">The event's ticket types, prices and questions are in its settings, under Tickets. On an event's page the Event details block shows them on its own, unless a Tickets block for that event is on the page.</p>
+    </>
+  ),
+  members: (a: Attrs, set: (p: Attrs) => void) => <MembersPanel a={a} set={set} />,
+  'member-account': () => (
+    <p className="mb-2 text-xs text-admin-muted">Signing in, creating an account (when Settings &gt; Members allows it) and resetting a password; signed in, the member's details and Sign out. The site's /account/ page shows it on its own; a page with that address needs this block.</p>
+  ),
+  'member-link': (a: Attrs, set: (p: Attrs) => void) => (
+    <>
+      <Text title="Label" value={a.label} placeholder="Sign in" onChange={(v) => set({ label: v || undefined })} />
+      <Text title="Label when signed in" value={a.signedInLabel} placeholder="My account" onChange={(v) => set({ signedInLabel: v || undefined })} />
+      <p className="mb-2 text-xs text-admin-muted">Links to the account page. Pages with it stay cached; the label changes in the visitor's browser.</p>
     </>
   ),
   'form': (a: Attrs, set: (p: Attrs) => void) => (
@@ -133,13 +145,16 @@ const LABELS: Record<string, string> = {
   'form': 'Form',
   'event-details': 'Event details',
   tickets: 'Tickets',
+  members: 'Members only',
+  'member-account': 'Member account',
+  'member-link': 'Member sign-in link',
   'events-calendar': 'Events page (list, month, day)',
   'event-calendar': 'Events calendar',
 };
 const label = (type: string) => LABELS[type] ?? type.replace(/-/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
 
 /** Blocks whose children are edited in place (a slot). */
-const CONTAINERS = new Set([...CONTENT_CONTAINERS, 'pattern']);
+const CONTAINERS = new Set([...CONTENT_CONTAINERS, 'pattern', 'members']);
 
 function AttrsPanel({ type, value, onChange }: { type: string; value: Attrs; onChange: (v: Attrs) => void }) {
   const a = value ?? {};
@@ -171,7 +186,7 @@ const APPLIES_TO: Record<string, string[]> = {
  * The editor's blocks. With `entryType` (editing an entry), the block list leaves out blocks that don't
  * apply to that type; they stay defined, so any already on the page still show and can be edited.
  */
-export function buildConfig(types: string[], entryType?: string): Config {
+export function buildConfig(types: string[], entryType?: string, opts: { members?: boolean } = {}): Config {
   const applies = (t: string) => !entryType || !APPLIES_TO[t] || APPLIES_TO[t].includes(entryType);
   const offered = (cats: Record<string, { title?: string; components?: string[]; visible?: boolean }>) =>
     Object.fromEntries(Object.entries(cats).map(([k, c]) => [k, c.components ? { ...c, components: c.components.filter(applies) } : c]));
@@ -208,6 +223,8 @@ export function buildConfig(types: string[], entryType?: string): Config {
       card: { title: 'Card fields', components: withSite('card', ['entry-title', 'entry-image', 'entry-excerpt', 'entry-date', 'event-date', 'entry-terms', 'entry-field']) },
       sections: { title: 'Sections', components: withSite('sections', ['hero', 'form']) },
       site: { title: 'Site', components: withSite('site', ['event-details', 'event-schedule', 'tickets']) },
+      // Offered while Members is on (Settings > Members); blocks already placed stay editable.
+      ...(opts.members ? { members: { title: 'Members', components: ['members', 'member-account', 'member-link'] } } : {}),
       advanced: { title: 'Advanced', components: withSite('advanced', ['html', 'part', 'entry-content']) },
       // Collection internals (items, empty state, pagination) are managed from the collection's settings.
       other: { visible: false },
@@ -220,6 +237,7 @@ export const EDITABLE_TYPES = [
   ...Object.keys(CONTENT_PANELS),
   'collection',
   'event-date', 'event-details', 'event-schedule', 'tickets', 'events-calendar', 'event-calendar',
+  'members', 'member-account', 'member-link',
   'entry-field', 'form', 'pattern',
   ...Object.keys(SITE_BLOCKS),
 ];

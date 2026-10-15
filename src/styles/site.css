@@ -10,6 +10,7 @@
 @import '../site/styles/theme.css'; /* the site's theme (src/site/styles) */
 @import './forms.css';
 @import './events.css';
+@import './members.css';
 
 @source '../render';
 @source '../lib/forms';

@@ -7,7 +7,11 @@ import { serviceClient } from '../../../lib/supabase';
 const { data: list } = await serviceClient().auth.admin.listUsers({ perPage: 1000 });
 const { data: profiles } = await serviceClient().from('profiles').select('id, role, display_name');
 const byId = new Map((profiles ?? []).map((p) => [p.id, p]));
+// Members are on the Members screen, unless they also edit the site.
+const { data: memberRows } = await serviceClient().from('members').select('user_id');
+const members = new Set((memberRows ?? []).map((m) => m.user_id));
 const users = (list?.users ?? [])
+  .filter((u) => !members.has(u.id) || ['editor', 'admin'].includes(byId.get(u.id)?.role ?? ''))
   .map((u) => ({ id: u.id, email: u.email ?? '', name: byId.get(u.id)?.display_name ?? '', role: byId.get(u.id)?.role ?? 'viewer', lastSignIn: u.last_sign_in_at, invited: !u.last_sign_in_at && !!u.invited_at }))
   .sort((a, b) => (a.role === b.role ? a.email.localeCompare(b.email) : ['admin', 'editor', 'viewer'].indexOf(a.role) - ['admin', 'editor', 'viewer'].indexOf(b.role)));
 const me = Astro.locals.user.id;

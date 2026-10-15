@@ -1,6 +1,7 @@
 import type { Loader, QueryResult } from '../lib/data';
 import type { Entry, Term } from '../lib/types';
 import type { PuckItem } from '../lib/puck/types';
+import type { Viewer } from '../lib/members/config';
 
 /** What this request asks for: an entry, a listing (archive or term), search results or nothing (404). */
 export interface Queried {
@@ -39,6 +40,11 @@ export interface RenderCtx {
   headScripts?: string[];
   /** Rendering inside the visual editor (show placeholders for unconfigured blocks). */
   editor?: boolean;
+  /** Who is viewing (src/lib/members/viewer.ts): set only when the page is rendered again for a signed-in visitor. */
+  viewer?: Viewer | null;
+  /** The page depends on who views it (members-only content, member prices, the account page): it is
+   *  never cached, and is rendered again for a signed-in visitor. Set by prepare. */
+  personal?: boolean;
 }
 
 export interface QueryEnv {

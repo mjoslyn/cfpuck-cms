@@ -1,0 +1,85 @@
+/* Members (src/render/c/members.ts): the Members only block, the sign-in prompt, the account page and the
+   member link. Role tokens only. */
+.c-members.is-editing {
+  position: relative;
+  padding: 0.75rem;
+  outline: 1px dashed var(--color-muted);
+  outline-offset: 2px;
+}
+.c-members__label {
+  margin: 0 0 0.5rem;
+  color: var(--color-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.c-members-prompt {
+  padding: 1.25rem 1.5rem;
+  border-left: 3px solid var(--color-accent);
+  background: var(--color-surface-soft);
+  color: var(--color-text);
+}
+.c-members-prompt p {
+  margin: 0;
+}
+.c-members-prompt p + p {
+  margin-top: 0.5rem;
+}
+.c-members-prompt__message {
+  font-weight: 600;
+}
+.c-members-prompt a {
+  color: var(--color-accent);
+}
+
+.c-account {
+  max-width: 34rem;
+}
+.c-account__heading {
+  margin: 0 0 1rem;
+}
+.c-account__heading:not(:first-child) {
+  margin-top: 2.5rem;
+}
+.c-account__message,
+.c-account__note {
+  margin: 0 0 1rem;
+}
+.c-account__message {
+  padding: 0.75rem 1rem;
+  border-left: 3px solid var(--color-accent);
+  background: var(--color-surface-soft);
+}
+.c-account__message.is-error {
+  border-left-color: #b42318;
+}
+.c-account__details {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.5rem 1.5rem;
+  margin: 0 0 1.5rem;
+}
+.c-account__details dt {
+  color: var(--color-muted);
+}
+.c-account__details dd {
+  margin: 0;
+}
+.c-account__more {
+  margin: 1rem 0;
+}
+.c-account__more summary {
+  cursor: pointer;
+  color: var(--color-accent);
+}
+.c-account__more[open] summary {
+  margin-bottom: 1rem;
+}
+.c-account__signout {
+  margin-top: 1.5rem;
+}
+
+.c-member-link {
+  color: inherit;
+}

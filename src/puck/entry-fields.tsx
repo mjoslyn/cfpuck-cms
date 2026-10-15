@@ -9,6 +9,8 @@ import { permalink } from '../lib/permalink';
 import { isPlaceholderSlug, slugify } from '../lib/slug';
 import { SeoForm } from './SeoForm';
 import { TicketsForm } from './TicketsForm';
+import { useMemberSettings } from './member-settings';
+import { accessOf } from '../lib/members/config';
 import { itemsText } from '../lib/seo';
 import { NO_CONTENT_WARNING, templateLabel, type TemplateInfo } from '../lib/templates';
 
@@ -267,6 +269,41 @@ export function EntriesField({ title, types, value, onChange }: { title: string;
 }
 
 
+/** Who may see the entry (fields.access), while Members is on or once set: everyone, or members (of some levels). */
+function AccessForm({ fields, onChange }: { fields: Record<string, any>; onChange: (fields: Record<string, any>) => void }) {
+  const s = useMemberSettings();
+  const a = accessOf(fields);
+  if (!s || (!s.enabled && !a.members)) return null;
+  const set = (patch: Partial<typeof a>) => {
+    const next = { ...a, ...patch };
+    const { access: _old, ...rest } = fields;
+    onChange(next.members ? { ...rest, access: { members: true, ...(next.levels.length ? { levels: next.levels } : {}) } } : rest);
+  };
+  return (
+    <details open={a.members} className="mt-4 border-t border-admin-ink/10 pt-3">
+      <summary className="mb-2 cursor-pointer text-xs font-semibold tracking-wider text-admin-muted uppercase">Members</summary>
+      <Toggle title="Members only" value={a.members} onChange={(members) => set({ members })} />
+      {a.members && s.levels.length > 1 && (
+        <fieldset className="mb-2">
+          <legend className="mb-1 text-xs text-admin-muted">Levels (none ticked: all)</legend>
+          {s.levels.map((l) => (
+            <label key={l.id} className="mr-3 inline-flex items-center gap-1 text-sm">
+              <input type="checkbox" checked={a.levels.includes(l.id)} onChange={(e) => set({ levels: e.target.checked ? [...a.levels, l.id] : a.levels.filter((x) => x !== l.id) })} />
+              {l.name}
+            </label>
+          ))}
+        </fieldset>
+      )}
+      <p className="text-xs text-admin-muted">
+        {a.members
+          ? 'Everyone else sees its title, excerpt and featured image with a sign-in link, and it is left out of lists and search for them. It applies when the page is published.'
+          : 'Only members (and editors) can see a members-only page.'}
+        {!s.enabled && ' Members is off (Settings > Members): only editors can see it now.'}
+      </p>
+    </details>
+  );
+}
+
 export interface EntryState {
   title: string;
   slug: string;
@@ -404,6 +441,7 @@ export function EntryForm({ type, value, onChange, templates, pageItems }: { typ
           <TicketsForm fields={value.fields} onChange={(fields) => set({ fields })} />
         </details>
       )}
+      {!PAGELESS_TYPES.has(type) && <AccessForm fields={value.fields} onChange={(fields) => set({ fields })} />}
       {!PAGELESS_TYPES.has(type) && (
         <details open className="mt-4 border-t border-admin-ink/10 pt-3">
           <summary className="mb-2 cursor-pointer text-xs font-semibold tracking-wider text-admin-muted uppercase">SEO</summary>

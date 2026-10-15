@@ -9,6 +9,7 @@ import { permalink } from '../permalink';
 import { typeDef } from '../site';
 import type { Entry } from '../types';
 import type { EmailDoc, EmailEvent, EmailItem } from '../forms/email';
+import { accessOf } from '../members/config';
 import { eventWhen, excerptOf, toCalEvent, venueIdOf, venueLines } from './model';
 
 /** What an Events block lists (its `query` setting). */
@@ -49,7 +50,8 @@ async function load(db: SupabaseClient, q: EmailEventsQuery, origin: string): Pr
     ...(!picked && terms.length ? { terms: { any: terms } } : {}),
     ...(!picked && q.featured ? { featuredOnly: true } : {}),
   });
-  let entries = result.ids.map((id) => loader.entries.get(id)!).filter(Boolean);
+  // Members-only events stay out of emails: they can go to anyone (the service key sees them all).
+  let entries = result.ids.map((id) => loader.entries.get(id)!).filter((e) => e && !accessOf(e.fields).members);
   if (picked) {
     const next = new Map<number, Entry>();
     for (const e of entries) if (!next.has(e.series_id ?? e.id)) next.set(e.series_id ?? e.id, e);

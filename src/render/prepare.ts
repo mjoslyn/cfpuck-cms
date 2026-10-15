@@ -234,6 +234,11 @@ async function walk(items: PuckItem[], ctx: RenderCtx, state: WalkState) {
         if (!ctx.headScripts.includes(tag)) ctx.headScripts.push(tag);
         break;
       }
+      case 'members':
+      case 'member-account':
+        // What these show depends on who is viewing.
+        ctx.personal = true;
+        break;
       case 'tickets': {
         // The Event details block leaves its event's tickets to this one.
         const target = await prepareTicketsBlock(ctx, props.id, attrs);
@@ -279,6 +284,8 @@ export async function prepare(items: PuckItem[], ctx: RenderCtx) {
   const listingImage = ctx.queried.kind === 'archive' && ctx.queried.postType ? listingImageId(ctx.settings.site, ctx.queried.postType) : undefined;
   if (listingImage) await ctx.loader.loadMedia([listingImage]);
   // Filters blocks set what the page's main query reads from the URL, so they are found first.
+  // A members-only page someone may not see: its prompt depends on who they are.
+  if (e?.locked) ctx.personal = true;
   const filters = findFilters(items);
   if (filters.length) ctx.data.set('filters', filters);
   await walk(items, ctx, state);

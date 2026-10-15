@@ -29,11 +29,14 @@ import { bodyClasses } from './body-classes';
 import { archiveTitleText as archiveTitle } from './c/collection';
 import './blocks';
 import type { FormResult } from '../lib/forms/types';
+import { ACCOUNT_PATH, memberSettings, type Viewer } from '../lib/members/config';
 
 
 export interface PageResult {
   status: number;
   html: string;
+  /** The page depends on who views it (RenderCtx.personal): not cached, rendered again for a signed-in visitor. */
+  personal?: boolean;
   /** Set when a missing URL has an obvious new home (guess404: a unique slug match). */
   location?: string;
 }
@@ -107,7 +110,7 @@ export async function resolve(url: URL, loader: Loader): Promise<Queried> {
   // Records (venues) have no page of their own: their URLs serve the front page.
   if (parts.length <= 2 && [...RECORD_TYPES].some((t) => TYPE_BASES[t] === parts[0])) return resolve(new URL('/', url), loader).then((q) => ({ ...q, url }));
   if (parts.length === 2 && BASE_TYPES[parts[0]]) {
-    const entry = await loader.entry(BASE_TYPES[parts[0]], parts[1]);
+    const entry = (await loader.entry(BASE_TYPES[parts[0]], parts[1])) ?? (await loader.lockedEntry([BASE_TYPES[parts[0]]], parts[1]));
     // A recurring series has no page of its own; send visitors to the next occurrence.
     const occurrences = entry && recurrenceOf(entry) ? expandEntry(entry, defaultHorizon(loader.now)) : null;
     if (occurrences?.length) {
@@ -125,8 +128,23 @@ export async function resolve(url: URL, loader: Loader): Promise<Queried> {
     loader.entries.set(occ.id, occ);
     return { ...base, kind: 'singular', entry: occ };
   }
-  const entry = await loader.entry(ROOT_TYPES, parts[parts.length - 1]);
-  return entry ? { ...base, kind: 'singular', entry } : base;
+  const slug = parts[parts.length - 1];
+  const entry = (await loader.entry(ROOT_TYPES, slug)) ?? (await loader.lockedEntry(ROOT_TYPES, slug));
+  if (entry) return { ...base, kind: 'singular', entry };
+  // The members' account page, unless a page has its address.
+  if (`/${parts.join('/')}/` === ACCOUNT_PATH && memberSettings(settings.site).enabled) return { ...base, kind: 'singular', entry: accountPage() };
+  return base;
+}
+
+/** The account page when no page has its address: a page holding a Member account block. */
+function accountPage(): Entry {
+  const now = new Date().toISOString();
+  return {
+    id: 0, type: 'page', slug: ACCOUNT_PATH.split('/').filter(Boolean).pop()!, title: 'Your account', title_rendered: null, excerpt: '', excerpt_rendered: null,
+    status: 'publish', template: null, parent_id: null, menu_order: 0, featured_media_id: null, fields: { seo: { noindex: true } },
+    content: { root: { props: {} }, content: [{ type: 'member-account', props: { id: 'member-account', attrs: {} } }] } as any,
+    event_start: null, event_end: null, event_all_day: null, published_at: now, updated_at: now, term_ids: [],
+  };
 }
 
 /**
@@ -204,7 +222,7 @@ export interface PreviewOverride {
   template?: PuckItem[];
 }
 
-export async function renderRequest(url: URL, db: SupabaseClient, form?: FormResult, preview?: PreviewOverride): Promise<PageResult> {
+export async function renderRequest(url: URL, db: SupabaseClient, form?: FormResult, preview?: PreviewOverride, viewer?: Viewer | null): Promise<PageResult> {
   const loader = new Loader(db);
   const settings = await loader.settings();
   const queried: Queried = preview ? { kind: 'singular', entry: preview.entry, page: 1, url, isFront: settings.site?.front_page_id === preview.entry.id } : await resolve(url, loader);
@@ -220,7 +238,9 @@ export async function renderRequest(url: URL, db: SupabaseClient, form?: FormRes
     const guess = await guess404(url, loader);
     if (guess && guess !== url.pathname) return { status: 301, html: '', location: guess };
   }
-  const ctx: RenderCtx = { loader, queried, settings, queries: new Map(), docs: new Map(), css: [], assets: new Set(), data: new Map(), scripts: [], rendered: [] };
+  // A member counts as one only while Members is on.
+  const who = viewer && !memberSettings(settings.site).enabled ? { ...viewer, member: null } : viewer;
+  const ctx: RenderCtx = { loader, queried, settings, queries: new Map(), docs: new Map(), css: [], assets: new Set(), data: new Map(), scripts: [], rendered: [], viewer: who ?? null };
 
   if (form) ctx.data.set('form-result', form);
   let template: PuckItem[] | null = preview?.template ?? null;
@@ -239,7 +259,7 @@ export async function renderRequest(url: URL, db: SupabaseClient, form?: FormRes
   // A listing page past the last one is not found (page 1 of an empty listing is fine).
   const pages = ctx.data.get('main-pages') as number | undefined;
   if (!preview && queried.kind !== 'singular' && queried.page > 1 && pages !== undefined && queried.page > pages) {
-    return renderRequest(new URL('/__not-found__/', url), db, form);
+    return renderRequest(new URL('/__not-found__/', url), db, form, undefined, viewer);
   }
 
   // Block themes run the main loop on singular requests, which drives image loading attributes.
@@ -277,5 +297,5 @@ ${scripts.join('\n')}
 </body>
 </html>
 `;
-  return { status: queried.kind === '404' ? 404 : 200, html };
+  return { status: queried.kind === '404' ? 404 : 200, html, personal: !!ctx.personal };
 }
