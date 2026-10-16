@@ -897,8 +897,8 @@ does the rest (see Database access). `scripts/copy-storage.ts` copies storage ob
 project (resumable). Editors set their password at `/admin/set-password/` (invitation and reset links
 land there; reset links with the session in the fragment, which the page hands to `/api/auth/session`, so
 they work in any browser), so Supabase Auth's Site URL and redirect URLs must include the site's domain.
-Supabase Auth's email links last as long as its Email OTP Expiration (an hour by default; 86400 seconds,
-a day, is kinder); the site's invitations last 7 days. Env:
+Supabase Auth's email links last as long as its Email OTP Expiration (an hour by default, as Supabase
+recommends); the site's invitations last 7 days. Env:
 `.env.example`.
 
 ## Commands

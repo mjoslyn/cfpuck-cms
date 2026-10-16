@@ -26,8 +26,8 @@ Under **Authentication > URL Configuration**:
 
 Invitations to editors and members are sent by the site over its SMTP settings, and their links last
 7 days. Password links (and invitations on a site without SMTP) come from Supabase Auth and last as
-long as **Authentication > Providers > Email > Email OTP Expiration**: an hour by default; `86400`
-(a day) is kinder.
+long as **Authentication > Providers > Email > Email OTP Expiration** (an hour by default, which
+Supabase recommends keeping). Set up SMTP so invitations get the longer links.
 
 :::note
 Hosted projects don't grant the API roles access to new tables the way the local stack does.
