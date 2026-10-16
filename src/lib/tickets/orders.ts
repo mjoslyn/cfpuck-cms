@@ -19,6 +19,7 @@ import { PROVIDERS, ProviderError, closeCheckout, pickProvider, providerOf, type
 import { ticketEmail, type EventView, type OrderView } from './email';
 import type { EmailPayment } from '../forms/email';
 import { formatMoney } from '../payments/money';
+import { defaultTemplate } from '../email-templates';
 
 const env = (k: string) => (import.meta.env?.[k] as string | undefined) ?? process.env[k];
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -467,7 +468,7 @@ export async function notifyWaitlist(db: SupabaseClient, ev: LoadedEvent, origin
     budget = free == null ? Infinity : free - (told ?? []).reduce((n, r) => n + r.quantity, 0);
   }
   const settings = await siteTicketSettings(db);
-  const email = emailToSend('waitlist', settings, ev.emails.waitlist);
+  const email = emailToSend('waitlist', settings, ev.emails.waitlist, await defaultTemplate(db, 'ticket:waitlist'));
   const view = eventView(ev, origin);
   const events = await emailEvents(db, email.design, origin);
   let sent = 0;
@@ -528,7 +529,7 @@ const notifyAddress = () => env('TICKETS_NOTIFY_EMAIL') || env('FORMS_ADMIN_EMAI
 async function sendOrderEmail(kind: EmailKind, o: OrderRow, ev: LoadedEvent, settings: TicketSettings, origin: string) {
   const at = ticketsAt(ev, o.page);
   const links = { order: `${origin}${at.path}?order=${o.token}${at.anchor}`, attendees: `${origin}/admin/tickets/${ev.series.id}/${o.occurrence ? `?date=${o.occurrence}` : ''}` };
-  const email = emailToSend(kind, settings, ev.emails[kind]);
+  const email = emailToSend(kind, settings, ev.emails[kind], await defaultTemplate(serviceClient(), `ticket:${kind}`));
   const mail = ticketEmail(email, orderView(o, ev.tickets), eventView(ev, origin), links, origin, await emailEvents(serviceClient(), email.design, origin));
   return kind === 'admin' ? sendMail({ to: [notifyAddress()], replyTo: o.email, ...mail }) : sendMail({ to: [o.email], ...mail });
 }

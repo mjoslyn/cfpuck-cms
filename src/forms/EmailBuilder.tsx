@@ -6,6 +6,7 @@
 // Both offer the Payment block (the payment's items, total and details; the canvas shows the kit's sample)
 // and, on a site with events, the Events block (upcoming or picked events; the canvas shows the real ones).
 // Mailing's kit (src/admin/mailing-email.ts) offers the Entries block: the site's latest entries.
+// Templates (src/forms/EmailTemplates.tsx): saved designs of the kit's kind to start from, and defaults.
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Puck, type Config, type Data } from '@puckeditor/core';
 import '@puckeditor/core/no-external.css'; // without its Inter webfont: the admin uses the system font
@@ -15,6 +16,8 @@ import { MergeTags, RichMessage } from './rich-message';
 import { EventsQueryField, useEmailEvents } from './email-events';
 import { useEventsOn } from '../puck/member-settings';
 import { EntriesQueryField, useEmailEntries } from '../admin/email-entries';
+import { EmailTemplates } from './EmailTemplates';
+import type { TemplateKit } from '../lib/email-templates';
 
 /** An email as it would be sent, for the Preview tab. */
 export interface RenderedEmail {
@@ -38,6 +41,8 @@ export interface EmailKit {
   payment?: { note: string };
   /** The Entries block (mailing emails): the site's latest entries, filled in when the email is sent. */
   entries?: boolean;
+  /** Saved templates of this kind (the Templates panel). */
+  templates?: TemplateKit;
   /** A data block in the plain text made from the design (usually its merge tag). */
   textField: (id: string, showLabel: boolean) => string;
   preview: {
@@ -286,6 +291,9 @@ export default function EmailBuilder({ title, kit, design: start, text, note, on
   // Puck keeps its own state; it starts from the design and reports every change.
   const initial = useRef<Data>(start as unknown as Data);
   const [design, setDesign] = useState<EmailDoc>(start);
+  // Using a template starts Puck again from it.
+  const [generation, setGeneration] = useState(0);
+  const [showTemplates, setShowTemplates] = useState(false);
 
   return (
     <div className="fixed inset-0 z-[900] flex flex-col bg-white" role="dialog" aria-modal="true" aria-label={title}>
@@ -300,30 +308,52 @@ export default function EmailBuilder({ title, kit, design: start, text, note, on
         </div>
         <div className="flex items-center gap-3 py-2">
           <span className="text-xs text-admin-muted">{note}</span>
+          {kit.templates && (
+            <button type="button" className="text-xs underline hover:text-admin-accent" aria-expanded={showTemplates} onClick={() => setShowTemplates((v) => !v)}>
+              Templates
+            </button>
+          )}
           <button type="button" onClick={onClose} className="rounded-sm bg-admin-ink px-4 py-1.5 text-xs font-semibold tracking-wider text-white uppercase hover:bg-admin-accent">
             Done
           </button>
         </div>
       </div>
-      <div className="min-h-0 flex-1">
-        <div className={tab === 'visual' ? 'h-full' : 'hidden'}>
-          <KitContext.Provider value={kit}>
-            {/* Changes go to the caller as they are made, so Puck's own Publish is left out. */}
-            <Puck
-              config={config}
-              data={initial.current}
-              onChange={(d: Data) => {
-                setDesign(d as unknown as EmailDoc);
-                onChange({ design: d as unknown as EmailDoc });
-              }}
-              headerTitle={'\u200b'}
-              overrides={{ headerActions: () => <></> }}
-              viewports={EMAIL_VIEWPORTS}
-            />
-          </KitContext.Provider>
+      <div className="flex min-h-0 flex-1">
+        <div className="min-h-0 min-w-0 flex-1">
+          <div className={tab === 'visual' ? 'h-full' : 'hidden'}>
+            <KitContext.Provider value={kit}>
+              {/* Changes go to the caller as they are made, so Puck's own Publish is left out. */}
+              <Puck
+                key={generation}
+                config={config}
+                data={initial.current}
+                onChange={(d: Data) => {
+                  setDesign(d as unknown as EmailDoc);
+                  onChange({ design: d as unknown as EmailDoc });
+                }}
+                headerTitle={'\u200b'}
+                overrides={{ headerActions: () => <></> }}
+                viewports={EMAIL_VIEWPORTS}
+              />
+            </KitContext.Provider>
+          </div>
+          {tab === 'text' && <PlainText kit={kit} design={design} value={text ?? ''} onChange={(t) => onChange({ text: t || undefined })} />}
+          {tab === 'preview' && <Preview kit={kit} design={design} text={text} />}
         </div>
-        {tab === 'text' && <PlainText kit={kit} design={design} value={text ?? ''} onChange={(t) => onChange({ text: t || undefined })} />}
-        {tab === 'preview' && <Preview kit={kit} design={design} text={text} />}
+        {kit.templates && showTemplates && (
+          <EmailTemplates
+            kit={kit.templates}
+            design={design}
+            text={text}
+            onUse={(t) => {
+              initial.current = t.design as unknown as Data;
+              setDesign(t.design);
+              setGeneration((g) => g + 1);
+              onChange({ design: t.design, text: t.text || undefined });
+            }}
+            onClose={() => setShowTemplates(false)}
+          />
+        )}
       </div>
     </div>
   );

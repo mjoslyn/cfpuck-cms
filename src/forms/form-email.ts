@@ -57,6 +57,7 @@ export function formEmailKit(formId: number, form: FormDef, notification: () => 
   const json = async (r: Response) => (r.ok ? r.json() : Promise.reject(new Error(await r.text())));
   const when = (s: string) => new Date(s).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
   return {
+    templates: 'form',
     dataBlock: { label: 'Form field', options: [['all', 'All fields (a table)'], ...fieldsOf(form).map((f) => [f.id, f.label || f.id] as [string, string])] },
     tags: mergeTagOptions(form),
     canvas: canvasContext(form),

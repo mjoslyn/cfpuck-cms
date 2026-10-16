@@ -12,6 +12,7 @@ import { EMAIL_RE, audienceOf, mailingSettings, splitName, type Campaign } from 
 import { audience, sendTest, startSending } from '../../../../lib/mailing/send';
 import { mailgunStatus, tagStats } from '../../../../lib/mailing/mailgun';
 import { setPaused } from '../../../../lib/mailing/state';
+import { defaultTemplate } from '../../../../lib/email-templates';
 
 const SENDABLE = ['draft', 'review', 'paused', 'failed'];
 const text = (v: unknown, max: number) => (typeof v === 'string' ? v.slice(0, max) : '');
@@ -39,7 +40,9 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
 
   if (action === 'create') {
     const { data: lists } = await db.from('mail_lists').select('id').order('sort').limit(1);
-    const { data, error } = await db.from('campaigns').insert({ name: 'New campaign', subject: '', design: STARTER_DESIGN, list_ids: lists?.length ? [lists[0].id] : [], track_links: settings.trackLinks !== false, utm: !!settings.utm, created_by: locals.user!.id }).select('id').single();
+    // The default template for campaigns (Templates in the email builder), else the starter.
+    const tpl = await defaultTemplate(db, 'campaign');
+    const { data, error } = await db.from('campaigns').insert({ name: 'New campaign', subject: '', design: tpl?.design ?? STARTER_DESIGN, ...(tpl?.text ? { text: tpl.text } : {}), list_ids: lists?.length ? [lists[0].id] : [], track_links: settings.trackLinks !== false, utm: !!settings.utm, created_by: locals.user!.id }).select('id').single();
     if (error) return fail(error.message);
     return isForm ? redirect(`/admin/mailing-lists/campaigns/${data.id}/`, 303) : Response.json({ id: data.id });
   }

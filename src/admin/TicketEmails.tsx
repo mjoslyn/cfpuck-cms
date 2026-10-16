@@ -52,7 +52,7 @@ export default function TicketEmails({ eventId, eventTitle, own, site }: { event
             label={label}
             help={HELP[kind]}
             value={e}
-            start={siteEmail?.design ?? DEFAULT_EMAILS[kind].design}
+            start={siteEmail?.design}
             subjectPlaceholder={siteEmail?.subject || DEFAULT_EMAILS[kind].subject}
             eventTitle={eventTitle}
             note="Saved for this event when you press Done."

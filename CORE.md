@@ -438,6 +438,13 @@ the canvas and the ticket emails' preview fetch them from `POST /api/admin/email
 one's own doesn't list them. The builder itself knows nothing of forms: its caller passes a kit (`EmailKit`: the data block's
 options, merge tags, canvas stand-ins, preview); a notification's is `formEmailKit`
 (`src/forms/form-email.ts`), ticket emails have their own.
+**Templates** (the builder's Templates panel, `src/forms/EmailTemplates.tsx`; table `email_templates`,
+editors only, migration `*_email_templates.sql`; `src/lib/email-templates.ts`): saved designs with their
+plain text, per kit (`templates` in `EmailKit`: `mailing` for campaigns and digests, `form`, `ticket`),
+to save the email as, save over, start from (Use) or delete. A template can be the default for one kind
+of email (`default_for`, unique; `TEMPLATE_DEFAULTS`): new campaigns, digests, forms and form
+notifications start from theirs (`defaultTemplate`), and a ticket email nobody designed is sent from
+its kind's (`ticket:<kind>`). Not synced or backed up.
 Notifications from before the builder send their message as before until opened there. Mail goes out over SMTP
 (`SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_PASS`/`SMTP_SECURE`, or one `SMTP_URL`; sender `MAIL_FROM`,
 default `mailFrom` in the site config).
@@ -588,7 +595,7 @@ tickets (30-120 minutes), and the emails with the reminder's and follow-up's tim
   block (`ORDER_DETAILS`: the summary table, date, venue, code, tickets, total, answers, the buyer's
   contact), and the Payment block (a paid order's payment; nothing for free orders). Sent: the event's own (table `ticket_emails`, its attendee list > Emails,
   `src/admin/TicketEmails.tsx`; kept out of the event's fields so editor saves can't overwrite it), else
-  the site's, else `DEFAULT_EMAILS` (`emailToSend`). `src/lib/tickets/email.ts` renders them with the
+  the site's, else the default template for that kind (`ticket:<kind>`, see Forms), else `DEFAULT_EMAILS` (`emailToSend`). `src/lib/tickets/email.ts` renders them with the
   forms' renderer (`renderEmail`); the builder's kit is `src/admin/ticket-email.ts`, its preview a sample
   order rendered in the browser. `netlify/functions/ticket-emails.mts` runs
   `sendDueTicketEmails` hourly (deployed site only): reminders, follow-ups, expired holds, auto waitlists.
@@ -739,6 +746,9 @@ never subscribes anyone again); the settings are, with the others. Migration `*_
   recipient variable (`%recipient.v1%`, escaped for HTML as `v1_h`, plain in the subject and text;
   values escaped once, by the site), and a footer under the design that it can't remove: why they get
   it, the name and postal address, unsubscribe and preferences links. Images are absolute addresses.
+  Nothing goes out without that footer: `footerProblem` checks the HTML and the text for the
+  recipient's unsubscribe and preferences links when a campaign is frozen, before each batch, and
+  before a test send, and refuses to send without them.
 - **Sending** (`src/lib/mailing/send.ts`): a job. `startSending` claims the campaign (`mail_claim`, a
   token) and hands it to `netlify/functions/mail-send-background.mts` (in-process under astro dev). A run
   freezes the campaign first (its HTML and text, tracked links, every recipient in `campaign_sends`, in

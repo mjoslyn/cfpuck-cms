@@ -28,6 +28,7 @@ export function ticketEmailKit(kind: EmailKind, subject: () => string, eventTitl
   const sample = ticketEmailContext(order, event, links, origin);
   return {
     dataBlock: { label: 'Order details', options: ORDER_DETAILS },
+    templates: 'ticket',
     tags: MERGE_TAGS,
     // Tags show as written; Order details blocks show the sample order.
     canvas: { merge: (text) => text, field: sample.field, origin, payment: SAMPLE_ORDER.payment },

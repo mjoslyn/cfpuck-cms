@@ -296,11 +296,12 @@ export function ticketSettingsFrom(v: unknown): TicketSettings | undefined {
 
 /**
  * The email that is sent: the event's own design (and its subject and text), else the site's, else the
- * default. A subject left empty comes from the next one down.
+ * default template for this kind (`template`: Templates in the email builder), else the built-in one.
+ * A subject left empty comes from the next one down.
  */
-export function emailToSend(kind: EmailKind, site: TicketSettings, own?: EventEmail): { subject: string; design: EmailDoc; text?: string } {
+export function emailToSend(kind: EmailKind, site: TicketSettings, own?: EventEmail, template?: { design: EmailDoc; text: string } | null): { subject: string; design: EmailDoc; text?: string } {
   const siteEmail = site.emails?.[kind];
-  const from = own?.design ? own : siteEmail?.design ? siteEmail : undefined;
+  const from = own?.design ? own : siteEmail?.design ? siteEmail : template ? { design: template.design, text: template.text || undefined } : undefined;
   return {
     subject: own?.subject?.trim() || siteEmail?.subject?.trim() || DEFAULT_EMAILS[kind].subject,
     design: from?.design ?? DEFAULT_EMAILS[kind].design,

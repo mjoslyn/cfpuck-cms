@@ -3,6 +3,7 @@
 // click palette items to add. Fields, settings, confirmation, payment and notifications save together.
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { browserClient } from '../lib/supabase-browser';
+import { defaultTemplate } from '../lib/email-templates';
 import { renderForm } from '../render/forms/form';
 import { INPUT_TYPES, NAME_LABELS, NAME_PARTS, logicOf } from '../lib/forms/logic';
 import { FIELD_TYPES, defaultNotification, newField } from '../lib/forms/defaults';
@@ -15,7 +16,7 @@ import { site } from '../lib/site';
 import { MergeTags, mergeTagOptions } from './rich-message';
 import EmailBuilder from './EmailBuilder';
 import { formEmailKit } from './form-email';
-import { defaultEmail, emailFromMessage } from '../lib/forms/email';
+import { defaultEmail, emailFromMessage, type EmailDoc } from '../lib/forms/email';
 
 const input = 'w-full rounded border border-admin-ink/15 bg-white px-2 py-1.5 text-sm outline-none focus:border-admin-accent';
 const labelCls = 'mb-1 block text-xs font-medium text-admin-muted';
@@ -551,6 +552,11 @@ export default function FormBuilder({ formId }: { formId: number }) {
   const [pages, setPages] = useState<{ id: number; title: string }[]>([]);
   const [submissions, setSubmissions] = useState<number | null>(null);
   const [providers, setProviders] = useState<Providers | null>(null);
+  // The default template for form notifications (the email builder's Templates), which new ones start from.
+  const [starter, setStarter] = useState<{ design: EmailDoc; text: string } | null>(null);
+  useEffect(() => {
+    defaultTemplate(db, 'form').then(setStarter, () => {});
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -942,7 +948,7 @@ export default function FormBuilder({ formId }: { formId: number }) {
                   </div>
                 </details>
               ))}
-              <button type="button" className={btn} onClick={() => setRow({ ...row, notifications: [...row.notifications, defaultNotification()] })}>
+              <button type="button" className={btn} onClick={() => setRow({ ...row, notifications: [...row.notifications, { ...defaultNotification(), ...(starter ? { design: starter.design, ...(starter.text ? { text: starter.text } : {}) } : {}) }] })}>
                 Add notification
               </button>
             </>

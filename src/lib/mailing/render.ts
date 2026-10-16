@@ -97,6 +97,19 @@ export function renderCampaign(input: RenderInput): Rendered {
   return { subject, html, text, vars };
 }
 
+/**
+ * Why an email can't go out without its footer ('' when it has one): the HTML and the text must both
+ * carry the recipient's unsubscribe and preferences links. Checked before every send, tests included,
+ * so no design, own text or later step can drop them.
+ */
+export function footerProblem(html: string, text: string, origin: string): string {
+  const links = [`${origin}${UNSUBSCRIBE_PATH}?t=%recipient.t%`, `${origin}${PREFERENCES_PATH}?t=%recipient.t%`];
+  const missing = (s: string) => links.some((l) => !s.includes(l));
+  if (missing(html)) return 'The email is missing its unsubscribe and preferences links.';
+  if (missing(text)) return 'The plain text is missing its unsubscribe and preferences links.';
+  return '';
+}
+
 /** The text part made from the HTML: the preheader left out, and each escaped variable as its plain one. */
 export function plainText(html: string): string {
   return textVersion(html.replace(/<div style="display:none[^"]*">[\s\S]*?<\/div>/, '')).replace(/%recipient\.([a-z0-9]+)_h%/g, '%recipient.$1%');

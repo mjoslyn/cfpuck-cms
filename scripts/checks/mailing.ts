@@ -7,7 +7,7 @@ process.env.MAIL_LINK_SECRET ??= 'check-secret';
 process.env.MAILGUN_WEBHOOK_SIGNING_KEY ??= 'check-signing-key';
 
 const { sign, verify, emailHash } = await import('../../src/lib/mailing/tokens');
-const { renderCampaign, recipientValues, findLinks, trackLinks, addHoneypot, plainText, trackText, withUtm, utmLinks } = await import('../../src/lib/mailing/render');
+const { renderCampaign, recipientValues, findLinks, trackLinks, addHoneypot, plainText, trackText, withUtm, utmLinks, footerProblem } = await import('../../src/lib/mailing/render');
 const { webhookSigned } = await import('../../src/lib/mailing/mailgun');
 const { judge, ipPrefix, openVerdict } = await import('../../src/lib/mailing/clicks');
 const { digestDue, isoWeek } = await import('../../src/lib/mailing/digest');
@@ -130,6 +130,12 @@ want('rules cleaned', JSON.stringify(rules) === JSON.stringify({ match: 'any', r
 want('tags normalised', cleanTags(' Trade Show 2026 ; <b>x</b>, , trade show 2026').join('|') === 'trade show 2026|bxb' && fieldKey('First Name!') === 'first_name');
 want('rules in words', describeSegment(rules) === 'is tagged farm or vip, or has business_type equal to “Dairy”, or hasn’t opened an email in the last 3650 days', describeSegment(rules));
 want('no rules is everyone', describeSegment(cleanRules({})) === 'Everyone on the campaign’s lists');
+
+// The footer: every way a campaign is put together keeps the unsubscribe and preferences links.
+const own = renderCampaign({ campaignId: 9, subject: 'S', design: design as any, text: 'Hi, see https://site.example/about/', siteName: 'T', address: 'A', origin: 'https://site.example' });
+want('the footer is in the HTML and the text', footerProblem(r.html, r.text, 'https://site.example') === '' && footerProblem(own.html, own.text, 'https://site.example') === '');
+want('tracking and UTM keep the footer', footerProblem(utmLinks(trackLinks(r.html, 'https://site.example', findLinks(r.html).map((_, i) => i + 1)), 'https://site.example', 'x'), plainText(r.html), 'https://site.example') === '');
+want('an email without the footer is refused', footerProblem('<p>Hi</p>', r.text, 'https://site.example') !== '' && footerProblem(r.html, 'Hi', 'https://site.example') !== '');
 
 // Names and the site's contact fields.
 want('a name splits at its first space', JSON.stringify(splitName('  Ann  Marie Smith ')) === '{"first_name":"Ann","last_name":"Marie Smith"}' && splitName('Cher').last_name === '');

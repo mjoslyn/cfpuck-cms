@@ -20,6 +20,7 @@ export function mailingEmailKit(opts: { id?: number; subject: () => string; dige
     // Tags show as written on the canvas.
     canvas: { merge: (text) => text, field: standIn, origin },
     entries: true,
+    templates: 'mailing',
     textField: (id) => `<p>${standIn(id)}</p>`,
     preview: {
       pickLabel: 'Shown to',

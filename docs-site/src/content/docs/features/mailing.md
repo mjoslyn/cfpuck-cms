@@ -87,7 +87,8 @@ the people on its lists who match. A segment that a campaign or digest uses can'
   Events on, the **Events** block. Merge tags: `{first_name}`, `{last_name}`, `{name}`, your subscriber fields (`{town}`), `{email}`, `{site_name}`,
   `{unsubscribe_url}`, `{preferences_url}`; a fallback for an empty value after a bar,
   `{first_name|there}`. Every email ends with a footer you can't remove: why they get it, your name and
-  postal address, and unsubscribe and preferences links;
+  postal address, and unsubscribe and preferences links. The site checks it is there before every send
+  and test, and sends nothing without it;
 - **Send a test**, to you and up to 5 more addresses, marked [Test].
 
 Editors write and test campaigns; admins **Send now** or **Schedule** (in the site's time zone), after a

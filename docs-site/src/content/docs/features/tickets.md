@@ -73,7 +73,9 @@ fails later comes off the order again.
 
 Five emails, each designed in the same email builder as form notifications: the **confirmation**, a
 **reminder** before the event, a **follow-up** after it, the **waitlist** notice, and the **copy to the
-admin** of each order. Besides the usual blocks they have:
+admin** of each order. One nobody has designed (for the event or the site) is sent from the default
+template for that email, if one is set (see Email templates in Forms), else the built-in email. Besides
+the usual blocks they have:
 
 - merge tags such as `{first_name}`, `{event}`, `{date}`, `{code}`, `{order_link}` (the order, on the
   page it was placed on; in the waitlist email, the tickets where they joined), `{attendee_link}`

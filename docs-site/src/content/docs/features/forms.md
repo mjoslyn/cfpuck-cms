@@ -66,6 +66,23 @@ wide, with text kept to what mail apps show the same.
 Notifications from before the builder keep sending their message as it was until they are opened in
 the builder, which turns it into blocks.
 
+### Email templates
+
+Every email builder (form notifications, ticket emails, campaigns and digests) has **Templates** in its
+header: save the email as a template, **Use** one to replace the email with it, **Save over it** to
+update one, or delete one. Templates are kept per kind of builder, since their blocks differ: a form
+notification's templates hold form fields, a ticket email's order details, a campaign's subscriber
+blocks (campaigns and digests share theirs).
+
+A template can be the **default** for one kind of email, chosen under **Default for**:
+
+- new form notifications (and the first notification of a new form);
+- new campaigns, and new weekly digests;
+- each ticket email (confirmation, reminder, follow-up, waitlist, the copy to the admin): sent as is
+  when neither the event nor the site has designed that email.
+
+Each kind has at most one default; choosing another moves it.
+
 ## Payments
 
 A form can take payment with **Stripe** or **Square**, whichever has its keys set (see Setting up the

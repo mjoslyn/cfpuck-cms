@@ -8,6 +8,7 @@ import { serviceClient } from '../../../../lib/supabase';
 import { EMAIL_RE, audienceOf, mailingSettings, splitName, type Campaign, type Digest } from '../../../../lib/mailing/config';
 import { runDigest } from '../../../../lib/mailing/digest';
 import { sendTest } from '../../../../lib/mailing/send';
+import { defaultTemplate } from '../../../../lib/email-templates';
 
 const text = (v: unknown, max: number) => (typeof v === 'string' ? v.slice(0, max) : '');
 const ids = (v: unknown) => (Array.isArray(v) ? [...new Set(v.map(Number).filter((n) => Number.isInteger(n) && n > 0))] : []);
@@ -35,7 +36,8 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
 
   if (action === 'create') {
     const { data: lists } = await db.from('mail_lists').select('id').order('sort').limit(1);
-    const { data, error } = await db.from('digests').insert({ name: 'Weekly digest', subject: '{site_name}: the week of {week_of}', design: STARTER(siteRow?.value?.events?.enabled === true), list_ids: lists?.length ? [lists[0].id] : [], track_links: settings.trackLinks !== false, utm: true }).select('id').single();
+    const tpl = await defaultTemplate(db, 'digest');
+    const { data, error } = await db.from('digests').insert({ name: 'Weekly digest', subject: '{site_name}: the week of {week_of}', design: tpl?.design ?? STARTER(siteRow?.value?.events?.enabled === true), ...(tpl?.text ? { text: tpl.text } : {}), list_ids: lists?.length ? [lists[0].id] : [], track_links: settings.trackLinks !== false, utm: true }).select('id').single();
     if (error) return fail(error.message);
     return isForm ? redirect(`/admin/mailing-lists/digests/${data.id}/`, 303) : Response.json({ id: data.id });
   }

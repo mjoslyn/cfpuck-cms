@@ -15,7 +15,7 @@ import { audienceOf, type Campaign } from './config';
 import { loadMailing, mailOrigin } from './contacts';
 import { emailEntries } from './entries';
 import { BATCH_SIZE, MailgunError, mailgunStatus, sendBatch, tagSeen } from './mailgun';
-import { addHoneypot, findLinks, plainText, recipientValues, renderCampaign, trackLinks, trackText, utmLinks, withUtm, type Recipient, type VarSpec } from './render';
+import { addHoneypot, findLinks, plainText, recipientValues, renderCampaign, trackLinks, trackText, utmLinks, withUtm, footerProblem, type Recipient, type VarSpec } from './render';
 import { sign } from './tokens';
 import { mailingPaused } from './state';
 import { cleanRules, type SegmentRules } from './segments';
@@ -99,6 +99,8 @@ async function freeze(db: SupabaseClient, c: Campaign): Promise<string> {
     html = utmLinks(html, origin, slug(c.name || c.subject));
     if (!c.text?.trim()) text = plainText(html);
   }
+  const missing = footerProblem(html, text, origin);
+  if (missing) return missing;
   const people = await audience(db, c);
   if (!people.length) return c.digest_id ? 'skip:Nobody on its lists is subscribed.' : 'Nobody on the chosen lists is subscribed (with the audience chosen).';
   // Batches, then each person's send row in their batch.
@@ -223,6 +225,12 @@ async function sendOne(db: SupabaseClient, c: Campaign, frozen: Frozen, b: { id:
   for (const p of people as any[]) variables[p.email] = recipientValues(frozen.vars, { ...p.contacts, email: p.email }, { t: sign('manage', Number(p.contact_id)), ct: sign('click', Number(p.contact_id)) });
   await db.from('campaign_batches').update({ status: 'attempting', attempts: b.attempts + 1, attempted_at: new Date().toISOString() }).eq('id', b.id);
   const unsubscribe = `${frozen.origin}/api/mail/unsubscribe?t=%recipient.t%&c=${c.id}`;
+  // The frozen email still has its footer (nothing goes out without it).
+  const missing = footerProblem(c.html ?? '', c.text_rendered ?? '', frozen.origin);
+  if (missing) {
+    await db.from('campaign_batches').update({ status: 'failed', error: missing }).eq('id', b.id);
+    return `failed:${missing}`;
+  }
   for (let attempt = 0; ; attempt++) {
     try {
       const mailgunId = await sendBatch({
@@ -267,6 +275,8 @@ export async function sendTest(db: SupabaseClient, c: Campaign, to: Recipient[])
   if (!settings.address) throw new Error('Add the postal address under Settings > Mailing Lists first: every email must carry it.');
   const variables: Record<string, Record<string, string>> = {};
   // An address that is a contact is filled in as that contact.
+  const missing = footerProblem(rendered.html, rendered.text, origin);
+  if (missing) throw new Error(missing);
   const { data: known } = await db.from('contacts').select('email, first_name, last_name, attributes').in('email', to.map((p) => p.email));
   for (const p of to) variables[p.email] = recipientValues(rendered.vars, (known ?? []).find((k) => k.email === p.email) ?? p, { t: 'test', ct: 'test' });
   return sendBatch({
