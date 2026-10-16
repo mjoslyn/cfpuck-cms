@@ -87,7 +87,7 @@ const contactQuery = (patch: Record<string, string>) => `?${new URLSearchParams(
       <h1 class="text-3xl font-normal">Mailing Lists</h1>
       <p class="mt-1 text-sm text-admin-muted">
         {settings.enabled ? 'Campaigns and weekly digests to the people on your mailing lists.' : 'Mailing is off: turn it on under Settings > Mailing Lists.'}
-        {' '}The sender, postal address and tracking are under <a class="underline" href="/admin/settings/#mailing">Settings &gt; Mailing Lists</a>.
+        {' '}The sender, postal address and tracking are under <a class="underline" href="/admin/settings/#mailing-lists">Settings &gt; Mailing Lists</a>.
         {!mailgun.configured && ' Mailgun isn’t set up, so nothing is sent (locally, emails go to the mail catcher).'}
       </p>
     </div>
@@ -103,19 +103,19 @@ const contactQuery = (patch: Record<string, string>) => `?${new URLSearchParams(
       )}
     </div>
   )}
-  {!settings.address && settings.enabled && <p class="mt-4 rounded bg-[#b26a00]/10 px-3 py-2 text-sm text-[#b26a00]">Add the postal address under <a class="underline" href="/admin/settings/#mailing">Settings &gt; Mailing Lists</a>: every email must carry it, so nothing can be sent until it is there.</p>}
+  {!settings.address && settings.enabled && <p class="mt-4 rounded bg-[#b26a00]/10 px-3 py-2 text-sm text-[#b26a00]">Add the postal address under <a class="underline" href="/admin/settings/#mailing-lists">Settings &gt; Mailing Lists</a>: every email must carry it, so nothing can be sent until it is there.</p>}
   {ok && <p class="mt-4 rounded bg-[#6db56d]/15 px-3 py-2 text-sm text-[#3f7a3f]">{ok}</p>}
   {error && <p class="mt-4 rounded bg-[#c4592a]/10 px-3 py-2 text-sm text-[#c4592a]">{error}</p>}
 
   <nav class="mt-6 flex flex-wrap gap-1 border-b border-admin-ink/10 text-sm" aria-label="Mailing Lists">
     {TABS.map(([k, label]) => (
-      <a href={`/admin/mailing/?tab=${k}`} class={`-mb-px border-b-2 px-4 py-2 font-medium ${tab === k ? 'border-admin-accent text-admin-ink' : 'border-transparent text-admin-muted hover:text-admin-ink'}`} aria-current={tab === k ? 'page' : undefined}>{label}</a>
+      <a href={`/admin/mailing-lists/?tab=${k}`} class={`-mb-px border-b-2 px-4 py-2 font-medium ${tab === k ? 'border-admin-accent text-admin-ink' : 'border-transparent text-admin-muted hover:text-admin-ink'}`} aria-current={tab === k ? 'page' : undefined}>{label}</a>
     ))}
   </nav>
 
   {tab === 'campaigns' && (
     <section>
-      {!lists.length && <p class="mt-4 rounded bg-admin-soft px-3 py-2 text-sm">Campaigns go to lists: <a class="underline" href="/admin/mailing/?tab=lists">add a list first</a>.</p>}
+      {!lists.length && <p class="mt-4 rounded bg-admin-soft px-3 py-2 text-sm">Campaigns go to lists: <a class="underline" href="/admin/mailing-lists/?tab=lists">add a list first</a>.</p>}
       <form method="post" action="/api/admin/mailing/campaigns" class="mt-4">
         <input type="hidden" name="action" value="create" />
         <button class={btn}>New campaign</button>
@@ -128,7 +128,7 @@ const contactQuery = (patch: Record<string, string>) => `?${new URLSearchParams(
           {campaigns.map((c) => (
             <tr class="border-t border-admin-ink/5 align-top">
               <td class="px-4 py-2.5">
-                <a class="font-medium hover:text-admin-accent" href={`/admin/mailing/campaigns/${c.id}/`}>{c.name || c.subject || 'Untitled'}</a>
+                <a class="font-medium hover:text-admin-accent" href={`/admin/mailing-lists/campaigns/${c.id}/`}>{c.name || c.subject || 'Untitled'}</a>
                 <div class="text-xs text-admin-muted">{c.subject}{c.digest_id ? ' · digest issue' : ''}</div>
               </td>
               <td class="px-4 py-2.5 text-admin-muted">{(c.list_ids ?? []).map(listName).join(', ') || '–'}</td>
@@ -160,7 +160,7 @@ const contactQuery = (patch: Record<string, string>) => `?${new URLSearchParams(
         <tbody>
           {digests.map((d) => (
             <tr class="border-t border-admin-ink/5 align-top">
-              <td class="px-4 py-2.5"><a class="font-medium hover:text-admin-accent" href={`/admin/mailing/digests/${d.id}/`}>{d.name}</a><div class="text-xs text-admin-muted">{d.enabled ? (d.mode === 'auto' ? 'On: sends on its own' : 'On: each issue waits for approval') : 'Off'}</div></td>
+              <td class="px-4 py-2.5"><a class="font-medium hover:text-admin-accent" href={`/admin/mailing-lists/digests/${d.id}/`}>{d.name}</a><div class="text-xs text-admin-muted">{d.enabled ? (d.mode === 'auto' ? 'On: sends on its own' : 'On: each issue waits for approval') : 'Off'}</div></td>
               <td class="px-4 py-2.5 text-admin-muted">{WEEKDAYS[d.weekday]}s at {d.send_time}</td>
               <td class="px-4 py-2.5 text-admin-muted">{(d.list_ids ?? []).map(listName).join(', ') || '–'}</td>
               <td class="px-4 py-2.5 text-admin-muted">{d.last_run_at ? when(d.last_run_at) : 'None yet'}</td>
@@ -234,7 +234,7 @@ const contactQuery = (patch: Record<string, string>) => `?${new URLSearchParams(
         <tbody>
           {contacts.map((c) => (
             <tr class="border-t border-admin-ink/5 align-top">
-              <td class="px-4 py-2.5"><a class="font-medium hover:text-admin-accent" href={`/admin/mailing/contacts/${c.id}/`}>{c.email}</a>{c.name && <div class="text-xs text-admin-muted">{c.name}</div>}</td>
+              <td class="px-4 py-2.5"><a class="font-medium hover:text-admin-accent" href={`/admin/mailing-lists/contacts/${c.id}/`}>{c.email}</a>{c.name && <div class="text-xs text-admin-muted">{c.name}</div>}</td>
               <td class="px-4 py-2.5">{CONTACT_STATUS[c.status as ContactStatus] ?? c.status}</td>
               <td class="px-4 py-2.5 text-xs">{(c.tags ?? []).map((t) => <a class="mr-1 inline-block rounded bg-admin-soft px-1.5 py-0.5 hover:text-admin-accent" href={contactQuery({ tag: t, page: '1' })}>{t}</a>)}</td>
               <td class="px-4 py-2.5 text-xs text-admin-muted">{c.consent_source}<br />{when(c.confirmed_at ?? c.consent_at)}</td>
@@ -281,7 +281,7 @@ const contactQuery = (patch: Record<string, string>) => `?${new URLSearchParams(
                   <label class="inline-flex items-center gap-1 text-sm"><input form={`list-${l.id}`} type="checkbox" name="public" value="1" checked={l.public} disabled={!isAdmin} />Public</label>
                 </div>
               </td>
-              <td class="px-4 py-2.5 whitespace-nowrap"><a class="underline hover:text-admin-accent" href={`/admin/mailing/?tab=contacts&list=${l.id}`}>View {counts.get(l.id) ?? 0} subscriber{counts.get(l.id) === 1 ? '' : 's'}</a></td>
+              <td class="px-4 py-2.5 whitespace-nowrap"><a class="underline hover:text-admin-accent" href={`/admin/mailing-lists/?tab=contacts&list=${l.id}`}>View {counts.get(l.id) ?? 0} subscriber{counts.get(l.id) === 1 ? '' : 's'}</a></td>
               <td class="px-4 py-2.5 whitespace-nowrap">
                 {isAdmin && (
                   <>
@@ -318,9 +318,9 @@ const contactQuery = (patch: Record<string, string>) => `?${new URLSearchParams(
         <tbody>
           {segments.map((g) => (
             <tr class="border-t border-admin-ink/5 align-top">
-              <td class="px-4 py-2.5"><a class="font-medium hover:text-admin-accent" href={`/admin/mailing/segments/${g.id}/`}>{g.name}</a>{g.description && <div class="text-xs text-admin-muted">{g.description}</div>}</td>
+              <td class="px-4 py-2.5"><a class="font-medium hover:text-admin-accent" href={`/admin/mailing-lists/segments/${g.id}/`}>{g.name}</a>{g.description && <div class="text-xs text-admin-muted">{g.description}</div>}</td>
               <td class="px-4 py-2.5 text-admin-muted">{describeSegment(g.rules, names)}</td>
-              <td class="px-4 py-2.5"><a class="underline hover:text-admin-accent" href={`/admin/mailing/segments/${g.id}/`}>{g.count} {g.count === 1 ? 'person' : 'people'}</a></td>
+              <td class="px-4 py-2.5"><a class="underline hover:text-admin-accent" href={`/admin/mailing-lists/segments/${g.id}/`}>{g.count} {g.count === 1 ? 'person' : 'people'}</a></td>
             </tr>
           ))}
           {!segments.length && <tr><td colspan="3" class="px-4 py-6 text-center text-admin-muted">No segments yet.</td></tr>}

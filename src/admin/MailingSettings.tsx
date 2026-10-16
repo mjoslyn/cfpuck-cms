@@ -30,7 +30,7 @@ export default function MailingSettingsPanel({ value, mailgun, lists, membersOn,
       {value.enabled && (
         <>
           <p className="mb-3 rounded bg-admin-soft p-2 text-sm">
-            Lists, subscribers, segments, campaigns and the weekly digest are on the <a className="underline" href="/admin/mailing/?tab=lists">Mailing Lists</a> screen (in the menu once these settings are saved).
+            Lists, subscribers, segments, campaigns and the weekly digest are on the <a className="underline" href="/admin/mailing-lists/?tab=lists">Mailing Lists</a> screen (in the menu once these settings are saved).
           </p>
           {mailgun.configured ? (
             <p className="mb-3 text-xs text-admin-muted">
@@ -70,7 +70,7 @@ export default function MailingSettingsPanel({ value, mailgun, lists, membersOn,
                   </label>
                 ))
               ) : (
-                <p className="text-xs text-admin-muted">No lists yet: add them on the <a className="underline" href="/admin/mailing/?tab=lists">Mailing Lists screen</a>.</p>
+                <p className="text-xs text-admin-muted">No lists yet: add them on the <a className="underline" href="/admin/mailing-lists/?tab=lists">Mailing Lists screen</a>.</p>
               )}
               <p className="mt-1 text-xs text-admin-muted">Offered (unticked) when someone creates a member account, and on a member's account page, where they choose their lists.</p>
             </fieldset>

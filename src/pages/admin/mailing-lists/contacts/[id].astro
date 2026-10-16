@@ -10,7 +10,7 @@ const db = Astro.locals.db;
 const isAdmin = Astro.locals.user?.role === 'admin';
 const id = Number(Astro.params.id);
 const { data: contact } = await db.from('contacts').select('*').eq('id', id).maybeSingle<Contact>();
-if (!contact) return Astro.redirect('/admin/mailing/?tab=contacts&error=No%20such%20contact.');
+if (!contact) return Astro.redirect('/admin/mailing-lists/?tab=contacts&error=No%20such%20contact.');
 const [{ data: lists }, { data: rows }, { data: sends }, { data: clicks }, { data: member }] = await Promise.all([
   db.from('mail_lists').select('*').order('sort').order('id'),
   db.from('contact_lists').select('list_id, status, subscribed_at, unsubscribed_at').eq('contact_id', id),
@@ -26,7 +26,7 @@ const error = Astro.url.searchParams.get('error');
 const VERDICT: Record<string, string> = { human: 'Person (confirmed)', likely_human: 'Likely a person', machine: 'Machine' };
 ---
 <Admin title={`${contact.email} · Mailing Lists`}>
-  <p class="text-sm text-admin-muted"><a class="underline" href="/admin/mailing/?tab=contacts">Mailing Lists › Subscribers</a></p>
+  <p class="text-sm text-admin-muted"><a class="underline" href="/admin/mailing-lists/?tab=contacts">Mailing Lists › Subscribers</a></p>
   <h1 class="text-3xl font-normal">{contact.email}</h1>
   <p class="mt-1 text-sm"><strong>{CONTACT_STATUS[contact.status as ContactStatus]}</strong>{contact.unsubscribed_at && ` since ${when(contact.unsubscribed_at)}`}{member && <span class="text-admin-muted"> · a member ({member.level || 'no level'}, {member.status})</span>}</p>
   {ok && <p class="mt-4 rounded bg-[#6db56d]/15 px-3 py-2 text-sm text-[#3f7a3f]">{ok}</p>}
@@ -99,7 +99,7 @@ const VERDICT: Record<string, string> = { human: 'Person (confirmed)', likely_hu
     <tbody>
       {(sends ?? []).map((s: any) => (
         <tr class="border-t border-admin-ink/5 align-top">
-          <td class="px-3 py-2"><a class="hover:text-admin-accent" href={`/admin/mailing/campaigns/${s.campaign_id}/`}>{s.campaigns?.name || s.campaigns?.subject}</a><div class="text-xs text-admin-muted">{CAMPAIGN_STATUS[s.campaigns?.status as CampaignStatus] ?? ''} {when(s.campaigns?.sent_at)}</div></td>
+          <td class="px-3 py-2"><a class="hover:text-admin-accent" href={`/admin/mailing-lists/campaigns/${s.campaign_id}/`}>{s.campaigns?.name || s.campaigns?.subject}</a><div class="text-xs text-admin-muted">{CAMPAIGN_STATUS[s.campaigns?.status as CampaignStatus] ?? ''} {when(s.campaigns?.sent_at)}</div></td>
           <td class="px-3 py-2">{s.complained_at ? 'Marked as spam' : s.bounced_at ? 'Bounced' : s.delivered_at ? `Delivered ${when(s.delivered_at)}` : s.status === 'dropped' ? 'Not sent (unsubscribed)' : s.status === 'queued' ? 'Waiting' : 'Sent'}{s.unsubscribed_at && <div class="text-xs text-admin-muted">Unsubscribed {when(s.unsubscribed_at)}</div>}</td>
           <td class="px-3 py-2">{when(s.opened_at) || '–'}</td>
           <td class="px-3 py-2">{s.human_confirmed_at ? `Confirmed ${when(s.human_confirmed_at)}` : s.clicked_at ? when(s.clicked_at) : '–'}{s.machine_clicked_at && <div class="text-xs text-admin-muted">Machine clicks</div>}</td>

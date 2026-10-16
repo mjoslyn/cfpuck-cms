@@ -41,12 +41,12 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
     const { data: lists } = await db.from('mail_lists').select('id').order('sort').limit(1);
     const { data, error } = await db.from('campaigns').insert({ name: 'New campaign', subject: '', design: STARTER_DESIGN, list_ids: lists?.length ? [lists[0].id] : [], track_links: settings.trackLinks !== false, utm: !!settings.utm, created_by: locals.user!.id }).select('id').single();
     if (error) return fail(error.message);
-    return isForm ? redirect(`/admin/mailing/campaigns/${data.id}/`, 303) : Response.json({ id: data.id });
+    return isForm ? redirect(`/admin/mailing-lists/campaigns/${data.id}/`, 303) : Response.json({ id: data.id });
   }
   if (action === 'unpause') {
     if (!admin) return fail('Admins only', 403);
     await setPaused(serviceClient(), null);
-    return isForm ? redirect('/admin/mailing/?ok=Sending%20resumed.', 303) : Response.json({ ok: true });
+    return isForm ? redirect('/admin/mailing-lists/?ok=Sending%20resumed.', 303) : Response.json({ ok: true });
   }
 
   const id = Number(body.id);

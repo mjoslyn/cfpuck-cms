@@ -24,7 +24,7 @@ export async function runDue(now = new Date()): Promise<string> {
   const { data: overdue } = await db.from('campaigns').update({ status: 'cancelled', error: 'Not approved before its time.' }).eq('status', 'review').lte('scheduled_at', now.toISOString()).select('id, name');
   for (const c of overdue ?? []) {
     done.push(`cancelled ${c.id}`);
-    await tellAdmins(`${c.name} wasn’t sent`, `<p>${c.name} wasn’t approved before its time, so it was cancelled.</p><p><a href="${mailOrigin()}/admin/mailing/campaigns/${c.id}/">See it</a></p>`);
+    await tellAdmins(`${c.name} wasn’t sent`, `<p>${c.name} wasn’t approved before its time, so it was cancelled.</p><p><a href="${mailOrigin()}/admin/mailing-lists/campaigns/${c.id}/">See it</a></p>`);
   }
   const paused = await mailingPaused(db);
   if (paused) return [...done, `paused: ${paused}`].join('; ');

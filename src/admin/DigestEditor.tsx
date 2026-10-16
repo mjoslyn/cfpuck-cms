@@ -69,7 +69,7 @@ export default function DigestEditor({ digest, lists, levels, issues, admin, tz,
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm text-admin-muted">
-            <a className="underline" href="/admin/mailing/?tab=digests">Mailing Lists › Weekly digests</a>
+            <a className="underline" href="/admin/mailing-lists/?tab=digests">Mailing Lists › Weekly digests</a>
           </p>
           <h1 className="text-3xl font-normal">{d.name}</h1>
           <p className="mt-1 text-sm">
@@ -155,7 +155,7 @@ export default function DigestEditor({ digest, lists, levels, issues, admin, tz,
                 ))}
               </select>
               <span className="mt-1 block text-xs text-admin-muted">
-                Only the people on the lists who match it. <a className="underline" href={d.segment_id ? `/admin/mailing/segments/${d.segment_id}/` : '/admin/mailing/?tab=segments'}>{d.segment_id ? 'See who matches' : 'Segments'}</a>
+                Only the people on the lists who match it. <a className="underline" href={d.segment_id ? `/admin/mailing-lists/segments/${d.segment_id}/` : '/admin/mailing-lists/?tab=segments'}>{d.segment_id ? 'See who matches' : 'Segments'}</a>
               </span>
             </label>
           {levels && (
@@ -216,7 +216,7 @@ export default function DigestEditor({ digest, lists, levels, issues, admin, tz,
           </button>
         )}
         {admin && (
-          <button type="button" className="ml-auto text-xs text-[#c4592a] underline" onClick={() => confirm('Delete this digest? Its issues stay as campaigns.') && run(async () => (await post({ action: 'delete', id: d.id }), (location.href = '/admin/mailing/?tab=digests')), 'Deleted.')}>
+          <button type="button" className="ml-auto text-xs text-[#c4592a] underline" onClick={() => confirm('Delete this digest? Its issues stay as campaigns.') && run(async () => (await post({ action: 'delete', id: d.id }), (location.href = '/admin/mailing-lists/?tab=digests')), 'Deleted.')}>
             Delete digest
           </button>
         )}
@@ -235,7 +235,7 @@ export default function DigestEditor({ digest, lists, levels, issues, admin, tz,
           {issues.map((i) => (
             <tr key={i.id} className="border-t border-admin-ink/5 align-top">
               <td className="px-3 py-2">
-                <a className="hover:text-admin-accent" href={`/admin/mailing/campaigns/${i.id}/`}>
+                <a className="hover:text-admin-accent" href={`/admin/mailing-lists/campaigns/${i.id}/`}>
                   {i.name}
                 </a>
               </td>

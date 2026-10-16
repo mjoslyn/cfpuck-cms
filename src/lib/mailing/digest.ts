@@ -96,7 +96,7 @@ export async function runDigest(db: SupabaseClient, d: Digest, now = new Date(),
   if (error) return error.code === '23505' ? 'taken' : `failed: ${error.message}`;
   if (skip) return `skipped (${items} items)`;
   if (review) {
-    await tellAdmins(`${d.name} for the week of ${week} is ready for review`, `<p>This week’s issue of ${d.name} is ready. It goes out ${new Date(row.scheduled_at).toLocaleString('en-US', { timeZone: SITE_TZ, dateStyle: 'full', timeStyle: 'short' })} if an admin approves it before then.</p><p><a href="${origin}/admin/mailing/campaigns/${c.id}/">Review it</a></p>`);
+    await tellAdmins(`${d.name} for the week of ${week} is ready for review`, `<p>This week’s issue of ${d.name} is ready. It goes out ${new Date(row.scheduled_at).toLocaleString('en-US', { timeZone: SITE_TZ, dateStyle: 'full', timeStyle: 'short' })} if an admin approves it before then.</p><p><a href="${origin}/admin/mailing-lists/campaigns/${c.id}/">Review it</a></p>`);
     return `waiting for review (campaign ${c.id})`;
   }
   await startSending(Number(c.id));

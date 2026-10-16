@@ -20,7 +20,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
   const form = await request.formData();
   const action = String(form.get('action') ?? '');
   const id = Number(form.get('id')) || 0;
-  const back = (msg: string, ok = false) => redirect(`${id && action !== 'erase' ? `/admin/mailing/contacts/${id}/` : '/admin/mailing/?tab=contacts'}${id && action !== 'erase' ? '?' : '&'}${ok ? 'ok' : 'error'}=${encodeURIComponent(msg)}`, 303);
+  const back = (msg: string, ok = false) => redirect(`${id && action !== 'erase' ? `/admin/mailing-lists/contacts/${id}/` : '/admin/mailing-lists/?tab=contacts'}${id && action !== 'erase' ? '?' : '&'}${ok ? 'ok' : 'error'}=${encodeURIComponent(msg)}`, 303);
   const db = locals.db;
   const list = Number(form.get('list')) || 0;
   const vouch = String(form.get('source') ?? '').trim().slice(0, 150);

@@ -37,7 +37,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
     const { data: lists } = await db.from('mail_lists').select('id').order('sort').limit(1);
     const { data, error } = await db.from('digests').insert({ name: 'Weekly digest', subject: '{site_name}: the week of {week_of}', design: STARTER(siteRow?.value?.events?.enabled === true), list_ids: lists?.length ? [lists[0].id] : [], track_links: settings.trackLinks !== false, utm: true }).select('id').single();
     if (error) return fail(error.message);
-    return isForm ? redirect(`/admin/mailing/digests/${data.id}/`, 303) : Response.json({ id: data.id });
+    return isForm ? redirect(`/admin/mailing-lists/digests/${data.id}/`, 303) : Response.json({ id: data.id });
   }
   const id = Number(body.id);
   const { data: d } = await db.from('digests').select('*').eq('id', id).maybeSingle<Digest>();

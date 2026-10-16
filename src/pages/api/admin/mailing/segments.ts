@@ -19,7 +19,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
     case 'create': {
       const { data, error } = await db.from('mail_segments').insert({ name: 'New segment' }).select('id').single();
       if (error) return fail(error.message);
-      return isForm ? redirect(`/admin/mailing/segments/${data.id}/`, 303) : Response.json({ id: data.id });
+      return isForm ? redirect(`/admin/mailing-lists/segments/${data.id}/`, 303) : Response.json({ id: data.id });
     }
     case 'save': {
       const s = body.segment ?? {};

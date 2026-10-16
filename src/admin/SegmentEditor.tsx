@@ -65,7 +65,7 @@ export default function SegmentEditor({ segment, lists, levels, tags, fields, us
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm text-admin-muted">
-            <a className="underline" href="/admin/mailing/?tab=segments">Mailing Lists › Segments</a>
+            <a className="underline" href="/admin/mailing-lists/?tab=segments">Mailing Lists › Segments</a>
           </p>
           <h1 className="text-3xl font-normal">{s.name || 'Untitled segment'}</h1>
         </div>
@@ -187,7 +187,7 @@ export default function SegmentEditor({ segment, lists, levels, tags, fields, us
               {usedBy.map((u, i) => (
                 <span key={`${u.kind}${u.id}`}>
                   {i ? ', ' : ''}
-                  <a className="underline" href={`/admin/mailing/${u.kind === 'campaign' ? 'campaigns' : 'digests'}/${u.id}/`}>
+                  <a className="underline" href={`/admin/mailing-lists/${u.kind === 'campaign' ? 'campaigns' : 'digests'}/${u.id}/`}>
                     {u.name}
                   </a>
                 </span>
@@ -202,7 +202,7 @@ export default function SegmentEditor({ segment, lists, levels, tags, fields, us
               if (!confirm('Delete this segment?')) return;
               try {
                 await post({ action: 'delete', id: s.id });
-                location.href = '/admin/mailing/?tab=segments';
+                location.href = '/admin/mailing-lists/?tab=segments';
               } catch (e) {
                 setStatus((e as Error).message);
               }
@@ -225,7 +225,7 @@ export default function SegmentEditor({ segment, lists, levels, tags, fields, us
               <ul className="max-h-[28rem] overflow-y-auto text-sm">
                 {people.people.map((p) => (
                   <li key={p.id} className="border-t border-admin-ink/5 py-1">
-                    <a className="hover:text-admin-accent" href={`/admin/mailing/contacts/${p.id}/`}>
+                    <a className="hover:text-admin-accent" href={`/admin/mailing-lists/contacts/${p.id}/`}>
                       {p.email}
                     </a>
                     {p.name && <span className="text-admin-muted"> · {p.name}</span>}

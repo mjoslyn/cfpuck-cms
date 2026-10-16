@@ -654,7 +654,7 @@ An optional feature, on under Settings > Mailing Lists (`settings.site.mailing`,
 `src/lib/mailing/config.ts`, `src/admin/MailingSettings.tsx`): mailing lists people sign up to, campaigns
 and a weekly digest sent through Mailgun from a marketing subdomain, and each email's deliveries, opens
 and clicks. The site's other email (form notifications, tickets, confirmations) goes over SMTP as before.
-Off, the Mailing Lists screen (`/admin/mailing/`), its blocks and pages are gone (`mailingOn`). Lists,
+Off, the Mailing Lists screen (`/admin/mailing-lists/`), its blocks and pages are gone (`mailingOn`). Lists,
 subscribers and segments are for anyone, members or not. Contacts, campaigns, sends, clicks
 and Mailgun's events aren't synced or backed up (they stay on the copy where they were made, so a restore
 never subscribes anyone again); the settings are, with the others. Migration `*_mailing.sql`.
@@ -717,7 +717,7 @@ never subscribes anyone again); the settings are, with the others. Migration `*_
 - **Members**: with Members on, member sign-up offers the member lists (unticked; a confirmed sign-up
   like any), the account page (Member account block) shows the member's lists to change, and campaigns
   and digests can go to only members (of some levels) or only non-members.
-- **Campaigns** (`/admin/mailing/`, `src/admin/CampaignEditor.tsx`, `/api/admin/mailing/campaigns`):
+- **Campaigns** (`/admin/mailing-lists/`, `src/admin/CampaignEditor.tsx`, `/api/admin/mailing/campaigns`):
   name, subject, sender, lists, members audience, link tracking, UTM, and the email, designed in the
   email builder with the mailing kit (`src/admin/mailing-email.ts`: merge tags `{first_name}`, `{name}`,
   `{email}`, `{site_name}`, `{unsubscribe_url}`, `{preferences_url}`, a fallback after a bar,

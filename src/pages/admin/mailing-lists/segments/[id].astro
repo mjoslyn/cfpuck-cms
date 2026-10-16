@@ -9,7 +9,7 @@ import { memberSettings } from '../../../../lib/members/config';
 const db = Astro.locals.db;
 const id = Number(Astro.params.id);
 const { data: row } = await db.from('mail_segments').select('*').eq('id', id).maybeSingle();
-if (!row) return Astro.redirect('/admin/mailing/?tab=segments&error=No%20such%20segment.');
+if (!row) return Astro.redirect('/admin/mailing-lists/?tab=segments&error=No%20such%20segment.');
 const [{ data: lists }, { data: siteRow }, { data: known }, { data: campaigns }, { data: digests }] = await Promise.all([
   db.from('mail_lists').select('*').order('sort').order('id'),
   db.from('settings').select('value').eq('key', 'site').maybeSingle(),

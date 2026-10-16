@@ -224,11 +224,11 @@ try {
   ok('the segment gets it, the rest of the list doesn’t', !!(await inbox(farmer, `E2E segment ${stamp}`)) && !(await fetch(`${mail}/api/v1/search?query=${encodeURIComponent(`to:${shop} subject:"E2E segment ${stamp}"`)}`).then((x) => x.json())).messages?.length);
   // The views: a list's subscribers, a tag, the segments, a segment, a campaign's recipients.
   const admin = async (path: string) => (await fetch(base + path, { headers: { Cookie: cookie } })).text();
-  ok('a list’s subscribers', (await admin(`/admin/mailing/?tab=contacts&list=${made.lists[0]}`)).includes('Subscribers to E2E News'));
-  ok('filtered by tag', (await admin('/admin/mailing/?tab=contacts&tag=farm')).includes(farmer));
-  ok('segments tab counts', (await admin('/admin/mailing/?tab=segments')).includes(`E2E farms ${stamp}`));
-  ok('segment page', (await admin(`/admin/mailing/segments/${sid}/`)).includes(`E2E seg ${stamp}`));
-  const rec = await admin(`/admin/mailing/campaigns/${scid}/?who=all`);
+  ok('a list’s subscribers', (await admin(`/admin/mailing-lists/?tab=contacts&list=${made.lists[0]}`)).includes('Subscribers to E2E News'));
+  ok('filtered by tag', (await admin('/admin/mailing-lists/?tab=contacts&tag=farm')).includes(farmer));
+  ok('segments tab counts', (await admin('/admin/mailing-lists/?tab=segments')).includes(`E2E farms ${stamp}`));
+  ok('segment page', (await admin(`/admin/mailing-lists/segments/${sid}/`)).includes(`E2E seg ${stamp}`));
+  const rec = await admin(`/admin/mailing-lists/campaigns/${scid}/?who=all`);
   ok('campaign recipients', rec.includes('Recipients') && rec.includes(farmer) && !rec.includes(shop));
 } finally {
   // Clean up.

@@ -131,7 +131,7 @@ export default function CampaignEditor({ campaign, lists, levels, stats, links, 
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm text-admin-muted">
-            <a className="underline" href="/admin/mailing/">Mailing Lists</a> › {digest ? <a className="underline" href={`/admin/mailing/digests/${digest.id}/`}>{digest.name}</a> : 'Campaigns'}
+            <a className="underline" href="/admin/mailing-lists/">Mailing Lists</a> › {digest ? <a className="underline" href={`/admin/mailing-lists/digests/${digest.id}/`}>{digest.name}</a> : 'Campaigns'}
           </p>
           <h1 className="text-3xl font-normal">{c.name || 'Untitled campaign'}</h1>
           <p className="mt-1 text-sm">
@@ -199,7 +199,7 @@ export default function CampaignEditor({ campaign, lists, levels, stats, links, 
               ))}
               {!lists.length && (
                 <p className="text-xs text-admin-muted">
-                  No lists yet: <a className="underline" href="/admin/mailing/?tab=lists">add one</a>.
+                  No lists yet: <a className="underline" href="/admin/mailing-lists/?tab=lists">add one</a>.
                 </p>
               )}
             </fieldset>
@@ -214,7 +214,7 @@ export default function CampaignEditor({ campaign, lists, levels, stats, links, 
                 ))}
               </select>
               <span className="mt-1 block text-xs text-admin-muted">
-                Only the people on the lists who match it. <a className="underline" href={c.segment_id ? `/admin/mailing/segments/${c.segment_id}/` : '/admin/mailing/?tab=segments'}>{c.segment_id ? 'See who matches' : 'Segments'}</a>
+                Only the people on the lists who match it. <a className="underline" href={c.segment_id ? `/admin/mailing-lists/segments/${c.segment_id}/` : '/admin/mailing-lists/?tab=segments'}>{c.segment_id ? 'See who matches' : 'Segments'}</a>
               </span>
             </label>
             {levels && (
@@ -323,11 +323,11 @@ export default function CampaignEditor({ campaign, lists, levels, stats, links, 
       )}
 
       <div className="mt-6 flex gap-3 text-xs">
-        <button type="button" className="underline hover:text-admin-accent" onClick={() => run(async () => (location.href = `/admin/mailing/campaigns/${(await post({ action: 'duplicate', id: c.id })).id}/`), 'Copied.')}>
+        <button type="button" className="underline hover:text-admin-accent" onClick={() => run(async () => (location.href = `/admin/mailing-lists/campaigns/${(await post({ action: 'duplicate', id: c.id })).id}/`), 'Copied.')}>
           Duplicate
         </button>
         {(c.status === 'draft' || (admin && ['cancelled', 'skipped', 'failed'].includes(c.status) && !c.started_at)) && (
-          <button type="button" className="text-[#c4592a] underline" onClick={() => confirm('Delete this campaign?') && run(async () => (await post({ action: 'delete', id: c.id }), (location.href = '/admin/mailing/')), 'Deleted.')}>
+          <button type="button" className="text-[#c4592a] underline" onClick={() => confirm('Delete this campaign?') && run(async () => (await post({ action: 'delete', id: c.id }), (location.href = '/admin/mailing-lists/')), 'Deleted.')}>
             Delete
           </button>
         )}
