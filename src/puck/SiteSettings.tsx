@@ -254,7 +254,7 @@ export default function SiteSettings({ site: initialSite, options: initialOption
     },
     {
       id: 'mailing',
-      label: 'Mailing',
+      label: 'Mailing Lists',
       panel: <MailingSettingsPanel value={site.mailing ?? {}} mailgun={mailgun} lists={mailLists} membersOn={!!site.members?.enabled} onChange={(mailing) => setSite((s) => ({ ...s, mailing }))} />,
     },
     {

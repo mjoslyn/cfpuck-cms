@@ -16,7 +16,7 @@ export function SubscribePanel({ a, set }: { a: Attrs; set: (patch: Attrs) => vo
   const chosen: number[] = Array.isArray(a.lists) ? a.lists.map(Number) : [];
   return (
     <>
-      {on === false && <p className="mb-3 rounded bg-admin-soft p-2 text-xs text-admin-muted">Mailing is off (Settings &gt; Mailing): the block shows nothing.</p>}
+      {on === false && <p className="mb-3 rounded bg-admin-soft p-2 text-xs text-admin-muted">Mailing is off (Settings &gt; Mailing Lists): the block shows nothing.</p>}
       {lists && (
         <fieldset className="mb-3 border-0 p-0">
           <legend className="mb-1 text-xs font-medium text-admin-muted">Lists offered (none ticked: every public list)</legend>
@@ -32,7 +32,7 @@ export function SubscribePanel({ a, set }: { a: Attrs; set: (patch: Attrs) => vo
       <Text title="Heading" value={a.heading} placeholder="(none)" onChange={(v) => set({ heading: v || undefined })} />
       <Text title="Text" value={a.text} placeholder="(none)" onChange={(v) => set({ text: v || undefined })} />
       <Text title="Button" value={a.button} placeholder="Subscribe" onChange={(v) => set({ button: v || undefined })} />
-      <Text title="Consent wording" value={a.consentText} placeholder="Settings > Mailing's" onChange={(v) => set({ consentText: v || undefined })} />
+      <Text title="Consent wording" value={a.consentText} placeholder="From Settings > Mailing Lists" onChange={(v) => set({ consentText: v || undefined })} />
       <Text title="Tag sign-ups with (comma separated)" value={a.tags} placeholder="(none)" onChange={(v) => set({ tags: v || undefined })} />
       <Toggle title="Ask for a name" value={a.showName} onChange={(showName) => set({ showName: showName || undefined })} />
       <Segmented title="Layout" value={a.layout === 'inline' ? 'inline' : 'stacked'} options={[['stacked', 'Stacked'], ['inline', 'In a row']]} onChange={(v) => set({ layout: v === 'inline' ? 'inline' : undefined })} />

@@ -115,7 +115,7 @@ const memberAccount: Renderer = (_b, env) => {
   return `<section class="c-account">${body}</section>`;
 };
 
-/** Member sign-up's email opt-in (Mailing on, with lists chosen for members under Settings > Mailing): unticked, with the consent wording. */
+/** Member sign-up's email opt-in (Mailing on, with lists chosen for members under Settings > Mailing Lists): unticked, with the consent wording. */
 function mailOptIn(ctx: RenderCtx): string {
   const m = mailingSettings(ctx.settings.site);
   const lists = ((ctx.data.get(LISTS_KEY) as MailList[] | undefined) ?? []).filter((l) => m.memberLists?.includes(l.id));

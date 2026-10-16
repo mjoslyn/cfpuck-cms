@@ -1,4 +1,4 @@
-// Settings > Mailing (settings.site.mailing; src/lib/mailing/config.ts): Mailing on or off, the sender,
+// Settings > Mailing Lists (settings.site.mailing; src/lib/mailing/config.ts): Mailing on or off, the sender,
 // the postal address every email carries, the consent wording, the lists offered to members, link
 // tracking and UTM defaults, and the health thresholds that pause sending. Mailgun's keys are in the
 // environment (src/lib/mailing/mailgun.ts); this shows which are missing. Lists, contacts, campaigns and

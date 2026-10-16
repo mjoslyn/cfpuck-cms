@@ -237,8 +237,8 @@ export function buildConfig(types: string[], entryType?: string, opts: { members
       site: { title: 'Site', components: withSite('site', ['event-details', 'event-schedule', 'tickets']) },
       // Offered while Members is on (Settings > Members); blocks already placed stay editable.
       ...(opts.members ? { members: { title: 'Members', components: ['members', 'member-account', 'member-link'] } } : {}),
-      // Offered while Mailing is on (Settings > Mailing).
-      ...(opts.mailing ? { mailing: { title: 'Mailing', components: ['subscribe', 'mail-preferences'] } } : {}),
+      // Offered while Mailing is on (Settings > Mailing Lists).
+      ...(opts.mailing ? { mailing: { title: 'Mailing Lists', components: ['subscribe', 'mail-preferences'] } } : {}),
       advanced: { title: 'Advanced', components: withSite('advanced', ['html', 'part', 'entry-content']) },
       // Collection internals (items, empty state, pagination) are managed from the collection's settings.
       other: { visible: false },

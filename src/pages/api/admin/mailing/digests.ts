@@ -48,7 +48,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
       const f = body.digest ?? {};
       const enabled = !!f.enabled;
       if ((enabled || d.enabled) && !admin) return fail('Only admins turn a digest on, or change one that is on.', 403);
-      if (enabled && !settings.address) return fail('Add the postal address under Settings > Mailing first: every email must carry it.');
+      if (enabled && !settings.address) return fail('Add the postal address under Settings > Mailing Lists first: every email must carry it.');
       const patch = {
         name: text(f.name, 200) || 'Weekly digest',
         subject: text(f.subject, 300),
@@ -88,7 +88,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
     }
     case 'issue': {
       if (!admin) return fail('Admins only', 403);
-      if (!settings.address) return fail('Add the postal address under Settings > Mailing first.');
+      if (!settings.address) return fail('Add the postal address under Settings > Mailing Lists first.');
       const out = await runDigest(serviceClient(), d, new Date(), { force: true });
       return out.startsWith('failed') ? fail(out) : Response.json({ ok: true, result: out });
     }

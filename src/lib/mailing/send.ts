@@ -79,7 +79,7 @@ export async function renderFor(db: SupabaseClient, c: Campaign, origin: string)
 async function freeze(db: SupabaseClient, c: Campaign): Promise<string> {
   const origin = mailOrigin();
   const { rendered, name, settings } = await renderFor(db, c, origin);
-  if (!settings.address) return 'Add the postal address under Settings > Mailing: every email must carry it.';
+  if (!settings.address) return 'Add the postal address under Settings > Mailing Lists: every email must carry it.';
   let html = rendered.html;
   let text = rendered.text;
   if (c.track_links) {
@@ -264,7 +264,7 @@ async function sendOne(db: SupabaseClient, c: Campaign, frozen: Frozen, b: { id:
 export async function sendTest(db: SupabaseClient, c: Campaign, to: { email: string; name: string }[]): Promise<string> {
   const origin = mailOrigin();
   const { rendered, name, settings } = await renderFor(db, c, origin);
-  if (!settings.address) throw new Error('Add the postal address under Settings > Mailing first: every email must carry it.');
+  if (!settings.address) throw new Error('Add the postal address under Settings > Mailing Lists first: every email must carry it.');
   const variables: Record<string, Record<string, string>> = {};
   for (const p of to) variables[p.email] = recipientValues(rendered.vars, p, { t: 'test', ct: 'test' });
   return sendBatch({

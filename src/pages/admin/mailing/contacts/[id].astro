@@ -25,7 +25,7 @@ const ok = Astro.url.searchParams.get('ok');
 const error = Astro.url.searchParams.get('error');
 const VERDICT: Record<string, string> = { human: 'Person (confirmed)', likely_human: 'Likely a person', machine: 'Machine' };
 ---
-<Admin title={contact.email}>
+<Admin title={`${contact.email} · Mailing Lists`}>
   <p class="text-sm text-admin-muted"><a class="underline" href="/admin/mailing/?tab=contacts">Mailing Lists › Subscribers</a></p>
   <h1 class="text-3xl font-normal">{contact.email}</h1>
   <p class="mt-1 text-sm"><strong>{CONTACT_STATUS[contact.status as ContactStatus]}</strong>{contact.unsubscribed_at && ` since ${when(contact.unsubscribed_at)}`}{member && <span class="text-admin-muted"> · a member ({member.level || 'no level'}, {member.status})</span>}</p>

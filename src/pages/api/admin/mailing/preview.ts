@@ -23,7 +23,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
     const [events, entries] = await Promise.all([emailEvents(locals.db, design, origin), emailEntries(locals.db, design, origin, since)]);
     const week = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     const subject = String(body.subject ?? '').replace(/\{week_of\}/g, week).replace(/\{date\}/g, week);
-    const r = renderCampaign({ campaignId: Number(body.id) || 0, subject, design, text: String(body.text ?? ''), siteName: name, address: settings.address ?? '(your postal address, from Settings > Mailing)', origin, events, entries });
+    const r = renderCampaign({ campaignId: Number(body.id) || 0, subject, design, text: String(body.text ?? ''), siteName: name, address: settings.address ?? '(your postal address, from Settings > Mailing Lists)', origin, events, entries });
     const values = recipientValues(r.vars, { email: 'sam@example.com', name: 'Sam Sample' }, { t: 'sample', ct: 'sample' });
     return Response.json({ to: ['Sam Sample <sam@example.com>'], replyTo: settings.replyTo, subject: fill(r.subject, values), html: fill(r.html, values), text: fill(r.text, values) });
   } catch (e) {

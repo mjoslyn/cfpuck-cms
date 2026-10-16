@@ -33,7 +33,7 @@ const subscribe: Renderer = (b, env) => {
   const { ctx } = env;
   const a = b.attrs;
   const s = mailingSettings(ctx.settings.site);
-  if (!s.enabled) return ctx.editor ? '<div class="cms-editor-note">Mailing is off (Settings &gt; Mailing): this block shows nothing.</div>' : '';
+  if (!s.enabled) return ctx.editor ? '<div class="cms-editor-note">Mailing is off (Settings &gt; Mailing Lists): this block shows nothing.</div>' : '';
   const choices = offered(ctx, a.lists);
   if (!choices.length) return ctx.editor ? '<div class="cms-editor-note">No mailing lists yet: add one on the Mailing Lists screen.</div>' : '';
   const id = `subscribe-${b.id}`;
@@ -100,7 +100,7 @@ function unsubscribeForm(d: PrefsData, back: string, label = 'Unsubscribe from a
 const mailPreferences: Renderer = (b, env) => {
   const { ctx } = env;
   const a = b.attrs;
-  if (!mailingSettings(ctx.settings.site).enabled) return ctx.editor ? '<div class="cms-editor-note">Mailing is off (Settings &gt; Mailing): this block shows nothing.</div>' : '';
+  if (!mailingSettings(ctx.settings.site).enabled) return ctx.editor ? '<div class="cms-editor-note">Mailing is off (Settings &gt; Mailing Lists): this block shows nothing.</div>' : '';
   const box = (html: string) => `<section ${attrs(['c-prefs', a.className], styleDecls(a.style), { id: a.anchor })}>${html}</section>`;
   if (ctx.editor) return box(`<h2 class="c-prefs__heading">${a.view === 'unsubscribe' ? 'Unsubscribe' : 'Email preferences'}</h2>${p('c-prefs__note', 'Shows the subscription of whoever followed a link from one of the site’s emails (or the signed-in member): confirm, choose lists, unsubscribe.')}`);
   const d = (ctx.data.get(PREFS_KEY) as PrefsData | undefined) ?? { mode: 'none', contact: null, lists: {}, token: '' };

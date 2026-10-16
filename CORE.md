@@ -650,7 +650,7 @@ member (`renderRequest` drops the viewer's membership), and the editor offers no
 
 ## Mailing
 
-An optional feature, on under Settings > Mailing (`settings.site.mailing`, `mailingSettings`,
+An optional feature, on under Settings > Mailing Lists (`settings.site.mailing`, `mailingSettings`,
 `src/lib/mailing/config.ts`, `src/admin/MailingSettings.tsx`): mailing lists people sign up to, campaigns
 and a weekly digest sent through Mailgun from a marketing subdomain, and each email's deliveries, opens
 and clicks. The site's other email (form notifications, tickets, confirmations) goes over SMTP as before.

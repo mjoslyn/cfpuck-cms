@@ -24,6 +24,6 @@ const members = memberSettings(siteRow?.value);
 const segment: Segment = { id: row.id, name: row.name, description: row.description, rules: cleanRules(row.rules), updated_at: row.updated_at };
 const usedBy = [...(campaigns ?? []).map((c) => ({ ...c, kind: 'campaign' as const })), ...(digests ?? []).map((d) => ({ ...d, kind: 'digest' as const }))];
 ---
-<Admin title={row.name}>
+<Admin title={`${row.name} · Mailing Lists`}>
   <SegmentEditor client:load segment={segment} lists={(lists ?? []) as MailList[]} levels={members.enabled ? members.levels : null} tags={tags} fields={fields} usedBy={usedBy} />
 </Admin>

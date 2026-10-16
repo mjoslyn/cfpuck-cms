@@ -1,6 +1,6 @@
 // Whether sending is paused site-wide (settings key 'mailing', which isn't synced: each copy's own),
 // and the health check that pauses it: a campaign whose complaint or bounce rate passes the thresholds
-// under Settings > Mailing, once it has enough deliveries to judge, pauses every send (digests too)
+// under Settings > Mailing Lists, once it has enough deliveries to judge, pauses every send (digests too)
 // until an admin looks and resumes. The admins are told by email. Server only.
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { site as config } from '../site';

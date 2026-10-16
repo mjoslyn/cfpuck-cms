@@ -169,11 +169,11 @@ export default function CampaignEditor({ campaign, lists, levels, stats, links, 
             <div className="mb-3 grid grid-cols-2 gap-3">
               <label className="block">
                 <span className={label}>From name</span>
-                <input className={input} value={c.from_name} placeholder="Settings > Mailing's" onChange={(e) => set({ from_name: e.target.value })} />
+                <input className={input} value={c.from_name} placeholder="From Settings > Mailing Lists" onChange={(e) => set({ from_name: e.target.value })} />
               </label>
               <label className="block">
                 <span className={label}>Replies go to</span>
-                <input className={input} value={c.reply_to} placeholder="Settings > Mailing's" onChange={(e) => set({ reply_to: e.target.value })} />
+                <input className={input} value={c.reply_to} placeholder="From Settings > Mailing Lists" onChange={(e) => set({ reply_to: e.target.value })} />
               </label>
             </div>
             <div className="mb-3 rounded bg-white p-3 shadow-[0_0_0_1px_rgba(26,26,46,0.08)]">

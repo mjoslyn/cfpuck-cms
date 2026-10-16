@@ -19,6 +19,6 @@ const members = memberSettings(siteRow?.value);
 const { data: segments } = await db.from('mail_segments').select('id, name').order('name');
 const lastSent = (issues ?? []).find((i) => i.status === 'sent')?.sent_at ?? null;
 ---
-<Admin title={digest.name}>
+<Admin title={`${digest.name} · Mailing Lists`}>
   <DigestEditor client:load digest={digest} lists={(lists ?? []) as MailList[]} levels={members.enabled ? members.levels : null} issues={(issues ?? []) as any} admin={Astro.locals.user?.role === 'admin'} tz={SITE_TZ} lastSent={lastSent} segments={segments ?? []} />
 </Admin>

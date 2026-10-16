@@ -114,7 +114,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
   const ready = () => {
     if (!c.subject.trim()) return 'Give it a subject.';
     if (!c.list_ids?.length) return 'Choose at least one list.';
-    if (!settings.address) return 'Add the postal address under Settings > Mailing: every email must carry it.';
+    if (!settings.address) return 'Add the postal address under Settings > Mailing Lists: every email must carry it.';
     return '';
   };
   switch (action) {

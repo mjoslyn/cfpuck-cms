@@ -73,7 +73,7 @@ Members aren't synced between copies of the site or kept in backups; the levels 
 
 ## Members and Mailing
 
-With [Mailing](../mailing/) on, choose **Lists offered to members** under Settings > Mailing. Member
+With [Mailing](../mailing/) on, choose **Lists offered to members** under Settings > Mailing Lists. Member
 sign-up then offers them (unticked; ticking it sends a confirmation email like any sign-up), and the
 account page shows the member's lists to change. Campaigns and digests can go to **only members** (of
 some levels) or **only people who aren't members**, matched by email address, and **Add members to a
