@@ -24,6 +24,10 @@ Under **Authentication > URL Configuration**:
 - using [Members](../../features/members/), also add `https://<your-domain>/account/**`, where
   members' sign-up, invitation and password links land.
 
+Under **Authentication > Providers > Email**, raise **Email OTP Expiration** to `86400` (a day):
+invitation and password links stop working after it, an hour by default, and invitations are often
+opened later than that.
+
 :::note
 Hosted projects don't grant the API roles access to new tables the way the local stack does.
 Migration 0019 grants them and sets default privileges; row-level security does the rest.

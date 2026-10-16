@@ -52,13 +52,16 @@ export const GET: APIRoute = async ({ url, request, cache, cookies }) => {
   // The site's old URLs (src/site/render.ts redirect).
   const old = SITE_RENDER.redirect?.(url);
   if (old) return Response.redirect(new URL(old, url), 301);
-  // A link from a member's email (confirming an address, setting a password) signs them in here.
+  // A link from a member's email (confirming an address) signs them in here. A code that can't be used
+  // (already used, expired, or opened in another browser than the one that asked) is only an error for
+  // someone not signed in: a member who is can carry on.
   const code = url.searchParams.get('code');
   if (url.pathname === ACCOUNT_PATH && code) {
-    const { error } = await serverClient(request, cookies).auth.exchangeCodeForSession(code);
+    const db = serverClient(request, cookies);
+    const { error } = await db.auth.exchangeCodeForSession(code);
     const next = new URL(url);
     next.searchParams.delete('code');
-    if (error) next.searchParams.set('error', 'That link has expired or was already used. Ask for a new one.');
+    if (error && !(await db.auth.getUser()).data.user) next.searchParams.set('error', 'That link has expired, was already used, or was opened in a different browser. Ask for a new one.');
     return new Response(null, { status: 303, headers: { Location: next.toString(), 'Cache-Control': 'no-store' } });
   }
   // Back from a form's checkout: its confirmation or the form again, for this visitor only (never cached).

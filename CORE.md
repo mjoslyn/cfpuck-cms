@@ -649,9 +649,10 @@ member (`renderRequest` drops the viewer's membership), and the editor offers no
   account and a membership, emailing the site's admin address), `logout`, `forgot` and `password`;
   `session` stores an invitation link's session (from the address's fragment, by
   `public/assets/js/member-account.js`); `me` answers the **Member sign-in link** block (`member-link`),
-  whose label `public/assets/js/member-link.js` switches in the browser, so pages with it stay cached. Links
-  in members' emails (confirm an address, reset a password) bring a `code` the route exchanges on
-  `/account/`, so Supabase Auth's redirect URLs must include the site.
+  whose label `public/assets/js/member-link.js` switches in the browser, so pages with it stay cached. Invitation
+  and password links carry their session in the fragment (sent with the service key, so they work in
+  any browser); a sign-up's confirmation brings a `code` the route exchanges on `/account/` (a visitor
+  already signed in carries on without an error), so Supabase Auth's redirect URLs must include the site.
 - **Members screen** (`/admin/members/`, admins; `POST /api/admin/members`): members by status (waiting
   for approval first), each one's name, level, status, expiry and notes; Approve, Resend invitation (to someone invited who hasn't signed in), Send password link,
   Remove (the membership, and the account unless it edits the site), and Add a member (an existing
@@ -882,7 +883,10 @@ Netlify, with a hosted Supabase project (`npx supabase link`). Migrations: `npx 
 new tables (the local stack does): migration 0019 grants them and sets default privileges, and RLS
 does the rest (see Database access). `scripts/copy-storage.ts` copies storage objects from the local stack to a hosted
 project (resumable). Editors set their password at `/admin/set-password/` (invitation and reset links
-land there), so Supabase Auth's Site URL and redirect URLs must include the site's domain. Env:
+land there with the session in the fragment, which the page hands to `/api/auth/session`; they work in
+any browser), so Supabase Auth's Site URL and redirect URLs must include the site's domain. Email links
+last as long as Supabase Auth's Email OTP Expiration (an hour by default; 86400 seconds, a day, suits
+invitations). Env:
 `.env.example`.
 
 ## Commands
