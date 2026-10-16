@@ -24,37 +24,41 @@ Orders already placed still complete: buyers coming back from paying and the pay
 Turned back on, everything returns. `npm run seed` adds the event templates, a sample event and events on
 the home page only while Events is on (run it again after turning them on).
 
-## Changing the event types
+## Extending the event types
 
 The core supplies the `event` and `venue` types and the `event_category` taxonomy
-(`src/lib/events/types.ts`). To add fields, rename them or change their URLs, define your own in
-`src/site/config.ts`; a site's own definition replaces the core's:
+(`src/lib/events/types.ts`). Extend them with `events` in `src/site/config.ts`; whatever you leave out
+stays as the core has it:
 
 ```ts
-types: [
-  // page, post, global...
-  {
-    type: 'event',
-    label: 'Events',
-    singular: 'Event',
-    base: 'event',              // /event/<slug>/
-    archive: '/events/',        // keep: the calendar views live under it
-    category: 'event_category',
-    describe: 'an event on the calendar (/events/)',
-    card: 'event',
-    fields: [
-      { key: 'venue', label: 'Venue', type: 'entry', entryType: 'venue' },
-      { key: 'cost', label: 'Cost', type: 'text', compose: 'price as written, e.g. "$25, kids free"' },
-      { key: 'website', label: 'Event website', type: 'url' },
-      { key: 'organizer', label: 'Organizer', type: 'text' },   // a field of your own
-    ],
+export default defineSite({
+  // name, types, taxonomies...
+  events: {
+    event: {
+      // Added to the core's fields; a field with a core field's key takes its place.
+      fields: [
+        { key: 'ages', label: 'Ages', type: 'text', compose: 'who it is for, e.g. "all ages", "21+"' },
+        { key: 'cost', label: 'Price', type: 'text' },
+      ],
+      removeFields: ['schedule'],   // core fields to leave out
+      label: 'Happenings',          // any other option replaces the core's
+      singular: 'Happening',
+      base: 'happening',            // /happening/<slug>/
+    },
+    venue: {
+      fields: [{ key: 'parking', label: 'Parking', type: 'textarea' }],
+    },
+    category: { label: 'Kind of event', base: 'events/kind' },
   },
-],
-taxonomies: [
-  // category, tag...
-  { name: 'event_category', label: 'Event category', base: 'events/category' },
-],
+});
 ```
+
+- `event` and `venue` take any content type option (`label`, `singular`, `base`, `describe`, `card`,
+  `taxonomies`, `order`...) plus `fields` and `removeFields`. The type names stay `event` and `venue`.
+- `category` takes the taxonomy's options (`label`, `singular`, `base`, `fields`).
+- Keep `archive: '/events/'` (the default): the calendar views live under it.
+- To replace a type whole instead, list your own `event` or `venue` in `types` (or `event_category` in
+  `taxonomies`); the core then uses yours as it is and ignores `events` for it.
 
 The date, time, all-day, time zone, recurrence, featured and Tickets settings are built into the event
 sidebar and don't go in `fields`. The core reads these field keys: on events `venue`, `cost`, `website`

@@ -91,8 +91,8 @@ at http://127.0.0.1:56524.
 ### Events
 
 Turn them on under **Settings > Events** (admins), where the default time zone is set too, then run
-`npm run seed` again for the event templates and a sample event. The site's config needs nothing. See
-[Events](../../features/events/).
+`npm run seed` again for the event templates and a sample event. The site's config needs nothing; to
+add fields or change labels and URLs, see [Extending the event types](../../features/events/#extending-the-event-types).
 
 ### Payments and tickets
 

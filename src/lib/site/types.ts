@@ -126,6 +126,24 @@ export interface SiteConfig {
   compose?: ComposeStyle;
   types: ContentType[];
   taxonomies: Taxonomy[];
+  /** Changes to the core's Events feature (Settings > Events): its event and venue types and event categories. */
+  events?: EventsConfig;
+}
+
+/**
+ * Changes to one of the core's types: its options replace the core's (label, base, describe, card...);
+ * `fields` are added to the core's, a field with a core field's key taking its place; `removeFields`
+ * leaves core fields out by key.
+ */
+export type TypeExtension = Partial<Omit<ContentType, 'type'>> & { removeFields?: string[] };
+
+export interface EventsConfig {
+  /** The event type (src/lib/events/types.ts). */
+  event?: TypeExtension;
+  /** The venue type. */
+  venue?: TypeExtension;
+  /** The event category taxonomy: its options replace the core's (label, singular, base, fields). */
+  category?: Partial<Omit<Taxonomy, 'name'>>;
 }
 
 export const defineSite = (config: SiteConfig): SiteConfig => config;
