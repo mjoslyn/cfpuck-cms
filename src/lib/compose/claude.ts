@@ -15,7 +15,7 @@ type Block = Anthropic.Messages.ContentBlockParam;
 
 import { claudeClient, env, NO_KEY } from './client';
 export { env };
-export const COMPOSE_MODEL = env('ANTHROPIC_MODEL') || 'claude-opus-5-5';
+export const COMPOSE_MODEL = env('ANTHROPIC_MODEL') || 'claude-sonnet-5-5';
 
 export interface UserTurn {
   role: 'user';

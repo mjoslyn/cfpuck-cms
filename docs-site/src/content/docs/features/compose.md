@@ -8,7 +8,7 @@ sidebar:
 Compose writes pages with Claude from the documents, images and links an editor adds. It is at
 `/admin/compose/` and in the page editor as a panel docked beside the canvas (pin keeps it open).
 
-Needs `ANTHROPIC_API_KEY`. `ANTHROPIC_MODEL` overrides the model (default `claude-opus-5-5`).
+Needs `ANTHROPIC_API_KEY`. `ANTHROPIC_MODEL` overrides the model (default `claude-sonnet-5-5`).
 
 ## Conversations
 

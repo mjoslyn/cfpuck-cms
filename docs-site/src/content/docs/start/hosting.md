@@ -98,6 +98,6 @@ Admins invite editors from `/admin/users/`. See [Editor and roles](../../feature
 | `SQUARE_ACCESS_TOKEN`, `SQUARE_LOCATION_ID`, `SQUARE_ENVIRONMENT`, `SQUARE_WEBHOOK_SIGNATURE_KEY`, `SQUARE_WEBHOOK_URL` | Square payments |
 | `TICKETS_NOTIFY_EMAIL` | Where the copy of each ticket order goes (default `FORMS_ADMIN_EMAIL`, then `adminEmail`) |
 | `SITE_URL` | The site's address for links in ticket emails (default Netlify's `URL`) |
-| `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | Compose |
+| `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | Compose (`ANTHROPIC_MODEL` overrides the default model, `claude-sonnet-5-5`) |
 | `ANTHROPIC_SEO_MODEL` | SEO text generation (default Haiku 4.5) |
 | `LOCAL_ADMIN_EMAIL`, `LOCAL_ADMIN_PASSWORD` | The admin the e2e scripts sign in as |

@@ -6,7 +6,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { Loader, PUBLIC_SCOPE } from '../data';
 import { downsize, mediaUrl } from '../media/image';
 import { permalink } from '../permalink';
-import { typeDef } from '../site';
+import { eventsOnIn } from './on';
 import type { Entry } from '../types';
 import type { EmailDoc, EmailEvent, EmailItem } from '../forms/email';
 import { eventWhen, excerptOf, toCalEvent, venueIdOf, venueLines } from './model';
@@ -83,10 +83,10 @@ async function load(db: SupabaseClient, q: EmailEventsQuery, origin: string): Pr
 // One load per query a minute, so a run of reminders or notifications doesn't repeat it for each.
 const cache = new Map<string, { at: number; events: Promise<EmailEvent[]> }>();
 
-/** Each Events block's events, by block id (empty when the document has none or the site has no events). */
+/** Each Events block's events, by block id (empty when the document has none or Events is off). */
 export async function emailEvents(db: SupabaseClient, doc: EmailDoc | null | undefined, origin: string): Promise<Record<string, EmailEvent[]>> {
   const blocks = eventBlocks(doc?.content);
-  if (!blocks.length || !typeDef('event')) return {};
+  if (!blocks.length || !(await eventsOnIn(db))) return {};
   const now = Date.now();
   for (const [k, v] of cache) if (now - v.at > 60_000) cache.delete(k);
   const out: Record<string, EmailEvent[]> = {};

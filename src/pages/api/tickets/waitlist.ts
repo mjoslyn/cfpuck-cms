@@ -1,11 +1,15 @@
 // The waitlist form of a sold-out event (src/render/c/tickets.ts; src/lib/tickets/orders.ts joinWaitlist).
 import type { APIRoute } from 'astro';
+import { eventsOnIn } from '../../../lib/events/on';
+import { siteDb } from '../../../lib/supabase';
 import { joinWaitlist } from '../../../lib/tickets/orders';
 
 const FORM = /multipart\/form-data|application\/x-www-form-urlencoded/i;
 
 export const POST: APIRoute = async ({ request, url }) => {
   if (!FORM.test(request.headers.get('content-type') ?? '')) return new Response('Not found', { status: 404 });
+  // Events off (Settings > Events): no ticket sales.
+  if (!(await eventsOnIn(siteDb()))) return new Response('Not found', { status: 404 });
   const next = await joinWaitlist(await request.formData());
   if (!next) return new Response('Not found', { status: 404 });
   return new Response(null, { status: 303, headers: { Location: new URL(next, url).toString(), 'Cache-Control': 'no-store' } });

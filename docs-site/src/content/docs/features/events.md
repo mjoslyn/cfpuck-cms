@@ -5,7 +5,61 @@ sidebar:
   order: 3
 ---
 
-Defining `event` and `venue` types in the config turns on the calendar.
+Events is optional: turn it on under **Settings > Events** (admins). It brings the event and venue
+types under Content, event pages, the calendar at `/events/`, event categories, calendar feeds, tickets,
+and the event and ticket blocks. The site's config doesn't need to define anything.
+
+## Turning events on and off
+
+Off (the default), nothing is deleted, but events, venues and event categories are hidden from the admin
+and the site shows none of them:
+
+- event pages, the calendar and its views, event category pages and the calendar feeds are Not found
+- collections, search and menus leave events out, and email Events blocks list none
+- event and ticket blocks show nothing, and the editor doesn't offer them
+- tickets aren't sold, and reminders, follow-ups and waitlist notices aren't sent; Tickets and Settings >
+  Tickets are hidden
+
+Orders already placed still complete: buyers coming back from paying and the payment webhooks work.
+Turned back on, everything returns. `npm run seed` adds the event templates, a sample event and events on
+the home page only while Events is on (run it again after turning them on).
+
+## Changing the event types
+
+The core supplies the `event` and `venue` types and the `event_category` taxonomy
+(`src/lib/events/types.ts`). To add fields, rename them or change their URLs, define your own in
+`src/site/config.ts`; a site's own definition replaces the core's:
+
+```ts
+types: [
+  // page, post, global...
+  {
+    type: 'event',
+    label: 'Events',
+    singular: 'Event',
+    base: 'event',              // /event/<slug>/
+    archive: '/events/',        // keep: the calendar views live under it
+    category: 'event_category',
+    describe: 'an event on the calendar (/events/)',
+    card: 'event',
+    fields: [
+      { key: 'venue', label: 'Venue', type: 'entry', entryType: 'venue' },
+      { key: 'cost', label: 'Cost', type: 'text', compose: 'price as written, e.g. "$25, kids free"' },
+      { key: 'website', label: 'Event website', type: 'url' },
+      { key: 'organizer', label: 'Organizer', type: 'text' },   // a field of your own
+    ],
+  },
+],
+taxonomies: [
+  // category, tag...
+  { name: 'event_category', label: 'Event category', base: 'events/category' },
+],
+```
+
+The date, time, all-day, time zone, recurrence, featured and Tickets settings are built into the event
+sidebar and don't go in `fields`. The core reads these field keys: on events `venue`, `cost`, `website`
+and `schedule` (a repeater of days, each with items); on venues `address`, `city`, `state`, `zip`,
+`country`, `phone` and `website`.
 
 ## Data
 
@@ -57,15 +111,16 @@ An event's rule is stored in `fields.recurrence` and edited in the event sidebar
 - The month and day views link no further than the first and last event; the feeds are cached like pages.
 - Saving an event rewrites the `start` and `end` fields the views read.
 
-## Site timezone
+## Time zone
 
-`SITE_TZ` is set by admins under Settings (`settings.site.timezone`); the config's `timezone` is the
-default. It is a live binding in `src/lib/site`: the middleware and Compose jobs refresh it from the
-settings (`src/lib/site/timezone.ts`, cached a minute), and admin pages pass it to the browser as
-`window.__siteTz`.
+The default time zone is set under **Settings > Events** (`settings.site.timezone`; the config's
+`timezone` when empty). An event can choose its own in its sidebar (`fields.timezone`); its times are in
+that zone, and visitors see its short name beside them. `SITE_TZ` is a live binding in `src/lib/site`:
+the middleware and Compose jobs refresh it from the settings (`src/lib/site/timezone.ts`, cached a
+minute), and admin pages pass it to the browser as `window.__siteTz`.
 
-Changing it moves events that were on the old timezone to the new one with their local times kept
-(`moveEventsToTimezone`). Events with their own timezone stay.
+Changing the default moves events that were on the old time zone to the new one with their local times
+kept (`moveEventsToTimezone`). Events with their own time zone stay.
 
 ## Tickets
 

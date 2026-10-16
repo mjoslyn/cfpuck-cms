@@ -1,4 +1,5 @@
-import { register } from '../engine';
+import { register, rendererFor } from '../engine';
+import { EVENT_BLOCKS, eventsOn } from '../../lib/events/on';
 import { eventDate } from '../events/date';
 import { eventDetails, eventSchedule } from '../events/single';
 import { renderCalendar, type Calendar } from '../events/calendar';
@@ -50,3 +51,9 @@ register(
 // The calendars are prepared in prepare.ts (buildCalendar, event-calendar data).
 register({ 'event-calendar': eventCalendar });
 register({ 'events-calendar': (_b, env) => `<main class="c-cal-page">${renderCalendar(env.ctx.data.get('calendar') as Calendar, env.ctx.queried.url.origin)}</main>` });
+
+// Event blocks while events are off (Settings > Events): nothing on the site, a note in the editor.
+for (const type of EVENT_BLOCKS) {
+  const render = rendererFor(type);
+  register({ [type]: (b, env, inner) => (eventsOn(env.ctx.settings.site) ? render(b, env, inner) : env.ctx.editor ? '<div class="cms-editor-note">Events are off (Settings &gt; Events): this block shows nothing.</div>' : '') });
+}

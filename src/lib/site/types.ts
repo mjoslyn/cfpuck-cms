@@ -25,7 +25,8 @@ export interface ScalarField {
 }
 
 export interface ContentType {
-  /** Stored in entries.type. `page`, `post` and `global` are required; `event` and `venue` turn on the calendar. */
+  /** Stored in entries.type. `page`, `post` and `global` are required. `event` and `venue` come with the core's
+   *  Events feature (Settings > Events); a site defines them only to change them. */
   type: string;
   /** Plural, for the admin list and listings ("Members"). */
   label: string;

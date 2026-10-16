@@ -404,7 +404,7 @@ export function EntryForm({ type, value, onChange, templates, pageItems }: { typ
             <input type="datetime-local" className={inputClass} value={toLocal(value.event_end, eventTz)} onChange={(e) => set({ event_end: e.target.value ? `${e.target.value}:00` : null })} />
           </Row>
           <Select
-            title="Timezone"
+            title="Time zone"
             value={value.fields.timezone ?? ''}
             options={TIMEZONES.map((t) => [t, t.replace(/_/g, ' ')] as [string, string])}
             onChange={(tz) => {
@@ -415,7 +415,7 @@ export function EntryForm({ type, value, onChange, templates, pageItems }: { typ
               set({ fields, event_start: value.event_start ? `${toLocal(value.event_start, eventTz)}:00` : null, event_end: value.event_end ? `${toLocal(value.event_end, eventTz)}:00` : null });
             }}
           />
-          <p className="-mt-2 mb-3 text-xs text-admin-muted">Default: the site's timezone ({SITE_TZ.replace(/_/g, ' ')}). Times are in the event's timezone; visitors see its short name when it differs from the site's.</p>
+          <p className="-mt-2 mb-3 text-xs text-admin-muted">Empty: the default time zone under Settings &gt; Events ({SITE_TZ.replace(/_/g, ' ')}). Choose another for this event alone; its times are in that zone, and visitors see its short name beside them.</p>
           <Toggle title="All-day event" value={value.event_all_day} onChange={(x) => set({ event_all_day: x })} />
           <RecurrenceForm
             start={toLocal(value.event_start, eventTz).slice(0, 10) || (value.event_start ?? '').slice(0, 10)}
@@ -436,7 +436,7 @@ export function EntryForm({ type, value, onChange, templates, pageItems }: { typ
         </details>
       )}
       {type === 'event' && (
-        <details open={!!value.fields?.tickets?.enabled} className="mt-4 border-t border-admin-ink/10 pt-3">
+        <details open={!!value.fields?.tickets?.types?.length} className="mt-4 border-t border-admin-ink/10 pt-3">
           <summary className="mb-2 cursor-pointer text-xs font-semibold tracking-wider text-admin-muted uppercase">Tickets</summary>
           <TicketsForm fields={value.fields} onChange={(fields) => set({ fields })} />
         </details>

@@ -15,7 +15,7 @@ What you get:
 - Page editor with drafts, preview, revisions, patterns and an accessibility check
 - Content types and fields from one config file; tags and categories; collections (grids, lists,
   sliders, load more)
-- Events with recurrence, a calendar (list, month, day) and `.ics` feeds
+- Events (optional, Settings > Events) with recurrence, a calendar (list, month, day) and `.ics` feeds
 - Media library with focal points, standard crops and AVIF/WebP copies
 - Form builder with conditional logic, email notifications and payments (Stripe or Square)
 - Event tickets and free registrations: ticket types with prices, capacities and sales windows,
@@ -92,7 +92,7 @@ The Supabase CLI runs through `npx`, so you don't need to install it.
 
 ### Optional features
 
-- **Compose.** Set `ANTHROPIC_API_KEY`, and optionally `ANTHROPIC_MODEL` (default claude-opus-5-5).
+- **Compose.** Set `ANTHROPIC_API_KEY`, and optionally `ANTHROPIC_MODEL` (default claude-sonnet-5-5).
   Restart the dev server after setting it.
 - **Form notification mail.** Set either `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` and
   `SMTP_SECURE`, or a single `SMTP_URL` such as `smtp://user:pass@host:587`. Also set `MAIL_FROM`.
@@ -100,9 +100,13 @@ The Supabase CLI runs through `npx`, so you don't need to install it.
   site config. Without SMTP, submissions are stored but no mail is sent.
   Locally, `SMTP_URL=smtp://127.0.0.1:56525` sends to the Supabase stack's mail catcher (inbox at
   http://127.0.0.1:56524).
-- **Tickets.** Needs the `event` content type in `src/site/config.ts`. Turn Tickets on in an event's
-  settings and add ticket types; the Event details block shows the form, or place a Tickets block on
-  any page or template. Free tickets need nothing else. For paid ones, set one provider's keys:
+- **Events.** Turn them on under Settings > Events (admins): event and venue types, the calendar at
+  `/events/`, event categories, `.ics` feeds and the event blocks, plus the default time zone (an event
+  can choose its own). Nothing goes in the site config unless you want to change the event types. Run
+  `npm run seed` again afterwards for the event templates and a sample event.
+- **Tickets.** With Events on, add ticket types in an event's settings (under Tickets); the Event
+  details block shows the form, or place a Tickets block on any page or template. Free tickets
+  need nothing else. For paid ones, set one provider's keys:
   - Stripe: `STRIPE_SECRET_KEY` (`sk_test_...` to test) and `STRIPE_WEBHOOK_SECRET`.
   - Square: `SQUARE_ACCESS_TOKEN`, `SQUARE_LOCATION_ID`, `SQUARE_ENVIRONMENT=sandbox` to test,
     `SQUARE_WEBHOOK_SIGNATURE_KEY` and `SQUARE_WEBHOOK_URL`.

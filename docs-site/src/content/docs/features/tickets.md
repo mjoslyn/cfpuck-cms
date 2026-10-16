@@ -5,8 +5,8 @@ sidebar:
   order: 6
 ---
 
-An event sells tickets (or takes free registrations) when **Tickets** is on in its settings. Free
-tickets need nothing else; paid ones go through Stripe or Square, whichever has its keys set (chosen
+With [Events](../events/) on, an event sells tickets (or takes free registrations) when it has
+ticket types: add them in its settings, under Tickets. Free tickets need nothing else; paid ones go through Stripe or Square, whichever has its keys set (chosen
 under **Settings > Tickets** when both do).
 
 ## An event's tickets
@@ -15,7 +15,7 @@ In the event's settings, under Tickets (stored in `fields.tickets`, `src/lib/tic
 
 - **Ticket types**: name, description, price (empty or 0 is free), how many there are, the most in one
   order, and when they're on sale (empty: now, until the event ends). A type no longer offered stays for
-  past orders.
+  past orders; to stop selling, mark every type no longer offered or remove them.
 - **Capacity**: all types together. A recurring event sells each date separately, with the same capacity
   for each.
 - **Waitlist**: off; on, emailing people as tickets free up; or on, notified by hand from the attendee list.
@@ -31,7 +31,7 @@ The **Tickets** block puts an event's ticket form on any page or template. Choos
 settings (and, for a recurring event, a date; empty: its next date), and it shows that event's name and
 date over the form. With no event chosen it shows the tickets of the event whose page it is on, so an
 event template can place it instead of relying on Event details (which then leaves its own form out).
-A page can have several. For an event that doesn't sell tickets (Tickets off, or no ticket types) the
+A page can have several. For an event that doesn't sell tickets (no ticket types, or Events off) the
 block shows nothing, so a template's Tickets block appears only on events that sell them. In the editor
 the block shows the whole form; without an event that sells tickets, with sample ticket types and a note
 saying why (a template's block on such an event's page shows nothing there, as on the site).

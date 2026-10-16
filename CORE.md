@@ -42,7 +42,8 @@ Everything that differs between sites lives in `src/site/`:
   each gets a term picker in an entry's settings, and collections, the event calendar and bulk actions
   offer them; `taxonomiesOf`), `fields` with `compose` hints, `describe`,
   `logoField`, default `card`, `order`) and taxonomies (label, URL `base`, the type a term page `lists`,
-  its terms' own `fields`; `category` and `tag` are required). Core code reads it only through `src/lib/site` (`CONTENT_TYPES`,
+  its terms' own `fields`; `category` and `tag` are required; `event`, `venue` and `event_category`
+  come with the core's Events feature, see Events). Core code reads it only through `src/lib/site` (`CONTENT_TYPES`,
   `COMPOSABLE_TYPES`, `LISTABLE_TYPES`, `RECORD_TYPES`, `PAGELESS_TYPES`, `TYPE_BASES`,
   `ARCHIVE_PATHS`, `TAXONOMY_BASES`, `fieldsFor`, `categoryOf`, `termPageType`, `SITE_TZ`): the
   editor's Details, Compose's fields and prompt, permalinks, URL routing (archives, term pages,
@@ -343,7 +344,7 @@ the editor, the panel targets it (or its whole section): Claude answers with `ed
 to inline formatting and links, addresses to web/mail/phone/site links and raw HTML never taken from
 Claude: `safe-html.ts`, since materials can carry instructions). Claude can
 also call `search_site` (`src/lib/compose/site.ts`) to feature the site's own entries. Needs
-`ANTHROPIC_API_KEY` (optional `ANTHROPIC_MODEL`, default claude-opus-5-5).
+`ANTHROPIC_API_KEY` (optional `ANTHROPIC_MODEL`, default claude-sonnet-5-5).
 
 A turn runs as a job (`src/lib/compose/job.ts`, table `compose_jobs`) because a build takes 30-90s or
 more, past Netlify's request limits: `POST /api/admin/compose` reads the materials, queues the turn and
@@ -495,8 +496,29 @@ Feeds (`src/lib/events/ical.ts`): `/events.ics` (same `q`, `month`, `past` filte
 (`src/lib/events/timezone.ts`) and are cached at the CDN like pages. The month and day views link no
 further than the first and last event (and today); a view outside that range is noindex.
 
-The site timezone (`SITE_TZ`) is set by admins under Settings (`settings.site.timezone`; the config's
-`timezone` is the default). It is a live binding in `src/lib/site`: the middleware and compose jobs
+Events is an optional feature, off until an admin turns it on (Settings > Events:
+`settings.site.events.enabled`; `eventsOn`, `src/lib/events/on.ts`; migration `*_events_setting.sql`
+turned it on for sites that already had events). The core supplies the `event` and `venue` types and the
+`event_category` taxonomy (`src/lib/events/types.ts`, added to the config by `withEvents` in
+`src/lib/site`); a site that defines its own keeps them (to add fields, change labels or URLs; the
+calendar views stay under `/events/`). The core reads these field keys: on events `venue`, `cost`,
+`website` and `schedule`; on venues `address`, `city`, `state`, `zip`, `country`, `phone` and `website`.
+
+Off, nothing is deleted, but the admin hides events, venues and event categories (Content's tabs,
+Taxonomies, Settings > Types and Search; `showsType`, `showsTaxonomy`) and the site shows none:
+`resolve` answers Not found for the event listing, calendar views, event pages and occurrences and the
+term pages of taxonomies that list events; the feeds, ticket checkout, waitlist and availability
+endpoints answer 404; the loader's scope leaves event entries out (`noEvents`: collections, search,
+menus); `EVENT_BLOCKS` render nothing (a note in the editor) and load nothing; email Events blocks list
+none; and the hourly ticket emails don't run. The editor doesn't offer event and ticket blocks, the
+email Events block or the event type in collections and Compose, and the admin hides Tickets and
+Settings > Tickets. The checkout's return and the payment webhooks still work for orders already
+placed. `npm run seed` adds the event templates, a sample event and venue, and events on the home page
+and in the header only while Events is on.
+
+The default time zone (`SITE_TZ`) is set by admins under Settings > Events (`settings.site.timezone`;
+the config's `timezone` is the default); an event can choose its own (`fields.timezone`, in its
+sidebar). It is a live binding in `src/lib/site`: the middleware and compose jobs
 refresh it from the settings (`src/lib/site/timezone.ts`, cached a minute), admin pages pass it to
 the browser as `window.__siteTz`. Changing it moves events that were on the old timezone to the new
 one with their local times kept (`moveEventsToTimezone`); events with their own timezone stay.
@@ -510,8 +532,9 @@ one the newest 1,100 occurrences are kept. Saving an event rewrites the `start`/
 
 ## Tickets
 
-An event sells tickets or takes free registrations when Tickets is on in its settings
-(`fields.tickets`, `src/puck/TicketsForm.tsx`; read with `ticketsOf`, `src/lib/tickets/config.ts`):
+While Events is on, an event sells tickets or takes free registrations when it has ticket types (its
+settings, Tickets: `fields.tickets`, `src/puck/TicketsForm.tsx`; read with `ticketsOf`, whose `enabled`
+is derived from the types, `src/lib/tickets/config.ts`; there is no switch of its own):
 ticket types (name, description, price in cents, capacity, most per order, sales window as local times
 in the event's timezone, hidden for past ones), the event's capacity (per date for a recurring event),
 most per order, phone (off, optional, required), address (off, for paid orders, always), the event's own

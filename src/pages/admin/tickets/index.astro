@@ -7,8 +7,10 @@ import { money, ticketSettings, ticketsOf } from '../../../lib/tickets/config';
 import { recurrenceOf } from '../../../lib/recurrence';
 
 const db = Astro.locals.db;
-const { data: events, error } = await db.from('entries').select('id, title, status, fields, event_start').eq('type', 'event').eq('fields->tickets->>enabled', 'true').order('event_start', { ascending: false });
+const { data: rows, error } = await db.from('entries').select('id, title, status, fields, event_start').eq('type', 'event').not('fields->tickets->types', 'is', null).order('event_start', { ascending: false });
 if (error) throw error;
+// An event sells tickets when it has ticket types (Events on).
+const events = (rows ?? []).filter((e) => ticketsOf(e.fields).enabled);
 const { data: settings } = await db.from('settings').select('value').eq('key', 'site').maybeSingle();
 const currency = ticketSettings(settings?.value).currency ?? 'usd';
 const { data: orders } = await allRows(db.from('ticket_orders').select('entry_id, quantity, amount, refunded_amount, status').in('status', ['paid', 'refunded']).order('id'));

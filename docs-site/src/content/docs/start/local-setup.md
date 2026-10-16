@@ -75,7 +75,7 @@ The Supabase CLI runs through `npx`, so you don't need to install it.
 
 ### Compose
 
-Set `ANTHROPIC_API_KEY`, and optionally `ANTHROPIC_MODEL` (default `claude-opus-5-5`). Restart the
+Set `ANTHROPIC_API_KEY`, and optionally `ANTHROPIC_MODEL` (default `claude-sonnet-5-5`). Restart the
 dev server after setting it. See [Compose](../../features/compose/).
 
 ### Form notification mail
@@ -88,11 +88,16 @@ submissions are stored but no mail is sent.
 Locally, `SMTP_URL=smtp://127.0.0.1:56525` sends to the Supabase stack's mail catcher, whose inbox is
 at http://127.0.0.1:56524.
 
+### Events
+
+Turn them on under **Settings > Events** (admins), where the default time zone is set too, then run
+`npm run seed` again for the event templates and a sample event. The site's config needs nothing. See
+[Events](../../features/events/).
+
 ### Payments and tickets
 
-Needs the `event` content type in `src/site/config.ts`. Turn Tickets on in an event's
-settings and add ticket types; the Event details block shows the form, or place a Tickets block on
-any page or template. Free tickets need nothing else. For paid ones, set one provider's keys:
+Turn Events on under Settings > Events, then add ticket types in an event's settings (under
+Tickets); the Event details block shows the form, or place a Tickets block on any page or template. Free tickets need nothing else. For paid ones, set one provider's keys:
 
 - Stripe: `STRIPE_SECRET_KEY` (`sk_test_...` to test) and `STRIPE_WEBHOOK_SECRET`.
 - Square: `SQUARE_ACCESS_TOKEN`, `SQUARE_LOCATION_ID`, `SQUARE_ENVIRONMENT=sandbox` to test,

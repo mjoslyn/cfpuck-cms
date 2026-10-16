@@ -11,15 +11,19 @@ import { termLink } from '../lib/permalink';
 import { TAXONOMY_BASES } from '../lib/site';
 import { termPagesOn, termTemplate, templateLabel } from '../lib/templates';
 import TermDetails from './TermDetails';
+import { showsTaxonomy } from '../lib/events/on';
 
 interface Props {
   taxonomy: string;
+  /** Whether events are on (Settings > Events): event categories are hidden while they're off. */
+  events: boolean;
   error?: string | null;
   notice?: string | null;
 }
-const { taxonomy, error, notice } = Astro.props;
+const { taxonomy, events, error, notice } = Astro.props;
+const taxonomies = site.taxonomies.filter((t) => showsTaxonomy(t.name, events));
 const db = Astro.locals.db;
-const tax = site.taxonomies.find((t) => t.name === taxonomy) ?? site.taxonomies[0];
+const tax = taxonomies.find((t) => t.name === taxonomy) ?? taxonomies[0];
 const flat = tax.name === 'tag';
 const one = (tax.singular ?? tax.label).toLowerCase();
 
@@ -56,14 +60,14 @@ const under = (id: number): Set<number> => {
   return out;
 };
 const counts = new Map<string, number>();
-await Promise.all(site.taxonomies.map(async (t) => {
+await Promise.all(taxonomies.map(async (t) => {
   const { count } = await db.from('terms').select('id', { count: 'exact', head: true }).eq('taxonomy', t.name);
   counts.set(t.name, count ?? 0);
 }));
 const input = 'rounded border border-admin-ink/15 bg-white px-2 py-1 text-sm focus:border-admin-accent focus:outline-none';
 ---
 <nav class="mt-4 flex flex-wrap gap-1 border-b border-admin-ink/10 text-sm" aria-label="Taxonomies">
-  {site.taxonomies.map((t) => (
+  {taxonomies.map((t) => (
     <a href={`/admin/?type=terms&taxonomy=${t.name}`} aria-current={t.name === tax.name ? 'page' : undefined} class:list={['-mb-px border-b-2 px-3 py-2', t.name === tax.name ? 'border-admin-accent text-admin-ink' : 'border-transparent text-admin-muted hover:text-admin-ink']}>
       {t.label} <span class="text-xs text-admin-muted">({counts.get(t.name)})</span>
     </a>

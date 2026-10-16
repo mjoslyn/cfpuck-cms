@@ -4,10 +4,12 @@
 import type { APIRoute } from 'astro';
 import { siteDb } from '../../../lib/supabase';
 import { PUBLIC_SCOPE, visibleTo } from '../../../lib/data';
+import { eventsOnIn } from '../../../lib/events/on';
 import { remaining, ticketsOf } from '../../../lib/tickets/config';
 import { soldCounts } from '../../../lib/tickets/orders';
 
 export const GET: APIRoute = async ({ url }) => {
+  if (!(await eventsOnIn(siteDb()))) return new Response('Not found', { status: 404 });
   const id = Number(url.searchParams.get('event')) || 0;
   const date = (url.searchParams.get('date') ?? '').slice(0, 10);
   const { data: entry } = id ? await visibleTo(siteDb().from('entries').select('fields').eq('id', id).eq('type', 'event'), PUBLIC_SCOPE).maybeSingle() : { data: null };

@@ -30,6 +30,7 @@ import { archiveTitleText as archiveTitle } from './c/collection';
 import './blocks';
 import type { FormResult } from '../lib/forms/types';
 import { ACCOUNT_PATH, memberSettings, type Viewer } from '../lib/members/config';
+import { eventsOn } from '../lib/events/on';
 
 
 export interface PageResult {
@@ -85,6 +86,8 @@ export async function resolve(url: URL, loader: Loader): Promise<Queried> {
   const parts = path.split('/').filter(Boolean);
   const base: Queried = { kind: '404', page, url };
   const settings = await loader.settings();
+  // Events off (Settings > Events): their listing, calendar views, term pages and pages are Not found.
+  const events = eventsOn(settings.site);
 
   if (!parts.length) {
     const id = settings.site?.front_page_id;
@@ -95,20 +98,21 @@ export async function resolve(url: URL, loader: Loader): Promise<Queried> {
   if (parts.length === 1 && parts[0] === 'search') return { ...base, kind: 'search', search: (url.searchParams.get('q') ?? '').trim().slice(0, 200) };
   // Listing pages that are on (Settings > Types); a page may take the address of one that is off.
   const archive = ARCHIVES[`/${parts.join('/')}/`];
-  if (archive && listingOn(settings.site, archive)) return { ...base, kind: 'archive', postType: archive };
+  if (archive && listingOn(settings.site, archive) && (archive !== 'event' || events)) return { ...base, kind: 'archive', postType: archive };
   // Calendar views: /events/past/, /events/month/[Y-m/], /events/today/, /events/day/Y-m-d/.
-  if (parts[0] === EVENTS_BASE && ['past', 'month', 'today', 'day'].includes(parts[1]) && listingOn(settings.site, 'event')) {
+  if (parts[0] === EVENTS_BASE && ['past', 'month', 'today', 'day'].includes(parts[1]) && listingOn(settings.site, 'event') && events) {
     return { ...base, kind: 'archive', postType: 'event' };
   }
   // Term pages (/directory/category/<slug>/, /tag/<slug>/...): the entries with the term.
   // A taxonomy whose pages are off: its addresses are treated like any other (a page there, or Not found).
-  const route = TAXONOMY_ROUTES.find((r) => parts.length === r.base.length + 1 && r.base.every((seg, i) => parts[i] === seg) && termPagesOn(settings.site, r.taxonomy));
+  const route = TAXONOMY_ROUTES.find((r) => parts.length === r.base.length + 1 && r.base.every((seg, i) => parts[i] === seg) && termPagesOn(settings.site, r.taxonomy) && (events || termPageType(r.taxonomy) !== 'event'));
   if (route) {
     const term = await loader.termBySlug(route.taxonomy, parts[parts.length - 1]);
     return term ? { ...base, kind: 'taxonomy', term, postType: termPageType(route.taxonomy) } : base;
   }
   // Records (venues) have no page of their own: their URLs serve the front page.
   if (parts.length <= 2 && [...RECORD_TYPES].some((t) => TYPE_BASES[t] === parts[0])) return resolve(new URL('/', url), loader).then((q) => ({ ...q, url }));
+  if (!events && (BASE_TYPES[parts[0]] === 'event')) return base;
   if (parts.length === 2 && BASE_TYPES[parts[0]]) {
     const entry = (await loader.entry(BASE_TYPES[parts[0]], parts[1])) ?? (await loader.lockedEntry([BASE_TYPES[parts[0]]], parts[1]));
     // A recurring series has no page of its own; send visitors to the next occurrence.
@@ -229,7 +233,7 @@ export async function renderRequest(url: URL, db: SupabaseClient, form?: FormRes
   const settings = await loader.settings();
   // A member counts as one only while Members is on.
   const who = viewer && !memberSettings(settings.site).enabled ? { ...viewer, member: null } : viewer;
-  if (loader.scope) loader.scope.viewer = who;
+  if (loader.scope) Object.assign(loader.scope, { viewer: who, noEvents: !eventsOn(settings.site) });
   const queried: Queried = preview ? { kind: 'singular', entry: preview.entry, page: 1, url, isFront: settings.site?.front_page_id === preview.entry.id } : await resolve(url, loader);
   if (queried.redirect) return { status: 302, html: '', location: queried.redirect };
   if (queried.kind === '404' && url.pathname !== '/__not-found__/') {

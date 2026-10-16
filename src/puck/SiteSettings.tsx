@@ -1,6 +1,6 @@
-// Site settings island, in tabs: General (name, tagline, front page, timezone), Types (the templates for
+// Site settings island, in tabs: General (name, tagline, front page), Types (the templates for
 // each type's pages and listing), Search (the types it covers), Social (profile links, default share
-// image), Tickets (payments and ticket emails), Admin (the admin's colors and logo), Redirects (saved as they are added, with the Not found log), Sync (with another copy of the
+// image), Events (on or off, the default time zone), Tickets (payments and ticket emails; while events are on), Admin (the admin's colors and logo), Redirects (saved as they are added, with the Not found log), Sync (with another copy of the
 // site), Backups (snapshots and sync backups) and the site's own options. One Save for all;
 // the tab is in the URL (#search), and leaving with unsaved changes asks first.
 import type { PaymentProvider, ProviderStatus } from '../lib/payments';
@@ -17,6 +17,7 @@ import BackupsTab from '../admin/Backups';
 import TicketSettingsPanel from '../admin/TicketSettings';
 import MemberSettingsPanel from '../admin/MemberSettings';
 import type { MemberSettings } from '../lib/members/config';
+import { eventsOn, showsTaxonomy, showsType } from '../lib/events/on';
 import type { TicketSettings } from '../lib/tickets/config';
 import type { Redirect } from '../lib/redirects';
 import { MENU_FIELDS } from '../lib/navigation';
@@ -24,7 +25,7 @@ import type { TaxonomyMeta } from '../lib/page-meta';
 import { ADMIN_THEME_DEFAULTS, ADMIN_THEME_FIELDS, adminThemeVars, contrast, type AdminTheme } from '../lib/admin-theme';
 
 interface Props {
-  site: { name?: string; description?: string; front_page_id?: number | null; timezone?: string; search_types?: string[]; social?: { network: string; url: string }[]; share_image?: number; share_image_url?: string; templates?: TemplateMap; taxonomy_templates?: Record<string, string>; taxonomy_pages_off?: string[]; taxonomy_meta?: Record<string, TaxonomyMeta>; listing_meta?: Record<string, TaxonomyMeta>; listings_off?: string[]; icons?: Record<string, string>; icon_media_id?: number | null; icon_preview?: string; admin_theme?: AdminTheme; tickets?: TicketSettings; members?: Partial<MemberSettings> };
+  site: { name?: string; description?: string; front_page_id?: number | null; timezone?: string; search_types?: string[]; social?: { network: string; url: string }[]; share_image?: number; share_image_url?: string; templates?: TemplateMap; taxonomy_templates?: Record<string, string>; taxonomy_pages_off?: string[]; taxonomy_meta?: Record<string, TaxonomyMeta>; listing_meta?: Record<string, TaxonomyMeta>; listings_off?: string[]; icons?: Record<string, string>; icon_media_id?: number | null; icon_preview?: string; admin_theme?: AdminTheme; tickets?: TicketSettings; members?: Partial<MemberSettings>; events?: { enabled?: boolean } };
   options: Record<string, any>;
   pages: { id: number; title: string }[];
   templates: TemplateInfo[];
@@ -112,13 +113,6 @@ export default function SiteSettings({ site: initialSite, options: initialOption
         <Text title="Site name" value={site.name} onChange={(v) => setSite({ ...site, name: v })} />
         <Text title="Tagline" value={site.description} onChange={(v) => setSite({ ...site, description: v })} />
         <Select title="Front page" value={site.front_page_id ? String(site.front_page_id) : ''} options={pages.map((p) => [String(p.id), p.title])} onChange={(v) => setSite({ ...site, front_page_id: v ? Number(v) : null })} />
-        <Select
-          title="Timezone"
-          value={site.timezone ?? ''}
-          options={TIMEZONES.map((t) => [t, t.replace(/_/g, ' ')] as [string, string])}
-          onChange={(v) => setSite({ ...site, timezone: v || undefined })}
-        />
-        <p className="-mt-2 mb-3 text-xs text-admin-muted">Default: {config.timezone.replace(/_/g, ' ')}. Event times, dates and calendars use it; events on the old timezone keep their local times when it changes.</p>
         </>
       ),
     },
@@ -127,8 +121,8 @@ export default function SiteSettings({ site: initialSite, options: initialOption
       label: 'Types',
       panel: (
         <>
-          <TypeTemplates value={site.templates ?? {}} off={site.listings_off ?? []} templates={templates} meta={site.listing_meta ?? {}} onChange={(m) => setSite((s) => ({ ...s, templates: m }))} onListings={(off) => setSite((s) => ({ ...s, listings_off: off }))} onMeta={(m) => setSite((s) => ({ ...s, listing_meta: Object.keys(m).length ? m : undefined }))} />
-          <TaxonomyTemplatesPanel value={site.taxonomy_templates ?? {}} off={site.taxonomy_pages_off ?? []} templates={templates} meta={site.taxonomy_meta ?? {}} onChange={(m) => setSite((s) => ({ ...s, taxonomy_templates: Object.keys(m).length ? m : undefined }))} onPages={(off) => setSite((s) => ({ ...s, taxonomy_pages_off: off.length ? off : undefined }))} onMeta={(m) => setSite((s) => ({ ...s, taxonomy_meta: Object.keys(m).length ? m : undefined }))} />
+          <TypeTemplates events={eventsOn(site)} value={site.templates ?? {}} off={site.listings_off ?? []} templates={templates} meta={site.listing_meta ?? {}} onChange={(m) => setSite((s) => ({ ...s, templates: m }))} onListings={(off) => setSite((s) => ({ ...s, listings_off: off }))} onMeta={(m) => setSite((s) => ({ ...s, listing_meta: Object.keys(m).length ? m : undefined }))} />
+          <TaxonomyTemplatesPanel events={eventsOn(site)} value={site.taxonomy_templates ?? {}} off={site.taxonomy_pages_off ?? []} templates={templates} meta={site.taxonomy_meta ?? {}} onChange={(m) => setSite((s) => ({ ...s, taxonomy_templates: Object.keys(m).length ? m : undefined }))} onPages={(off) => setSite((s) => ({ ...s, taxonomy_pages_off: off.length ? off : undefined }))} onMeta={(m) => setSite((s) => ({ ...s, taxonomy_meta: Object.keys(m).length ? m : undefined }))} />
         </>
       ),
     },
@@ -138,7 +132,7 @@ export default function SiteSettings({ site: initialSite, options: initialOption
       panel: (
         <>
         <p className="mb-3 text-xs text-admin-muted">What site search and its live results cover.</p>
-        {SEARCHABLE_TYPES.map((type) => {
+        {SEARCHABLE_TYPES.filter((type) => showsType(type, eventsOn(site))).map((type) => {
           const chosen = site.search_types ?? SEARCHABLE_TYPES;
           const on = chosen.includes(type);
           return (
@@ -221,11 +215,33 @@ export default function SiteSettings({ site: initialSite, options: initialOption
         </>
       ),
     },
+    // Events, an optional feature (src/lib/events/on.ts); its tickets while on.
     {
-      id: 'tickets',
-      label: 'Tickets',
-      panel: <TicketSettingsPanel value={site.tickets ?? {}} providers={ticketProviders} onChange={(tickets) => setSite((s) => ({ ...s, tickets }))} />,
+      id: 'events',
+      label: 'Events',
+      panel: (
+        <>
+          <Toggle title="Events on" value={eventsOn(site)} onChange={(on) => setSite((s) => ({ ...s, events: { enabled: on } }))} />
+          <p className="text-xs text-admin-muted">
+            {eventsOn(site)
+              ? 'Events and venues under Content, event pages, the calendar (/events/), event categories, calendar feeds, ticket sales and the event and ticket blocks.'
+              : 'Turn on to add events and venues under Content, event pages, a calendar (/events/), event categories, calendar feeds, tickets and the event and ticket blocks. Turning it off later deletes nothing: events are hidden until it is on again.'}
+          </p>
+          <Select
+            title="Default time zone"
+            value={site.timezone ?? ''}
+            options={TIMEZONES.map((t) => [t, t.replace(/_/g, ' ')] as [string, string])}
+            onChange={(v) => setSite({ ...site, timezone: v || undefined })}
+          />
+          <p className="-mt-2 mb-3 text-xs text-admin-muted">
+            Empty: {config.timezone.replace(/_/g, ' ')}. New events use it, and the calendar, feeds and the site's dates show times in it; an event can have its own. Events on the old time zone keep their local times when it changes.
+          </p>
+        </>
+      ),
     },
+    ...(eventsOn(site)
+      ? [{ id: 'tickets', label: 'Tickets', panel: <TicketSettingsPanel value={site.tickets ?? {}} providers={ticketProviders} onChange={(tickets) => setSite((s) => ({ ...s, tickets }))} /> }]
+      : []),
     {
       id: 'members',
       label: 'Members',
@@ -306,9 +322,9 @@ export default function SiteSettings({ site: initialSite, options: initialOption
 }
 
 /** Types with pages of their own, and the template for their entries and their listing page. */
-function TypeTemplates({ value, off, templates, meta, onChange, onListings, onMeta }: { value: TemplateMap; off: string[]; templates: TemplateInfo[]; meta: Record<string, TaxonomyMeta>; onChange: (m: TemplateMap) => void; onListings: (off: string[]) => void; onMeta: (m: Record<string, TaxonomyMeta>) => void }) {
+function TypeTemplates({ events, value, off, templates, meta, onChange, onListings, onMeta }: { events: boolean; value: TemplateMap; off: string[]; templates: TemplateInfo[]; meta: Record<string, TaxonomyMeta>; onChange: (m: TemplateMap) => void; onListings: (off: string[]) => void; onMeta: (m: Record<string, TaxonomyMeta>) => void }) {
   const have = new Set(templates.map((t) => t.slug));
-  const types = CONTENT_TYPES.filter((t) => !PAGELESS_TYPES.has(t.type));
+  const types = CONTENT_TYPES.filter((t) => !PAGELESS_TYPES.has(t.type) && showsType(t.type, events));
   const setMeta = (type: string, m: TaxonomyMeta) => {
     const next = { ...meta };
     if (m.image || (m.seo && Object.keys(m.seo).length)) next[type] = m;
@@ -477,9 +493,9 @@ function PageDefaults({ kind, name, label, path, value, onChange }: { kind: 'tax
 }
 
 /** Settings > Types: the template for each taxonomy's term pages (a term can choose its own), and their default image and SEO. */
-function TaxonomyTemplatesPanel({ value, off, templates, meta, onChange, onPages, onMeta }: { value: Record<string, string>; off: string[]; templates: TemplateInfo[]; meta: Record<string, TaxonomyMeta>; onChange: (m: Record<string, string>) => void; onPages: (off: string[]) => void; onMeta: (m: Record<string, TaxonomyMeta>) => void }) {
+function TaxonomyTemplatesPanel({ events, value, off, templates, meta, onChange, onPages, onMeta }: { events: boolean; value: Record<string, string>; off: string[]; templates: TemplateInfo[]; meta: Record<string, TaxonomyMeta>; onChange: (m: Record<string, string>) => void; onPages: (off: string[]) => void; onMeta: (m: Record<string, TaxonomyMeta>) => void }) {
   const have = new Set(templates.map((t) => t.slug));
-  const taxonomies = config.taxonomies.filter((t) => t.base);
+  const taxonomies = config.taxonomies.filter((t) => t.base && showsTaxonomy(t.name, events));
   return (
     <>
       <h3 className="mt-8 mb-1 text-sm font-semibold">Taxonomy pages</h3>

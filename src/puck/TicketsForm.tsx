@@ -116,46 +116,49 @@ function MemberPricing({ type, levels, onChange }: { type: TicketType; levels: M
 export function TicketsForm({ fields, onChange }: { fields: Record<string, any>; onChange: (fields: Record<string, any>) => void }) {
   const members = useMemberSettings();
   const t: EventTickets = { types: [], ...(fields[TICKETS_KEY] ?? {}) };
-  const set = (patch: Partial<EventTickets>) => onChange({ ...fields, [TICKETS_KEY]: { ...t, ...patch } });
+  // `enabled` isn't stored any more: an event sells tickets while it has ticket types.
+  const { enabled: _enabled, ...stored } = t;
+  const set = (patch: Partial<EventTickets>) => onChange({ ...fields, [TICKETS_KEY]: { ...stored, ...patch } });
   // The attendee list, for an event that has been saved (/admin/edit/<id>/).
   const [entryId, setEntryId] = useState<string | null>(null);
   useEffect(() => setEntryId(location.pathname.match(/\/admin\/edit\/(\d+)/)?.[1] ?? null), []);
 
   return (
     <>
-      <Toggle title="Sell tickets or take registrations" value={t.enabled} onChange={(enabled) => set({ enabled, types: t.types.length ? t.types : [{ id: newId('t'), name: 'General admission', price: 0 }] })} />
-      {entryId && t.enabled && (
-        <p className="-mt-2 mb-3 text-xs">
+      {/* The event sells tickets (or takes registrations) while it has ticket types. */}
+      {!t.types.length && <p className="mb-2 text-xs text-admin-muted">Add a ticket type to sell tickets or take registrations (a price of 0 is free).</p>}
+      {entryId && t.types.length > 0 && (
+        <p className="mb-3 text-xs">
           <a className="text-admin-accent underline" href={`/admin/tickets/${entryId}/`} target="_blank" rel="noopener">Attendee list and orders</a>
         </p>
       )}
-      {t.enabled && (
+      {t.types.length > 0 && <Text title="Heading" value={t.heading} placeholder="Tickets" onChange={(heading) => set({ heading: heading || undefined })} />}
+      {t.types.length > 0 && <span className="mb-1 block text-xs font-medium text-admin-muted">Ticket types</span>}
+      <List<TicketType>
+        items={t.types}
+        label={(x) => `${x.name || 'Ticket'}${x.hidden ? ' (not offered)' : ''}`}
+        onChange={(types) => set({ types })}
+        render={(x, setType) => (
+          <>
+            <Text title="Name" value={x.name} onChange={(name) => setType({ name })} />
+            <Row title="Description">
+              <textarea className={inputClass} rows={2} value={x.description ?? ''} onChange={(e) => setType({ description: e.target.value || undefined })} />
+            </Row>
+            <PriceInput value={x.price} onChange={(price) => setType({ price: price ?? 0 })} />
+            {members?.enabled && members.levels.length > 0 && <MemberPricing type={x} levels={members.levels} onChange={setType} />}
+            <Num title="How many (empty: no limit of its own)" value={x.capacity ?? undefined} min={0} onChange={(capacity) => setType({ capacity: capacity ?? null })} />
+            <Num title="Most in one order" value={x.maxPerOrder ?? undefined} min={1} onChange={(maxPerOrder) => setType({ maxPerOrder: maxPerOrder ?? null })} />
+            <DateTime title="On sale from (empty: now)" value={x.salesStart} onChange={(salesStart) => setType({ salesStart })} />
+            <DateTime title="On sale until (empty: until the event ends)" value={x.salesEnd} onChange={(salesEnd) => setType({ salesEnd })} />
+            <Toggle title="No longer offered (kept for past orders)" value={x.hidden} onChange={(hidden) => setType({ hidden: hidden || undefined })} />
+          </>
+        )}
+      />
+      <button type="button" className={`${small} mb-3`} onClick={() => set({ types: [...t.types, { id: newId('t'), name: t.types.length ? '' : 'General admission', price: 0 }] })}>
+        Add ticket type
+      </button>
+      {t.types.length > 0 && (
         <>
-          <Text title="Heading" value={t.heading} placeholder="Tickets" onChange={(heading) => set({ heading: heading || undefined })} />
-          <span className="mb-1 block text-xs font-medium text-admin-muted">Ticket types</span>
-          <List<TicketType>
-            items={t.types}
-            label={(x) => `${x.name || 'Ticket'}${x.hidden ? ' (not offered)' : ''}`}
-            onChange={(types) => set({ types })}
-            render={(x, setType) => (
-              <>
-                <Text title="Name" value={x.name} onChange={(name) => setType({ name })} />
-                <Row title="Description">
-                  <textarea className={inputClass} rows={2} value={x.description ?? ''} onChange={(e) => setType({ description: e.target.value || undefined })} />
-                </Row>
-                <PriceInput value={x.price} onChange={(price) => setType({ price: price ?? 0 })} />
-                {members?.enabled && members.levels.length > 0 && <MemberPricing type={x} levels={members.levels} onChange={setType} />}
-                <Num title="How many (empty: no limit of its own)" value={x.capacity ?? undefined} min={0} onChange={(capacity) => setType({ capacity: capacity ?? null })} />
-                <Num title="Most in one order" value={x.maxPerOrder ?? undefined} min={1} onChange={(maxPerOrder) => setType({ maxPerOrder: maxPerOrder ?? null })} />
-                <DateTime title="On sale from (empty: now)" value={x.salesStart} onChange={(salesStart) => setType({ salesStart })} />
-                <DateTime title="On sale until (empty: until the event ends)" value={x.salesEnd} onChange={(salesEnd) => setType({ salesEnd })} />
-                <Toggle title="No longer offered (kept for past orders)" value={x.hidden} onChange={(hidden) => setType({ hidden: hidden || undefined })} />
-              </>
-            )}
-          />
-          <button type="button" className={`${small} mb-3`} onClick={() => set({ types: [...t.types, { id: newId('t'), name: '', price: 0 }] })}>
-            Add ticket type
-          </button>
           <p className="-mt-1 mb-3 text-xs text-admin-muted">Times are in the event's timezone. A recurring event sells tickets for each date separately.</p>
           <Num title="Capacity: tickets of all types together (empty: no limit)" value={t.capacity ?? undefined} min={0} onChange={(capacity) => set({ capacity: capacity ?? null })} />
           <Num title="Most tickets in one order (default 10)" value={t.maxPerOrder ?? undefined} min={1} onChange={(maxPerOrder) => set({ maxPerOrder: maxPerOrder ?? null })} />

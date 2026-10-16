@@ -22,6 +22,7 @@ import { applyFilters, filterSpec, findFilters } from './c/filters';
 import { prepareMap } from './c/map';
 import { prepareNavigation } from './c/navigation';
 import { prepareTickets, prepareTicketsBlock } from './c/tickets';
+import { EVENT_BLOCKS, eventsOn } from '../lib/events/on';
 
 interface WalkState {
   /** Counter for unique ids (sliders, content feeds). */
@@ -127,6 +128,8 @@ async function walk(items: PuckItem[], ctx: RenderCtx, state: WalkState) {
     const attrs = props.attrs ?? {};
     const className = String(attrs.className ?? '');
 
+    // Events off (Settings > Events): their blocks show nothing, so load nothing for them.
+    if (EVENT_BLOCKS.includes(type) && !eventsOn(ctx.settings.site)) continue;
     switch (type) {
       case 'part':
         await loadDoc(ctx, `part:${attrs.slug}`, async () => (await ctx.loader.template('part', attrs.slug))?.content as PuckItem[], state);

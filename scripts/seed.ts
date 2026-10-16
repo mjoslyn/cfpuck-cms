@@ -1,6 +1,8 @@
 // Starter content for a new install: the header and footer parts, the base templates (index, page,
-// single, event, events archive, search), a home page set as the front page, and the site settings. Anything
-// that already exists is left alone, so it is safe to run again and on a hosted project.
+// single, search), a home page set as the front page, and the site settings; with Events on (Settings >
+// Events), the event templates, a sample event and venue, and events on the home page and in the header.
+// Anything that already exists is left alone, so it is safe to run again (after turning Events on, it
+// adds the event templates and the sample event) and on a hosted project.
 //   npx tsx --env-file=.env scripts/seed.ts
 import { createClient } from '@supabase/supabase-js';
 import { buildPage } from '../src/lib/compose/build';
@@ -8,8 +10,11 @@ import { site } from '../src/lib/site';
 import type { PuckItem } from '../src/lib/puck/types';
 import { eventDates } from '../src/lib/admin/save';
 import { SEARCH_TEMPLATE } from '../src/lib/content/search-template';
+import { eventsOn } from '../src/lib/events/on';
 
 const sb = createClient(process.env.PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
+const { data: current } = await sb.from('settings').select('value').eq('key', 'site').maybeSingle();
+const events = eventsOn(current?.value);
 
 let n = 0;
 const node = (type: string, attrs: Record<string, any> = {}, children?: PuckItem[]): PuckItem =>
@@ -22,7 +27,7 @@ const header = [
   node('section', { tag: 'header', style: { background: 'var(--color-dark)', padding: pad('var(--space-40)') }, layout: { type: 'constrained', contentSize: '1280px' } }, [
     node('section', { layout: { type: 'row', justify: 'space-between', align: 'center' } }, [
       node('text', { content: `<a href="/">${esc(site.name)}</a>`, style: { color: 'var(--color-on-dark)', linkColor: 'var(--color-on-dark)', fontFamily: 'var(--font-display)', fontSize: 'var(--text-x-large)' } }),
-      node('text', { content: '<a href="/events/">Events</a> &nbsp; <a href="/about/">About</a> &nbsp; <a href="/search/">Search</a>', style: { color: 'var(--color-on-dark)', linkColor: 'var(--color-on-dark)' } }),
+      node('text', { content: `${events ? '<a href="/events/">Events</a> &nbsp; ' : ''}<a href="/about/">About</a> &nbsp; <a href="/search/">Search</a>`, style: { color: 'var(--color-on-dark)', linkColor: 'var(--color-on-dark)' } }),
     ]),
   ]),
 ];
@@ -66,14 +71,15 @@ const templates: Record<string, PuckItem[]> = {
   'archive-events': page([node('events-calendar')]),
   search: SEARCH_TEMPLATE,
 };
+if (!events) for (const slug of ['single-event', 'archive-events']) delete templates[slug];
 
 const home = buildPage(
   {
     title: 'Home',
     sections: [
-      { kind: 'hero', eyebrow: site.organization, heading: `Welcome to ${site.name}`, body: 'Edit this page in the editor, or ask Compose to write a new one.', buttons: [{ label: 'Upcoming events', url: '/events/' }] },
+      { kind: 'hero', eyebrow: site.organization, heading: `Welcome to ${site.name}`, body: 'Edit this page in the editor, or ask Compose to write a new one.', buttons: events ? [{ label: 'Upcoming events', url: '/events/' }] : [] },
       { kind: 'text', heading: 'About us', body: 'Say who you are and what visitors will find here.' },
-      { kind: 'listing', heading: 'Upcoming events', listing: { content_type: 'event', count: 3 }, background: 'tint' },
+      ...(events ? [{ kind: 'listing', heading: 'Upcoming events', listing: { content_type: 'event', count: 3 }, background: 'tint' }] : []),
     ],
   } as any,
   { images: new Map(), videos: new Map(), tags: new Map() },
@@ -107,15 +113,16 @@ for (const [slug, content] of Object.entries(templates)) await ensureTemplate('t
 const homeId = await ensurePage('home', 'Home', home);
 await ensurePage('about', 'About', buildPage({ title: 'About', sections: [{ kind: 'text', heading: 'About', body: 'Tell visitors about the organisation.' }] } as any, { images: new Map(), videos: new Map(), tags: new Map() }, 'seed-about'));
 
-// A sample event two weeks out, at a sample venue, so the listing and the calendar show something.
-const venue = await ensureEntry('venue', 'town-hall', 'Town Hall', [], { fields: { address: '1 Main Street' } });
-const day = new Date(Date.now() + 14 * 864e5).toISOString().slice(0, 10);
-await ensureEntry('event', 'welcome-evening', 'Welcome evening', [node('text', { content: 'Meet your neighbours. Replace this sample event with your own.' })], {
-  excerpt: 'Meet your neighbours.',
-  ...eventDates({ event_start: `${day}T18:00`, event_end: `${day}T20:00`, event_all_day: false }, { venue, cost: 'Free' }),
-});
+// With Events on: a sample event two weeks out, at a sample venue, so the listing and the calendar show something.
+if (events) {
+  const venue = await ensureEntry('venue', 'town-hall', 'Town Hall', [], { fields: { address: '1 Main Street' } });
+  const day = new Date(Date.now() + 14 * 864e5).toISOString().slice(0, 10);
+  await ensureEntry('event', 'welcome-evening', 'Welcome evening', [node('text', { content: 'Meet your neighbours. Replace this sample event with your own.' })], {
+    excerpt: 'Meet your neighbours.',
+    ...eventDates({ event_start: `${day}T18:00`, event_end: `${day}T20:00`, event_all_day: false }, { venue, cost: 'Free' }),
+  });
+} else console.log('events: off (turn them on under Settings > Events, then run this again for the event templates and a sample event)');
 
-const { data: current } = await sb.from('settings').select('value').eq('key', 'site').maybeSingle();
 const value = { name: site.name, description: site.organization, ...(current?.value ?? {}) };
 if (!value.front_page_id) value.front_page_id = homeId;
 const { error } = await sb.from('settings').upsert({ key: 'site', value });

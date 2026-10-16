@@ -1,11 +1,15 @@
 // The site's configuration and everything derived from it. Core code reads content types, URLs,
 // taxonomies, timezone and identity from here, never from src/site directly.
-import config from '../../site/config';
+import siteConfig from '../../site/config';
 import movedPaths from '../../site/moved-paths.json';
 import presets from '../../site/presets.json';
 import type { ContentType, FieldDef, SiteConfig, Taxonomy } from './types';
+import { withEvents } from '../events/types';
 
 export type { ContentType, FieldDef, SiteConfig, Taxonomy };
+
+// The site's config with the core's optional features' types added (Events: src/lib/events/types.ts).
+const config: SiteConfig = { ...siteConfig, ...withEvents(siteConfig.types, siteConfig.taxonomies) };
 
 for (const t of ['page', 'post', 'global']) if (!config.types.some((c) => c.type === t)) throw new Error(`site config: the "${t}" content type is required`);
 for (const t of ['category', 'tag']) if (!config.taxonomies.some((c) => c.name === t)) throw new Error(`site config: the "${t}" taxonomy is required`);

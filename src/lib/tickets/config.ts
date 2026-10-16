@@ -58,6 +58,7 @@ export type EmailKind = 'confirmation' | 'reminder' | 'followUp' | 'waitlist' | 
 
 /** An event's tickets (fields.tickets). */
 export interface EventTickets {
+  /** Whether the event sells tickets: it has ticket types (read with ticketsOf; not stored). */
   enabled?: boolean;
   /** Heading over the ticket form (default "Tickets"). */
   heading?: string;
@@ -248,7 +249,7 @@ export function ticketsOf(fields: Record<string, any> | null | undefined): Event
       help: str(q.help, 500) || undefined,
     }));
   return {
-    enabled: t.enabled === true,
+    enabled: types.length > 0,
     heading: str(t.heading, 200) || undefined,
     types,
     capacity: num(t.capacity),
