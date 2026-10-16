@@ -1,7 +1,8 @@
 // The Events feature's content types and taxonomy (Settings > Events, src/lib/events/on.ts). The core
-// adds them to the site's config (src/lib/site), so a site needs none of them in its config.ts; one
-// that defines its own `event`, `venue` or `event_category` keeps its own. Safe in the browser.
-import type { ContentType, FieldDef, Taxonomy } from '../site/types';
+// adds them to the site's config (src/lib/site), so a site needs none of them in its config.ts. A site
+// changes them with its config's `events` (fields added, replaced or left out; labels, URLs...); one that
+// lists its own `event`, `venue` or `event_category` keeps that whole. Safe in the browser.
+import type { ContentType, EventsConfig, FieldDef, Taxonomy, TypeExtension } from '../site/types';
 
 const ADDRESS: FieldDef[] = [
   { key: 'address', label: 'Street address', type: 'text' },
@@ -55,14 +56,29 @@ export const EVENT_CATEGORY: Taxonomy = { name: 'event_category', label: 'Event 
 /** The content types that belong to Events: hidden from the admin's tabs and pickers while it is off. */
 export const EVENT_TYPES = ['event', 'venue'];
 
-/** The site's types and taxonomies with the Events feature's added where the site has none of its own. */
-export function withEvents(types: ContentType[], taxonomies: Taxonomy[]): { types: ContentType[]; taxonomies: Taxonomy[] } {
+/** A core type with a site's changes (its `events` config): options replaced, fields added, replaced or left out by key. */
+export function extendType(base: ContentType, ext: TypeExtension | undefined): ContentType {
+  if (!ext) return base;
+  const { fields, removeFields, ...options } = ext;
+  const drop = new Set(removeFields ?? []);
+  const own = new Map((fields ?? []).map((f) => [f.key, f]));
+  const merged = (base.fields ?? []).filter((f) => !drop.has(f.key)).map((f) => own.get(f.key) ?? f);
+  const added = (fields ?? []).filter((f) => !(base.fields ?? []).some((b) => b.key === f.key));
+  return { ...base, ...options, type: base.type, fields: [...merged, ...added] };
+}
+
+/**
+ * The site's types and taxonomies with the Events feature's added: the core's event and venue types and
+ * event categories, extended by the site's `events` config. A site that lists its own `event` or `venue`
+ * type, or `event_category` taxonomy, keeps it whole instead.
+ */
+export function withEvents(types: ContentType[], taxonomies: Taxonomy[], ext: EventsConfig = {}): { types: ContentType[]; taxonomies: Taxonomy[] } {
   const has = (t: string) => types.some((c) => c.type === t);
-  const add = [EVENT_TYPE, VENUE_TYPE].filter((t) => !has(t.type));
+  const add = [extendType(EVENT_TYPE, ext.event), extendType(VENUE_TYPE, ext.venue)].filter((t) => !has(t.type));
   // Before the first type without a page (records, globals), so the admin's tabs keep pages first.
   const at = types.findIndex((t) => t.record || t.pageless);
   const merged = at < 0 ? [...types, ...add] : [...types.slice(0, at), ...add, ...types.slice(at)];
   const event = merged.find((t) => t.type === 'event')!;
   const wanted = event.category === EVENT_CATEGORY.name && !taxonomies.some((t) => t.name === EVENT_CATEGORY.name);
-  return { types: merged, taxonomies: wanted ? [...taxonomies, EVENT_CATEGORY] : taxonomies };
+  return { types: merged, taxonomies: wanted ? [...taxonomies, { ...EVENT_CATEGORY, ...ext.category, name: EVENT_CATEGORY.name }] : taxonomies };
 }

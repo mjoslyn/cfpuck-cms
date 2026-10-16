@@ -43,7 +43,7 @@ Everything that differs between sites lives in `src/site/`:
   offer them; `taxonomiesOf`), `fields` with `compose` hints, `describe`,
   `logoField`, default `card`, `order`) and taxonomies (label, URL `base`, the type a term page `lists`,
   its terms' own `fields`; `category` and `tag` are required; `event`, `venue` and `event_category`
-  come with the core's Events feature, see Events). Core code reads it only through `src/lib/site` (`CONTENT_TYPES`,
+  come with the core's Events feature, extended with `events`, see Events). Core code reads it only through `src/lib/site` (`CONTENT_TYPES`,
   `COMPOSABLE_TYPES`, `LISTABLE_TYPES`, `RECORD_TYPES`, `PAGELESS_TYPES`, `TYPE_BASES`,
   `ARCHIVE_PATHS`, `TAXONOMY_BASES`, `fieldsFor`, `categoryOf`, `termPageType`, `SITE_TZ`): the
   editor's Details, Compose's fields and prompt, permalinks, URL routing (archives, term pages,
@@ -500,8 +500,10 @@ Events is an optional feature, off until an admin turns it on (Settings > Events
 `settings.site.events.enabled`; `eventsOn`, `src/lib/events/on.ts`; migration `*_events_setting.sql`
 turned it on for sites that already had events). The core supplies the `event` and `venue` types and the
 `event_category` taxonomy (`src/lib/events/types.ts`, added to the config by `withEvents` in
-`src/lib/site`); a site that defines its own keeps them (to add fields, change labels or URLs; the
-calendar views stay under `/events/`). The core reads these field keys: on events `venue`, `cost`,
+`src/lib/site`). A site extends them with its config's `events` (`EventsConfig`: `event` and `venue`
+take any type option plus `fields`, added to the core's or replacing one by key, and `removeFields`;
+`category` the taxonomy's options; `extendType`), or lists its own `event`, `venue` or `event_category`
+to replace one whole (the calendar views stay under `/events/`). The core reads these field keys: on events `venue`, `cost`,
 `website` and `schedule`; on venues `address`, `city`, `state`, `zip`, `country`, `phone` and `website`.
 
 Off, nothing is deleted, but the admin hides events, venues and event categories (Content's tabs,

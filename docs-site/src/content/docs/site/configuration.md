@@ -54,8 +54,9 @@ export default defineSite({
 ## Content types
 
 `page`, `post` and `global` are required. Events (the `event` and `venue` types and the
-`event_category` taxonomy) come with the core and are turned on under Settings > Events; define them
-here only to change them ([Events](../../features/events/#changing-the-event-types)).
+`event_category` taxonomy) come with the core and are turned on under Settings > Events; extend them
+with `events` (fields added, replaced or left out, labels, URLs), see
+[Events](../../features/events/#extending-the-event-types).
 
 ```ts
 {

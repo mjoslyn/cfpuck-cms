@@ -102,8 +102,17 @@ The Supabase CLI runs through `npx`, so you don't need to install it.
   http://127.0.0.1:56524).
 - **Events.** Turn them on under Settings > Events (admins): event and venue types, the calendar at
   `/events/`, event categories, `.ics` feeds and the event blocks, plus the default time zone (an event
-  can choose its own). Nothing goes in the site config unless you want to change the event types. Run
-  `npm run seed` again afterwards for the event templates and a sample event.
+  can choose its own). Run `npm run seed` again afterwards for the event templates and a sample
+  event. The site config needs nothing for them; to add fields or change labels and URLs, extend them
+  with `events` in `src/site/config.ts`:
+
+  ```ts
+  events: {
+    event: { fields: [{ key: 'ages', label: 'Ages', type: 'text' }], removeFields: ['schedule'] },
+    venue: { fields: [{ key: 'parking', label: 'Parking', type: 'textarea' }] },
+    category: { label: 'Kind of event' },
+  },
+  ```
 - **Tickets.** With Events on, add ticket types in an event's settings (under Tickets); the Event
   details block shows the form, or place a Tickets block on any page or template. Free tickets
   need nothing else. For paid ones, set one provider's keys:
@@ -138,7 +147,7 @@ Everything site-specific lives in `src/site/`:
 
 | File | What it holds |
 | --- | --- |
-| `config.ts` | Name, organization, timezone, mail sender, admin email, a short brief for Compose, content types (labels, URLs, fields) and taxonomies |
+| `config.ts` | Name, organization, timezone, mail sender, admin email, a short brief for Compose, content types (labels, URLs, fields), taxonomies, and changes to the core's event types (`events`) |
 | `styles/tokens.css` | Colors, fonts, type sizes and spacing. The core's styles use the role colors (`--color-text`, `--color-accent`, `--color-dark`, ...), which this file maps onto your palette |
 | `presets.json` | The colors, sizes and spacing the editor offers |
 | `styles/theme.css` | Your own styles |

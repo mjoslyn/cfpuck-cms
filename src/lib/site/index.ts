@@ -3,13 +3,13 @@
 import siteConfig from '../../site/config';
 import movedPaths from '../../site/moved-paths.json';
 import presets from '../../site/presets.json';
-import type { ContentType, FieldDef, SiteConfig, Taxonomy } from './types';
+import type { ContentType, EventsConfig, FieldDef, SiteConfig, Taxonomy, TypeExtension } from './types';
 import { withEvents } from '../events/types';
 
-export type { ContentType, FieldDef, SiteConfig, Taxonomy };
+export type { ContentType, EventsConfig, FieldDef, SiteConfig, Taxonomy, TypeExtension };
 
 // The site's config with the core's optional features' types added (Events: src/lib/events/types.ts).
-const config: SiteConfig = { ...siteConfig, ...withEvents(siteConfig.types, siteConfig.taxonomies) };
+const config: SiteConfig = { ...siteConfig, ...withEvents(siteConfig.types, siteConfig.taxonomies, siteConfig.events) };
 
 for (const t of ['page', 'post', 'global']) if (!config.types.some((c) => c.type === t)) throw new Error(`site config: the "${t}" content type is required`);
 for (const t of ['category', 'tag']) if (!config.taxonomies.some((c) => c.name === t)) throw new Error(`site config: the "${t}" taxonomy is required`);
