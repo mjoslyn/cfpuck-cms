@@ -123,6 +123,14 @@ const STATUS_LABELS: Record<string, string> = { pending: 'Waiting', active: 'Act
                 </form>
               )}
               <div class="mt-2 flex gap-3 text-xs">
+                {!u?.last_sign_in_at && u?.invited_at && (
+                  <form method="post" action="/api/admin/members">
+                    <input type="hidden" name="action" value="resend" />
+                    <input type="hidden" name="id" value={m.user_id} />
+                    <input type="hidden" name="return" value={ret} />
+                    <button class="underline hover:text-admin-accent">Resend invitation</button>
+                  </form>
+                )}
                 <form method="post" action="/api/admin/members">
                   <input type="hidden" name="action" value="reset" />
                   <input type="hidden" name="id" value={m.user_id} />

@@ -18,7 +18,7 @@ The admin is at `/admin/`, signed in through Supabase Auth.
 | `viewer` | No access |
 
 Admin-only pages are listed in `ADMIN_ONLY` (`src/middleware.ts`); settings writes are admin-only in
-row-level security (`is_admin()`). Admins manage users at `/admin/users/`: roles and invitations.
+row-level security (`is_admin()`). Admins manage users at `/admin/users/`: roles and invitations, with **Resend invitation** for anyone who hasn't signed in yet.
 Editors set their password at `/admin/set-password/`, where invitation and reset links land.
 
 ## Admin colors and logo

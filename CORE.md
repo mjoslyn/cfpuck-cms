@@ -636,7 +636,7 @@ member (`renderRequest` drops the viewer's membership), and the editor offers no
   in members' emails (confirm an address, reset a password) bring a `code` the route exchanges on
   `/account/`, so Supabase Auth's redirect URLs must include the site.
 - **Members screen** (`/admin/members/`, admins; `POST /api/admin/members`): members by status (waiting
-  for approval first), each one's name, level, status, expiry and notes; Approve, Send password link,
+  for approval first), each one's name, level, status, expiry and notes; Approve, Resend invitation (to someone invited who hasn't signed in), Send password link,
   Remove (the membership, and the account unless it edits the site), and Add a member (an existing
   account joins; a new address is invited to set a password on the account page). The Users screen
   leaves members out.
@@ -784,7 +784,7 @@ never subscribes anyone again); the settings are, with the others. Migration `*_
 ## Editor
 
 `/admin/` (Supabase Auth; `profiles.role`: editor, admin, or viewer = no access). Editors manage content,
-templates, media, forms and compose; site settings and users (`/admin/users/`: roles, invitations) are
+templates, media, forms and compose; site settings and users (`/admin/users/`: roles, invitations, Resend invitation for those not yet signed in; `src/lib/admin/invite.ts`) are
 for admins, as is the redirects API (`ADMIN_ONLY` in `src/middleware.ts`; settings writes are admin-only in RLS via
 `is_admin()`; the users API checks the role itself too, since invitations use the service key). `src/puck/Editor.tsx` renders blocks through the same string renderer inside Puck
 (`BlockView.tsx` parses HTML to React; slots become the block's inner wrapper element). The left rail

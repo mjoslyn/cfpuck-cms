@@ -67,7 +67,16 @@ const when = (s?: string | null) => (s ? new Date(s).toLocaleDateString('en-US',
               </form>
             )}
           </td>
-          <td class="px-4 py-2.5 text-admin-muted">{u.invited ? 'Invited, not signed in yet' : when(u.lastSignIn)}</td>
+          <td class="px-4 py-2.5 text-admin-muted">
+            {u.invited ? 'Invited, not signed in yet' : when(u.lastSignIn)}
+            {u.invited && (
+              <form method="post" action="/api/admin/users" class="mt-1 text-xs">
+                <input type="hidden" name="action" value="resend" />
+                <input type="hidden" name="id" value={u.id} />
+                <button class="underline hover:text-admin-accent">Resend invitation</button>
+              </form>
+            )}
+          </td>
         </tr>
       ))}
     </tbody>

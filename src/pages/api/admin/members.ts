@@ -2,11 +2,13 @@
 // add (email, name, level, status, expires_on): an existing account becomes a member, or the address is
 //   invited (the link lands on the account page to set a password);
 // update (id, name, level, status, expires_on, notes); approve (id); reset (id): email a password link;
+// resend (id): an invitation not yet taken up, sent again;
 // remove (id): the membership, and the account too unless it edits the site.
 import type { APIRoute } from 'astro';
 import { serviceClient } from '../../../lib/supabase';
 import { EMAIL, accountUrl } from '../../../lib/members/account';
 import { memberSettings } from '../../../lib/members/config';
+import { resendInvite } from '../../../lib/admin/invite';
 
 const STATUSES = ['pending', 'active', 'suspended'];
 const date = (v: FormDataEntryValue | null) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
@@ -71,6 +73,10 @@ export const POST: APIRoute = async ({ request, locals, redirect, url }) => {
     if (!m?.email) return back('No such member.');
     const { error } = await serviceClient().auth.resetPasswordForEmail(m.email, { redirectTo: `${url.origin}${accountUrl({ view: 'password' })}` });
     return error ? back(error.message) : back(`A link to set a password went to ${m.email}.`, true);
+  }
+  if (action === 'resend') {
+    const res = await resendInvite(id, `${url.origin}${accountUrl({ view: 'password' })}`);
+    return 'error' in res ? back(res.error) : back(`Invitation sent again to ${res.email}.`, true);
   }
   if (action === 'remove') {
     const { error } = await locals.db.from('members').delete().eq('user_id', id);
