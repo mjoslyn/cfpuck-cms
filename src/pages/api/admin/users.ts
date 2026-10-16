@@ -1,9 +1,10 @@
 // Users (admins only; see middleware). Form posts, back to /admin/users/:
 // action=role (id, role: viewer | editor | admin), action=invite (email, role), action=resend (id: an
-// invitation not yet taken up, sent again).
+// invitation not yet taken up, sent again), action=delete (id: the account, with its profile and any
+// membership; what it made stays, its author left empty).
 import type { APIRoute } from 'astro';
 import { serviceClient } from '../../../lib/supabase';
-import { resendInvite } from '../../../lib/admin/invite';
+import { invite, resendInvite } from '../../../lib/admin/invite';
 
 const ROLES = ['viewer', 'editor', 'admin'];
 
@@ -26,16 +27,24 @@ export const POST: APIRoute = async ({ request, locals, redirect, url }) => {
   if (action === 'invite') {
     const email = String(form.get('email') ?? '').trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return back('Enter an email address.');
-    const admin = serviceClient().auth.admin;
-    const { data, error } = await admin.inviteUserByEmail(email, { redirectTo: `${url.origin}/admin/set-password/` });
-    if (error) return back(error.message);
+    const res = await invite(email, 'admin', url.origin);
+    if ('error' in res) return back(res.error);
     // The profile is created by the auth trigger; give it the chosen role.
-    const { error: e2 } = await serviceClient().from('profiles').update({ role }).eq('id', data.user.id);
-    return e2 ? back(e2.message) : back(`Invitation sent to ${email}.`, true);
+    const { error: e2 } = await serviceClient().from('profiles').update({ role }).eq('id', res.user.id);
+    return e2 ? back(e2.message) : back(`Invitation sent to ${email}. ${res.note}`, true);
   }
   if (action === 'resend') {
-    const res = await resendInvite(String(form.get('id') ?? ''), `${url.origin}/admin/set-password/`);
-    return 'error' in res ? back(res.error) : back(`Invitation sent again to ${res.email}.`, true);
+    const res = await resendInvite(String(form.get('id') ?? ''), 'admin', url.origin);
+    return 'error' in res ? back(res.error) : back(`A new invitation went to ${res.email}. ${res.note}`, true);
+  }
+  if (action === 'delete') {
+    const id = String(form.get('id') ?? '');
+    if (!id) return back('No account.');
+    if (id === locals.user.id) return back("You can't delete your own account.");
+    const admin = serviceClient().auth.admin;
+    const { data } = await admin.getUserById(id);
+    const { error } = await admin.deleteUser(id);
+    return error ? back(error.message) : back(`${data.user?.email ?? 'The account'} was deleted.`, true);
   }
   return back('Unknown action.');
 };

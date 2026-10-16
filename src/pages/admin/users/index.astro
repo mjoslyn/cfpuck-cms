@@ -2,17 +2,19 @@
 import Admin from '../../../layouts/Admin.astro';
 import { SITE_TZ } from '../../../lib/site';
 import { serviceClient } from '../../../lib/supabase';
+import { awaitingPassword } from '../../../lib/admin/invite';
 
 // Accounts come from Supabase Auth (service key; this page is admins only), roles from profiles.
 const { data: list } = await serviceClient().auth.admin.listUsers({ perPage: 1000 });
 const { data: profiles } = await serviceClient().from('profiles').select('id, role, display_name');
+const waiting = await awaitingPassword();
 const byId = new Map((profiles ?? []).map((p) => [p.id, p]));
 // Members are on the Members screen, unless they also edit the site.
 const { data: memberRows } = await serviceClient().from('members').select('user_id');
 const members = new Set((memberRows ?? []).map((m) => m.user_id));
 const users = (list?.users ?? [])
   .filter((u) => !members.has(u.id) || ['editor', 'admin'].includes(byId.get(u.id)?.role ?? ''))
-  .map((u) => ({ id: u.id, email: u.email ?? '', name: byId.get(u.id)?.display_name ?? '', role: byId.get(u.id)?.role ?? 'viewer', lastSignIn: u.last_sign_in_at, invited: !u.last_sign_in_at && !!u.invited_at }))
+  .map((u) => ({ id: u.id, email: u.email ?? '', name: byId.get(u.id)?.display_name ?? '', role: byId.get(u.id)?.role ?? 'viewer', lastSignIn: u.last_sign_in_at, invited: waiting.has(u.id) }))
   .sort((a, b) => (a.role === b.role ? a.email.localeCompare(b.email) : ['admin', 'editor', 'viewer'].indexOf(a.role) - ['admin', 'editor', 'viewer'].indexOf(b.role)));
 const me = Astro.locals.user.id;
 const ok = Astro.url.searchParams.get('ok');
@@ -44,6 +46,7 @@ const when = (s?: string | null) => (s ? new Date(s).toLocaleDateString('en-US',
         <th class="px-4 py-2.5 font-semibold">User</th>
         <th class="px-4 py-2.5 font-semibold">Role</th>
         <th class="px-4 py-2.5 font-semibold">Last signed in</th>
+        <th class="px-4 py-2.5"><span class="sr-only">Actions</span></th>
       </tr>
     </thead>
     <tbody>
@@ -68,12 +71,21 @@ const when = (s?: string | null) => (s ? new Date(s).toLocaleDateString('en-US',
             )}
           </td>
           <td class="px-4 py-2.5 text-admin-muted">
-            {u.invited ? 'Invited, not signed in yet' : when(u.lastSignIn)}
+            {u.invited ? (u.lastSignIn ? 'Invited, no password set yet' : 'Invited, not signed in yet') : when(u.lastSignIn)}
             {u.invited && (
               <form method="post" action="/api/admin/users" class="mt-1 text-xs">
                 <input type="hidden" name="action" value="resend" />
                 <input type="hidden" name="id" value={u.id} />
                 <button class="underline hover:text-admin-accent">Resend invitation</button>
+              </form>
+            )}
+          </td>
+          <td class="px-4 py-2.5 text-right">
+            {u.id !== me && (
+              <form method="post" action="/api/admin/users" class="text-xs" onsubmit={`return confirm(${JSON.stringify(`Delete ${u.email}? They can no longer sign in, and any membership goes too. What they made stays.`)})`}>
+                <input type="hidden" name="action" value="delete" />
+                <input type="hidden" name="id" value={u.id} />
+                <button class="text-[#c4592a] underline">Delete</button>
               </form>
             )}
           </td>

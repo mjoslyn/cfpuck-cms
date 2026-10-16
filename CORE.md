@@ -649,12 +649,12 @@ member (`renderRequest` drops the viewer's membership), and the editor offers no
   account and a membership, emailing the site's admin address), `logout`, `forgot` and `password`;
   `session` stores an invitation link's session (from the address's fragment, by
   `public/assets/js/member-account.js`); `me` answers the **Member sign-in link** block (`member-link`),
-  whose label `public/assets/js/member-link.js` switches in the browser, so pages with it stay cached. Invitation
-  and password links carry their session in the fragment (sent with the service key, so they work in
+  whose label `public/assets/js/member-link.js` switches in the browser, so pages with it stay cached.
+  Invitations are the site's own (see Editor); password links carry their session in the fragment (sent with the service key, so they work in
   any browser); a sign-up's confirmation brings a `code` the route exchanges on `/account/` (a visitor
   already signed in carries on without an error), so Supabase Auth's redirect URLs must include the site.
 - **Members screen** (`/admin/members/`, admins; `POST /api/admin/members`): members by status (waiting
-  for approval first), each one's name, level, status, expiry and notes; Approve, Resend invitation (to someone invited who hasn't signed in), Send password link,
+  for approval first), each one's name, level, status, expiry and notes; Approve, Resend invitation (to someone invited who hasn't set a password), Send password link,
   Remove (the membership, and the account unless it edits the site), and Add a member (an existing
   account joins; a new address is invited to set a password on the account page). The Users screen
   leaves members out.
@@ -814,7 +814,7 @@ never subscribes anyone again); the settings are, with the others. Migration `*_
 ## Editor
 
 `/admin/` (Supabase Auth; `profiles.role`: editor, admin, or viewer = no access). Editors manage content,
-templates, media, forms and compose; site settings and users (`/admin/users/`: roles, invitations, Resend invitation for those not yet signed in; `src/lib/admin/invite.ts`) are
+templates, media, forms and compose; site settings and users (`/admin/users/`: roles, invitations, Resend invitation for those invited who haven't set a password, signed in by a link or not, `src/lib/admin/invite.ts`; Delete, not your own account: the profile and any membership go, what they made stays with its author left empty) are
 for admins, as is the redirects API (`ADMIN_ONLY` in `src/middleware.ts`; settings writes are admin-only in RLS via
 `is_admin()`; the users API checks the role itself too, since invitations use the service key). `src/puck/Editor.tsx` renders blocks through the same string renderer inside Puck
 (`BlockView.tsx` parses HTML to React; slots become the block's inner wrapper element). The left rail
@@ -826,6 +826,18 @@ are offered only on those entry types. Pages whose template has no `post-content
 mode: the template document itself. In content mode the template around the page's content shows as it
 will on the site; for admins, hovering one of its blocks, a template part or a pattern outlines it with a
 link to edit that template, part or pattern in a new tab (`markSources`, `SourceLinks`; globals get none).
+
+Invitations (Users and Members; `src/lib/admin/invite.ts`) are sent by the site over SMTP, not by
+Supabase Auth, so their link lasts `INVITE_DAYS` (7) instead of Supabase's email link lifetime (an hour
+by default, a day at most). The account is made with `generateLink` (invited, no password) and the link,
+`/api/auth/invite?t=`, is signed with a key made from the service key and names the account, its
+expiry, where it leads (set-password or the account page) and the account's open invitation
+(`app_metadata.invite`, a random value): a new invitation replaces it and setting a password clears it
+(`passwordSet`), so older and used links stop working. Opening the link signs in with a password-reset
+token made and used on the spot (a reset leaves the password empty, where Supabase's own invitation
+link sets a random one). Without SMTP, Supabase Auth sends its invitation (or a password link, once the
+address is confirmed). `awaiting_password()` (server only) lists accounts with an open invitation, or
+invited with no password, for the screens' "Invited" rows and Resend invitation.
 
 Admin colors and logo (Settings > Admin, `settings.site.admin_theme`, `src/lib/admin-theme.ts`): accent,
 text, menu bar and background, and a logo for the menu bar in place of the site name (or beside it,
@@ -883,10 +895,10 @@ Netlify, with a hosted Supabase project (`npx supabase link`). Migrations: `npx 
 new tables (the local stack does): migration 0019 grants them and sets default privileges, and RLS
 does the rest (see Database access). `scripts/copy-storage.ts` copies storage objects from the local stack to a hosted
 project (resumable). Editors set their password at `/admin/set-password/` (invitation and reset links
-land there with the session in the fragment, which the page hands to `/api/auth/session`; they work in
-any browser), so Supabase Auth's Site URL and redirect URLs must include the site's domain. Email links
-last as long as Supabase Auth's Email OTP Expiration (an hour by default; 86400 seconds, a day, suits
-invitations). Env:
+land there; reset links with the session in the fragment, which the page hands to `/api/auth/session`, so
+they work in any browser), so Supabase Auth's Site URL and redirect URLs must include the site's domain.
+Supabase Auth's email links last as long as its Email OTP Expiration (an hour by default; 86400 seconds,
+a day, is kinder); the site's invitations last 7 days. Env:
 `.env.example`.
 
 ## Commands

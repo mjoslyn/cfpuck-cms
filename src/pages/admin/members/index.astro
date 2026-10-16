@@ -4,6 +4,7 @@
 import Admin from '../../../layouts/Admin.astro';
 import { SITE_TZ } from '../../../lib/site';
 import { serviceClient } from '../../../lib/supabase';
+import { awaitingPassword } from '../../../lib/admin/invite';
 import { isActive, memberSettings, type MemberRow } from '../../../lib/members/config';
 
 const db = Astro.locals.db;
@@ -13,6 +14,7 @@ const { data: rows } = await db.from('members').select('*').order('created_at', 
 const all = (rows ?? []) as MemberRow[];
 // Sign-in times come from Supabase Auth (service key; this page is admins only).
 const { data: list } = await serviceClient().auth.admin.listUsers({ perPage: 1000 });
+const waiting = await awaitingPassword();
 const auth = new Map((list?.users ?? []).map((u) => [u.id, u]));
 
 const state = (m: MemberRow) => (m.status === 'active' && !isActive(m) ? 'expired' : m.status);
@@ -106,7 +108,7 @@ const STATUS_LABELS: Record<string, string> = { pending: 'Waiting', active: 'Act
               {state(m) === 'expired' && <div class="mt-1 text-xs text-[#c4592a]">Expired {when(`${m.expires_on}T12:00:00Z`)}</div>}
               <textarea form={form} name="notes" rows="1" placeholder="Notes" aria-label={`Notes on ${m.email}`} class={`${input} mt-2 w-full`}>{m.notes}</textarea>
             </td>
-            <td class="px-4 py-2.5 text-admin-muted">{u?.last_sign_in_at ? when(u.last_sign_in_at) : u?.invited_at ? 'Invited, not signed in yet' : 'Not yet'}</td>
+            <td class="px-4 py-2.5 text-admin-muted">{waiting.has(m.user_id) ? (u?.last_sign_in_at ? 'Invited, no password set yet' : 'Invited, not signed in yet') : u?.last_sign_in_at ? when(u.last_sign_in_at) : 'Not yet'}</td>
             <td class="px-4 py-2.5 whitespace-nowrap">
               <form id={form} method="post" action="/api/admin/members" class="inline">
                 <input type="hidden" name="action" value="update" />
@@ -123,7 +125,7 @@ const STATUS_LABELS: Record<string, string> = { pending: 'Waiting', active: 'Act
                 </form>
               )}
               <div class="mt-2 flex gap-3 text-xs">
-                {!u?.last_sign_in_at && u?.invited_at && (
+                {waiting.has(m.user_id) && (
                   <form method="post" action="/api/admin/members">
                     <input type="hidden" name="action" value="resend" />
                     <input type="hidden" name="id" value={m.user_id} />

@@ -24,9 +24,10 @@ Under **Authentication > URL Configuration**:
 - using [Members](../../features/members/), also add `https://<your-domain>/account/**`, where
   members' sign-up, invitation and password links land.
 
-Under **Authentication > Providers > Email**, raise **Email OTP Expiration** to `86400` (a day):
-invitation and password links stop working after it, an hour by default, and invitations are often
-opened later than that.
+Invitations to editors and members are sent by the site over its SMTP settings, and their links last
+7 days. Password links (and invitations on a site without SMTP) come from Supabase Auth and last as
+long as **Authentication > Providers > Email > Email OTP Expiration**: an hour by default; `86400`
+(a day) is kinder.
 
 :::note
 Hosted projects don't grant the API roles access to new tables the way the local stack does.

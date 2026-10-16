@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { serverClient } from '../../../lib/supabase';
+import { passwordSet } from '../../../lib/admin/invite';
 
 /** Set the signed-in user's password (from /admin/set-password/, after an invitation or reset link). */
 export const POST: APIRoute = async ({ request, cookies, redirect }) => {
@@ -13,5 +14,6 @@ export const POST: APIRoute = async ({ request, cookies, redirect }) => {
   if (!user) return back('That link has expired or was already used. Ask for a new one.');
   const { error } = await db.auth.updateUser({ password });
   if (error) return back(error.message);
+  await passwordSet(user);
   return redirect('/admin/');
 };

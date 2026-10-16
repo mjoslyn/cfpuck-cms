@@ -2,6 +2,7 @@
 import type { APIRoute } from 'astro';
 import { serverClient } from '../../../lib/supabase';
 import { accountUrl } from '../../../lib/members/account';
+import { passwordSet } from '../../../lib/admin/invite';
 
 export const POST: APIRoute = async ({ request, cookies, redirect }) => {
   const form = await request.formData();
@@ -15,5 +16,6 @@ export const POST: APIRoute = async ({ request, cookies, redirect }) => {
   } = await db.auth.getUser();
   if (!user) return redirect(accountUrl({ error: 'That link has expired or was already used. Ask for a new one.' }), 303);
   const { error } = await db.auth.updateUser({ password });
+  if (!error) await passwordSet(user);
   return error ? back(error.message) : redirect(accountUrl({ m: 'password-saved' }), 303);
 };

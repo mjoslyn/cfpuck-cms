@@ -29,7 +29,7 @@ so Supabase Auth's redirect URLs must include `https://<your-domain>/account/**`
 
 **Members** in the admin (admins only) lists everyone with a membership, with tabs by status (waiting
 for approval, active, expired, suspended) and a search. For each: name, level, status, expiry date
-(empty: never) and notes, saved with **Save**; **Approve** for sign-ups; **Resend invitation** (invited, not signed in yet); **Send password link**; and
+(empty: never) and notes, saved with **Save**; **Approve** for sign-ups; **Resend invitation** (invited, no password set yet); **Send password link**; and
 **Remove**, which ends the membership and deletes the account unless the person also edits the site.
 **Add a member** makes an existing account a member, or invites a new address to set a password.
 

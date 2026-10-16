@@ -8,7 +8,7 @@ import type { APIRoute } from 'astro';
 import { serviceClient } from '../../../lib/supabase';
 import { EMAIL, accountUrl } from '../../../lib/members/account';
 import { memberSettings } from '../../../lib/members/config';
-import { resendInvite } from '../../../lib/admin/invite';
+import { invite, resendInvite } from '../../../lib/admin/invite';
 
 const STATUSES = ['pending', 'active', 'suspended'];
 const date = (v: FormDataEntryValue | null) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
@@ -41,17 +41,17 @@ export const POST: APIRoute = async ({ request, locals, redirect, url }) => {
     if (!EMAIL.test(email)) return back('Enter an email address.');
     const name = String(form.get('name') ?? '').trim().slice(0, 100);
     let user = await userByEmail(email);
-    let invited = false;
+    let invited = '';
     if (!user) {
-      const { data, error } = await serviceClient().auth.admin.inviteUserByEmail(email, { redirectTo: `${url.origin}${accountUrl({ view: 'password' })}`, data: { name } });
-      if (error) return back(error.message);
-      user = data.user;
-      invited = true;
+      const res = await invite(email, 'member', url.origin, { name });
+      if ('error' in res) return back(res.error);
+      user = res.user;
+      invited = res.note;
       if (name) await serviceClient().from('profiles').update({ display_name: name }).eq('id', user.id);
     }
     const { error } = await locals.db.from('members').insert({ user_id: user.id, email, name: name || String(user.user_metadata?.name ?? ''), level: level(form.get('level')), status: STATUSES.includes(String(form.get('status'))) ? String(form.get('status')) : 'active', expires_on: date(form.get('expires_on')) });
     if (error) return back(error.code === '23505' ? `${email} is already a member.` : error.message);
-    return back(invited ? `Invitation sent to ${email}.` : `${email} already had an account; they're a member now.`, true);
+    return back(invited ? `Invitation sent to ${email}. ${invited}` : `${email} already had an account; they're a member now.`, true);
   }
 
   if (!id) return back('No member.');
@@ -75,8 +75,8 @@ export const POST: APIRoute = async ({ request, locals, redirect, url }) => {
     return error ? back(error.message) : back(`A link to set a password went to ${m.email}.`, true);
   }
   if (action === 'resend') {
-    const res = await resendInvite(id, `${url.origin}${accountUrl({ view: 'password' })}`);
-    return 'error' in res ? back(res.error) : back(`Invitation sent again to ${res.email}.`, true);
+    const res = await resendInvite(id, 'member', url.origin);
+    return 'error' in res ? back(res.error) : back(`A new invitation went to ${res.email}. ${res.note}`, true);
   }
   if (action === 'remove') {
     const { error } = await locals.db.from('members').delete().eq('user_id', id);
