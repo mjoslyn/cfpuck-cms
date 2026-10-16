@@ -7,11 +7,11 @@ import { defineSite } from '../lib/site/types';
 
 export default defineSite({
   name: 'Example Town',
-  organization: 'Example Town Chamber of Commerce',
+  organization: 'Example Town Council',
   timezone: 'America/New_York',
   mailFrom: 'Example Town <noreply@example.org>',
   adminEmail: 'info@example.org',
-  brief: 'The Example Town Chamber of Commerce site: things to do, events and news for visitors and the businesses that serve them.',
+  brief: 'The Example Town site: things to do, events and news for visitors and the businesses that serve them.',
 
   types: [
     { type: 'page', label: 'Pages', singular: 'Page', describe: 'a page on the site' },

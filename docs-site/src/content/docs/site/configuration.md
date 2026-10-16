@@ -31,11 +31,11 @@ After you change `config.ts`, run `npm run check`.
 ```ts
 export default defineSite({
   name: 'Example Town',
-  organization: 'Example Town Chamber of Commerce',
+  organization: 'Example Town Council',
   timezone: 'America/New_York',
   mailFrom: 'Example Town <noreply@example.org>',
   adminEmail: 'info@example.org',
-  brief: 'The Example Town Chamber of Commerce site: things to do, events and news for visitors and the businesses that serve them.',
+  brief: 'The Example Town site: things to do, events and news for visitors and the businesses that serve them.',
   types: [ /* ... */ ],
   taxonomies: [ /* ... */ ],
 });
