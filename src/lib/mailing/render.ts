@@ -12,6 +12,7 @@ const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '
 /** The merge tags a campaign offers: [tag, label]. A tag can carry a fallback for an empty value: {first_name|friend}. */
 export const MAILING_TAGS: [string, string][] = [
   ['{first_name}', 'First name'],
+  ['{last_name}', 'Last name'],
   ['{name}', 'Full name'],
   ['{email}', 'Email address'],
   ['{site_name}', 'Site name'],
@@ -19,9 +20,9 @@ export const MAILING_TAGS: [string, string][] = [
   ['{preferences_url}', 'Email preferences link'],
 ];
 
-/** Per-recipient values a tag can stand for. */
-export const RECIPIENT_FIELDS = ['first_name', 'name', 'email'] as const;
-export type RecipientField = (typeof RECIPIENT_FIELDS)[number];
+/** Per-recipient values a tag can stand for, besides the site's contact fields ({<key>}, `field:<key>`). */
+export const RECIPIENT_FIELDS = ['first_name', 'last_name', 'name', 'email'] as const;
+export type RecipientField = (typeof RECIPIENT_FIELDS)[number] | `field:${string}`;
 
 /** A tag in use and the variable it became: `v<n>` plain (subject, text), `v<n>_h` HTML-escaped (the HTML). */
 export interface VarSpec {
@@ -49,9 +50,11 @@ export interface RenderInput {
   origin: string;
   events?: Record<string, EmailEvent[]>;
   entries?: Record<string, EmailEvent[]>;
+  /** The site's contact field keys: {<key>} is that field. */
+  fields?: string[];
 }
 
-const TAG = /\{([a-z_]+)(?:\|([^{}]*))?\}/g;
+const TAG = /\{([a-z][a-z0-9_]*)(?:\|([^{}]*))?\}/g;
 
 /** The email with its tags as Mailgun variables; links not yet tracked. */
 export function renderCampaign(input: RenderInput): Rendered {
@@ -67,6 +70,7 @@ export function renderCampaign(input: RenderInput): Rendered {
   const merge = (text: string, html: boolean) =>
     text.replace(TAG, (whole, key: string, fallback?: string) => {
       if ((RECIPIENT_FIELDS as readonly string[]).includes(key)) return `%recipient.${variable(key as RecipientField, (fallback ?? '').trim())}${html ? '_h' : ''}%`;
+      if (input.fields?.includes(key)) return `%recipient.${variable(`field:${key}`, (fallback ?? '').trim())}${html ? '_h' : ''}%`;
       if (key === 'site_name') return html ? esc(input.siteName) : input.siteName;
       if (key === 'unsubscribe_url') return unsubscribe;
       if (key === 'preferences_url') return preferences;
@@ -74,8 +78,8 @@ export function renderCampaign(input: RenderInput): Rendered {
     });
   const ctx: EmailContext = {
     // Text blocks arrive escaped; a fallback typed in them is escaped too, and goes out as typed.
-    merge: (text, html) => merge(html ? text.replace(/\{([a-z_]+)\|([^{}]*)\}/g, (_, k, f) => `{${k}|${f.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")}}`) : text, html),
-    field: (id) => (id === 'email' ? `%recipient.${variable('email', '')}_h%` : `%recipient.${variable(id === 'first_name' ? 'first_name' : 'name', '')}_h%`),
+    merge: (text, html) => merge(html ? text.replace(/\{([a-z][a-z0-9_]*)\|([^{}]*)\}/g, (_, k, f) => `{${k}|${f.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")}}`) : text, html),
+    field: (id) => `%recipient.${variable((RECIPIENT_FIELDS as readonly string[]).includes(id) ? (id as RecipientField) : id.startsWith('field:') && input.fields?.includes(id.slice(6)) ? (id as RecipientField) : 'name', '')}_h%`,
     origin: input.origin,
     events: input.events,
     entries: input.entries,
@@ -98,10 +102,20 @@ export function plainText(html: string): string {
   return textVersion(html.replace(/<div style="display:none[^"]*">[\s\S]*?<\/div>/, '')).replace(/%recipient\.([a-z0-9]+)_h%/g, '%recipient.$1%');
 }
 
+/** Who a variable is filled in for. */
+export interface Recipient {
+  email: string;
+  first_name?: string;
+  last_name?: string;
+  attributes?: Record<string, unknown> | null;
+}
+
 /** One recipient's values for the variables, plain and escaped, with the signed tokens for their links. */
-export function recipientValues(specs: VarSpec[], person: { email: string; name: string }, tokens: { t: string; ct: string }): Record<string, string> {
-  const first = person.name.trim().split(/\s+/)[0] ?? '';
-  const value = (f: RecipientField) => (f === 'email' ? person.email : f === 'name' ? person.name.trim() : first);
+export function recipientValues(specs: VarSpec[], person: Recipient, tokens: { t: string; ct: string }): Record<string, string> {
+  const first = (person.first_name ?? '').trim();
+  const last = (person.last_name ?? '').trim();
+  const value = (f: RecipientField) =>
+    f === 'email' ? person.email : f === 'first_name' ? first : f === 'last_name' ? last : f === 'name' ? [first, last].filter(Boolean).join(' ') : String(person.attributes?.[f.slice(6)] ?? '').trim();
   const out: Record<string, string> = { t: tokens.t, ct: tokens.ct };
   for (const v of specs) {
     const plain = value(v.field) || v.fallback;

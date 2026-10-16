@@ -4,19 +4,23 @@
 // sends them (/api/admin/mailing/preview), filled in for a sample subscriber.
 import type { EmailKit } from '../forms/EmailBuilder';
 import { MAILING_TAGS } from '../lib/mailing/render';
+import type { ContactField } from '../lib/mailing/config';
 
-const STAND_IN: Record<string, string> = { name: '{name}', first_name: '{first_name}', email: '{email}' };
+/** How a Subscriber block shows on the canvas: its tag. */
+const standIn = (id: string) => (id.startsWith('field:') ? `{${id.slice(6)}}` : ['name', 'first_name', 'last_name', 'email'].includes(id) ? `{${id}}` : '{name}');
 
-/** `subject` and `since` are read when the preview renders, so it shows them as they are then. */
-export function mailingEmailKit(opts: { id?: number; subject: () => string; digest?: boolean; since?: () => string | undefined }): EmailKit {
+/** `subject` and `since` are read when the preview renders, so it shows them as they are then. `fields`: the site's contact fields, each a tag. */
+export function mailingEmailKit(opts: { id?: number; subject: () => string; digest?: boolean; since?: () => string | undefined; fields?: ContactField[] }): EmailKit {
   const origin = typeof window === 'undefined' ? '' : window.location.origin;
+  const fields = opts.fields ?? [];
+  const tags: [string, string][] = [...MAILING_TAGS, ...fields.map((f): [string, string] => [`{${f.key}}`, f.label]), ...(opts.digest ? [['{week_of}', 'Week of (the Monday)'] as [string, string]] : [])];
   return {
-    dataBlock: { label: 'Subscriber', options: [['name', 'Name'], ['first_name', 'First name'], ['email', 'Email address']] },
-    tags: opts.digest ? [...MAILING_TAGS, ['{week_of}', 'Week of (the Monday)']] : MAILING_TAGS,
+    dataBlock: { label: 'Subscriber', options: [['name', 'Name'], ['first_name', 'First name'], ['last_name', 'Last name'], ['email', 'Email address'], ...fields.map((f): [string, string] => [`field:${f.key}`, f.label])] },
+    tags,
     // Tags show as written on the canvas.
-    canvas: { merge: (text) => text, field: (id) => STAND_IN[id] ?? '{name}', origin },
+    canvas: { merge: (text) => text, field: standIn, origin },
     entries: true,
-    textField: (id) => `<p>${STAND_IN[id] ?? '{name}'}</p>`,
+    textField: (id) => `<p>${standIn(id)}</p>`,
     preview: {
       pickLabel: 'Shown to',
       sampleLabel: 'A sample subscriber',

@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import EmailBuilder from '../forms/EmailBuilder';
 import { mailingEmailKit } from './mailing-email';
-import { CAMPAIGN_STATUS, rate, type Audience, type Campaign, type CampaignStats, type MailList } from '../lib/mailing/config';
+import { CAMPAIGN_STATUS, rate, type Audience, type Campaign, type CampaignStats, type ContactField, type MailList } from '../lib/mailing/config';
 import type { MemberLevel } from '../lib/members/config';
 import type { EmailDoc } from '../lib/forms/email';
 
@@ -36,6 +36,7 @@ interface Props {
   /** Sending is paused site-wide (why). */
   paused: string;
   segments: { id: number; name: string }[];
+  fields?: ContactField[];
 }
 
 const input = 'w-full rounded border border-admin-ink/15 bg-white px-2 py-1.5 text-sm outline-none focus:border-admin-accent';
@@ -57,7 +58,7 @@ function localNow(tz: string, plusHours = 1): string {
   return `${p.year}-${p.month}-${p.day}T${p.hour}:00`;
 }
 
-export default function CampaignEditor({ campaign, lists, levels, stats, links, admin, mailgun, tz, digest, paused, segments }: Props) {
+export default function CampaignEditor({ campaign, lists, levels, stats, links, admin, mailgun, tz, digest, paused, segments, fields = [] }: Props) {
   const [c, setC] = useState(campaign);
   const [saved, setSaved] = useState(() => JSON.stringify(campaign));
   const [status, setStatus] = useState('');
@@ -73,7 +74,7 @@ export default function CampaignEditor({ campaign, lists, levels, stats, links, 
   const editable = EDITABLE.includes(c.status) && (admin || c.status === 'draft');
   const set = (patch: Partial<Campaign>) => setC((x) => ({ ...x, ...patch }));
   const audience = (c.audience ?? {}) as Audience;
-  const kit = useMemo(() => mailingEmailKit({ id: c.id, subject: () => latest.current.subject, digest: !!c.digest_id, since: () => latest.current.since ?? undefined }), [c.id]);
+  const kit = useMemo(() => mailingEmailKit({ id: c.id, subject: () => latest.current.subject, digest: !!c.digest_id, since: () => latest.current.since ?? undefined, fields }), [c.id]);
 
   useEffect(() => {
     if (!dirty) return;

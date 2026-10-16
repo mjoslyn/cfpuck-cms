@@ -1,19 +1,19 @@
 // Contacts (admins; see the middleware). Form posts, back to the contacts list or a contact:
-// add (email, name, list, source note: subscribed at once, as an admin vouches for their consent);
-// update (id, name, notes, lists[]: their lists); resend (id: the confirmation email again); unsubscribe (id); erase (id: gone, with a hash kept so
+// add (email, first_name, last_name, list, source note: subscribed at once, as an admin vouches for their consent);
+// update (id, first_name, last_name, notes, tags, cf_<key>: the site's fields, field_key/field_value: others, lists[]: their lists); resend (id: the confirmation email again); unsubscribe (id); erase (id: gone, with a hash kept so
 // they're never mailed again without signing up anew); import (file: CSV with email and name columns,
 // list, source: who agreed and how); members (list, levels[], vouch: active members join a list).
 // GET ?export=csv: every contact as CSV.
 import type { APIRoute } from 'astro';
 import { serviceClient } from '../../../../lib/supabase';
-import { contactsCsv, erase, importContacts, parseCsv, resendConfirmation, unsubscribe } from '../../../../lib/mailing/contacts';
+import { contactsCsv, erase, importContacts, loadMailing, parseCsv, resendConfirmation, unsubscribe } from '../../../../lib/mailing/contacts';
 import type { Contact } from '../../../../lib/mailing/config';
-import { EMAIL_RE, normalEmail } from '../../../../lib/mailing/config';
+import { EMAIL_RE, fieldValue, normalEmail, type ContactField } from '../../../../lib/mailing/config';
 import { isActive, type MemberRow } from '../../../../lib/members/config';
 import { cleanTags, fieldKey } from '../../../../lib/mailing/segments';
 
-/** CSV columns that aren't fields: the address, the name's parts and the tags. */
-const OWN_COLUMNS = new Set(['email', 'name', 'first name', 'first_name', 'last name', 'last_name', 'full name', 'tags', 'tag']);
+/** CSV columns that aren't fields: the address, the name's parts, the tags and the export's own columns. */
+const OWN_COLUMNS = new Set(['email', 'name', 'first name', 'first_name', 'firstname', 'last name', 'last_name', 'lastname', 'surname', 'full name', 'tags', 'tag', 'status', 'lists', 'consent_source', 'consent_at', 'confirmed_at', 'unsubscribed_at', 'created_at']);
 
 export const POST: APIRoute = async ({ request, locals, redirect, url }) => {
   if (locals.user?.role !== 'admin') return new Response('Admins only', { status: 403 });
@@ -26,13 +26,14 @@ export const POST: APIRoute = async ({ request, locals, redirect, url }) => {
   const vouch = String(form.get('source') ?? '').trim().slice(0, 150);
   // Tags for everyone added (comma separated).
   const extraTags = cleanTags(String(form.get('tags') ?? ''));
+  const fields: ContactField[] = (await loadMailing(db)).settings.fields ?? [];
 
   if (action === 'add') {
     const email = normalEmail(form.get('email'));
     if (!EMAIL_RE.test(email)) return back('Enter an email address.');
     if (!list) return back('Choose a list.');
     if (!vouch) return back('Say how they agreed to receive email.');
-    const r = await importContacts(db, [{ email, name: String(form.get('name') ?? ''), tags: extraTags }], list, `admin: ${vouch}`);
+    const r = await importContacts(db, [{ email, first_name: String(form.get('first_name') ?? ''), last_name: String(form.get('last_name') ?? ''), tags: extraTags }], list, `admin: ${vouch}`);
     if (r.skipped.length) return back(`${email} unsubscribed, bounced, complained or was erased before: they need to sign up themselves.`);
     return back(`${email} ${r.added ? 'added' : 'updated'}.`, true);
   }
@@ -42,12 +43,24 @@ export const POST: APIRoute = async ({ request, locals, redirect, url }) => {
     if (file.size > 5 * 1024 * 1024) return back('That file is over 5 MB.');
     if (!list) return back('Choose a list.');
     if (!vouch) return back('Say how these people agreed to receive email.');
-    // A tags column (separated by ; or |) tags each person; other columns become their fields.
+    // A tags column (separated by ; or |) tags each person; other columns become their fields: the
+    // site's fields by key or label (values that don't fit the field's type are left out), others as they are.
+    const byColumn = (k: string) => fields.find((f) => f.key === fieldKey(k) || f.label.toLowerCase() === k);
     const rows = parseCsv(await file.text()).map((r) => ({
       email: r.email ?? '',
-      name: r.name || r['full name'] || [r['first name'] ?? r.first_name, r['last name'] ?? r.last_name].filter(Boolean).join(' '),
+      first_name: r['first name'] ?? r.first_name ?? r.firstname ?? '',
+      last_name: r['last name'] ?? r.last_name ?? r.lastname ?? r.surname ?? '',
+      name: r.name || r['full name'] || '',
       tags: cleanTags([...String(r.tags ?? r.tag ?? '').split(/[;|]/), ...extraTags]),
-      attributes: Object.fromEntries(Object.entries(r).filter(([k]) => !OWN_COLUMNS.has(k)).map(([k, v]) => [fieldKey(k), String(v).slice(0, 500)]).filter(([k]) => k)),
+      attributes: Object.fromEntries(
+        Object.entries(r)
+          .filter(([k]) => !OWN_COLUMNS.has(k))
+          .map(([k, v]) => {
+            const f = byColumn(k);
+            return f ? [f.key, fieldValue(f, v)] : [fieldKey(k), String(v).slice(0, 500)];
+          })
+          .filter(([k]) => k),
+      ),
     }));
     try {
       const r = await importContacts(db, rows, list, `import: ${vouch} (${file.name.slice(0, 80)})`);
@@ -68,10 +81,11 @@ export const POST: APIRoute = async ({ request, locals, redirect, url }) => {
   if (!id) return back('No contact.');
   if (action === 'update') {
     // Fields come as field_key / field_value pairs; an empty key or value drops the field.
+    // The site's fields come as cf_<key>, each checked against its type.
     const keys = form.getAll('field_key').map(fieldKey);
     const values = form.getAll('field_value').map((v) => String(v).trim().slice(0, 500));
-    const attributes = Object.fromEntries(keys.map((k, i) => [k, values[i] ?? '']).filter(([k, v]) => k && v));
-    const { error } = await db.from('contacts').update({ name: String(form.get('name') ?? '').trim().slice(0, 100), notes: String(form.get('notes') ?? '').slice(0, 2000), tags: cleanTags(String(form.get('tags') ?? '')), attributes }).eq('id', id);
+    const attributes = Object.fromEntries([...keys.map((k, i) => [k, values[i] ?? '']).filter(([k]) => !fields.some((f) => f.key === k)), ...fields.map((f) => [f.key, fieldValue(f, form.get(`cf_${f.key}`))])].filter(([k, v]) => k && v));
+    const { error } = await db.from('contacts').update({ first_name: String(form.get('first_name') ?? '').trim().slice(0, 100), last_name: String(form.get('last_name') ?? '').trim().slice(0, 100), notes: String(form.get('notes') ?? '').slice(0, 2000), tags: cleanTags(String(form.get('tags') ?? '')), attributes }).eq('id', id);
     if (error) return back(error.message);
     // Lists: ticked ones subscribed (only while the contact is), the rest unsubscribed.
     const ticked = form.getAll('lists').map(Number);
@@ -124,6 +138,6 @@ export const GET: APIRoute = async ({ locals, url }) => {
     for (const r of data ?? []) on.set(Number(r.contact_id), [...(on.get(Number(r.contact_id)) ?? []), names.get(Number(r.list_id)) ?? String(r.list_id)]);
     if (!data || data.length < 1000) break;
   }
-  const csv = contactsCsv(contacts.map((c) => ({ ...c, lists: on.get(c.id) ?? [] })));
+  const csv = contactsCsv(contacts.map((c) => ({ ...c, lists: on.get(c.id) ?? [] })), (await loadMailing(db)).settings.fields);
   return new Response(csv, { headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="contacts-${new Date().toISOString().slice(0, 10)}.csv"`, 'Cache-Control': 'no-store' } });
 };

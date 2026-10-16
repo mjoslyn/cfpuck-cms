@@ -7,7 +7,7 @@
 import type { Renderer, RenderCtx } from '../env';
 import { esc } from '../html';
 import { attrs, escAttr, styleDecls } from './style';
-import { CONSENT_TEXT, PREFERENCES_PATH, SUBSCRIBE_PATH, mailingSettings, type MailList } from '../../lib/mailing/config';
+import { CONSENT_TEXT, PREFERENCES_PATH, SUBSCRIBE_PATH, mailingSettings, type ContactField, type MailList } from '../../lib/mailing/config';
 import type { PrefsData } from '../../lib/mailing/page-data';
 
 export const LISTS_KEY = 'mail-lists';
@@ -28,7 +28,7 @@ const SUBSCRIBE_MESSAGES: Record<string, string> = {
   sent: 'Thanks! Check your email: we’ve sent a link to confirm your subscription.',
 };
 
-/** Subscribe: email (and name), the lists to choose from when there are several, the consent wording and a button. */
+/** Subscribe: email (and first and last name, and the site's fields it asks for), the lists to choose from when there are several, the consent wording and a button. */
 const subscribe: Renderer = (b, env) => {
   const { ctx } = env;
   const a = b.attrs;
@@ -46,6 +46,17 @@ const subscribe: Renderer = (b, env) => {
   if (sent) return `<section ${attrs(['c-subscribe', a.className], styleDecls(a.style), { id })}>${heading}<p class="c-subscribe__message" role="status" tabindex="-1" data-focus>${SUBSCRIBE_MESSAGES.sent}</p></section>`;
   const field = (name: string, label: string, type: string, auto: string, required: boolean) =>
     `<div class="c-field c-subscribe__field"><label class="c-field__label" for="${id}-${name}">${label}</label><input class="c-input" id="${id}-${name}" name="${name}" type="${type}" autocomplete="${auto}"${required ? ' required' : ''} /></div>`;
+  // The site's contact fields the block asks for (attrs.fields: keys), each optional.
+  const asked = (Array.isArray(a.fields) ? a.fields : []).map((k: unknown) => s.fields?.find((f) => f.key === k)).filter((f: ContactField | undefined): f is ContactField => !!f);
+  const custom = (f: ContactField) => {
+    const fid = `${id}-cf-${f.key}`;
+    const control =
+      f.type === 'choice'
+        ? `<select class="c-input" id="${fid}" name="cf_${f.key}"><option value=""></option>${(f.options ?? []).map((o) => `<option>${esc(o)}</option>`).join('')}</select>`
+        : `<input class="c-input" id="${fid}" name="cf_${f.key}" type="${f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}"${f.type === 'number' ? ' step="any"' : ''} />`;
+    return `<div class="c-field c-subscribe__field"><label class="c-field__label" for="${fid}">${esc(f.label)}</label>${control}</div>`;
+  };
+  const names = a.showName ? field('first_name', 'First name', 'text', 'given-name', false) + field('last_name', 'Last name', 'text', 'family-name', false) : '';
   const listField =
     choices.length > 1
       ? `<fieldset class="c-field c-subscribe__lists"><legend class="c-field__label">${esc(a.listsLabel || 'What would you like to receive?')}</legend><div class="c-choices">${choices
@@ -58,7 +69,7 @@ const subscribe: Renderer = (b, env) => {
   const form =
     `<form class="c-subscribe__form${a.layout === 'inline' ? ' is-inline' : ''}" method="post" action="/api/mail/subscribe">` +
     `<input type="hidden" name="back" value="${escAttr(back)}" /><input type="hidden" name="block" value="${escAttr(b.id)}" /><input type="hidden" name="consent" value="${escAttr(consent)}" />${a.tags ? `<input type="hidden" name="tags" value="${escAttr(String(a.tags))}" />` : ''}` +
-    `<div class="c-subscribe__fields">${a.showName ? field('name', 'Name', 'text', 'name', false) : ''}${field('email', 'Email', 'email', 'email', true)}${a.layout === 'inline' ? `<button type="submit" class="c-button__link c-subscribe__submit">${esc(a.button || 'Subscribe')}</button>` : ''}</div>` +
+    `<div class="c-subscribe__fields">${names}${field('email', 'Email', 'email', 'email', true)}${asked.map(custom).join('')}${a.layout === 'inline' ? `<button type="submit" class="c-button__link c-subscribe__submit">${esc(a.button || 'Subscribe')}</button>` : ''}</div>` +
     listField +
     p('c-subscribe__consent', esc(consent)) +
     hp +

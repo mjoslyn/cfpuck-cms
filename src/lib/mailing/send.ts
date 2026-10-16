@@ -15,7 +15,7 @@ import { audienceOf, type Campaign } from './config';
 import { loadMailing, mailOrigin } from './contacts';
 import { emailEntries } from './entries';
 import { BATCH_SIZE, MailgunError, mailgunStatus, sendBatch, tagSeen } from './mailgun';
-import { addHoneypot, findLinks, plainText, recipientValues, renderCampaign, trackLinks, trackText, utmLinks, withUtm, type VarSpec } from './render';
+import { addHoneypot, findLinks, plainText, recipientValues, renderCampaign, trackLinks, trackText, utmLinks, withUtm, type Recipient, type VarSpec } from './render';
 import { sign } from './tokens';
 import { mailingPaused } from './state';
 import { cleanRules, type SegmentRules } from './segments';
@@ -71,7 +71,7 @@ export async function audienceOfRules(db: SupabaseClient, q: { lists: number[] |
 export async function renderFor(db: SupabaseClient, c: Campaign, origin: string) {
   const { name, settings } = await loadMailing(db);
   const [events, entries] = await Promise.all([emailEvents(db, c.design, origin), emailEntries(db, c.design, origin, c.since)]);
-  const rendered = renderCampaign({ campaignId: c.id, subject: c.subject, design: c.design ?? { root: { props: {} }, content: [] }, text: c.text, siteName: name, address: settings.address ?? '', origin, events, entries });
+  const rendered = renderCampaign({ campaignId: c.id, subject: c.subject, design: c.design ?? { root: { props: {} }, content: [] }, text: c.text, siteName: name, address: settings.address ?? '', origin, events, entries, fields: settings.fields?.map((f) => f.key) });
   return { rendered, events, entries, name, settings };
 }
 
@@ -206,7 +206,7 @@ async function markAccepted(db: SupabaseClient, batch: number, mailgunId: string
 
 /** Send one batch. 'ok', 'stop' (try again on a later run) or 'failed:<why>'. */
 async function sendOne(db: SupabaseClient, c: Campaign, frozen: Frozen, b: { id: number; n: number; attempts: number }): Promise<string> {
-  const { data: rows, error } = await db.from('campaign_sends').select('contact_id, email, status, contacts(name)').eq('batch_id', b.id);
+  const { data: rows, error } = await db.from('campaign_sends').select('contact_id, email, status, contacts(first_name, last_name, attributes)').eq('batch_id', b.id);
   if (error) throw new Error(error.message);
   const queued = (rows ?? []).filter((r: any) => r.status === 'queued');
   // Still subscribed now? Unsubscribes during a send take effect for the batches still to go.
@@ -220,7 +220,7 @@ async function sendOne(db: SupabaseClient, c: Campaign, frozen: Frozen, b: { id:
     return 'ok';
   }
   const variables: Record<string, Record<string, string>> = {};
-  for (const p of people as any[]) variables[p.email] = recipientValues(frozen.vars, { email: p.email, name: String(p.contacts?.name ?? '') }, { t: sign('manage', Number(p.contact_id)), ct: sign('click', Number(p.contact_id)) });
+  for (const p of people as any[]) variables[p.email] = recipientValues(frozen.vars, { ...p.contacts, email: p.email }, { t: sign('manage', Number(p.contact_id)), ct: sign('click', Number(p.contact_id)) });
   await db.from('campaign_batches').update({ status: 'attempting', attempts: b.attempts + 1, attempted_at: new Date().toISOString() }).eq('id', b.id);
   const unsubscribe = `${frozen.origin}/api/mail/unsubscribe?t=%recipient.t%&c=${c.id}`;
   for (let attempt = 0; ; attempt++) {
@@ -261,12 +261,14 @@ async function sendOne(db: SupabaseClient, c: Campaign, frozen: Frozen, b: { id:
 }
 
 /** A test send to a few addresses (the campaign as it would go now; no tracking, not counted). */
-export async function sendTest(db: SupabaseClient, c: Campaign, to: { email: string; name: string }[]): Promise<string> {
+export async function sendTest(db: SupabaseClient, c: Campaign, to: Recipient[]): Promise<string> {
   const origin = mailOrigin();
   const { rendered, name, settings } = await renderFor(db, c, origin);
   if (!settings.address) throw new Error('Add the postal address under Settings > Mailing Lists first: every email must carry it.');
   const variables: Record<string, Record<string, string>> = {};
-  for (const p of to) variables[p.email] = recipientValues(rendered.vars, p, { t: 'test', ct: 'test' });
+  // An address that is a contact is filled in as that contact.
+  const { data: known } = await db.from('contacts').select('email, first_name, last_name, attributes').in('email', to.map((p) => p.email));
+  for (const p of to) variables[p.email] = recipientValues(rendered.vars, (known ?? []).find((k) => k.email === p.email) ?? p, { t: 'test', ct: 'test' });
   return sendBatch({
     from: fromHeader(c.from_name || settings.fromName || name, settings.fromLocal),
     replyTo: c.reply_to || settings.replyTo || undefined,

@@ -4,20 +4,24 @@
 // Admins can unsubscribe or erase them. Actions post to /api/admin/mailing/contacts.
 import Admin from '../../../../layouts/Admin.astro';
 import { SITE_TZ } from '../../../../lib/site';
-import { CAMPAIGN_STATUS, CONTACT_STATUS, type CampaignStatus, type Contact, type ContactStatus, type MailList } from '../../../../lib/mailing/config';
+import { CAMPAIGN_STATUS, CONTACT_STATUS, mailingSettings, type CampaignStatus, type Contact, type ContactStatus, type MailList } from '../../../../lib/mailing/config';
 
 const db = Astro.locals.db;
 const isAdmin = Astro.locals.user?.role === 'admin';
 const id = Number(Astro.params.id);
 const { data: contact } = await db.from('contacts').select('*').eq('id', id).maybeSingle<Contact>();
 if (!contact) return Astro.redirect('/admin/mailing-lists/?tab=contacts&error=No%20such%20contact.');
-const [{ data: lists }, { data: rows }, { data: sends }, { data: clicks }, { data: member }] = await Promise.all([
+const [{ data: lists }, { data: rows }, { data: sends }, { data: clicks }, { data: member }, { data: siteRow }] = await Promise.all([
   db.from('mail_lists').select('*').order('sort').order('id'),
   db.from('contact_lists').select('list_id, status, subscribed_at, unsubscribed_at').eq('contact_id', id),
   db.from('campaign_sends').select('campaign_id, status, delivered_at, opened_at, clicked_at, machine_clicked_at, human_confirmed_at, bounced_at, complained_at, unsubscribed_at, campaigns(name, subject, sent_at, status)').eq('contact_id', id).order('campaign_id', { ascending: false }).limit(100),
   db.from('link_clicks').select('id, campaign_id, at, verdict, reasons, method, campaign_links(label, url, kind)').eq('contact_id', id).order('at', { ascending: false }).limit(200),
   db.from('members').select('name, level, status').ilike('email', contact.email).maybeSingle(),
+  db.from('settings').select('value').eq('key', 'site').maybeSingle(),
 ]);
+// The site's fields (Settings > Mailing Lists), then any others the contact has (from imports).
+const fields = mailingSettings(siteRow?.value).fields ?? [];
+const others = Object.entries(contact.attributes ?? {}).filter(([k]) => !fields.some((f) => f.key === k));
 const status = new Map((rows ?? []).map((r) => [Number(r.list_id), r]));
 const waiting = (rows ?? []).some((r) => r.status === 'pending');
 const when = (s?: string | null) => (s ? new Date(s).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: SITE_TZ }) : '');
@@ -36,7 +40,28 @@ const VERDICT: Record<string, string> = { human: 'Person (confirmed)', likely_hu
   <div class="mt-6 grid gap-6 md:grid-cols-2">
     <form method="post" action="/api/admin/mailing/contacts" class="rounded bg-white p-4 shadow-[0_0_0_1px_rgba(26,26,46,0.08)]">
       <input type="hidden" name="action" value="update" /><input type="hidden" name="id" value={id} />
-      <label class="mb-3 block text-xs text-admin-muted">Name<br /><input name="name" value={contact.name} class={`${input} w-full`} disabled={!isAdmin} /></label>
+      <div class="mb-3 grid grid-cols-2 gap-2">
+        <label class="block text-xs text-admin-muted">First name<br /><input name="first_name" value={contact.first_name} class={`${input} w-full`} disabled={!isAdmin} /></label>
+        <label class="block text-xs text-admin-muted">Last name<br /><input name="last_name" value={contact.last_name} class={`${input} w-full`} disabled={!isAdmin} /></label>
+      </div>
+      {fields.map((f) => {
+        const v = String(contact.attributes?.[f.key] ?? '');
+        return (
+          <label class="mb-3 block text-xs text-admin-muted">
+            {f.label}
+            <br />
+            {f.type === 'choice' ? (
+              <select name={`cf_${f.key}`} class={`${input} w-full`} disabled={!isAdmin}>
+                <option value=""></option>
+                {(f.options ?? []).map((o) => <option selected={o === v}>{o}</option>)}
+                {v && !(f.options ?? []).includes(v) && <option selected>{v}</option>}
+              </select>
+            ) : (
+              <input name={`cf_${f.key}`} type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'} step={f.type === 'number' ? 'any' : undefined} value={v} class={`${input} w-full`} disabled={!isAdmin} />
+            )}
+          </label>
+        );
+      })}
       <fieldset class="mb-3 border-0 p-0">
         <legend class="mb-1 text-xs text-admin-muted">Lists</legend>
         {((lists ?? []) as MailList[]).map((l) => {
@@ -53,14 +78,14 @@ const VERDICT: Record<string, string> = { human: 'Person (confirmed)', likely_hu
       </fieldset>
       <label class="mb-3 block text-xs text-admin-muted">Tags (comma separated)<br /><input name="tags" value={(contact.tags ?? []).join(', ')} placeholder="farm, vip" class={`${input} w-full`} disabled={!isAdmin} /></label>
       <fieldset class="mb-3 border-0 p-0">
-        <legend class="mb-1 text-xs text-admin-muted">Fields (for segments: town, business type...)</legend>
-        {[...Object.entries(contact.attributes ?? {}), ...(isAdmin ? [['', '']] : [])].map(([k, v]) => (
+        <legend class="mb-1 text-xs text-admin-muted">{fields.length ? 'Other fields' : 'Fields (for segments: town, business type...)'}</legend>
+        {[...others, ...(isAdmin ? [['', '']] : [])].map(([k, v]) => (
           <div class="mb-1 flex gap-2">
             <input name="field_key" value={k} placeholder="field" aria-label="Field" class={`${input} w-36`} disabled={!isAdmin} />
             <input name="field_value" value={String(v ?? '')} placeholder="value" aria-label="Value" class={`${input} w-full`} disabled={!isAdmin} />
           </div>
         ))}
-        {isAdmin && <p class="text-xs text-admin-muted">Fill in the empty row to add a field; clear a value to remove one.</p>}
+        {isAdmin && <p class="text-xs text-admin-muted">Fill in the empty row to add a field; clear a value to remove one. Fields every contact has are set under Settings &gt; Mailing Lists.</p>}
       </fieldset>
       <label class="mb-3 block text-xs text-admin-muted">Notes<br /><textarea name="notes" rows="2" class={`${input} w-full`} disabled={!isAdmin}>{contact.notes}</textarea></label>
       {isAdmin && <button class="rounded-sm bg-admin-ink px-4 py-2 text-xs font-semibold tracking-wider text-white uppercase hover:bg-admin-accent">Save</button>}

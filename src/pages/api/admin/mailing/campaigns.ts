@@ -8,7 +8,7 @@ import type { APIRoute } from 'astro';
 import { serviceClient } from '../../../../lib/supabase';
 import { SITE_TZ } from '../../../../lib/site';
 import { localToUtc } from '../../../../lib/recurrence';
-import { EMAIL_RE, audienceOf, mailingSettings, type Campaign } from '../../../../lib/mailing/config';
+import { EMAIL_RE, audienceOf, mailingSettings, splitName, type Campaign } from '../../../../lib/mailing/config';
 import { audience, sendTest, startSending } from '../../../../lib/mailing/send';
 import { mailgunStatus, tagStats } from '../../../../lib/mailing/mailgun';
 import { setPaused } from '../../../../lib/mailing/state';
@@ -88,7 +88,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
     }
     case 'test': {
       const extra = (Array.isArray(body.to) ? body.to : String(body.to ?? '').split(/[\s,;]+/)).map((e: string) => String(e).trim().toLowerCase()).filter((e: string) => EMAIL_RE.test(e)).slice(0, 5);
-      const to = [{ email: locals.user!.email, name: locals.user!.name || '' }, ...extra.filter((e: string) => e !== locals.user!.email).map((email: string) => ({ email, name: '' }))];
+      const to = [{ email: locals.user!.email, ...splitName(locals.user!.name) }, ...extra.filter((e: string) => e !== locals.user!.email).map((email: string) => ({ email }))];
       try {
         await sendTest(serviceClient(), c, to);
       } catch (e) {

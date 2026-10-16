@@ -3,7 +3,7 @@
 // POST /api/admin/mailing/segments.
 import { useEffect, useRef, useState } from 'react';
 import { RULE_TYPES, cleanTags, describeSegment, type Rule, type RuleType, type Segment } from '../lib/mailing/segments';
-import type { MailList } from '../lib/mailing/config';
+import type { ContactField, MailList } from '../lib/mailing/config';
 import type { MemberLevel } from '../lib/members/config';
 
 const input = 'rounded border border-admin-ink/15 bg-white px-2 py-1.5 text-sm outline-none focus:border-admin-accent';
@@ -18,7 +18,7 @@ async function post(body: Record<string, unknown>) {
 /** A new rule of a type, with a starting value. */
 const fresh = (type: RuleType): Rule => (type === 'joined' || type === 'opened' || type === 'clicked' ? { type, days: 30 } : type === 'field' ? { type, key: '', op: 'equals', value: '' } : { type });
 
-export default function SegmentEditor({ segment, lists, levels, tags, fields, usedBy }: { segment: Segment; lists: MailList[]; levels: MemberLevel[] | null; tags: string[]; fields: string[]; usedBy: { id: number; name: string; kind: 'campaign' | 'digest' }[] }) {
+export default function SegmentEditor({ segment, lists, levels, tags, fields, defined = [], usedBy }: { segment: Segment; lists: MailList[]; levels: MemberLevel[] | null; tags: string[]; fields: string[]; defined?: ContactField[]; usedBy: { id: number; name: string; kind: 'campaign' | 'digest' }[] }) {
   const [s, setS] = useState(segment);
   const [saved, setSaved] = useState(() => JSON.stringify(segment));
   const [status, setStatus] = useState('');
@@ -135,7 +135,21 @@ export default function SegmentEditor({ segment, lists, levels, tags, fields, us
                         <option value="contains">containing</option>
                         <option value="set">filled in</option>
                       </select>
-                      {r.op !== 'set' && <input className={`${input} w-40`} placeholder="value" value={r.value ?? ''} onChange={(e) => setRule(i, { value: e.target.value })} />}
+                      {r.op !== 'set' &&
+                        (() => {
+                          // One of the site's fields: its options, or a date or number input.
+                          const f = defined.find((d) => d.key === r.key);
+                          if (f?.type === 'choice' && r.op === 'equals')
+                            return (
+                              <select className={input} aria-label="Value" value={r.value ?? ''} onChange={(e) => setRule(i, { value: e.target.value })}>
+                                <option value=""></option>
+                                {(f.options ?? []).map((o) => (
+                                  <option key={o}>{o}</option>
+                                ))}
+                              </select>
+                            );
+                          return <input className={`${input} w-40`} type={f?.type === 'date' && r.op === 'equals' ? 'date' : f?.type === 'number' && r.op === 'equals' ? 'number' : 'text'} placeholder="value" aria-label="Value" value={r.value ?? ''} onChange={(e) => setRule(i, { value: e.target.value })} />;
+                        })()}
                     </>
                   )}
                   {r.type === 'member' && levels && levels.length > 0 && (
@@ -172,9 +186,16 @@ export default function SegmentEditor({ segment, lists, levels, tags, fields, us
               ))}
             </datalist>
             <datalist id="segment-fields">
-              {fields.map((f) => (
-                <option key={f} value={f} />
+              {defined.map((f) => (
+                <option key={f.key} value={f.key}>
+                  {f.label}
+                </option>
               ))}
+              {fields
+                .filter((f) => !defined.some((d) => d.key === f))
+                .map((f) => (
+                  <option key={f} value={f} />
+                ))}
             </datalist>
             <p className="mt-3 text-xs text-admin-muted">
               {describeSegment(s.rules, names)}. A campaign or digest using this segment goes to the people on its lists who match. Tags and fields are set on each contact, and from an import's columns. Opens and clicks count people, not mail scanners.

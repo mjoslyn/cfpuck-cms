@@ -5,7 +5,7 @@
 // the site's pages.
 import type { APIRoute } from 'astro';
 import { serviceClient } from '../../../../lib/supabase';
-import { EMAIL_RE, audienceOf, mailingSettings, type Campaign, type Digest } from '../../../../lib/mailing/config';
+import { EMAIL_RE, audienceOf, mailingSettings, splitName, type Campaign, type Digest } from '../../../../lib/mailing/config';
 import { runDigest } from '../../../../lib/mailing/digest';
 import { sendTest } from '../../../../lib/mailing/send';
 
@@ -80,7 +80,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
       const week = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
       const issue = { id: 0, name: d.name, subject: (d.subject || d.name).replace(/\{week_of\}/g, week).replace(/\{date\}/g, week), from_name: d.from_name, reply_to: d.reply_to, design: d.design, text: d.text, since, list_ids: d.list_ids, audience: d.audience, segment_id: d.segment_id } as unknown as Campaign;
       try {
-        await sendTest(serviceClient(), issue, [{ email: locals.user!.email, name: locals.user!.name || '' }]);
+        await sendTest(serviceClient(), issue, [{ email: locals.user!.email, ...splitName(locals.user!.name) }]);
       } catch (e) {
         return fail((e as Error).message);
       }

@@ -13,6 +13,7 @@ const { judge, ipPrefix, openVerdict } = await import('../../src/lib/mailing/cli
 const { digestDue, isoWeek } = await import('../../src/lib/mailing/digest');
 const { parseCsv, contactsCsv } = await import('../../src/lib/mailing/contacts');
 const { unhealthy } = await import('../../src/lib/mailing/state');
+const { cleanFields, fieldValue, splitName, nameParts } = await import('../../src/lib/mailing/config');
 
 let bad = 0;
 const want = (name: string, ok: boolean, detail = '') => {
@@ -44,11 +45,19 @@ want('HTML uses escaped variables', /News for %recipient\.v\d+_h%/.test(r.html) 
 want('footer carries the address and links', r.html.includes('1 Main St, Town') && r.html.includes('https://site.example/unsubscribe/?t=%recipient.t%&c=7') && r.html.includes('https://site.example/email-preferences/?t=%recipient.t%'));
 want('site name escaped in the footer', r.html.includes('Town &amp; Co'));
 want('text part uses plain variables', !/%recipient\.v\d+_h%/.test(r.text) && /%recipient\.v\d+%/.test(r.text) && r.text.includes('Unsubscribe'));
-const v = recipientValues(r.vars, { email: 'a@x.org', name: '<Al> & "Bo"' }, { t: 'T', ct: 'C' });
+const v = recipientValues(r.vars, { email: 'a@x.org', first_name: '<Al>', last_name: '& "Bo"' }, { t: 'T', ct: 'C' });
 const first = r.vars.find((x) => x.field === 'first_name' && x.fallback === 'friend')!;
 want('a value is escaped for HTML only', v[`${first.name}_h`] === '&lt;Al&gt;' && v[first.name] === '<Al>');
-const empty = recipientValues(r.vars, { email: 'a@x.org', name: '' }, { t: 'T', ct: 'C' });
+const empty = recipientValues(r.vars, { email: 'a@x.org' }, { t: 'T', ct: 'C' });
 want('an empty name takes the fallback', empty[first.name] === 'friend' && empty[r.vars.find((x) => x.fallback === 'reader')!.name] === 'reader');
+want('the full name is first and last', v[r.vars.find((x) => x.field === 'name')!.name] === '<Al> & "Bo"');
+
+// The site's contact fields as tags: {town} for a field with that key; an unknown key stays as written.
+const rf = renderCampaign({ campaignId: 8, subject: '{last_name} in {town|your town} {shoe_size}', design: { root: { props: {} }, content: [] } as any, siteName: 'T', address: 'A', origin: 'https://site.example', fields: ['town'] });
+const vf = recipientValues(rf.vars, { email: 'a@x.org', last_name: 'Bo', attributes: { town: 'Olean' } }, { t: 'T', ct: 'C' });
+want('a field is a tag', rf.subject.replace(/%recipient\.(v\d+)%/g, (_, k) => vf[k]) === 'Bo in Olean {shoe_size}', rf.subject);
+const vg = recipientValues(rf.vars, { email: 'a@x.org' }, { t: 'T', ct: 'C' });
+want('an empty field takes the fallback', rf.subject.replace(/%recipient\.(v\d+)%/g, (_, k) => vg[k]) === ' in your town {shoe_size}');
 
 // Links: the web links in order, not the preferences link; tracked, with the hidden link in HTML only.
 const found = findLinks(r.html);
@@ -111,7 +120,8 @@ want('bounces pause', unhealthy({ ...base, bounced: 30 }, { complaintRate: 0.1, 
 const rows = parseCsv('﻿Email;Name\nann@x.org;"Smith; Ann"\n\nbo@x.org;Bo\n');
 want('CSV with semicolons and quotes', rows.length === 2 && rows[0].email === 'ann@x.org' && rows[0].name === 'Smith; Ann', JSON.stringify(rows));
 want('CSV without a header', parseCsv('ann@x.org,Ann\nbo@x.org\n').map((r) => r.email).join() === 'ann@x.org,bo@x.org');
-want('export guards formulas', contactsCsv([{ id: 1, email: 'a@x.org', name: '=HYPERLINK("x")', status: 'subscribed', lists: ['News'], consent_source: '', consent_at: null, confirmed_at: null, unsubscribed_at: null, created_at: '' } as any]).includes(`"'=HYPERLINK(""x"")"`));
+want('export has the fields as columns', contactsCsv([{ id: 1, email: 'a@x.org', first_name: 'Ann', last_name: 'Lee', attributes: { town: 'Olean', extra: 'x' }, status: 'subscribed', lists: [], created_at: '' } as any], [{ key: 'town', label: 'Town', type: 'text' }, { key: 'size', label: 'Size', type: 'text' }]).startsWith('email,first_name,last_name,status,lists,tags,town,size,extra,'));
+want('export guards formulas', contactsCsv([{ id: 1, email: 'a@x.org', first_name: '=HYPERLINK("x")', last_name: '', attributes: {}, status: 'subscribed', lists: ['News'], consent_source: '', consent_at: null, confirmed_at: null, unsubscribed_at: null, created_at: '' } as any]).includes(`"'=HYPERLINK(""x"")"`));
 
 // Segments: rules cleaned (empty ones dropped, values bounded), tags normalised, rules in words.
 const { cleanRules, cleanTags, describeSegment, fieldKey } = await import('../../src/lib/mailing/segments');
@@ -120,5 +130,12 @@ want('rules cleaned', JSON.stringify(rules) === JSON.stringify({ match: 'any', r
 want('tags normalised', cleanTags(' Trade Show 2026 ; <b>x</b>, , trade show 2026').join('|') === 'trade show 2026|bxb' && fieldKey('First Name!') === 'first_name');
 want('rules in words', describeSegment(rules) === 'is tagged farm or vip, or has business_type equal to “Dairy”, or hasn’t opened an email in the last 3650 days', describeSegment(rules));
 want('no rules is everyone', describeSegment(cleanRules({})) === 'Everyone on the campaign’s lists');
+
+// Names and the site's contact fields.
+want('a name splits at its first space', JSON.stringify(splitName('  Ann  Marie Smith ')) === '{"first_name":"Ann","last_name":"Marie Smith"}' && splitName('Cher').last_name === '');
+want('first and last win over a whole name', nameParts({ first_name: 'Al', name: 'X Y' }).first_name === 'Al' && nameParts({ name: 'X Y' }).last_name === 'Y');
+const fields = cleanFields([{ label: 'Town' }, { label: 'Size', key: 'size', type: 'choice', options: 'S, M, , L' }, { label: 'Email' }, { label: 'Town again', key: 'town' }, { label: '9 lives' }, { label: 'Born', type: 'date' }, { label: 'Age', type: 'number' }]);
+want('fields cleaned: keys from labels, reserved and repeated keys left out', fields.map((f) => f.key).join() === 'town,size,born,age' && fields[1].options?.join() === 'S,M,L', JSON.stringify(fields));
+want('values checked against the field type', fieldValue(fields[1], 'm') === 'M' && fieldValue(fields[1], 'XL') === '' && fieldValue(fields[2], '2026-02-28') === '2026-02-28' && fieldValue(fields[2], '2026-02-30') === '' && fieldValue(fields[2], '2026-13-45') === '' && fieldValue(fields[2], 'May 1') === '' && fieldValue(fields[3], ' 42 ') === '42' && fieldValue(fields[3], 'old') === '');
 
 process.exitCode = bad ? 1 : 0;

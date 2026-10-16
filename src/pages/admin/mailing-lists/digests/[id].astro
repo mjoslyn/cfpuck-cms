@@ -3,7 +3,7 @@
 import Admin from '../../../../layouts/Admin.astro';
 import DigestEditor from '../../../../admin/DigestEditor';
 import { SITE_TZ } from '../../../../lib/site';
-import type { Digest, MailList } from '../../../../lib/mailing/config';
+import { mailingSettings, type Digest, type MailList } from '../../../../lib/mailing/config';
 import { memberSettings } from '../../../../lib/members/config';
 
 const db = Astro.locals.db;
@@ -16,9 +16,10 @@ const [{ data: lists }, { data: siteRow }, { data: issues }] = await Promise.all
   db.from('campaigns').select('id, name, status, scheduled_at, sent_at, recipients, error').eq('digest_id', id).order('created_at', { ascending: false }).limit(60),
 ]);
 const members = memberSettings(siteRow?.value);
+const fields = mailingSettings(siteRow?.value).fields ?? [];
 const { data: segments } = await db.from('mail_segments').select('id, name').order('name');
 const lastSent = (issues ?? []).find((i) => i.status === 'sent')?.sent_at ?? null;
 ---
 <Admin title={`${digest.name} · Mailing Lists`}>
-  <DigestEditor client:load digest={digest} lists={(lists ?? []) as MailList[]} levels={members.enabled ? members.levels : null} issues={(issues ?? []) as any} admin={Astro.locals.user?.role === 'admin'} tz={SITE_TZ} lastSent={lastSent} segments={segments ?? []} />
+  <DigestEditor client:load digest={digest} lists={(lists ?? []) as MailList[]} levels={members.enabled ? members.levels : null} issues={(issues ?? []) as any} admin={Astro.locals.user?.role === 'admin'} tz={SITE_TZ} lastSent={lastSent} segments={segments ?? []} fields={fields} />
 </Admin>

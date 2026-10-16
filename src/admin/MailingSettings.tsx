@@ -1,11 +1,13 @@
 // Settings > Mailing Lists (settings.site.mailing; src/lib/mailing/config.ts): Mailing on or off, the sender,
 // the postal address every email carries, the consent wording, the lists offered to members, link
-// tracking and UTM defaults, and the health thresholds that pause sending. Mailgun's keys are in the
+// tracking and UTM defaults, the fields every contact has (each also a merge tag), and the health
+// thresholds that pause sending. Mailgun's keys are in the
 // environment (src/lib/mailing/mailgun.ts); this shows which are missing. Lists, contacts, campaigns and
 // digests are on the Mailing Lists screen.
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Num, Text, Toggle } from '../puck/fields';
-import { CONSENT_TEXT, HEALTH, PREFERENCES_PATH, SUBSCRIBE_PATH, UNSUBSCRIBE_PATH, type MailList, type MailingSettings } from '../lib/mailing/config';
+import { CONSENT_TEXT, FIELD_TYPES, HEALTH, PREFERENCES_PATH, RESERVED_FIELD_KEYS, SUBSCRIBE_PATH, UNSUBSCRIBE_PATH, type ContactField, type ContactFieldType, type MailList, type MailingSettings } from '../lib/mailing/config';
+import { fieldKey } from '../lib/mailing/segments';
 
 export interface MailgunInfo {
   configured: boolean;
@@ -21,6 +23,12 @@ export default function MailingSettingsPanel({ value, mailgun, lists, membersOn,
   const [origin, setOrigin] = useState('');
   useEffect(() => setOrigin(location.origin), []);
   const memberLists = value.memberLists ?? [];
+  const fields = value.fields ?? [];
+  // Keys already saved stay as they are (contacts' values and merge tags use them); a new field's key follows its label.
+  const saved = useRef(new Set(fields.map((f) => f.key)));
+  const setField = (i: number, patch: Partial<ContactField>) => set({ fields: fields.map((f, j) => (j === i ? { ...f, ...patch, ...(patch.label !== undefined && !saved.current.has(f.key) ? { key: fieldKey(patch.label) } : {}) } : f)) });
+  const problem = (f: ContactField, i: number) =>
+    !f.label.trim() ? '' : !/^[a-z]/.test(f.key) ? 'Start the name with a letter.' : RESERVED_FIELD_KEYS.includes(f.key) ? `{${f.key}} is a built-in tag: choose another name.` : fields.findIndex((g) => g.key === f.key) !== i ? 'Another field has this name.' : '';
   return (
     <>
       <p className="mb-3 text-xs text-admin-muted">
@@ -75,6 +83,34 @@ export default function MailingSettingsPanel({ value, mailgun, lists, membersOn,
               <p className="mt-1 text-xs text-admin-muted">Offered (unticked) when someone creates a member account, and on a member's account page, where they choose their lists.</p>
             </fieldset>
           )}
+
+          <span className="mt-4 mb-1 block text-xs font-semibold tracking-wider text-admin-muted uppercase">Subscriber fields</span>
+          <p className="mb-2 text-xs text-admin-muted">Fields every contact can have, besides first and last name: set on each contact, filled from an import's columns of the same name, asked for by a Subscribe block, used in segments, and in emails as a merge tag.</p>
+          {fields.map((f, i) => (
+            <div key={i} className="mb-2 rounded border border-admin-ink/10 p-2">
+              <div className="flex gap-2">
+                <input className="min-w-0 flex-1 rounded border border-admin-ink/15 bg-white px-2 py-1 text-sm" aria-label="Field name" placeholder="Town" value={f.label} onChange={(e) => setField(i, { label: e.target.value })} />
+                <select className="rounded border border-admin-ink/15 bg-white px-1 py-1 text-sm" aria-label="Type" value={f.type} onChange={(e) => setField(i, { type: e.target.value as ContactFieldType })}>
+                  {FIELD_TYPES.map(([t, label]) => (
+                    <option key={t} value={t}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+                <button type="button" className="text-xs text-[#c4592a] underline" onClick={() => set({ fields: fields.filter((_, j) => j !== i) })}>
+                  Remove
+                </button>
+              </div>
+              {f.type === 'choice' && (
+                <input className="mt-2 w-full rounded border border-admin-ink/15 bg-white px-2 py-1 text-sm" aria-label="Options" placeholder="Options, comma separated" defaultValue={(f.options ?? []).join(', ')} onBlur={(e) => setField(i, { options: e.target.value.split(',').map((o) => o.trim()).filter(Boolean) })} />
+              )}
+              <p className="mt-1 text-xs text-admin-muted">{problem(f, i) || (f.key ? <>Merge tag <code>{`{${f.key}}`}</code></> : '')}</p>
+            </div>
+          ))}
+          <button type="button" className="mb-3 text-sm underline hover:text-admin-accent" onClick={() => set({ fields: [...fields, { key: '', label: '', type: 'text' }] })}>
+            Add a field
+          </button>
+          <p className="mb-3 text-xs text-admin-muted">Removing a field keeps contacts' values: they show as other fields on each contact.</p>
 
           <span className="mt-4 mb-1 block text-xs font-semibold tracking-wider text-admin-muted uppercase">New campaigns</span>
           <Toggle title="Track links (each link goes through the site, which tells people's clicks from mail scanners')" value={value.trackLinks !== false} onChange={(trackLinks) => set({ trackLinks })} />

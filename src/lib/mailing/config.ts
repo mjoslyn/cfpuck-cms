@@ -3,6 +3,7 @@
 // notifications and tickets go over SMTP as before). The settings, the site's addresses for signing up
 // and managing a subscription, and the shapes the screens share. Safe in the browser; the database side
 // is supabase/migrations/*_mailing.sql.
+import { fieldKey } from './segments';
 
 /** settings.site.mailing. */
 export interface MailingSettings {
@@ -25,6 +26,66 @@ export interface MailingSettings {
   /** Pause sending when a campaign's complaint rate (%) or bounce rate (%) passes these, once it has 500 delivered. */
   complaintRate?: number;
   bounceRate?: number;
+  /** Contacts' own fields (kept in contacts.attributes under their keys). */
+  fields?: ContactField[];
+}
+
+export type ContactFieldType = 'text' | 'number' | 'date' | 'choice';
+export const FIELD_TYPES: [ContactFieldType, string][] = [
+  ['text', 'Text'],
+  ['number', 'Number'],
+  ['date', 'Date'],
+  ['choice', 'Choice'],
+];
+
+/** A field every contact can have (Settings > Mailing Lists): its key is also its merge tag, {key}. */
+export interface ContactField {
+  key: string;
+  label: string;
+  type: ContactFieldType;
+  /** A choice field's options. */
+  options?: string[];
+}
+
+/** Keys a field can't have: the built-in merge tags. */
+export const RESERVED_FIELD_KEYS = ['email', 'first_name', 'last_name', 'name', 'site_name', 'unsubscribe_url', 'preferences_url', 'week_of'];
+
+/** Fields as stored: known types, keys that start with a letter and aren't reserved or repeated (at most 30). */
+export function cleanFields(v: unknown): ContactField[] {
+  const seen = new Set<string>();
+  return (Array.isArray(v) ? v : []).flatMap((f: any) => {
+    const label = String(f?.label ?? '').trim().slice(0, 60);
+    const key = fieldKey(f?.key || label);
+    if (!label || !/^[a-z]/.test(key) || RESERVED_FIELD_KEYS.includes(key) || seen.has(key)) return [];
+    seen.add(key);
+    const type = FIELD_TYPES.some(([t]) => t === f.type) ? (f.type as ContactFieldType) : 'text';
+    const options = type === 'choice' ? [...new Set((Array.isArray(f.options) ? f.options : String(f.options ?? '').split(',')).map((o: unknown) => String(o).trim().slice(0, 60)).filter(Boolean))].slice(0, 50) as string[] : undefined;
+    return [{ key, label, type, ...(options ? { options } : {}) }];
+  }).slice(0, 30);
+}
+
+/** A value for a field, as stored ('' when it isn't one: not a number, not a date, not an option). */
+export function fieldValue(f: ContactField, v: unknown): string {
+  const s = String(v ?? '').trim();
+  if (!s) return '';
+  if (f.type === 'number') return Number.isFinite(Number(s)) ? String(Number(s)) : '';
+  if (f.type === 'date') return /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(`${s}T00:00:00Z`)) && new Date(`${s}T00:00:00Z`).toISOString().startsWith(s) ? s : '';
+  if (f.type === 'choice') return f.options?.find((o) => o.toLowerCase() === s.toLowerCase()) ?? '';
+  return s.slice(0, 500);
+}
+
+/** A whole name split at its first space: "Ann Marie Smith" is Ann and Marie Smith. */
+export function splitName(full: unknown): { first_name: string; last_name: string } {
+  const t = String(full ?? '').trim().replace(/\s+/g, ' ');
+  const i = t.indexOf(' ');
+  return i < 0 ? { first_name: t.slice(0, 100), last_name: '' } : { first_name: t.slice(0, i).slice(0, 100), last_name: t.slice(i + 1).slice(0, 100) };
+}
+
+/** First and last name from what a form or import gives: the two parts, else a whole name split. */
+export function nameParts(v: { first_name?: unknown; last_name?: unknown; name?: unknown }): { first_name: string; last_name: string } {
+  const first = String(v.first_name ?? '').trim().slice(0, 100);
+  const last = String(v.last_name ?? '').trim().slice(0, 100);
+  return first || last ? { first_name: first, last_name: last } : splitName(v.name);
 }
 
 export const CONSENT_TEXT = 'I agree to receive email from us. I can unsubscribe at any time.';
@@ -58,6 +119,7 @@ export function mailingSettings(site: Record<string, any> | null | undefined): M
     utm: m.utm === true,
     complaintRate: pct(m.complaintRate, HEALTH.complaintRate),
     bounceRate: pct(m.bounceRate, HEALTH.bounceRate),
+    fields: cleanFields(m.fields),
   };
 }
 
@@ -94,6 +156,9 @@ export const CONTACT_STATUS: Record<ContactStatus, string> = {
 export interface Contact {
   id: number;
   email: string;
+  first_name: string;
+  last_name: string;
+  /** First and last joined (made by the database). */
   name: string;
   attributes: Record<string, unknown>;
   status: ContactStatus;

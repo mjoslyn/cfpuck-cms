@@ -661,8 +661,10 @@ never subscribes anyone again); the settings are, with the others. Migration `*_
 
 - **Settings**: the sender's name and the local part of its address (`fromLocal`, at `MAILGUN_DOMAIN`),
   reply-to, the postal address every email carries (nothing sends without it), the consent wording, the
-  lists offered to members (`memberLists`), link tracking and UTM defaults for new campaigns, and the
-  complaint and bounce rates that pause sending.
+  lists offered to members (`memberLists`), link tracking and UTM defaults for new campaigns, the
+  complaint and bounce rates that pause sending, and **Subscriber fields** (`fields`, `ContactField`:
+  label, key from it, type text, number, date or choice with options; `cleanFields` leaves out keys that
+  are built-in tags, `RESERVED_FIELD_KEYS`; a saved field keeps its key).
 - **Mailgun** (`src/lib/mailing/mailgun.ts`, REST, no SDK; keys in the environment, never settings):
   `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `MAILGUN_REGION` (`us`, default, or `eu`),
   `MAILGUN_WEBHOOK_SIGNING_KEY`, `MAILGUN_TEST_MODE` (`o:testmode`; Mailgun accepts and delivers nothing),
@@ -672,7 +674,8 @@ never subscribes anyone again); the settings are, with the others. Migration `*_
   preferences and unsubscribe; `confirm`; `click`; `seen`), keyed by `MAIL_LINK_SECRET` (else one made
   from the service key; changing it breaks links already sent). No tokens are stored.
 - **Data**: `mail_lists` (name, description, `public`, sort); `contacts` (email lowercased and unique,
-  name, attributes, status `pending`/`subscribed`/`unsubscribed`/`bounced`/`complained`: anything but
+  `first_name` and `last_name` (`name` is the two joined, a generated column; migration
+  `*_mailing_name_parts.sql` split the names already kept at their first space), attributes, status `pending`/`subscribed`/`unsubscribed`/`bounced`/`complained`: anything but
   subscribed means no marketing mail; the consent's source, wording, time, address and confirmation);
   `contact_lists` (per list: `pending`, `subscribed`, `unsubscribed`); `mail_suppressions` (SHA-256 of
   addresses erased, bounced or complained, never mailed again without a confirmed sign-up); `campaigns`,
@@ -691,10 +694,16 @@ never subscribes anyone again); the settings are, with the others. Migration `*_
   source; each can be turned round. `cleanRules` keeps them to known shapes; the database evaluates
   them (`mail_rule`). The editor shows who matches now (subscribed, on any list) with a count. A segment
   a campaign or digest names can't be deleted, so no audience widens on its own.
-- **Tags and fields**: set on a contact's page; Add a contact takes tags; an import's `tags` column
-  (separated by `;` or `|`) tags each person and its other columns become fields (merged into a known
-  contact's), with tags for everyone imported; a Subscribe block can tag its sign-ups (`attrs.tags`;
-  added only to a new or unconfirmed address, so a form can't retag someone subscribed).
+- **Tags and fields**: set on a contact's page (the site's fields as inputs of their type, `cf_<key>`;
+  other fields as key and value); Add a contact takes first and last name and tags; an import reads
+  `first name`/`last name` (or `name`, split), its `tags` column (separated by `;` or `|`) tags each
+  person, a column named like one of the site's fields (key or label) fills it, its value checked
+  against the field's type (`fieldValue`), and other columns become fields of their own (merged into a
+  known contact's); the export has first and last name and a column per field, so it imports back. A
+  Subscribe block asks first and last name (`showName`) and any of the site's fields (`attrs.fields`),
+  and can tag its sign-ups (`attrs.tags`); fields and tags are added only to a new or unconfirmed
+  address, so a form can't change someone subscribed. The segment editor offers the site's fields
+  with their options.
 - **Signing up** (`src/lib/mailing/contacts.ts`): always confirmed by email (double opt-in, over SMTP,
   at most 3 confirmation emails a day to one address; 30 sign-ups a minute site-wide). The **Subscribe**
   block (`subscribe`, `src/render/c/mailing.ts`; Mailing category in the editor) posts to
@@ -719,7 +728,7 @@ never subscribes anyone again); the settings are, with the others. Migration `*_
   and digests can go to only members (of some levels) or only non-members.
 - **Campaigns** (`/admin/mailing-lists/`, `src/admin/CampaignEditor.tsx`, `/api/admin/mailing/campaigns`):
   name, subject, sender, lists, members audience, link tracking, UTM, and the email, designed in the
-  email builder with the mailing kit (`src/admin/mailing-email.ts`: merge tags `{first_name}`, `{name}`,
+  email builder with the mailing kit (`src/admin/mailing-email.ts`: merge tags `{first_name}`, `{last_name}`, `{name}`, each of the site's fields as `{<key>}`,
   `{email}`, `{site_name}`, `{unsubscribe_url}`, `{preferences_url}`, a fallback after a bar,
   `{first_name|there}`; a Subscriber block; the **Entries** block, the site's latest entries of some
   types and terms, members-only ones left out, `src/lib/mailing/entries.ts`; and Events). Editors save

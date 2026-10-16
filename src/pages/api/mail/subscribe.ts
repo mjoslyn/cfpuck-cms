@@ -3,7 +3,7 @@
 // the same whether the address was known or not.
 import type { APIRoute } from 'astro';
 import { serviceClient } from '../../../lib/supabase';
-import { SUBSCRIBE_PATH } from '../../../lib/mailing/config';
+import { SUBSCRIBE_PATH, fieldValue } from '../../../lib/mailing/config';
 import { loadLists, loadMailing, signUp } from '../../../lib/mailing/contacts';
 import { safeNext } from '../../../lib/members/account';
 import { clientIp } from '../../../lib/mailing/request';
@@ -34,7 +34,12 @@ export const POST: APIRoute = async ({ request, redirect, url }) => {
   const lists = form.getAll('lists').map(Number).filter((n) => allowed.includes(n));
   const result = await signUp(db, {
     email: String(form.get('email') ?? ''),
+    first_name: String(form.get('first_name') ?? ''),
+    last_name: String(form.get('last_name') ?? ''),
+    // A form from before names were split.
     name: String(form.get('name') ?? ''),
+    // The site's fields (cf_<key>), checked against their types; only a new or unconfirmed address takes them.
+    attributes: Object.fromEntries((settings.fields ?? []).map((f) => [f.key, fieldValue(f, form.get(`cf_${f.key}`))])),
     lists,
     source: `subscribe:${back}`,
     consentText: String(form.get('consent') ?? '').slice(0, 1000),

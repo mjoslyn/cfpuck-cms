@@ -51,9 +51,16 @@ and keeps only a one-way hash of the address, so they're never mailed again unle
 
 ## Tags, fields and segments
 
-Each person can have **tags** (farm, vip, trade show 2026) and **fields** (town, business type), set on
-their page, given when adding them, or taken from an import: a `tags` column (separated by `;` or `|`)
-and any other column becomes a field. A Subscribe block can tag the people who sign up through it.
+Each person has a first and last name, and can have **tags** (farm, vip, trade show 2026) and
+**fields** (town, business type), set on their page, given when adding them, or taken from an import: a
+`tags` column (separated by `;` or `|`), and any other column becomes a field.
+
+Fields every contact can have are set under **Settings > Mailing Lists > Subscriber fields**: a name
+and a type (text, number, date, or a choice of options). Each shows on every contact's page as its own
+input, fills from an import column of the same name (a value that doesn't fit the type is left out), is
+offered in segments with its options, and is a merge tag (Town is `{town}`). A Subscribe block can ask
+for first and last name and any of these fields, and tag the people who sign up through it; a form only
+fills them in for someone new or not yet confirmed.
 
 A **segment** (the **Segments** tab) picks some of the people on a campaign's lists, members or not. Its
 rules, all or any of which must match, can each be turned round:
@@ -77,7 +84,7 @@ the people on its lists who match. A segment that a campaign or digest uses can'
   only members (of some levels) or only non-members;
 - the email, designed in the email builder: text, images, buttons, sections and columns, the
   **Entries** block (the site's latest posts or other entries, of some categories or tags) and, with
-  Events on, the **Events** block. Merge tags: `{first_name}`, `{name}`, `{email}`, `{site_name}`,
+  Events on, the **Events** block. Merge tags: `{first_name}`, `{last_name}`, `{name}`, your subscriber fields (`{town}`), `{email}`, `{site_name}`,
   `{unsubscribe_url}`, `{preferences_url}`; a fallback for an empty value after a bar,
   `{first_name|there}`. Every email ends with a footer you can't remove: why they get it, your name and
   postal address, and unsubscribe and preferences links;

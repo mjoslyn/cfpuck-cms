@@ -2,7 +2,7 @@
 // A segment and who matches it now (src/admin/SegmentEditor.tsx).
 import Admin from '../../../../layouts/Admin.astro';
 import SegmentEditor from '../../../../admin/SegmentEditor';
-import type { MailList } from '../../../../lib/mailing/config';
+import { mailingSettings, type MailList } from '../../../../lib/mailing/config';
 import { cleanRules, type Segment } from '../../../../lib/mailing/segments';
 import { memberSettings } from '../../../../lib/members/config';
 
@@ -21,9 +21,10 @@ const [{ data: lists }, { data: siteRow }, { data: known }, { data: campaigns },
 const tags = [...new Set((known ?? []).flatMap((c) => c.tags ?? []))].sort();
 const fields = [...new Set((known ?? []).flatMap((c) => Object.keys(c.attributes ?? {})))].sort();
 const members = memberSettings(siteRow?.value);
+const defined = mailingSettings(siteRow?.value).fields ?? [];
 const segment: Segment = { id: row.id, name: row.name, description: row.description, rules: cleanRules(row.rules), updated_at: row.updated_at };
 const usedBy = [...(campaigns ?? []).map((c) => ({ ...c, kind: 'campaign' as const })), ...(digests ?? []).map((d) => ({ ...d, kind: 'digest' as const }))];
 ---
 <Admin title={`${row.name} · Mailing Lists`}>
-  <SegmentEditor client:load segment={segment} lists={(lists ?? []) as MailList[]} levels={members.enabled ? members.levels : null} tags={tags} fields={fields} usedBy={usedBy} />
+  <SegmentEditor client:load segment={segment} lists={(lists ?? []) as MailList[]} levels={members.enabled ? members.levels : null} tags={tags} fields={fields} defined={defined} usedBy={usedBy} />
 </Admin>

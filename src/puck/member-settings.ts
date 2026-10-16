@@ -9,7 +9,7 @@ import { mailingOn } from '../lib/mailing/config';
 
 let loading: Promise<Record<string, any> | null> | null = null;
 
-function useSite(): Record<string, any> | null | undefined {
+export function useSite(): Record<string, any> | null | undefined {
   const [site, setSite] = useState<Record<string, any> | null | undefined>(undefined);
   useEffect(() => {
     loading ??= Promise.resolve(browserClient().from('settings').select('value').eq('key', 'site').maybeSingle()).then(({ data }) => data?.value ?? null, () => null);

@@ -181,7 +181,10 @@ const contactQuery = (patch: Record<string, string>) => `?${new URLSearchParams(
             <form method="post" action="/api/admin/mailing/contacts" class="mt-3 grid gap-2">
               <input type="hidden" name="action" value="add" />
               <label class="text-xs text-admin-muted">Email<br /><input name="email" type="email" required class={`${input} w-full`} /></label>
-              <label class="text-xs text-admin-muted">Name<br /><input name="name" class={`${input} w-full`} /></label>
+              <div class="grid grid-cols-2 gap-2">
+                <label class="text-xs text-admin-muted">First name<br /><input name="first_name" class={`${input} w-full`} /></label>
+                <label class="text-xs text-admin-muted">Last name<br /><input name="last_name" class={`${input} w-full`} /></label>
+              </div>
               <label class="text-xs text-admin-muted">List<br /><select name="list" class={`${input} w-full`}>{lists.map((l) => <option value={l.id}>{l.name}</option>)}</select></label>
               <label class="text-xs text-admin-muted">Tags (optional, comma separated)<br /><input name="tags" placeholder="farm, vip" class={`${input} w-full`} /></label>
               <label class="text-xs text-admin-muted">How they agreed (kept as their consent)<br /><input name="source" required placeholder="Asked at the front desk, 12 Oct" class={`${input} w-full`} /></label>
@@ -197,7 +200,7 @@ const contactQuery = (patch: Record<string, string>) => `?${new URLSearchParams(
               <label class="text-xs text-admin-muted">How these people agreed<br /><input name="source" required placeholder="Signed up on the old site's newsletter form" class={`${input} w-full`} /></label>
               <button class={btn}>Import</button>
               <label class="text-xs text-admin-muted">Tag everyone imported (optional)<br /><input name="tags" placeholder="trade show 2026" class={`${input} w-full`} /></label>
-              <p class="text-xs text-admin-muted">Only people who agreed to receive this email. A tags column (separated by ; or |) tags each person; other columns become fields to segment by. Anyone who unsubscribed, bounced or was erased before is skipped.</p>
+              <p class="text-xs text-admin-muted">Only people who agreed to receive this email. Columns: email, first name and last name (or name), tags (separated by ; or |), and fields: a column named like one of the site's fields (Settings &gt; Mailing Lists) fills it, any other becomes a field of its own. Anyone who unsubscribed, bounced or was erased before is skipped.</p>
             </form>
           </details>
           {members.enabled && (

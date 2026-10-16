@@ -5,7 +5,7 @@
 import { useMemo, useRef, useState } from 'react';
 import EmailBuilder from '../forms/EmailBuilder';
 import { mailingEmailKit } from './mailing-email';
-import { CAMPAIGN_STATUS, WEEKDAYS, type Audience, type CampaignStatus, type Digest, type MailList } from '../lib/mailing/config';
+import { CAMPAIGN_STATUS, WEEKDAYS, type Audience, type CampaignStatus, type ContactField, type Digest, type MailList } from '../lib/mailing/config';
 import type { MemberLevel } from '../lib/members/config';
 import type { EmailDoc } from '../lib/forms/email';
 
@@ -30,7 +30,7 @@ async function post(body: Record<string, unknown>) {
   return res.json();
 }
 
-export default function DigestEditor({ digest, lists, levels, issues, admin, tz, lastSent, segments }: { digest: Digest; lists: MailList[]; levels: MemberLevel[] | null; issues: Issue[]; admin: boolean; tz: string; lastSent: string | null; segments: { id: number; name: string }[] }) {
+export default function DigestEditor({ digest, lists, levels, issues, admin, tz, lastSent, segments, fields = [] }: { digest: Digest; lists: MailList[]; levels: MemberLevel[] | null; issues: Issue[]; admin: boolean; tz: string; lastSent: string | null; segments: { id: number; name: string }[]; fields?: ContactField[] }) {
   const [d, setD] = useState(digest);
   const [saved, setSaved] = useState(() => JSON.stringify(digest));
   const [status, setStatus] = useState('');
@@ -43,7 +43,7 @@ export default function DigestEditor({ digest, lists, levels, issues, admin, tz,
   const set = (patch: Partial<Digest>) => setD((x) => ({ ...x, ...patch }));
   const audience = (d.audience ?? {}) as Audience;
   const since = lastSent ?? new Date(Date.now() - 7 * 86_400_000).toISOString();
-  const kit = useMemo(() => mailingEmailKit({ subject: () => latest.current.subject || latest.current.name, digest: true, since: () => since }), []);
+  const kit = useMemo(() => mailingEmailKit({ subject: () => latest.current.subject || latest.current.name, digest: true, since: () => since, fields }), []);
   const run = async (fn: () => Promise<unknown>, done: string | ((r: any) => string), reload = false) => {
     setBusy(true);
     setStatus('Working…');

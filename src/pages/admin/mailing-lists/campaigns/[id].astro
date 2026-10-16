@@ -3,7 +3,7 @@
 import Admin from '../../../../layouts/Admin.astro';
 import CampaignEditor from '../../../../admin/CampaignEditor';
 import { SITE_TZ } from '../../../../lib/site';
-import type { Campaign, CampaignStats, MailList } from '../../../../lib/mailing/config';
+import { mailingSettings, type Campaign, type CampaignStats, type MailList } from '../../../../lib/mailing/config';
 import { memberSettings } from '../../../../lib/members/config';
 import { mailgunStatus } from '../../../../lib/mailing/mailgun';
 import { linkStats } from '../../../../lib/mailing/tracking';
@@ -22,6 +22,7 @@ const [{ data: lists }, { data: siteRow }, { data: stats }, links, paused] = awa
 ]);
 const { data: segments } = await db.from('mail_segments').select('id, name').order('name');
 const members = memberSettings(siteRow?.value);
+const fields = mailingSettings(siteRow?.value).fields ?? [];
 const { data: digest } = campaign.digest_id ? await db.from('digests').select('id, name').eq('id', campaign.digest_id).maybeSingle() : { data: null };
 // Who it went to: each recipient and how their email went, filtered (?who=) and paged (?page=).
 const WHO: [string, string][] = [['all', 'Everyone'], ['delivered', 'Delivered'], ['opened', 'Opened'], ['clicked', 'Clicked'], ['bounced', 'Bounced'], ['complained', 'Marked as spam'], ['unsubscribed', 'Unsubscribed'], ['dropped', 'Not sent']];
@@ -37,7 +38,7 @@ const outcome = (r: any) => (r.complained_at ? 'Marked as spam' : r.bounced_at ?
 const { html: _html, text_rendered: _text, vars: _vars, ...rest } = campaign;
 ---
 <Admin title={`${campaign.name || 'Campaign'} · Mailing Lists`}>
-  <CampaignEditor client:load campaign={{ ...rest, html: null, text_rendered: null, vars: null } as Campaign} lists={(lists ?? []) as MailList[]} levels={members.enabled ? members.levels : null} stats={stats as CampaignStats | null} links={links as any} admin={Astro.locals.user?.role === 'admin'} mailgun={mailgunStatus().configured} tz={SITE_TZ} digest={digest} paused={paused} segments={segments ?? []} />
+  <CampaignEditor client:load campaign={{ ...rest, html: null, text_rendered: null, vars: null } as Campaign} lists={(lists ?? []) as MailList[]} levels={members.enabled ? members.levels : null} stats={stats as CampaignStats | null} links={links as any} admin={Astro.locals.user?.role === 'admin'} mailgun={mailgunStatus().configured} tz={SITE_TZ} digest={digest} paused={paused} segments={segments ?? []} fields={fields} />
   {(recipientCount ?? 0) > 0 || who !== 'all' ? (
     <section class="mt-8 max-w-5xl">
       <h2 class="mb-2 text-xl">Recipients</h2>
