@@ -926,7 +926,7 @@ export default function FormBuilder({ formId }: { formId: number }) {
                   <div className="mt-3">
                     <TextIn label="Name" value={n.name} onChange={(v) => setNotification(i, { name: v })} />
                     <Check label="Send this email" value={n.active !== false} onChange={(v) => setNotification(i, { active: v ? undefined : false })} />
-                    <TextIn label="Send to" value={n.to} hint="Addresses separated by commas. {admin_email} is the Chamber's address; a field tag like {Email:f3} sends to what the visitor entered." onChange={(v) => setNotification(i, { to: v })} />
+                    <TextIn label="Send to" value={n.to} hint="Addresses separated by commas. {admin_email} is the site's admin address; a field tag like {Email:f3} sends to what the visitor entered." onChange={(v) => setNotification(i, { to: v })} />
                     <TextIn label="Reply-to" value={n.replyTo} placeholder="The visitor's email, if the form has one" onChange={(v) => setNotification(i, { replyTo: v || undefined })} />
                     <TextIn label="From name" value={n.fromName} placeholder={site.organization} onChange={(v) => setNotification(i, { fromName: v || undefined })} />
                     <MergeTags tags={mergeTagOptions(form)} onInsert={(tag) => setNotification(i, { subject: `${n.subject ?? ''}${tag}` })} />

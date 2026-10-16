@@ -110,9 +110,9 @@ export interface ComposeStyle {
 export type ComposeBand = 'plain' | 'tint' | 'soft' | 'dark';
 
 export interface SiteConfig {
-  /** The site's name, as visitors see it ("This is Ellicottville"). */
+  /** The site's name, as visitors see it ("Example Town"). */
   name: string;
-  /** Who runs it ("Ellicottville Chamber of Commerce"): admin sign-in, mail sender name. */
+  /** Who runs it ("Example Town Council"): admin sign-in, mail sender name. */
   organization: string;
   /** IANA timezone for event times and dates ("America/New_York"). */
   timezone: string;

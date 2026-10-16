@@ -16,7 +16,7 @@ export function newForm(id: number, title: string): FormDef {
 
 export const defaultNotification = (): Notification => ({
   id: Math.random().toString(36).slice(2, 12),
-  name: 'Chamber notification',
+  name: 'Notification',
   to: '{admin_email}',
   subject: 'New submission from {form_title}',
   message: '{all_fields}',

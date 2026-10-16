@@ -13,7 +13,7 @@ export function mergeTagOptions(form: FormDef): [string, string][] {
   return [
     ['{all_fields}', 'All fields'],
     ['{form_title}', 'Form title'],
-    ['{admin_email}', 'Chamber email'],
+    ['{admin_email}', 'Site admin email'],
     ['{date}', 'Date'],
     ...(form.payment ? ([['{payment_total}', 'Payment total'], ['{payment_id}', 'Payment ID'], ['{payment_summary}', 'Payment summary']] as [string, string][]) : []),
     ...form.fields.filter((f) => INPUT_TYPES.includes(f.type)).map((f) => [`{${f.label}:${f.id}}`, f.label] as [string, string]),
