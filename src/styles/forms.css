@@ -1,7 +1,8 @@
 /* Forms (src/render/forms/form.ts). Fields are white with black text unless a block's form style
-   (src/render/forms/style.ts) sets --form-input-bg, --form-input-text, --form-border, --form-label,
-   --form-radius or --form-button-radius; its button colours are the button's --button-bg and
-   --button-color. */
+   (src/render/forms/style.ts) sets them: --form-input-bg, --form-input-text, --form-border,
+   --form-border-width, --form-input-pad, --form-input-size, --form-placeholder, --form-focus,
+   --form-check, --form-label, --form-radius, --form-button-radius; its button colours are the
+   button's --button-bg and --button-color. */
 .c-form {
   --form-error: #b42318;
   max-width: 100%;
@@ -81,25 +82,26 @@
   box-sizing: border-box;
   width: 100%;
   margin: 0;
-  padding: 0.75rem 0.875rem;
-  border: 1px solid var(--form-border, rgba(26, 26, 46, 0.22));
+  padding: var(--form-input-pad, 0.75rem 0.875rem);
+  border: var(--form-border-width, 1px) solid var(--form-border, rgba(26, 26, 46, 0.22));
   border-radius: var(--form-radius, 4px);
   background: var(--form-input-bg, #fff);
   color: var(--form-input-text, #111);
   font: inherit;
-  font-size: 1rem;
+  font-size: var(--form-input-size, 1rem);
   line-height: 1.4;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .c-input::placeholder {
-  color: #94a3b8;
+  color: var(--form-placeholder, #94a3b8);
+  opacity: 1;
 }
 .c-input:hover {
   border-color: rgba(26, 26, 46, 0.4);
 }
 .c-input:focus {
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px rgba(184, 115, 51, 0.2);
+  border-color: var(--form-focus, var(--color-accent));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--form-focus, var(--color-accent)) 25%, transparent);
   outline: none;
 }
 textarea.c-input {
@@ -133,7 +135,7 @@ select.c-input {
   width: 1.125rem;
   height: 1.125rem;
   margin: 0.15rem 0 0;
-  accent-color: var(--color-accent);
+  accent-color: var(--form-check, var(--color-accent));
 }
 .c-field__row {
   display: grid;

@@ -20,6 +20,17 @@ export interface FormStyle {
   radius?: string;
   /** Button corners: a CSS length from FORM_RADII. */
   buttonRadius?: string;
+  /** Field height: a key of FIELD_SIZES. */
+  fieldSize?: string;
+  /** Field text size: a key of TEXT_SIZES. */
+  textSize?: string;
+  /** Field border width: a CSS length from BORDER_WIDTHS. */
+  borderWidth?: string;
+  placeholder?: string;
+  /** The border and ring round the field being typed in. */
+  focus?: string;
+  /** Checkboxes and radio buttons. */
+  check?: string;
 }
 
 export const FORM_RADII: [string, string][] = [
@@ -28,6 +39,28 @@ export const FORM_RADII: [string, string][] = [
   ['4px', 'Slightly rounded'],
   ['8px', 'Rounded'],
   ['999px', 'Pill'],
+];
+
+/** Field heights, as their padding. */
+export const FIELD_SIZES: [string, string][] = [
+  ['', 'Normal'],
+  ['compact', 'Compact'],
+  ['large', 'Large'],
+];
+const FIELD_PADDING: Record<string, string> = { compact: '0.5rem 0.75rem', large: '1rem 1.125rem' };
+
+export const TEXT_SIZES: [string, string][] = [
+  ['', 'Normal'],
+  ['small', 'Small'],
+  ['large', 'Large'],
+];
+const TEXT_SIZE: Record<string, string> = { small: '0.875rem', large: '1.125rem' };
+
+export const BORDER_WIDTHS: [string, string][] = [
+  ['', 'Thin (default)'],
+  ['0', 'None'],
+  ['2px', 'Medium'],
+  ['3px', 'Thick'],
 ];
 
 const PROPS: [keyof FormStyle, string][] = [
@@ -42,11 +75,18 @@ const PROPS: [keyof FormStyle, string][] = [
   ['buttonText', '--button-color'],
   ['radius', '--form-radius'],
   ['buttonRadius', '--form-button-radius'],
+  ['fieldSize', '--form-input-pad'],
+  ['textSize', '--form-input-size'],
+  ['borderWidth', '--form-border-width'],
+  ['placeholder', '--form-placeholder'],
+  ['focus', '--form-focus'],
+  ['check', '--form-check'],
 ];
 
-// A palette colour (var(--color-…)), a hex colour or a few keywords; corners from the list above.
+// A palette colour (var(--color-…)), a hex colour or a few keywords; sizes, widths and corners from the lists above.
 const COLOR = /^(?:var\(--color-[a-z0-9-]+\)|#[0-9a-f]{3,8}|white|black|transparent)$/i;
 const RADIUS = new Set(FORM_RADII.map(([v]) => v).filter(Boolean));
+const WIDTHS = new Set(BORDER_WIDTHS.map(([v]) => v).filter(Boolean));
 
 /** The style's custom properties (and the box's background, border and text colour), leaving out anything that isn't a colour (or corner) we allow. */
 export function formStyleDecls(s: unknown): [string, string][] {
@@ -54,8 +94,13 @@ export function formStyleDecls(s: unknown): [string, string][] {
   const v = s as Record<string, unknown>;
   return PROPS.flatMap(([k, prop]): [string, string][] => {
     const x = typeof v[k] === 'string' ? (v[k] as string).trim() : '';
-    const corner = k === 'radius' || k === 'buttonRadius';
-    if (!x || (corner ? !RADIUS.has(x) : !COLOR.test(x))) return [];
+    if (!x) return [];
+    // The settings picked from a list: only their own values.
+    if (k === 'fieldSize') return FIELD_PADDING[x] ? [[prop, FIELD_PADDING[x]]] : [];
+    if (k === 'textSize') return TEXT_SIZE[x] ? [[prop, TEXT_SIZE[x]]] : [];
+    if (k === 'borderWidth') return WIDTHS.has(x) ? [[prop, x]] : [];
+    if (k === 'radius' || k === 'buttonRadius') return RADIUS.has(x) ? [[prop, x]] : [];
+    if (!COLOR.test(x)) return [];
     if (k === 'border') return [[prop, `1px solid ${x}`]];
     // The form's text colours its headings and small print too.
     if (k === 'text') return [[prop, x], ['--heading-color', x], ['--form-muted', x]];

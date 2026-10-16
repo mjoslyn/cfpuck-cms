@@ -26,9 +26,10 @@ the browser. Everything is validated again on the server.
 Fields are white with black text by default, and labels take the colour of the text around them. The
 Form block's **Form style** settings (also on the Subscribe and Newsletter blocks) set the form's own
 background, border and text colour (a background or border puts the form in a box with room round it),
-the field background, text and border, the labels, the button's colours, and the corners of the fields
-and of the button (square, slightly rounded, rounded or pill), each colour from the site's palette or
-a hex colour.
+the fields (background, text, border and placeholder colours, the colour round the field being typed
+in, height, text size and border width), the colour of checkboxes and radio buttons, the labels, the
+button's colours, and the corners of the fields and of the button (square, slightly rounded, rounded
+or pill), each colour from the site's palette or a hex colour.
 
 ## Submissions
 
