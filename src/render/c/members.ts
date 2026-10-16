@@ -9,6 +9,8 @@ import { esc } from '../html';
 import { attrs, escAttr, styleDecls } from './style';
 import { safeNext } from '../../lib/members/account';
 import { ACCOUNT_PATH, MEMBERS_MESSAGE, accessOf, isActive, levelNames, mayView, memberSettings } from '../../lib/members/config';
+import { CONSENT_TEXT, mailingSettings, type MailList } from '../../lib/mailing/config';
+import { LISTS_KEY, accountEmail } from './mailing';
 
 const account = (next?: string) => `${ACCOUNT_PATH}${next && next !== ACCOUNT_PATH ? `?next=${encodeURIComponent(next)}` : ''}`;
 const p = (cls: string, html: string) => `<p class="${cls}">${html}</p>`;
@@ -92,6 +94,7 @@ const memberAccount: Renderer = (_b, env) => {
       head('Your account') +
       `<dl class="c-account__details">${rows.filter(([, x]) => x).map(([k, x]) => `<dt>${k}</dt><dd>${x}</dd>`).join('')}</dl>` +
       (next ? p('c-account__note', `<a href="${escAttr(next)}">Back to where you were</a>`) : '') +
+      accountEmail(ctx) +
       `<details class="c-account__more"><summary>Change your password</summary>${form('/api/members/password', password('New password'), 'Save password')}</details>` +
       `<form method="post" action="/api/members/logout" class="c-account__signout"><button type="submit" class="c-button__link">Sign out</button></form>`;
   } else {
@@ -103,7 +106,7 @@ const memberAccount: Renderer = (_b, env) => {
       `<details class="c-account__more"><summary>Forgot your password?</summary>${form('/api/members/forgot', field('email', 'Email', 'email', 'email').replace(/member-email/g, 'member-forgot-email'), 'Send a link')}</details>` +
       (s.signup !== 'off'
         ? `<h2 class="c-account__heading">Create an account</h2>${s.signup === 'approve' ? p('c-account__note', 'New accounts are approved by us before they become memberships.') : ''}` +
-          form('/api/members/signup', field('name', 'Name', 'text', 'name').replace(/member-name/g, 'member-new-name') + field('email', 'Email', 'email', 'email').replace(/member-email/g, 'member-new-email') + password().replace(/member-(password|confirm)/g, 'member-new-$1') + hp, 'Create account', nextInput)
+          form('/api/members/signup', field('name', 'Name', 'text', 'name').replace(/member-name/g, 'member-new-name') + field('email', 'Email', 'email', 'email').replace(/member-email/g, 'member-new-email') + password().replace(/member-(password|confirm)/g, 'member-new-$1') + mailOptIn(ctx) + hp, 'Create account', nextInput)
         : '');
   }
   // Invitation links bring the session in the address's fragment; member-account.js hands it to the server.
@@ -111,6 +114,14 @@ const memberAccount: Renderer = (_b, env) => {
   if (!ctx.scripts.includes(tag)) ctx.scripts.push(tag);
   return `<section class="c-account">${body}</section>`;
 };
+
+/** Member sign-up's email opt-in (Mailing on, with lists chosen for members under Settings > Mailing): unticked, with the consent wording. */
+function mailOptIn(ctx: RenderCtx): string {
+  const m = mailingSettings(ctx.settings.site);
+  const lists = ((ctx.data.get(LISTS_KEY) as MailList[] | undefined) ?? []).filter((l) => m.memberLists?.includes(l.id));
+  if (!m.enabled || !lists.length) return '';
+  return `<div class="c-field"><label class="c-choice" for="member-new-mail"><input id="member-new-mail" type="checkbox" name="mail_optin" value="1" /><span>Send me ${esc(lists.map((l) => l.name).join(' and '))} by email. ${esc(m.consentText || CONSENT_TEXT)}</span></label></div>`;
+}
 
 /** Member link: "Sign in", switched to "My account" in the browser for signed-in visitors (member-link.js). */
 const memberLink: Renderer = (b, env) => {

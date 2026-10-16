@@ -284,6 +284,8 @@ the copy that has them set (production can't reach a local copy).
   `restoreBackup` queues it (`queueRestore`, a file under `jobs/` in the bucket) and the background
   function `netlify/functions/restore-background.mts` runs it once (`runRestore`; under `astro dev` the
   request does) and clears the page cache; the screen polls `GET /api/admin/sync?restoreJob=<id>`.
+- Mailing's contacts, campaigns, sends and clicks aren't synced or backed up, and a restore leaves
+  them alone: a snapshot restore can't subscribe anyone again (see Mailing).
 - A site with **Protect this site from syncs** on (`settings.site.sync_protected`, set on its own Sync
   tab) refuses every sync into it; settings syncs keep each copy's own protection.
 
@@ -644,6 +646,123 @@ member (`renderRequest` drops the viewer's membership), and the editor offers no
   charges the same way (`startCheckout`'s `member`; a members-only ticket without a membership goes
   back with `members-only`), and the order records `member_id`.
 
+## Mailing
+
+An optional feature, on under Settings > Mailing (`settings.site.mailing`, `mailingSettings`,
+`src/lib/mailing/config.ts`, `src/admin/MailingSettings.tsx`): mailing lists people sign up to, campaigns
+and a weekly digest sent through Mailgun from a marketing subdomain, and each email's deliveries, opens
+and clicks. The site's other email (form notifications, tickets, confirmations) goes over SMTP as before.
+Off, the Mailing screen, its blocks and pages are gone (`mailingOn`). Contacts, campaigns, sends, clicks
+and Mailgun's events aren't synced or backed up (they stay on the copy where they were made, so a restore
+never subscribes anyone again); the settings are, with the others. Migration `*_mailing.sql`.
+
+- **Settings**: the sender's name and the local part of its address (`fromLocal`, at `MAILGUN_DOMAIN`),
+  reply-to, the postal address every email carries (nothing sends without it), the consent wording, the
+  lists offered to members (`memberLists`), link tracking and UTM defaults for new campaigns, and the
+  complaint and bounce rates that pause sending.
+- **Mailgun** (`src/lib/mailing/mailgun.ts`, REST, no SDK; keys in the environment, never settings):
+  `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `MAILGUN_REGION` (`us`, default, or `eu`),
+  `MAILGUN_WEBHOOK_SIGNING_KEY`, `MAILGUN_TEST_MODE` (`o:testmode`; Mailgun accepts and delivers nothing),
+  `MAILGUN_API_BASE` (a stand-in server, for tests). Without keys a batch goes, one address at a time,
+  to a mail catcher on this machine (an SMTP host of 127.0.0.1 or localhost), else is only logged.
+- **Signed links** (`src/lib/mailing/tokens.ts`): a contact's id with an HMAC per purpose (`manage`:
+  preferences and unsubscribe; `confirm`; `click`; `seen`), keyed by `MAIL_LINK_SECRET` (else one made
+  from the service key; changing it breaks links already sent). No tokens are stored.
+- **Data**: `mail_lists` (name, description, `public`, sort); `contacts` (email lowercased and unique,
+  name, attributes, status `pending`/`subscribed`/`unsubscribed`/`bounced`/`complained`: anything but
+  subscribed means no marketing mail; the consent's source, wording, time, address and confirmation);
+  `contact_lists` (per list: `pending`, `subscribed`, `unsubscribed`); `mail_suppressions` (SHA-256 of
+  addresses erased, bounced or complained, never mailed again without a confirmed sign-up); `campaigns`,
+  `campaign_batches`, `campaign_sends`, `campaign_links`, `link_clicks`, `mail_events`, `mailgun_tokens`,
+  `digests`. Editors read; admins change lists and contacts; editors write campaigns only as drafts and
+  digests only while off (RLS), and the send routes check the role too. `mail_audience` (a campaign's
+  recipients: subscribed, on any of its lists, not suppressed, optionally only active members of some
+  levels or only non-members, matched by address), `mail_still_subscribed`, `mail_claim`,
+  `mail_digest_claim` (server only) and `campaign_stats` (editors).
+- **Signing up** (`src/lib/mailing/contacts.ts`): always confirmed by email (double opt-in, over SMTP,
+  at most 3 confirmation emails a day to one address; 30 sign-ups a minute site-wide). The **Subscribe**
+  block (`subscribe`, `src/render/c/mailing.ts`; Mailing category in the editor) posts to
+  `/api/mail/subscribe`: email, optional name, the public lists it offers (ticked when there are
+  several), the consent wording and a honeypot; only public lists and the member lists are taken. The
+  confirmation link opens the preferences page, whose button (a GET never confirms: mail scanners
+  follow links) posts to `/api/mail/confirm`. Admins add people who agreed elsewhere (Add a contact,
+  Import a CSV, Add members to a list), naming how they agreed; those who unsubscribed, bounced,
+  complained or were erased are skipped. Unconfirmed sign-ups are deleted after 30 days.
+- **Pages**: `/subscribe/` (a Subscribe block), `/unsubscribe/` and `/email-preferences/` (the **Email
+  preferences** block, `mail-preferences`, `view` unsubscribe or preferences): a page with one of these
+  addresses takes its place (`MAILING_PAGES` in `src/render/page.ts`). The preferences block shows whose
+  subscription the signed link (`?t=`, `?confirm=`) is for, or the signed-in visitor's; it loads through
+  a server hook (`src/render/hooks.ts`, registered by `src/lib/mailing/page-data.ts`, which the
+  middleware imports) because the render code also runs in the editor's browser bundle. Its pages are
+  never cached. `/api/mail/preferences` saves lists (resubscribing an unsubscribed address, never a
+  bounced or complained one); `/api/mail/unsubscribe` takes the page's button and mail apps' one-click
+  POST (RFC 8058, `List-Unsubscribe=One-Click`), from anywhere: Astro's `security.checkOrigin` is off and
+  the middleware does the same check, except for that route.
+- **Members**: with Members on, member sign-up offers the member lists (unticked; a confirmed sign-up
+  like any), the account page (Member account block) shows the member's lists to change, and campaigns
+  and digests can go to only members (of some levels) or only non-members.
+- **Campaigns** (`/admin/mailing/`, `src/admin/CampaignEditor.tsx`, `/api/admin/mailing/campaigns`):
+  name, subject, sender, lists, members audience, link tracking, UTM, and the email, designed in the
+  email builder with the mailing kit (`src/admin/mailing-email.ts`: merge tags `{first_name}`, `{name}`,
+  `{email}`, `{site_name}`, `{unsubscribe_url}`, `{preferences_url}`, a fallback after a bar,
+  `{first_name|there}`; a Subscriber block; the **Entries** block, the site's latest entries of some
+  types and terms, members-only ones left out, `src/lib/mailing/entries.ts`; and Events). Editors save
+  and send tests (to themselves and 5 more, marked [Test], links untracked); admins send, schedule (a
+  time in the site's time zone), pause, resume, cancel and approve, after a confirmation that counts
+  who it goes to now. Writes there don't clear the page cache; lists' do.
+- **Rendering** (`src/lib/mailing/render.ts`): the email builder's renderer, each tag a Mailgun
+  recipient variable (`%recipient.v1%`, escaped for HTML as `v1_h`, plain in the subject and text;
+  values escaped once, by the site), and a footer under the design that it can't remove: why they get
+  it, the name and postal address, unsubscribe and preferences links. Images are absolute addresses.
+- **Sending** (`src/lib/mailing/send.ts`): a job. `startSending` claims the campaign (`mail_claim`, a
+  token) and hands it to `netlify/functions/mail-send-background.mts` (in-process under astro dev). A run
+  freezes the campaign first (its HTML and text, tracked links, every recipient in `campaign_sends`, in
+  batches of up to 1,000), then per batch re-checks who is still subscribed (the rest `dropped`), marks
+  it `attempting` and posts it to `/v3/<domain>/messages` with each address's variables, the tags
+  `campaign-<id>` and `batch-<id>`, `v:campaign_id`, opens tracked by Mailgun (clicks by the site) and
+  `List-Unsubscribe` / `List-Unsubscribe-Post` headers. 429 and 5xx back off (2, 4, 8, 16s), then wait
+  for the next run; another 4xx fails the campaign. A request with no answer leaves the batch `unknown`:
+  the next run asks Mailgun's events for the batch's tag, resends only if none show after 10 minutes,
+  once, and otherwise pauses the campaign. A run stops starting batches after 12 minutes and lets go;
+  pausing or cancelling stops it before the next batch.
+- **Scheduler**: `netlify/functions/mail-due.mts` (every 5 minutes, deployed site) runs `runDue`:
+  scheduled campaigns that are due, sends a run let go of, digest issues waiting for approval past their
+  time (cancelled, the admins told), and digests due. `mail-nightly.mts` (06:20 UTC) runs `runNightly`:
+  Mailgun's bounces, complaints and unsubscribes reconciled with the contacts, then events and clicks
+  older than 90 days, webhook tokens older than a day and unconfirmed sign-ups pruned.
+- **Weekly digest** (`src/lib/mailing/digest.ts`, `src/admin/DigestEditor.tsx`): a design, lists,
+  audience, a weekday and time in the site's time zone, and a mode: `review` (each issue made at its
+  time waits `review_hours` for an admin's approval, else is cancelled) or `auto`. Once its time this
+  ISO week has passed (by less than a day; `mail_digest_claim` makes each week's issue once) the issue
+  is made as a campaign (`digest_id`, `issue_key`), its Entries blocks set to "only new" listing what
+  was published since the last issue went out (`since`), and skipped when it has fewer than `min_items`
+  entries and events. `{week_of}` is the Monday of its week. Make an issue now and Send me this week's
+  issue are on its screen.
+- **Webhook** (`POST /api/mailgun/webhook`, `src/lib/mailing/webhook.ts`): the signature (HMAC-SHA256 of
+  timestamp and token, within 5 minutes; each token once, `mailgun_tokens`), every event logged once by
+  Mailgun's event id (`mail_events`), then: delivered, opened (people's only: `openVerdict` leaves out
+  mail scanners and privacy proxies such as Apple's), failed (permanent: bounced, suppressed),
+  complained (suppressed, never mailed again), unsubscribed. A bounce or complaint runs the health
+  check (`src/lib/mailing/state.ts`): once a campaign has 500 deliveries, a complaint rate or bounce
+  rate past the settings' pauses sending site-wide (settings key `mailing`, not synced), every campaign
+  that is sending, and digests, and emails the admins; an admin resumes it on the Mailing screen.
+- **Link tracking** (`src/lib/mailing/tracking.ts`, `clicks.ts`): each web link becomes
+  `/m/c/<link>/<recipient token>`, which records the click and redirects to the link's stored address
+  (never one from the request; HEAD too, never cached); one hidden link per email is followed only by
+  machines. Links to the site itself get `#mc=<signed click id>`, and `public/assets/js/mail-seen.js`
+  (on every page while Mailing is on) reports the visitor's first interaction (`POST /api/mail/seen`),
+  which makes the click a person's. A send's clicks are judged together, again with each new click or
+  delivery (`judge`): machine for a HEAD request, the hidden link and clicks within 2 minutes of it, a
+  scanner's user agent or address range, 3 different links within 5 seconds, or a click within 10
+  seconds of delivery with no later sign of a person; human with an interaction; likely human
+  otherwise. Each verdict keeps its reasons. Addresses are kept as their /24 or /48 network only.
+  A campaign's numbers (`campaign_stats`): delivered, bounce and complaint rates, opens (indicative),
+  people who clicked (human and likely human), confirmed, machine clicks, unsubscribes, and each link's;
+  Compare with Mailgun's totals reads the campaign tag's stats.
+- **Contacts screen** (admins change, editors read): search and filters, each contact's consent, lists,
+  notes, sends and clicks with their verdicts, Unsubscribe, **Erase** (deletes the contact, their sends
+  and clicks, keeps the hash, adds them to Mailgun's unsubscribes) and Export as CSV (formulas guarded).
+
 ## Editor
 
 `/admin/` (Supabase Auth; `profiles.role`: editor, admin, or viewer = no access). Editors manage content,
@@ -693,7 +812,7 @@ The database API (Supabase's REST API, reached with the public key the browser h
 answers editors only (migration `*_closed_api.sql`). Anonymous requests have no grants on our tables,
 sequences or functions; signed-in accounts that aren't editors (members, sign-ups) get nothing back,
 since every table's policies check `is_editor()` / `is_admin()`, and the server's functions
-(`not_found_hit`, `redirect_hit`, `ticket_order_status`, `sync_*`, `ticket_order_create`) are
+(`not_found_hit`, `redirect_hit`, `ticket_order_status`, `sync_*`, `ticket_order_create`, `mail_*`) are
 revoked; `ticket_sold` runs with the caller's rights, so only editors see counts through it.
 
 - The editor and admin screens read and write through the editor's own session (`browserClient`,
@@ -729,10 +848,11 @@ npm run seed                            # starter templates, home page, sample e
 npx tsx --env-file=.env scripts/migrate-content.ts [--dry-run]   # site then core content migrations
 npx tsx scripts/checks/formatting.ts    # autop/texturize against scripts/checks/formatting-cases.json
 npx tsx scripts/checks/recurrence.ts    # recurrence rules, DST, event date sync
+npx tsx scripts/checks/mailing.ts       # signed links, mailing emails, link tracking, click verdicts, digest times
 npx tsx --env-file=.env scripts/media-formats.ts   # backfill AVIF/WebP for existing media
 ```
 
-`.github/workflows/check.yml` runs `npm run check`, the two checks above and `scripts/checks/private-address.ts` on every push and pull
+`.github/workflows/check.yml` runs `npm run check`, the three checks above and `scripts/checks/private-address.ts` on every push and pull
 request.
 
 `scripts/safety-e2e.ts` (uploads, form limits, shared addresses, stale saves, tags, search, roles, restore as a job) and
@@ -742,6 +862,10 @@ a second local stack as `SYNC_REMOTE_*`) use the running site without a browser 
 browser, submits it, pays (Stripe's checkout with its test card; a Square sandbox payment link opens
 Square's testing panel, whose Test Payment pays the order) and reports the confirmation and the stored
 payment (that needs the provider's test keys and network access to it).
+`scripts/mailing-e2e.ts` runs Mailing without Mailgun (emails read from the local mail catcher,
+`LOCAL_MAIL_URL`): sign-up and confirmation, preferences, unsubscribing (one-click from another site),
+a campaign with its variables, footer and tracked links, clicks as a person and a machine, signed and
+replayed webhooks, a digest issue, and a member's opt-in.
 
 The e2e scripts (`scripts/*-e2e.ts`, `scripts/checks/compose.ts`) sign in as `LOCAL_ADMIN_EMAIL` /
 `LOCAL_ADMIN_PASSWORD` and were written against a site with content (pages, events, venues, members);

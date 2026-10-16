@@ -31,6 +31,7 @@ import './blocks';
 import type { FormResult } from '../lib/forms/types';
 import { ACCOUNT_PATH, memberSettings, type Viewer } from '../lib/members/config';
 import { eventsOn } from '../lib/events/on';
+import { PREFERENCES_PATH, SUBSCRIBE_PATH, UNSUBSCRIBE_PATH, mailingOn } from '../lib/mailing/config';
 
 
 export interface PageResult {
@@ -137,7 +138,28 @@ export async function resolve(url: URL, loader: Loader): Promise<Queried> {
   if (entry) return { ...base, kind: 'singular', entry };
   // The members' account page, unless a page has its address.
   if (`/${parts.join('/')}/` === ACCOUNT_PATH && memberSettings(settings.site).enabled) return { ...base, kind: 'singular', entry: accountPage() };
+  // Mailing's pages (signing up, unsubscribing, email preferences), unless a page has the address.
+  const mailing = MAILING_PAGES[`/${parts.join('/')}/`];
+  if (mailing && mailingOn(settings.site)) return { ...base, kind: 'singular', entry: builtInPage(mailing.slug, mailing.title, mailing.block) };
   return base;
+}
+
+/** Mailing's built-in pages: a page holding one block. */
+const MAILING_PAGES: Record<string, { slug: string; title: string; block: { type: string; attrs: Record<string, unknown> } }> = {
+  [SUBSCRIBE_PATH]: { slug: SUBSCRIBE_PATH.split('/').filter(Boolean).pop()!, title: 'Subscribe', block: { type: 'subscribe', attrs: { heading: 'Get our email', showName: true } } },
+  [UNSUBSCRIBE_PATH]: { slug: UNSUBSCRIBE_PATH.split('/').filter(Boolean).pop()!, title: 'Unsubscribe', block: { type: 'mail-preferences', attrs: { view: 'unsubscribe' } } },
+  [PREFERENCES_PATH]: { slug: PREFERENCES_PATH.split('/').filter(Boolean).pop()!, title: 'Email preferences', block: { type: 'mail-preferences', attrs: {} } },
+};
+
+/** A built-in page (no stored entry): a page with one block, not for search engines. */
+function builtInPage(slug: string, title: string, block: { type: string; attrs: Record<string, unknown> }): Entry {
+  const now = new Date().toISOString();
+  return {
+    id: 0, type: 'page', slug, title, title_rendered: null, excerpt: '', excerpt_rendered: null,
+    status: 'publish', template: null, parent_id: null, menu_order: 0, featured_media_id: null, fields: { seo: { noindex: true } },
+    content: { root: { props: {} }, content: [{ type: block.type, props: { id: block.type, attrs: block.attrs } }] } as any,
+    event_start: null, event_end: null, event_all_day: null, published_at: now, updated_at: now, term_ids: [],
+  };
 }
 
 /** The account page when no page has its address: a page holding a Member account block. */
@@ -281,6 +303,8 @@ export async function renderRequest(url: URL, db: SupabaseClient, form?: FormRes
   const scripts = [...(SITE_RENDER.pageScripts ? await SITE_RENDER.pageScripts(ctx) : ctx.scripts), '<script src="/assets/js/editor-bar.js" defer></script>'];
   // Live search on any search form (the search-form block or a site's own).
   if (body.includes('c-search-form') || body.includes('data-live-search')) scripts.push('<script src="/assets/js/search.js" defer></script>');
+  // A visit from a tracked email link reports the visitor's first interaction (Mailing on).
+  if (mailingOn(site) && !preview) scripts.push('<script src="/assets/js/mail-seen.js" defer></script>');
 
   // A calendar view names itself ("Events for October 2026"), unless its listing has a search title of its own.
   const title = ctx.data.get('calendar') && !ownTitle(queried, site) ? `${esc((ctx.data.get('calendar') as { title: string }).title)} &#8211; ${site.name ?? ''}` : documentTitle(queried, site);

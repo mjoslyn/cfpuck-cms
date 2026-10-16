@@ -1,0 +1,120 @@
+---
+// A contact: their status, how and when they agreed, their lists (admins change them), notes, and what
+// they were sent: each campaign with its delivery, opens and clicks (each click's verdict and why).
+// Admins can unsubscribe or erase them. Actions post to /api/admin/mailing/contacts.
+import Admin from '../../../../layouts/Admin.astro';
+import { SITE_TZ } from '../../../../lib/site';
+import { CAMPAIGN_STATUS, CONTACT_STATUS, type CampaignStatus, type Contact, type ContactStatus, type MailList } from '../../../../lib/mailing/config';
+
+const db = Astro.locals.db;
+const isAdmin = Astro.locals.user?.role === 'admin';
+const id = Number(Astro.params.id);
+const { data: contact } = await db.from('contacts').select('*').eq('id', id).maybeSingle<Contact>();
+if (!contact) return Astro.redirect('/admin/mailing/?tab=contacts&error=No%20such%20contact.');
+const [{ data: lists }, { data: rows }, { data: sends }, { data: clicks }, { data: member }] = await Promise.all([
+  db.from('mail_lists').select('*').order('sort').order('id'),
+  db.from('contact_lists').select('list_id, status, subscribed_at, unsubscribed_at').eq('contact_id', id),
+  db.from('campaign_sends').select('campaign_id, status, delivered_at, opened_at, clicked_at, machine_clicked_at, human_confirmed_at, bounced_at, complained_at, unsubscribed_at, campaigns(name, subject, sent_at, status)').eq('contact_id', id).order('campaign_id', { ascending: false }).limit(100),
+  db.from('link_clicks').select('id, campaign_id, at, verdict, reasons, method, campaign_links(label, url, kind)').eq('contact_id', id).order('at', { ascending: false }).limit(200),
+  db.from('members').select('name, level, status').ilike('email', contact.email).maybeSingle(),
+]);
+const status = new Map((rows ?? []).map((r) => [Number(r.list_id), r]));
+const when = (s?: string | null) => (s ? new Date(s).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: SITE_TZ }) : '');
+const input = 'rounded border border-admin-ink/15 bg-white px-2 py-1 text-sm outline-none focus:border-admin-accent';
+const ok = Astro.url.searchParams.get('ok');
+const error = Astro.url.searchParams.get('error');
+const VERDICT: Record<string, string> = { human: 'Person (confirmed)', likely_human: 'Likely a person', machine: 'Machine' };
+---
+<Admin title={contact.email}>
+  <p class="text-sm text-admin-muted"><a class="underline" href="/admin/mailing/?tab=contacts">Mailing › Contacts</a></p>
+  <h1 class="text-3xl font-normal">{contact.email}</h1>
+  <p class="mt-1 text-sm"><strong>{CONTACT_STATUS[contact.status as ContactStatus]}</strong>{contact.unsubscribed_at && ` since ${when(contact.unsubscribed_at)}`}{member && <span class="text-admin-muted"> · a member ({member.level || 'no level'}, {member.status})</span>}</p>
+  {ok && <p class="mt-4 rounded bg-[#6db56d]/15 px-3 py-2 text-sm text-[#3f7a3f]">{ok}</p>}
+  {error && <p class="mt-4 rounded bg-[#c4592a]/10 px-3 py-2 text-sm text-[#c4592a]">{error}</p>}
+
+  <div class="mt-6 grid gap-6 md:grid-cols-2">
+    <form method="post" action="/api/admin/mailing/contacts" class="rounded bg-white p-4 shadow-[0_0_0_1px_rgba(26,26,46,0.08)]">
+      <input type="hidden" name="action" value="update" /><input type="hidden" name="id" value={id} />
+      <label class="mb-3 block text-xs text-admin-muted">Name<br /><input name="name" value={contact.name} class={`${input} w-full`} disabled={!isAdmin} /></label>
+      <fieldset class="mb-3">
+        <legend class="mb-1 text-xs text-admin-muted">Lists</legend>
+        {((lists ?? []) as MailList[]).map((l) => {
+          const r = status.get(l.id);
+          return (
+            <label class="mb-1 flex items-center gap-2 text-sm">
+              <input type="checkbox" name="lists" value={l.id} checked={r?.status === 'subscribed'} disabled={!isAdmin || (contact.status !== 'subscribed' && r?.status !== 'subscribed')} />
+              {l.name}
+              <span class="text-xs text-admin-muted">{r ? (r.status === 'subscribed' ? `since ${when(r.subscribed_at)}` : r.status === 'pending' ? 'waiting for confirmation' : `left ${when(r.unsubscribed_at)}`) : ''}</span>
+            </label>
+          );
+        })}
+        {contact.status !== 'subscribed' && <p class="text-xs text-admin-muted">Lists can only be added while they are subscribed: they sign up (or confirm) themselves.</p>}
+      </fieldset>
+      <label class="mb-3 block text-xs text-admin-muted">Notes<br /><textarea name="notes" rows="2" class={`${input} w-full`} disabled={!isAdmin}>{contact.notes}</textarea></label>
+      {isAdmin && <button class="rounded-sm bg-admin-ink px-4 py-2 text-xs font-semibold tracking-wider text-white uppercase hover:bg-admin-accent">Save</button>}
+    </form>
+    <div class="rounded bg-white p-4 text-sm shadow-[0_0_0_1px_rgba(26,26,46,0.08)]">
+      <h2 class="mb-2 font-semibold">Consent</h2>
+      <dl class="grid grid-cols-[8rem_1fr] gap-x-3 gap-y-1">
+        <dt class="text-admin-muted">Source</dt><dd>{contact.consent_source || '–'}</dd>
+        <dt class="text-admin-muted">Agreed</dt><dd>{when(contact.consent_at) || '–'}</dd>
+        <dt class="text-admin-muted">Confirmed</dt><dd>{when(contact.confirmed_at) || 'Not yet'}</dd>
+        <dt class="text-admin-muted">Wording</dt><dd>{contact.consent_text || '–'}</dd>
+        <dt class="text-admin-muted">From address</dt><dd>{contact.consent_ip || '–'}</dd>
+        <dt class="text-admin-muted">Added</dt><dd>{when(contact.created_at)}</dd>
+      </dl>
+      {isAdmin && (
+        <div class="mt-4 flex gap-4 text-xs">
+          {contact.status === 'subscribed' && (
+            <form method="post" action="/api/admin/mailing/contacts" onsubmit="return confirm('Unsubscribe them from everything?')">
+              <input type="hidden" name="action" value="unsubscribe" /><input type="hidden" name="id" value={id} />
+              <button class="underline hover:text-admin-accent">Unsubscribe</button>
+            </form>
+          )}
+          <form method="post" action="/api/admin/mailing/contacts" onsubmit={`return confirm(${JSON.stringify(`Erase ${contact.email}? Their record, sends and clicks are deleted. A one-way hash of the address is kept so they aren't mailed again unless they sign up themselves.`)})`}>
+            <input type="hidden" name="action" value="erase" /><input type="hidden" name="id" value={id} />
+            <button class="text-[#c4592a] underline">Erase</button>
+          </form>
+        </div>
+      )}
+    </div>
+  </div>
+
+  <h2 class="mt-8 mb-2 text-xl">Sent to them</h2>
+  <table class="w-full border-collapse overflow-hidden rounded bg-white text-sm shadow-[0_0_0_1px_rgba(26,26,46,0.08)]">
+    <thead class="bg-admin-soft text-left text-xs tracking-wider text-admin-muted uppercase">
+      <tr><th class="px-3 py-2 font-semibold">Campaign</th><th class="px-3 py-2 font-semibold">Delivery</th><th class="px-3 py-2 font-semibold">Opened</th><th class="px-3 py-2 font-semibold">Clicked</th></tr>
+    </thead>
+    <tbody>
+      {(sends ?? []).map((s: any) => (
+        <tr class="border-t border-admin-ink/5 align-top">
+          <td class="px-3 py-2"><a class="hover:text-admin-accent" href={`/admin/mailing/campaigns/${s.campaign_id}/`}>{s.campaigns?.name || s.campaigns?.subject}</a><div class="text-xs text-admin-muted">{CAMPAIGN_STATUS[s.campaigns?.status as CampaignStatus] ?? ''} {when(s.campaigns?.sent_at)}</div></td>
+          <td class="px-3 py-2">{s.complained_at ? 'Marked as spam' : s.bounced_at ? 'Bounced' : s.delivered_at ? `Delivered ${when(s.delivered_at)}` : s.status === 'dropped' ? 'Not sent (unsubscribed)' : s.status === 'queued' ? 'Waiting' : 'Sent'}{s.unsubscribed_at && <div class="text-xs text-admin-muted">Unsubscribed {when(s.unsubscribed_at)}</div>}</td>
+          <td class="px-3 py-2">{when(s.opened_at) || '–'}</td>
+          <td class="px-3 py-2">{s.human_confirmed_at ? `Confirmed ${when(s.human_confirmed_at)}` : s.clicked_at ? when(s.clicked_at) : '–'}{s.machine_clicked_at && <div class="text-xs text-admin-muted">Machine clicks</div>}</td>
+        </tr>
+      ))}
+      {!sends?.length && <tr><td colspan="4" class="px-3 py-6 text-center text-admin-muted">Nothing sent to them yet.</td></tr>}
+    </tbody>
+  </table>
+
+  {!!clicks?.length && (
+    <>
+      <h2 class="mt-8 mb-2 text-xl">Clicks</h2>
+      <table class="w-full border-collapse overflow-hidden rounded bg-white text-sm shadow-[0_0_0_1px_rgba(26,26,46,0.08)]">
+        <thead class="bg-admin-soft text-left text-xs tracking-wider text-admin-muted uppercase">
+          <tr><th class="px-3 py-2 font-semibold">When</th><th class="px-3 py-2 font-semibold">Link</th><th class="px-3 py-2 font-semibold">Verdict</th></tr>
+        </thead>
+        <tbody>
+          {clicks.map((k: any) => (
+            <tr class="border-t border-admin-ink/5 align-top">
+              <td class="px-3 py-2 whitespace-nowrap">{when(k.at)}</td>
+              <td class="px-3 py-2">{k.campaign_links?.kind === 'honeypot' ? 'The hidden link' : k.campaign_links?.label}<div class="max-w-md truncate text-xs text-admin-muted">{k.campaign_links?.url}</div></td>
+              <td class="px-3 py-2">{VERDICT[k.verdict] ?? k.verdict}{k.reasons?.length ? <div class="text-xs text-admin-muted">{k.reasons.join(', ')}{k.method === 'HEAD' ? '' : ''}</div> : null}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
+  )}
+</Admin>

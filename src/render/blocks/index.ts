@@ -16,6 +16,7 @@ import { NAVIGATION_RENDERERS } from '../c/navigation';
 import { SOCIAL_RENDERERS } from '../c/social';
 import { TICKETS_RENDERERS } from '../c/tickets';
 import { MEMBERS_RENDERERS } from '../c/members';
+import { MAILING_RENDERERS } from '../c/mailing';
 import { embedForm } from '../forms/embed';
 import type { FormRow } from '../../lib/forms/types';
 
@@ -41,6 +42,7 @@ register(
     ...SOCIAL_RENDERERS,
     ...TICKETS_RENDERERS,
     ...MEMBERS_RENDERERS,
+    ...MAILING_RENDERERS,
     // The site's own blocks (src/site/render.ts).
     ...Object.fromEntries(Object.entries(SITE_BLOCKS).map(([type, def]) => [type, def.render])),
   },

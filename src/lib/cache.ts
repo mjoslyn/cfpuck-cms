@@ -16,7 +16,8 @@ export const BROWSER_CACHE_CONTROL = 'public, max-age=0, must-revalidate';
 // accessibility marks, form submissions, users and the attendee list (tickets a cancellation frees
 // show within the minute, and the ticket form checks what's left as it loads). Everything else under
 // /api/admin that succeeds with POST, PUT, PATCH or DELETE clears the pages.
-const NO_PURGE = ['/api/admin/a11y', '/api/admin/compose', '/api/admin/email-events', '/api/admin/excerpt', '/api/admin/meta-compose', '/api/admin/seo', '/api/admin/submissions', '/api/admin/tickets', '/api/admin/users'];
+// Mailing's campaigns, digests and contacts aren't on pages (its lists are: Subscribe blocks name them).
+const NO_PURGE = ['/api/admin/mailing/campaigns', '/api/admin/mailing/contacts', '/api/admin/mailing/digests', '/api/admin/mailing/preview', '/api/admin/a11y', '/api/admin/compose', '/api/admin/email-events', '/api/admin/excerpt', '/api/admin/meta-compose', '/api/admin/seo', '/api/admin/submissions', '/api/admin/tickets', '/api/admin/users'];
 // Settings > Sync: only syncing into this copy and restoring a backup here change its content.
 const SYNC_WRITES = ['apply', 'restoreBackup'];
 

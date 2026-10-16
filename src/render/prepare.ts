@@ -23,6 +23,9 @@ import { prepareMap } from './c/map';
 import { prepareNavigation } from './c/navigation';
 import { prepareTickets, prepareTicketsBlock } from './c/tickets';
 import { EVENT_BLOCKS, eventsOn } from '../lib/events/on';
+import { LISTS_KEY } from './c/mailing';
+import { renderHooks } from './hooks';
+import { mailingOn } from '../lib/mailing/config';
 
 interface WalkState {
   /** Counter for unique ids (sliders, content feeds). */
@@ -241,6 +244,22 @@ async function walk(items: PuckItem[], ctx: RenderCtx, state: WalkState) {
       case 'member-account':
         // What these show depends on who is viewing.
         ctx.personal = true;
+        // The account page's email choices (Mailing on).
+        if (type === 'member-account' && mailingOn(ctx.settings.site)) {
+          await loadMailLists(ctx);
+          if (ctx.viewer && !ctx.editor) await renderHooks.mailPreferences?.(ctx);
+        }
+        break;
+      case 'subscribe':
+        await loadMailLists(ctx);
+        // A sign-up's outcome is for that visitor only.
+        if (['subscribe', 'subscribe_error'].some((k) => ctx.queried.url.searchParams.has(k))) ctx.personal = true;
+        break;
+      case 'mail-preferences':
+        // Whose subscription it shows comes from the page's signed link or the visitor.
+        ctx.personal = true;
+        await loadMailLists(ctx);
+        if (!ctx.editor) await renderHooks.mailPreferences?.(ctx);
         break;
       case 'tickets': {
         // The Event details block leaves its event's tickets to this one.
@@ -269,6 +288,13 @@ async function walk(items: PuckItem[], ctx: RenderCtx, state: WalkState) {
 
     if (props.children) await walk(props.children, ctx, state);
   }
+}
+
+/** The mailing lists, once per page (Subscribe and Email preferences blocks, the account page). */
+async function loadMailLists(ctx: RenderCtx) {
+  if (ctx.data.has(LISTS_KEY) || !mailingOn(ctx.settings.site)) return;
+  const { data } = await ctx.loader.db.from('mail_lists').select('*').order('sort').order('id');
+  ctx.data.set(LISTS_KEY, data ?? []);
 }
 
 export async function prepare(items: PuckItem[], ctx: RenderCtx) {

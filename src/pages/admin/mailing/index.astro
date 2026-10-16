@@ -1,0 +1,283 @@
+---
+// Mailing (Settings > Mailing turns it on): campaigns, weekly digests, contacts and lists, a tab each
+// (?tab=). Editors write campaigns and digests; admins send them, and manage contacts and lists.
+import Admin from '../../../layouts/Admin.astro';
+import { SITE_TZ } from '../../../lib/site';
+import { CAMPAIGN_STATUS, CONTACT_STATUS, WEEKDAYS, mailingSettings, type Campaign, type CampaignStatus, type Contact, type ContactStatus, type Digest, type MailList } from '../../../lib/mailing/config';
+import { mailingState } from '../../../lib/mailing/state';
+import { mailgunStatus } from '../../../lib/mailing/mailgun';
+import { memberSettings } from '../../../lib/members/config';
+
+const db = Astro.locals.db;
+const isAdmin = Astro.locals.user?.role === 'admin';
+const { data: siteRow } = await db.from('settings').select('value').eq('key', 'site').maybeSingle();
+const settings = mailingSettings(siteRow?.value);
+const members = memberSettings(siteRow?.value);
+const state = await mailingState(db);
+const mailgun = mailgunStatus();
+const TABS: [string, string][] = [['campaigns', 'Campaigns'], ['digests', 'Weekly digests'], ['contacts', 'Contacts'], ['lists', 'Lists']];
+const tab = TABS.some(([k]) => k === Astro.url.searchParams.get('tab')) ? Astro.url.searchParams.get('tab')! : 'campaigns';
+const ok = Astro.url.searchParams.get('ok');
+const error = Astro.url.searchParams.get('error');
+const when = (s?: string | null) => (s ? new Date(s).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: SITE_TZ }) : '');
+const input = 'rounded border border-admin-ink/15 bg-white px-2 py-1 text-sm outline-none focus:border-admin-accent';
+const btn = 'rounded-sm bg-admin-ink px-4 py-2 text-xs font-semibold tracking-wider text-white uppercase hover:bg-admin-accent';
+const table = 'mt-4 w-full border-collapse overflow-hidden rounded bg-white text-sm shadow-[0_0_0_1px_rgba(26,26,46,0.08)]';
+const th = 'px-4 py-2.5 font-semibold';
+
+const { data: listRows } = await db.from('mail_lists').select('*').order('sort').order('id');
+const lists = (listRows ?? []) as MailList[];
+const listName = (id: number) => lists.find((l) => l.id === id)?.name ?? `List ${id}`;
+// Members on each list (subscribed).
+const counts = new Map<number, number>();
+for (const l of lists) {
+  const { count } = await db.from('contact_lists').select('contact_id', { count: 'exact', head: true }).eq('list_id', l.id).eq('status', 'subscribed');
+  counts.set(l.id, count ?? 0);
+}
+
+let campaigns: Campaign[] = [];
+let digests: Digest[] = [];
+let contacts: Contact[] = [];
+let contactTotal = 0;
+const q = (Astro.url.searchParams.get('q') ?? '').trim();
+const status = Object.keys(CONTACT_STATUS).includes(Astro.url.searchParams.get('status') ?? '') ? Astro.url.searchParams.get('status')! : '';
+const onList = Number(Astro.url.searchParams.get('list')) || 0;
+const page = Math.max(1, Number(Astro.url.searchParams.get('page')) || 1);
+const PER_PAGE = 100;
+if (tab === 'campaigns') {
+  const { data } = await db.from('campaigns').select('id, name, subject, status, scheduled_at, sent_at, recipients, digest_id, list_ids, updated_at, error').order('updated_at', { ascending: false }).limit(200);
+  campaigns = (data ?? []) as Campaign[];
+}
+if (tab === 'digests') {
+  const { data } = await db.from('digests').select('*').order('id');
+  digests = (data ?? []) as Digest[];
+}
+if (tab === 'contacts') {
+  // On a list: an inner join on its subscribed rows.
+  let query = db.from('contacts').select(onList ? '*, contact_lists!inner(list_id, status)' : '*', { count: 'exact' }).order('created_at', { ascending: false }).range((page - 1) * PER_PAGE, page * PER_PAGE - 1);
+  if (onList) query = query.eq('contact_lists.list_id', onList).eq('contact_lists.status', 'subscribed');
+  if (status) query = query.eq('status', status);
+  if (q) query = query.or(`email.ilike.%${q.replace(/[%_,()*]/g, ' ')}%,name.ilike.%${q.replace(/[%_,()*]/g, ' ')}%`);
+  const { data, count } = await query;
+  contacts = (data ?? []) as unknown as Contact[];
+  contactTotal = count ?? 0;
+}
+const STATUS_TONE: Record<string, string> = { sent: 'text-[#3f7a3f]', sending: 'text-admin-accent', scheduled: 'text-admin-accent', review: 'text-[#b26a00]', failed: 'text-[#c4592a]', paused: 'text-[#b26a00]' };
+const contactQuery = (patch: Record<string, string>) => `?${new URLSearchParams({ tab: 'contacts', ...(q ? { q } : {}), ...(status ? { status } : {}), ...(onList ? { list: String(onList) } : {}), ...patch })}`;
+---
+<Admin title="Mailing">
+  <div class="flex flex-wrap items-end justify-between gap-6">
+    <div>
+      <h1 class="text-3xl font-normal">Mailing</h1>
+      <p class="mt-1 text-sm text-admin-muted">
+        {settings.enabled ? 'Campaigns and weekly digests to the people on your mailing lists.' : 'Mailing is off: turn it on under Settings > Mailing.'}
+        {' '}The sender, postal address and tracking are under <a class="underline" href="/admin/settings/#mailing">Settings &gt; Mailing</a>.
+        {!mailgun.configured && ' Mailgun isn’t set up, so nothing is sent (locally, emails go to the mail catcher).'}
+      </p>
+    </div>
+  </div>
+  {state.paused && (
+    <div class="mt-4 flex flex-wrap items-center gap-3 rounded bg-[#c4592a]/10 px-3 py-2 text-sm text-[#c4592a]">
+      <span><strong>Sending is paused:</strong> {state.paused.reason}. Nothing goes out, digests included.</span>
+      {isAdmin && (
+        <form method="post" action="/api/admin/mailing/campaigns" onsubmit="return confirm('Resume sending? Paused campaigns stay paused until each is resumed.')">
+          <input type="hidden" name="action" value="unpause" />
+          <button class="rounded-sm border border-[#c4592a] px-3 py-1 text-xs font-semibold hover:bg-[#c4592a] hover:text-white">Resume sending</button>
+        </form>
+      )}
+    </div>
+  )}
+  {!settings.address && settings.enabled && <p class="mt-4 rounded bg-[#b26a00]/10 px-3 py-2 text-sm text-[#b26a00]">Add the postal address under <a class="underline" href="/admin/settings/#mailing">Settings &gt; Mailing</a>: every email must carry it, so nothing can be sent until it is there.</p>}
+  {ok && <p class="mt-4 rounded bg-[#6db56d]/15 px-3 py-2 text-sm text-[#3f7a3f]">{ok}</p>}
+  {error && <p class="mt-4 rounded bg-[#c4592a]/10 px-3 py-2 text-sm text-[#c4592a]">{error}</p>}
+
+  <nav class="mt-6 flex flex-wrap gap-1 border-b border-admin-ink/10 text-sm" aria-label="Mailing">
+    {TABS.map(([k, label]) => (
+      <a href={`/admin/mailing/?tab=${k}`} class={`-mb-px border-b-2 px-4 py-2 font-medium ${tab === k ? 'border-admin-accent text-admin-ink' : 'border-transparent text-admin-muted hover:text-admin-ink'}`} aria-current={tab === k ? 'page' : undefined}>{label}</a>
+    ))}
+  </nav>
+
+  {tab === 'campaigns' && (
+    <section>
+      <form method="post" action="/api/admin/mailing/campaigns" class="mt-4">
+        <input type="hidden" name="action" value="create" />
+        <button class={btn}>New campaign</button>
+      </form>
+      <table class={table}>
+        <thead class="bg-admin-soft text-left text-xs tracking-wider text-admin-muted uppercase">
+          <tr><th class={th}>Campaign</th><th class={th}>Lists</th><th class={th}>Status</th><th class={th}>Recipients</th></tr>
+        </thead>
+        <tbody>
+          {campaigns.map((c) => (
+            <tr class="border-t border-admin-ink/5 align-top">
+              <td class="px-4 py-2.5">
+                <a class="font-medium hover:text-admin-accent" href={`/admin/mailing/campaigns/${c.id}/`}>{c.name || c.subject || 'Untitled'}</a>
+                <div class="text-xs text-admin-muted">{c.subject}{c.digest_id ? ' · digest issue' : ''}</div>
+              </td>
+              <td class="px-4 py-2.5 text-admin-muted">{(c.list_ids ?? []).map(listName).join(', ') || '–'}</td>
+              <td class="px-4 py-2.5">
+                <span class={STATUS_TONE[c.status] ?? ''}>{CAMPAIGN_STATUS[c.status as CampaignStatus] ?? c.status}</span>
+                <div class="text-xs text-admin-muted">{c.status === 'sent' ? when(c.sent_at) : ['scheduled', 'review'].includes(c.status) ? when(c.scheduled_at) : when(c.updated_at)}</div>
+                {c.error && ['failed', 'paused', 'skipped', 'cancelled'].includes(c.status) && <div class="text-xs text-admin-muted">{c.error}</div>}
+              </td>
+              <td class="px-4 py-2.5 text-admin-muted">{c.recipients || '–'}</td>
+            </tr>
+          ))}
+          {!campaigns.length && <tr><td colspan="4" class="px-4 py-6 text-center text-admin-muted">No campaigns yet.</td></tr>}
+        </tbody>
+      </table>
+    </section>
+  )}
+
+  {tab === 'digests' && (
+    <section>
+      <p class="mt-4 text-sm text-admin-muted">A digest goes out once a week: what was published since its last issue (Entries blocks) and the events coming up. Each week's issue is a campaign, waiting for an admin's approval unless the digest sends on its own.</p>
+      <form method="post" action="/api/admin/mailing/digests" class="mt-4">
+        <input type="hidden" name="action" value="create" />
+        <button class={btn}>New digest</button>
+      </form>
+      <table class={table}>
+        <thead class="bg-admin-soft text-left text-xs tracking-wider text-admin-muted uppercase">
+          <tr><th class={th}>Digest</th><th class={th}>When</th><th class={th}>Lists</th><th class={th}>Last issue</th></tr>
+        </thead>
+        <tbody>
+          {digests.map((d) => (
+            <tr class="border-t border-admin-ink/5 align-top">
+              <td class="px-4 py-2.5"><a class="font-medium hover:text-admin-accent" href={`/admin/mailing/digests/${d.id}/`}>{d.name}</a><div class="text-xs text-admin-muted">{d.enabled ? (d.mode === 'auto' ? 'On: sends on its own' : 'On: each issue waits for approval') : 'Off'}</div></td>
+              <td class="px-4 py-2.5 text-admin-muted">{WEEKDAYS[d.weekday]}s at {d.send_time}</td>
+              <td class="px-4 py-2.5 text-admin-muted">{(d.list_ids ?? []).map(listName).join(', ') || '–'}</td>
+              <td class="px-4 py-2.5 text-admin-muted">{d.last_run_at ? when(d.last_run_at) : 'None yet'}</td>
+            </tr>
+          ))}
+          {!digests.length && <tr><td colspan="4" class="px-4 py-6 text-center text-admin-muted">No digests yet.</td></tr>}
+        </tbody>
+      </table>
+    </section>
+  )}
+
+  {tab === 'contacts' && (
+    <section>
+      {isAdmin && (
+        <div class="mt-4 grid gap-3 md:grid-cols-3">
+          <details class="rounded bg-white p-4 shadow-[0_0_0_1px_rgba(26,26,46,0.08)]">
+            <summary class="cursor-pointer text-sm font-semibold">Add a contact</summary>
+            <form method="post" action="/api/admin/mailing/contacts" class="mt-3 grid gap-2">
+              <input type="hidden" name="action" value="add" />
+              <label class="text-xs text-admin-muted">Email<br /><input name="email" type="email" required class={`${input} w-full`} /></label>
+              <label class="text-xs text-admin-muted">Name<br /><input name="name" class={`${input} w-full`} /></label>
+              <label class="text-xs text-admin-muted">List<br /><select name="list" class={`${input} w-full`}>{lists.map((l) => <option value={l.id}>{l.name}</option>)}</select></label>
+              <label class="text-xs text-admin-muted">How they agreed (kept as their consent)<br /><input name="source" required placeholder="Asked at the front desk, 12 Oct" class={`${input} w-full`} /></label>
+              <button class={btn}>Add</button>
+            </form>
+          </details>
+          <details class="rounded bg-white p-4 shadow-[0_0_0_1px_rgba(26,26,46,0.08)]">
+            <summary class="cursor-pointer text-sm font-semibold">Import a CSV</summary>
+            <form method="post" action="/api/admin/mailing/contacts" enctype="multipart/form-data" class="mt-3 grid gap-2">
+              <input type="hidden" name="action" value="import" />
+              <label class="text-xs text-admin-muted">File (columns: email, name)<br /><input name="file" type="file" accept=".csv,text/csv,text/plain" required class="text-sm" /></label>
+              <label class="text-xs text-admin-muted">Onto the list<br /><select name="list" class={`${input} w-full`}>{lists.map((l) => <option value={l.id}>{l.name}</option>)}</select></label>
+              <label class="text-xs text-admin-muted">How these people agreed<br /><input name="source" required placeholder="Signed up on the old site's newsletter form" class={`${input} w-full`} /></label>
+              <button class={btn}>Import</button>
+              <p class="text-xs text-admin-muted">Only people who agreed to receive this email. Anyone who unsubscribed, bounced or was erased before is skipped.</p>
+            </form>
+          </details>
+          {members.enabled && (
+            <details class="rounded bg-white p-4 shadow-[0_0_0_1px_rgba(26,26,46,0.08)]">
+              <summary class="cursor-pointer text-sm font-semibold">Add members to a list</summary>
+              <form method="post" action="/api/admin/mailing/contacts" class="mt-3 grid gap-2">
+                <input type="hidden" name="action" value="members" />
+                <fieldset class="text-xs text-admin-muted">Active members of (none ticked: any level)<br />{members.levels.map((l) => <label class="mr-3 inline-flex items-center gap-1 text-sm text-admin-ink"><input type="checkbox" name="levels" value={l.id} />{l.name}</label>)}</fieldset>
+                <label class="text-xs text-admin-muted">Onto the list<br /><select name="list" class={`${input} w-full`}>{lists.map((l) => <option value={l.id}>{l.name}</option>)}</select></label>
+                <label class="text-xs text-admin-muted">How they agreed<br /><input name="source" required placeholder="Membership terms include member news" class={`${input} w-full`} /></label>
+                <button class={btn}>Add members</button>
+                <p class="text-xs text-admin-muted">Members can also choose their lists on their account page.</p>
+              </form>
+            </details>
+          )}
+        </div>
+      )}
+      <div class="mt-6 flex flex-wrap items-center gap-3">
+        <form method="get" class="flex flex-wrap gap-2">
+          <input type="hidden" name="tab" value="contacts" />
+          <input name="q" value={q} type="search" placeholder="Search names and emails" class={`${input} w-64`} />
+          <select name="status" class={input}><option value="">Any status</option>{Object.entries(CONTACT_STATUS).map(([k, l]) => <option value={k} selected={k === status}>{l}</option>)}</select>
+          <select name="list" class={input}><option value="">Any list</option>{lists.map((l) => <option value={l.id} selected={l.id === onList}>{l.name}</option>)}</select>
+          <button class="rounded-sm border border-admin-ink/20 px-3 py-1 text-xs font-semibold hover:border-admin-ink/50">Filter</button>
+        </form>
+        {isAdmin && <a class="ml-auto text-sm underline hover:text-admin-accent" href="/api/admin/mailing/contacts?export=csv">Export all as CSV</a>}
+      </div>
+      <table class={table}>
+        <thead class="bg-admin-soft text-left text-xs tracking-wider text-admin-muted uppercase">
+          <tr><th class={th}>Contact</th><th class={th}>Status</th><th class={th}>Agreed</th></tr>
+        </thead>
+        <tbody>
+          {contacts.map((c) => (
+            <tr class="border-t border-admin-ink/5 align-top">
+              <td class="px-4 py-2.5"><a class="font-medium hover:text-admin-accent" href={`/admin/mailing/contacts/${c.id}/`}>{c.email}</a>{c.name && <div class="text-xs text-admin-muted">{c.name}</div>}</td>
+              <td class="px-4 py-2.5">{CONTACT_STATUS[c.status as ContactStatus] ?? c.status}</td>
+              <td class="px-4 py-2.5 text-xs text-admin-muted">{c.consent_source}<br />{when(c.confirmed_at ?? c.consent_at)}</td>
+            </tr>
+          ))}
+          {!contacts.length && <tr><td colspan="3" class="px-4 py-6 text-center text-admin-muted">No contacts{q || status || onList ? ' match' : ' yet'}.</td></tr>}
+        </tbody>
+      </table>
+      {contactTotal > PER_PAGE && (
+        <p class="mt-3 flex gap-4 text-sm">
+          <span class="text-admin-muted">{contactTotal} contacts</span>
+          {page > 1 && <a class="underline" href={contactQuery({ page: String(page - 1) })}>Previous</a>}
+          {page * PER_PAGE < contactTotal && <a class="underline" href={contactQuery({ page: String(page + 1) })}>Next</a>}
+        </p>
+      )}
+    </section>
+  )}
+
+  {tab === 'lists' && (
+    <section>
+      <p class="mt-4 text-sm text-admin-muted">Public lists are offered by Subscribe blocks and on the email preferences page; the others are for people an admin adds (and members, when offered to them under Settings &gt; Mailing).</p>
+      <table class={table}>
+        <thead class="bg-admin-soft text-left text-xs tracking-wider text-admin-muted uppercase">
+          <tr><th class={th}>List</th><th class={th}>Subscribed</th><th class={th}><span class="sr-only">Actions</span></th></tr>
+        </thead>
+        <tbody>
+          {lists.map((l) => (
+            <tr class="border-t border-admin-ink/5 align-top">
+              <td class="px-4 py-2.5">
+                <div class="flex flex-wrap gap-2">
+                  <input form={`list-${l.id}`} name="name" value={l.name} aria-label="Name" class={`${input} w-56`} disabled={!isAdmin} />
+                  <input form={`list-${l.id}`} name="description" value={l.description} placeholder="Description (optional)" aria-label="Description" class={`${input} w-80`} disabled={!isAdmin} />
+                  <input form={`list-${l.id}`} name="sort" type="number" value={l.sort} aria-label="Order" class={`${input} w-20`} disabled={!isAdmin} />
+                  <label class="inline-flex items-center gap-1 text-sm"><input form={`list-${l.id}`} type="checkbox" name="public" value="1" checked={l.public} disabled={!isAdmin} />Public</label>
+                </div>
+              </td>
+              <td class="px-4 py-2.5"><a class="underline hover:text-admin-accent" href={`/admin/mailing/?tab=contacts&list=${l.id}`}>{counts.get(l.id) ?? 0}</a></td>
+              <td class="px-4 py-2.5 whitespace-nowrap">
+                {isAdmin && (
+                  <>
+                    <form id={`list-${l.id}`} method="post" action="/api/admin/mailing/lists" class="inline">
+                      <input type="hidden" name="action" value="update" /><input type="hidden" name="id" value={l.id} />
+                      <button class="rounded-sm bg-admin-ink px-3 py-1 text-xs font-semibold text-white hover:bg-admin-accent">Save</button>
+                    </form>
+                    <form method="post" action="/api/admin/mailing/lists" class="ml-2 inline" onsubmit={`return confirm(${JSON.stringify(`Remove the list “${l.name}”? Its subscribers leave it; their other lists stay.`)})`}>
+                      <input type="hidden" name="action" value="remove" /><input type="hidden" name="id" value={l.id} />
+                      <button class="text-xs text-[#c4592a] underline">Remove</button>
+                    </form>
+                  </>
+                )}
+              </td>
+            </tr>
+          ))}
+          {!lists.length && <tr><td colspan="3" class="px-4 py-6 text-center text-admin-muted">No lists yet.</td></tr>}
+        </tbody>
+      </table>
+      {isAdmin && (
+        <form method="post" action="/api/admin/mailing/lists" class="mt-4 flex flex-wrap items-end gap-3 rounded bg-white p-4 shadow-[0_0_0_1px_rgba(26,26,46,0.08)]">
+          <input type="hidden" name="action" value="add" />
+          <label class="text-xs text-admin-muted">Name<br /><input name="name" required placeholder="Newsletter" class={`${input} w-56`} /></label>
+          <label class="text-xs text-admin-muted">Description<br /><input name="description" placeholder="News and events, once a month" class={`${input} w-80`} /></label>
+          <label class="inline-flex items-center gap-1 pb-1 text-sm"><input type="checkbox" name="public" value="1" checked />Public</label>
+          <button class={btn}>Add list</button>
+        </form>
+      )}
+    </section>
+  )}
+</Admin>

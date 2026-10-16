@@ -3,6 +3,7 @@ import Admin from '../../../layouts/Admin.astro';
 import SiteSettings from '../../../puck/SiteSettings';
 import { hasContentBlock } from '../../../lib/templates';
 import { providerStatus } from '../../../lib/payments';
+import { mailgunStatus } from '../../../lib/mailing/mailgun';
 
 const db = Astro.locals.db;
 const [{ data: settings }, { data: pages }, { data: templates }, { data: redirects }, { data: notFound }] = await Promise.all([
@@ -12,9 +13,10 @@ const [{ data: settings }, { data: pages }, { data: templates }, { data: redirec
   db.from('redirects').select('*').order('created_at', { ascending: false }),
   db.from('not_found').select('*').order('hits', { ascending: false }).limit(200),
 ]);
+const { data: mailLists } = await db.from('mail_lists').select('*').order('sort').order('id');
 const byKey = Object.fromEntries((settings ?? []).map((s) => [s.key, s.value]));
 ---
 <Admin title="Settings">
   <h1 class="mb-6 text-3xl font-normal">Settings</h1>
-  <SiteSettings client:load site={byKey.site ?? {}} options={byKey.options ?? {}} pages={pages ?? []} templates={(templates ?? []).map((t) => ({ slug: t.slug, title: t.title, content: hasContentBlock((t.content as any)?.content) }))} redirects={redirects ?? []} notFound={notFound ?? []} ticketProviders={providerStatus()} />
+  <SiteSettings client:load site={byKey.site ?? {}} options={byKey.options ?? {}} pages={pages ?? []} templates={(templates ?? []).map((t) => ({ slug: t.slug, title: t.title, content: hasContentBlock((t.content as any)?.content) }))} redirects={redirects ?? []} notFound={notFound ?? []} ticketProviders={providerStatus()} mailgun={mailgunStatus()} mailLists={mailLists ?? []} />
 </Admin>

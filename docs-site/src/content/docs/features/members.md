@@ -70,3 +70,11 @@ Pages are normally cached and shared by every visitor. A page whose content depe
 and is rendered for each signed-in visitor as they may see it. Other pages stay cached.
 
 Members aren't synced between copies of the site or kept in backups; the levels and settings are.
+
+## Members and Mailing
+
+With [Mailing](../mailing/) on, choose **Lists offered to members** under Settings > Mailing. Member
+sign-up then offers them (unticked; ticking it sends a confirmation email like any sign-up), and the
+account page shows the member's lists to change. Campaigns and digests can go to **only members** (of
+some levels) or **only people who aren't members**, matched by email address, and **Add members to a
+list** on the Mailing screen's Contacts tab puts active members on a list when they agreed to it.

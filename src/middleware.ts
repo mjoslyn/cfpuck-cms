@@ -4,13 +4,31 @@ import { defineMiddleware } from 'astro:middleware';
 import { serverClient } from './lib/supabase';
 import { refreshSiteTimezone } from './lib/site/timezone';
 import { changesPages, PAGE_CACHE_TAG } from './lib/cache';
+// Server-only work the page renderer calls (src/render/hooks.ts).
+import './lib/mailing/page-data';
 
 const PUBLIC_ADMIN = ['/admin/login/', '/admin/set-password/', '/api/auth/login', '/api/auth/logout'];
-const ADMIN_ONLY = ['/admin/settings', '/admin/users', '/admin/members', '/api/admin/redirects', '/api/admin/settings', '/api/admin/sync', '/api/admin/users', '/api/admin/members'];
+const ADMIN_ONLY = ['/admin/settings', '/admin/users', '/admin/members', '/api/admin/redirects', '/api/admin/settings', '/api/admin/sync', '/api/admin/users', '/api/admin/members', '/api/admin/mailing/contacts', '/api/admin/mailing/lists'];
+
+// Astro's own same-site check (security.checkOrigin) is off in astro.config.mjs and done here instead, the
+// same way, so that these routes can be posted to from elsewhere: mail apps' one-click unsubscribe
+// (RFC 8058) comes from the mail provider's servers.
+const CROSS_SITE_POSTS = ['/api/mail/unsubscribe'];
+const FORM_TYPES = ['application/x-www-form-urlencoded', 'multipart/form-data', 'text/plain'];
+
+/** A non-GET request from another site: refused when it is form-like (or has no content type at all). */
+function crossSite(request: Request, url: URL): boolean {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(request.method) || request.headers.get('origin') === url.origin) return false;
+  const type = request.headers.get('content-type');
+  return type === null || FORM_TYPES.some((t) => type.toLowerCase().includes(t));
+}
 
 export const onRequest = defineMiddleware(async (context, next) => {
-  await refreshSiteTimezone();
   const { pathname } = context.url;
+  if (crossSite(context.request, context.url) && !CROSS_SITE_POSTS.includes(pathname)) {
+    return new Response(`Cross-site ${context.request.method} form submissions are forbidden`, { status: 403 });
+  }
+  await refreshSiteTimezone();
   const isAdmin = pathname.startsWith('/admin') || pathname.startsWith('/api/admin');
   if (!isAdmin || PUBLIC_ADMIN.some((p) => pathname.startsWith(p))) return next();
 

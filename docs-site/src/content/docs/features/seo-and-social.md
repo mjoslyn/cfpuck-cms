@@ -2,7 +2,7 @@
 title: SEO and social
 description: Per-entry SEO settings, meta tags, generated descriptions and social profiles.
 sidebar:
-  order: 8
+  order: 9
 ---
 
 ## Entry SEO

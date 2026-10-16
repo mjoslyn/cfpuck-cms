@@ -58,6 +58,8 @@ export default defineConfig({
   integrations: [react(), siteRoutes, sitePublic],
   // Netlify's CDN caches the pages (durable, cache tags) and purges them after edits (src/lib/cache.ts).
   cache: { provider: cacheNetlify() },
+  // The same check runs in src/middleware.ts, which lets mail apps' one-click unsubscribe through.
+  security: { checkOrigin: false },
   trailingSlash: 'ignore',
   build: { format: 'directory' },
   vite: { plugins: [tailwindcss()] },

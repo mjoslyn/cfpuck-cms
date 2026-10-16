@@ -22,6 +22,9 @@ What you get:
   a waitlist, an attendee list with check-in and refunds, and confirmation, reminder and follow-up
   emails
 - Members: levels, sign-ups, members-only pages and blocks, and member ticket prices
+- Mailing (optional, through Mailgun): lists with confirmed sign-ups, campaigns and a weekly digest
+  built in the email builder, one-click unsubscribe, and opens and clicks with mail scanners' clicks
+  told apart from people's
 - Compose: pages and edits written by Claude from your materials
 - Roles: editor and admin, with invitations; the database API answers editors only
 
@@ -127,6 +130,14 @@ The Supabase CLI runs through `npx`, so you don't need to install it.
 
   Members' emails (confirming an address, resetting a password, invitations) go through Supabase
   Auth; locally they arrive in the mail catcher.
+- **Mailing.** Turn it on under Settings > Mailing (admins) and fill in the postal address every email
+  carries (nothing sends without it). Add lists on the Mailing screen, put a **Subscribe** block where
+  people should sign up (or link to `/subscribe/`), then write campaigns or set up a weekly digest there.
+  Sign-ups are confirmed by email over SMTP. Sending needs Mailgun (see Hosting): `MAILGUN_API_KEY`,
+  `MAILGUN_DOMAIN`, `MAILGUN_REGION` (`eu` for EU accounts) and `MAILGUN_WEBHOOK_SIGNING_KEY`, plus
+  `MAIL_LINK_SECRET` for the signed links in emails. Locally, without Mailgun, campaigns go to the mail
+  catcher one address at a time. With Members on, member sign-up and the account page offer the lists
+  chosen under Settings > Mailing.
 
 ## Make it your site
 
@@ -187,10 +198,22 @@ follow the config. `CORE.md` describes each option.
        `payment.updated`, `refund.created` and `refund.updated`; set `SQUARE_WEBHOOK_URL` to that
        exact address.
 
+   - Using Mailing: in Mailgun, add a sending domain for marketing (a subdomain such as
+     `news.<your-domain>`, separate from the domain your other mail uses) and add its SPF, DKIM and
+     tracking CNAME records; publish a DMARC record (`p=none` at first, `quarantine` once reports are
+     clean). Turn on open tracking for that domain; leave click and unsubscribe tracking off (the site
+     does both). Add a webhook for delivered, opened, permanent and temporary failure, spam complaint
+     and unsubscribed events to `https://<your-domain>/api/mailgun/webhook`, and set its signing key as
+     `MAILGUN_WEBHOOK_SIGNING_KEY`. Set `MAILGUN_TEST_MODE=true` to try it without delivering anything.
+     Before the first real campaign, send tests to Gmail, Outlook and Yahoo addresses and check the
+     unsubscribe link Gmail shows next to the sender.
+
    Netlify deploys the site's functions with it: `compose-background.mts` (Compose jobs),
    `restore-background.mts` (backup restores), `scheduled-snapshot.mts` (daily snapshots) and
    `ticket-emails.mts`, which runs hourly to send ticket reminders and follow-ups, release expired
-   holds and notify the waitlist.
+   holds and notify the waitlist. Mailing adds `mail-send-background.mts` (a campaign's sending run),
+   `mail-due.mts` (every 5 minutes: scheduled campaigns and weekly digests) and `mail-nightly.mts`
+   (Mailgun's suppression lists and pruning).
 4. **Invite editors** from `/admin/users/`.
 
 ## Updating the core
@@ -220,5 +243,6 @@ commit the fix on its own and `git cherry-pick` it into the core repository.
 ```
 npm run check                                   # typecheck
 npx tsx scripts/checks/recurrence.ts            # recurrence rules and DST
+npx tsx scripts/checks/mailing.ts               # mailing emails, signed links, click verdicts, digest times
 npx tsx --env-file=.env scripts/publishing-e2e.ts   # drafts, preview, publish (needs LOCAL_ADMIN_* in .env)
 ```

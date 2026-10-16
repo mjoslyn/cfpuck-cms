@@ -36,6 +36,8 @@ npx supabase db query --linked          # run SQL against it
 npm run check                                       # typecheck
 npx tsx scripts/checks/recurrence.ts                # recurrence rules, DST, event date sync
 npx tsx scripts/checks/formatting.ts                # autop/texturize against scripts/checks/formatting-cases.json
+npx tsx scripts/checks/mailing.ts                   # mailing emails, signed links, click verdicts, digest times
+npx tsx --env-file=.env scripts/mailing-e2e.ts      # mailing through the running site, without Mailgun
 npx tsx --env-file=.env scripts/publishing-e2e.ts   # drafts, preview, publish
 ```
 

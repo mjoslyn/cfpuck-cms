@@ -64,6 +64,9 @@ Netlify deploys the site's functions with it:
 | `restore-background.mts` | Runs backup restores |
 | `scheduled-snapshot.mts` | Takes scheduled snapshots, daily at 07:00 UTC |
 | `ticket-emails.mts` | Hourly: ticket reminders and follow-ups, expired holds, automatic waitlists |
+| `mail-send-background.mts` | Mailing: one sending run of a campaign (up to 15 minutes) |
+| `mail-due.mts` | Mailing, every 5 minutes: scheduled campaigns, weekly digest issues, issues not approved in time |
+| `mail-nightly.mts` | Mailing, nightly: Mailgun's bounces, complaints and unsubscribes; pruning |
 
 ## Payments
 
@@ -80,6 +83,28 @@ provider serves both:
 
 Free tickets need no provider. See [Tickets](../../features/tickets/) and
 [Forms](../../features/forms/).
+
+## Mailing
+
+To send [Mailing](../../features/mailing/) campaigns and digests, set up Mailgun:
+
+- Add a **sending domain for marketing**, a subdomain such as `news.<your-domain>`, separate from
+  the domain the site's other mail uses, so its reputation stays its own.
+- Add the DNS records Mailgun gives for it: SPF, DKIM and the tracking CNAME (such as
+  `email.news.<your-domain>`), and publish a DMARC record (`p=none` at first, `quarantine` once the
+  reports are clean).
+- Turn on **open tracking** for that domain. Leave click and unsubscribe tracking off: the site tracks
+  clicks itself and handles unsubscribing, with its own one-click `List-Unsubscribe` header.
+- Add a **webhook** to `https://<your-domain>/api/mailgun/webhook` for delivered, opened, permanent
+  failure, temporary failure, spam complaint and unsubscribed events, and set its signing key as
+  `MAILGUN_WEBHOOK_SIGNING_KEY`.
+- Set `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `MAILGUN_REGION` (`eu` for EU accounts) and
+  `MAIL_LINK_SECRET`. `MAILGUN_TEST_MODE=true` makes Mailgun accept emails and deliver none.
+- Before the first real campaign, send tests to Gmail, Outlook and Yahoo addresses, and check that
+  Gmail shows its Unsubscribe link next to the sender.
+
+A shared IP is enough to start; a dedicated one is worth it only past roughly 50,000 emails a month,
+with a warmup plan.
 
 ## 4. Invite editors
 
@@ -100,4 +125,6 @@ Admins invite editors from `/admin/users/`. See [Editor and roles](../../feature
 | `SITE_URL` | The site's address for links in ticket emails (default Netlify's `URL`) |
 | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | Compose (`ANTHROPIC_MODEL` overrides the default model, `claude-sonnet-5-5`) |
 | `ANTHROPIC_SEO_MODEL` | SEO text generation (default Haiku 4.5) |
+| `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `MAILGUN_REGION`, `MAILGUN_WEBHOOK_SIGNING_KEY`, `MAILGUN_TEST_MODE` | Mailing through Mailgun |
+| `MAIL_LINK_SECRET` | The key for signed links in mailing emails (default: one made from the service key) |
 | `LOCAL_ADMIN_EMAIL`, `LOCAL_ADMIN_PASSWORD` | The admin the e2e scripts sign in as |

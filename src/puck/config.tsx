@@ -4,6 +4,7 @@ import { BlockView } from './BlockView';
 import { JsonAttrs, Row, Select, Text, Toggle, inputClass, type Attrs } from './fields';
 import { EntryField } from './entry-fields';
 import { MembersPanel } from './MembersPanel';
+import { SubscribePanel } from './SubscribePanel';
 import { EVENT_BLOCKS } from '../lib/events/on';
 import { SITE_BLOCKS } from '../lib/site/render';
 import { taxonomiesOf } from '../lib/site';
@@ -58,6 +59,13 @@ Object.assign(PANELS, {
       <Text title="Label" value={a.label} placeholder="Sign in" onChange={(v) => set({ label: v || undefined })} />
       <Text title="Label when signed in" value={a.signedInLabel} placeholder="My account" onChange={(v) => set({ signedInLabel: v || undefined })} />
       <p className="mb-2 text-xs text-admin-muted">Links to the account page. Pages with it stay cached; the label changes in the visitor's browser.</p>
+    </>
+  ),
+  subscribe: (a: Attrs, set: (p: Attrs) => void) => <SubscribePanel a={a} set={set} />,
+  'mail-preferences': (a: Attrs, set: (p: Attrs) => void) => (
+    <>
+      <Select title="Shows first" value={a.view === 'unsubscribe' ? 'unsubscribe' : 'preferences'} options={[['preferences', 'Email preferences'], ['unsubscribe', 'Unsubscribe']]} onChange={(v) => set({ view: v === 'unsubscribe' ? 'unsubscribe' : undefined })} />
+      <p className="mb-2 text-xs text-admin-muted">For whoever followed a link from one of the site's emails (or the signed-in member): confirming a sign-up, choosing lists, unsubscribing. The site's /email-preferences/ and /unsubscribe/ pages show it on their own; a page with one of those addresses needs this block.</p>
     </>
   ),
   'form': (a: Attrs, set: (p: Attrs) => void) => (
@@ -149,6 +157,8 @@ const LABELS: Record<string, string> = {
   members: 'Members only',
   'member-account': 'Member account',
   'member-link': 'Member sign-in link',
+  subscribe: 'Subscribe',
+  'mail-preferences': 'Email preferences',
   'events-calendar': 'Events page (list, month, day)',
   'event-calendar': 'Events calendar',
 };
@@ -187,7 +197,7 @@ const APPLIES_TO: Record<string, string[]> = {
  * The editor's blocks. With `entryType` (editing an entry), the block list leaves out blocks that don't
  * apply to that type; they stay defined, so any already on the page still show and can be edited.
  */
-export function buildConfig(types: string[], entryType?: string, opts: { members?: boolean; events?: boolean } = {}): Config {
+export function buildConfig(types: string[], entryType?: string, opts: { members?: boolean; events?: boolean; mailing?: boolean } = {}): Config {
   // Event and ticket blocks are offered while events are on (Settings > Events).
   const applies = (t: string) => (!entryType || !APPLIES_TO[t] || APPLIES_TO[t].includes(entryType)) && (opts.events !== false || !EVENT_BLOCKS.includes(t));
   const offered = (cats: Record<string, { title?: string; components?: string[]; visible?: boolean }>) =>
@@ -227,6 +237,8 @@ export function buildConfig(types: string[], entryType?: string, opts: { members
       site: { title: 'Site', components: withSite('site', ['event-details', 'event-schedule', 'tickets']) },
       // Offered while Members is on (Settings > Members); blocks already placed stay editable.
       ...(opts.members ? { members: { title: 'Members', components: ['members', 'member-account', 'member-link'] } } : {}),
+      // Offered while Mailing is on (Settings > Mailing).
+      ...(opts.mailing ? { mailing: { title: 'Mailing', components: ['subscribe', 'mail-preferences'] } } : {}),
       advanced: { title: 'Advanced', components: withSite('advanced', ['html', 'part', 'entry-content']) },
       // Collection internals (items, empty state, pagination) are managed from the collection's settings.
       other: { visible: false },
@@ -240,6 +252,7 @@ export const EDITABLE_TYPES = [
   'collection',
   'event-date', 'event-details', 'event-schedule', 'tickets', 'events-calendar', 'event-calendar',
   'members', 'member-account', 'member-link',
+  'subscribe', 'mail-preferences',
   'entry-field', 'form', 'pattern',
   ...Object.keys(SITE_BLOCKS),
 ];

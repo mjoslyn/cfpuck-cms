@@ -2,7 +2,7 @@
 title: Sync
 description: Copy content, files and settings between this site and another copy of it, either way.
 sidebar:
-  order: 10
+  order: 11
 ---
 
 **Settings > Sync** (admins) copies content between this site and another copy of it, such as

@@ -2,7 +2,7 @@
 title: Redirects
 description: Redirect rules, automatic redirects and the not-found log.
 sidebar:
-  order: 9
+  order: 10
 ---
 
 **Settings > Redirects** (admins; `/admin/redirects/` forwards there) maps old addresses to new

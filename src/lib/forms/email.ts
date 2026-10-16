@@ -37,6 +37,8 @@ export interface EmailContext {
   payment?: EmailPayment | null;
   /** Each Events block's events, by block id (src/lib/events/email.ts loads them; none: its empty text). */
   events?: Record<string, EmailEvent[]>;
+  /** Each Entries block's entries (mailing: src/lib/mailing/entries.ts), as Events blocks have theirs. */
+  entries?: Record<string, EmailEvent[]>;
 }
 
 /** An event as the Events block shows it. */
@@ -144,7 +146,8 @@ export function emailText(html: string, root: Required<Omit<EmailRoot, 'preheade
       if (t === 'br') return '<br>';
       if (t === 'a') {
         const m = attrs.match(/href\s*=\s*("([^"]*)"|'([^']*)')/i);
-        const url = href(m ? (m[2] ?? m[3]) : '', origin);
+        // The attribute as written in HTML: its &amp; is an &, escaped once again below.
+        const url = href(m ? (m[2] ?? m[3]).replace(/&amp;/g, '&') : '', origin);
         return url ? `<a href="${esc(url)}" style="${style.a}">` : '<a>';
       }
       return style[t] ? `<${t} style="${style[t]}">` : `<${t}>`;
@@ -159,7 +162,7 @@ function eventRow(ev: EmailEvent, p: Record<string, any>, root: Required<Omit<Em
   const muted = 'margin:0;font-size:14px;line-height:1.45;color:#64748b';
   const text = [
     `<p style="margin:0 0 4px 0;font-size:17px;line-height:1.3;font-weight:700"><a href="${link}" style="color:${root.textColor};text-decoration:none">${esc(ev.title)}</a></p>`,
-    `<p style="${muted}">${esc(ev.when)}</p>`,
+    ev.when ? `<p style="${muted}">${esc(ev.when)}</p>` : '',
     p.showVenue !== false && ev.venue ? `<p style="${muted}">${esc(ev.venue)}</p>` : '',
     p.showExcerpt !== false && ev.excerpt ? `<p style="margin:8px 0 0 0;font-size:15px;line-height:1.5">${esc(ev.excerpt)}</p>` : '',
     p.linkLabel ? `<p style="margin:8px 0 0 0;font-size:15px"><a href="${link}" style="color:${root.linkColor};font-weight:600;text-decoration:underline">${esc(p.linkLabel)}</a></p>` : '',
@@ -218,8 +221,9 @@ export function renderBlock(item: EmailItem, ctx: EmailContext, rootIn: EmailRoo
       const heading = p.heading ? `<p style="margin:0 0 8px 0;font-weight:700">${ctx.merge(esc(p.heading), true)}</p>` : '';
       return row(`<div style="${font}font-size:16px;line-height:1.55;color:${root.textColor}">${heading}${paymentTable(ctx.payment, { items: p.showItems !== false, details: p.showDetails !== false })}</div>`, ' style="padding:0 0 12px 0"');
     }
-    case 'Events': {
-      const list = ctx.events?.[p.id] ?? [];
+    case 'Events':
+    case 'Entries': {
+      const list = (item.type === 'Events' ? ctx.events : ctx.entries)?.[p.id] ?? [];
       const heading = p.heading ? `<h3 style="margin:0 0 12px 0;${font}font-size:20px;line-height:1.25;font-weight:700;color:${root.textColor}">${ctx.merge(esc(p.heading), true)}</h3>` : '';
       if (!list.length) return p.empty ? row(`${heading}<p style="margin:0;${font}font-size:15px;color:#64748b">${ctx.merge(esc(p.empty), true)}</p>`, ' style="padding:0 0 16px 0"') : '';
       return row(heading + list.map((ev, i) => eventRow(ev, p, root, i === 0, i === list.length - 1)).join(''), ' style="padding:0 0 16px 0"');
@@ -246,8 +250,8 @@ const stripEmpty = (o: EmailRoot) => Object.fromEntries(Object.entries(o ?? {}).
 /** The blocks of a document, without the page around them (the builder's canvas). */
 export const renderEmailBody = (doc: EmailDoc, ctx: EmailContext) => (doc.content ?? []).map((item) => renderBlock(item, ctx, doc.root?.props ?? {})).join('');
 
-/** A whole email: the document, its 600px body and preheader. */
-export function renderEmail(doc: EmailDoc, ctx: EmailContext, title = ''): string {
+/** A whole email: the document, its 600px body and preheader, and (mailing) a footer under the body that the design can't remove. */
+export function renderEmail(doc: EmailDoc, ctx: EmailContext, title = '', footer = ''): string {
   const root = { ...EMAIL_DEFAULTS, ...stripEmpty(doc.root?.props ?? {}) };
   const width = num(root.width, 600, 320, 800);
   const preheader = doc.root?.props?.preheader ? ctx.merge(esc(doc.root.props.preheader), true) : '';
@@ -258,7 +262,7 @@ export function renderEmail(doc: EmailDoc, ctx: EmailContext, title = ''): strin
 ${preheader ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0">${preheader}</div>` : ''}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${color(root.background, EMAIL_DEFAULTS.background)}" style="background:${color(root.background, EMAIL_DEFAULTS.background)}"><tr><td align="center" style="padding:24px 12px">
 <table role="presentation" class="email-wrap" width="${width}" cellpadding="0" cellspacing="0" border="0" bgcolor="${color(root.contentBackground, '#ffffff')}" style="width:${width}px;max-width:${width}px;background:${color(root.contentBackground, '#ffffff')}"><tr><td style="padding:32px;font-family:${root.fontFamily};color:${color(root.textColor, EMAIL_DEFAULTS.textColor)};font-size:16px;line-height:1.55">
 ${renderEmailBody(doc, ctx)}
-</td></tr></table>
+</td></tr></table>${footer ? `\n<table role="presentation" class="email-wrap" width="${width}" cellpadding="0" cellspacing="0" border="0" style="width:${width}px;max-width:${width}px"><tr><td style="padding:16px 32px;font-family:${root.fontFamily};color:#64748b;font-size:12px;line-height:1.5;text-align:center">${footer}</td></tr></table>` : ''}
 </td></tr></table>
 </body></html>`;
 }

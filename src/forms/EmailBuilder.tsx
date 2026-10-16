@@ -5,6 +5,7 @@
 // fields and submissions (src/forms/form-email.ts), or a ticket order's details (src/admin/ticket-email.ts).
 // Both offer the Payment block (the payment's items, total and details; the canvas shows the kit's sample)
 // and, on a site with events, the Events block (upcoming or picked events; the canvas shows the real ones).
+// Mailing's kit (src/admin/mailing-email.ts) offers the Entries block: the site's latest entries.
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Puck, type Config, type Data } from '@puckeditor/core';
 import '@puckeditor/core/no-external.css'; // without its Inter webfont: the admin uses the system font
@@ -13,6 +14,7 @@ import { MediaPicker } from '../puck/fields';
 import { MergeTags, RichMessage } from './rich-message';
 import { EventsQueryField, useEmailEvents } from './email-events';
 import { useEventsOn } from '../puck/member-settings';
+import { EntriesQueryField, useEmailEntries } from '../admin/email-entries';
 
 /** An email as it would be sent, for the Preview tab. */
 export interface RenderedEmail {
@@ -34,6 +36,8 @@ export interface EmailKit {
   canvas: EmailContext;
   /** The Payment block, offered with this note under its settings; its plain text is {payment_summary}. */
   payment?: { note: string };
+  /** The Entries block (mailing emails): the site's latest entries, filled in when the email is sent. */
+  entries?: boolean;
   /** A data block in the plain text made from the design (usually its merge tag). */
   textField: (id: string, showLabel: boolean) => string;
   preview: {
@@ -89,6 +93,17 @@ function EventsLeaf(props: Record<string, any>) {
   return <div dangerouslySetInnerHTML={{ __html: html || placeholder(error || 'No events to show now, so the block shows nothing.') }} />;
 }
 
+/** The Entries block, with the site's entries as they are now. */
+function EntriesLeaf(props: Record<string, any>) {
+  const root = useContext(RootProps);
+  const kit = useContext(KitContext)!;
+  const { entries, error } = useEmailEntries(props.query);
+  if (!entries) return <div dangerouslySetInnerHTML={{ __html: placeholder('Loading entries…') }} />;
+  const item = { type: 'Entries', props: { ...props, id: 'canvas' } } as EmailItem;
+  const html = renderBlock(item, { ...kit.canvas, entries: { canvas: entries } }, root);
+  return <div dangerouslySetInnerHTML={{ __html: html || placeholder(error || 'Nothing to show now, so the block shows nothing.') }} />;
+}
+
 function ColorField({ label, value, onChange, fallback }: { label: string; value?: string; onChange: (v: string | undefined) => void; fallback: string }) {
   return (
     <div>
@@ -107,8 +122,10 @@ function emailConfig(kit: EmailKit, events: boolean): Config {
   const leaf = (type: string) => (props: any) => <Leaf type={type} props={props} />;
   return {
     categories: {
-      content: { title: 'Content', components: ['Heading', 'Text', 'Button', 'Image', 'FormField', ...(kit.payment ? ['Payment'] : []), ...(events ? ['Events'] : [])] },
+      content: { title: 'Content', components: ['Heading', 'Text', 'Button', 'Image', 'FormField', ...(kit.payment ? ['Payment'] : []), ...(kit.entries ? ['Entries'] : []), ...(events ? ['Events'] : [])] },
       layout: { title: 'Layout', components: ['Section', 'Columns', 'Divider', 'Spacer'] },
+      // Blocks this builder doesn't offer (Payment without a payment, Events while events are off, Entries outside mailing).
+      other: { visible: false },
     },
     root: {
       fields: {
@@ -208,6 +225,19 @@ function emailConfig(kit: EmailKit, events: boolean): Config {
         },
         defaultProps: { heading: 'Coming up', query: { source: 'upcoming', count: 3 }, showImage: true, showVenue: true, showExcerpt: true, linkLabel: 'Details', empty: '' },
         render: (props: any) => <EventsLeaf {...props} />,
+      },
+      Entries: {
+        label: 'Entries',
+        fields: {
+          heading: { type: 'text', label: 'Heading (optional)' },
+          query: { type: 'custom', label: 'Shows', render: ({ value, onChange }: any) => <EntriesQueryField value={value} onChange={onChange} /> },
+          showImage: { type: 'radio', label: 'Image', options: [{ label: 'Show', value: true }, { label: 'Hide', value: false }] },
+          showExcerpt: { type: 'radio', label: 'Short description', options: [{ label: 'Show', value: true }, { label: 'Hide', value: false }] },
+          linkLabel: { type: 'text', label: 'Link text under each (empty: the title is the link)' },
+          empty: { type: 'text', label: 'When there are none (empty: the block shows nothing)' },
+        },
+        defaultProps: { heading: 'Latest news', query: { count: 3 }, showImage: true, showExcerpt: true, linkLabel: 'Read more', empty: '' },
+        render: (props: any) => <EntriesLeaf {...props} />,
       },
       Divider: { label: 'Divider', fields: { color: color('Colour', '#e5e1dc') }, defaultProps: {}, render: leaf('Divider') },
       Spacer: { label: 'Spacer', fields: { height: { type: 'number', label: 'Height (px)', min: 4, max: 200 } }, defaultProps: { height: 24 }, render: leaf('Spacer') },

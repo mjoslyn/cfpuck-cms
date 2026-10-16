@@ -1,6 +1,6 @@
 // Site settings island, in tabs: General (name, tagline, front page), Types (the templates for
 // each type's pages and listing), Search (the types it covers), Social (profile links, default share
-// image), Events (on or off, the default time zone), Tickets (payments and ticket emails; while events are on), Admin (the admin's colors and logo), Redirects (saved as they are added, with the Not found log), Sync (with another copy of the
+// image), Events (on or off, the default time zone), Tickets (payments and ticket emails; while events are on), Members, Mailing (lists, sender, tracking), Admin (the admin's colors and logo), Redirects (saved as they are added, with the Not found log), Sync (with another copy of the
 // site), Backups (snapshots and sync backups) and the site's own options. One Save for all;
 // the tab is in the URL (#search), and leaving with unsaved changes asks first.
 import type { PaymentProvider, ProviderStatus } from '../lib/payments';
@@ -16,6 +16,8 @@ import Sync from '../admin/Sync';
 import BackupsTab from '../admin/Backups';
 import TicketSettingsPanel from '../admin/TicketSettings';
 import MemberSettingsPanel from '../admin/MemberSettings';
+import MailingSettingsPanel, { type MailgunInfo } from '../admin/MailingSettings';
+import type { MailList, MailingSettings } from '../lib/mailing/config';
 import type { MemberSettings } from '../lib/members/config';
 import { eventsOn, showsTaxonomy, showsType } from '../lib/events/on';
 import type { TicketSettings } from '../lib/tickets/config';
@@ -25,7 +27,7 @@ import type { TaxonomyMeta } from '../lib/page-meta';
 import { ADMIN_THEME_DEFAULTS, ADMIN_THEME_FIELDS, adminThemeVars, contrast, type AdminTheme } from '../lib/admin-theme';
 
 interface Props {
-  site: { name?: string; description?: string; front_page_id?: number | null; timezone?: string; search_types?: string[]; social?: { network: string; url: string }[]; share_image?: number; share_image_url?: string; templates?: TemplateMap; taxonomy_templates?: Record<string, string>; taxonomy_pages_off?: string[]; taxonomy_meta?: Record<string, TaxonomyMeta>; listing_meta?: Record<string, TaxonomyMeta>; listings_off?: string[]; icons?: Record<string, string>; icon_media_id?: number | null; icon_preview?: string; admin_theme?: AdminTheme; tickets?: TicketSettings; members?: Partial<MemberSettings>; events?: { enabled?: boolean } };
+  site: { name?: string; description?: string; front_page_id?: number | null; timezone?: string; search_types?: string[]; social?: { network: string; url: string }[]; share_image?: number; share_image_url?: string; templates?: TemplateMap; taxonomy_templates?: Record<string, string>; taxonomy_pages_off?: string[]; taxonomy_meta?: Record<string, TaxonomyMeta>; listing_meta?: Record<string, TaxonomyMeta>; listings_off?: string[]; icons?: Record<string, string>; icon_media_id?: number | null; icon_preview?: string; admin_theme?: AdminTheme; tickets?: TicketSettings; members?: Partial<MemberSettings>; mailing?: MailingSettings; events?: { enabled?: boolean } };
   options: Record<string, any>;
   pages: { id: number; title: string }[];
   templates: TemplateInfo[];
@@ -33,6 +35,9 @@ interface Props {
   notFound: NotFound[];
   /** Which payment providers have their keys set (for Tickets). */
   ticketProviders: Record<PaymentProvider, ProviderStatus>;
+  /** Mailgun's keys (for Mailing) and the mailing lists. */
+  mailgun: MailgunInfo;
+  mailLists: MailList[];
 }
 
 /** The template pickers' value for "Off" (no listing page, no term pages). */
@@ -41,7 +46,7 @@ const OFF = '__off__';
 /** Every IANA timezone the browser knows. */
 const TIMEZONES: string[] = (Intl as any).supportedValuesOf?.('timeZone') ?? [config.timezone];
 
-export default function SiteSettings({ site: initialSite, options: initialOptions, pages, templates, redirects, notFound, ticketProviders }: Props) {
+export default function SiteSettings({ site: initialSite, options: initialOptions, pages, templates, redirects, notFound, ticketProviders, mailgun, mailLists }: Props) {
   const [site, setSite] = useState(initialSite);
   const [options, setOptions] = useState(initialOptions);
   const [status, setStatus] = useState('');
@@ -246,6 +251,11 @@ export default function SiteSettings({ site: initialSite, options: initialOption
       id: 'members',
       label: 'Members',
       panel: <MemberSettingsPanel value={site.members ?? {}} onChange={(members) => setSite((s) => ({ ...s, members }))} />,
+    },
+    {
+      id: 'mailing',
+      label: 'Mailing',
+      panel: <MailingSettingsPanel value={site.mailing ?? {}} mailgun={mailgun} lists={mailLists} membersOn={!!site.members?.enabled} onChange={(mailing) => setSite((s) => ({ ...s, mailing }))} />,
     },
     {
       id: 'admin',

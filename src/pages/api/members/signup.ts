@@ -7,6 +7,8 @@ import { serverClient, serviceClient, siteDb } from '../../../lib/supabase';
 import { EMAIL, accountUrl, loadMemberSettings, safeNext } from '../../../lib/members/account';
 import { sendMail } from '../../../lib/forms/mail';
 import { site } from '../../../lib/site';
+import { mailingSettings, CONSENT_TEXT } from '../../../lib/mailing/config';
+import { signUp } from '../../../lib/mailing/contacts';
 
 const env = (k: string) => (import.meta.env?.[k] as string | undefined) ?? process.env[k];
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
@@ -39,6 +41,15 @@ export const POST: APIRoute = async ({ request, cookies, redirect, url }) => {
   if (admin) {
     const html = `<p>${esc(name)} (${esc(email)}) created an account${status === 'pending' ? '. It is waiting for approval' : ''}.</p><p><a href="${url.origin}/admin/members/">Members</a></p>`;
     await sendMail({ to: [admin], subject: `New member sign-up: ${name}`, html }).catch((e) => console.error(`members: sign-up email failed: ${e.message}`));
+  }
+  // Ticked "Send me ... by email" (Mailing on): the member lists, confirmed by email like any sign-up.
+  if (form.get('mail_optin')) {
+    const { data: siteRow } = await siteDb().from('settings').select('value').eq('key', 'site').maybeSingle();
+    const mail = mailingSettings(siteRow?.value);
+    if (mail.enabled && mail.memberLists?.length) {
+      const ip = request.headers.get('x-nf-client-connection-ip') ?? request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? '';
+      await signUp(db, { email, name, lists: mail.memberLists, source: 'members:signup', consentText: mail.consentText || CONSENT_TEXT, ip, origin: url.origin }).catch((e) => console.error(`members: mailing sign-up failed: ${e.message}`));
+    }
   }
   const m = !data.session ? 'confirm' : status === 'active' ? 'signed-up' : 'pending';
   return redirect(accountUrl({ m, next: status === 'active' ? next : undefined }), 303);

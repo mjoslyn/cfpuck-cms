@@ -1,0 +1,23 @@
+---
+// A weekly digest and its issues (src/admin/DigestEditor.tsx).
+import Admin from '../../../../layouts/Admin.astro';
+import DigestEditor from '../../../../admin/DigestEditor';
+import { SITE_TZ } from '../../../../lib/site';
+import type { Digest, MailList } from '../../../../lib/mailing/config';
+import { memberSettings } from '../../../../lib/members/config';
+
+const db = Astro.locals.db;
+const id = Number(Astro.params.id);
+const { data: digest } = await db.from('digests').select('*').eq('id', id).maybeSingle<Digest>();
+if (!digest) return Astro.redirect('/admin/mailing/?tab=digests&error=No%20such%20digest.');
+const [{ data: lists }, { data: siteRow }, { data: issues }] = await Promise.all([
+  db.from('mail_lists').select('*').order('sort').order('id'),
+  db.from('settings').select('value').eq('key', 'site').maybeSingle(),
+  db.from('campaigns').select('id, name, status, scheduled_at, sent_at, recipients, error').eq('digest_id', id).order('created_at', { ascending: false }).limit(60),
+]);
+const members = memberSettings(siteRow?.value);
+const lastSent = (issues ?? []).find((i) => i.status === 'sent')?.sent_at ?? null;
+---
+<Admin title={digest.name}>
+  <DigestEditor client:load digest={digest} lists={(lists ?? []) as MailList[]} levels={members.enabled ? members.levels : null} issues={(issues ?? []) as any} admin={Astro.locals.user?.role === 'admin'} tz={SITE_TZ} lastSent={lastSent} />
+</Admin>

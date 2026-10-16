@@ -5,6 +5,7 @@ import { loadAdminTheme } from '../lib/admin-theme';
 import { siteDb } from '../lib/supabase';
 import { memberSettings } from '../lib/members/config';
 import { eventsOn } from '../lib/events/on';
+import { mailingOn } from '../lib/mailing/config';
 // Admin chrome. Tailwind only; the public site's CSS never loads here.
 import '../styles/tailwind.css';
 import '../styles/admin.css';
@@ -18,10 +19,11 @@ const user = Astro.locals.user;
 const path = Astro.url.pathname;
 const isAdmin = user?.role === 'admin';
 const theme = await loadAdminTheme(Astro.locals.db ?? siteDb());
-// Members and Tickets while they are on (Settings > Members, Settings > Events).
+// Members, Tickets and Mailing while they are on (Settings > Members, Events, Mailing).
 const siteSettings = (await (Astro.locals.db ?? siteDb()).from('settings').select('value').eq('key', 'site').maybeSingle()).data?.value;
 const membersOn = isAdmin && memberSettings(siteSettings).enabled;
 const ticketsOn = eventsOn(siteSettings);
+const mailOn = mailingOn(siteSettings);
 const nav = [
   { href: '/admin/', label: 'Content' },
   { href: '/admin/templates/', label: 'Templates' },
@@ -29,6 +31,7 @@ const nav = [
   { href: '/admin/forms/', label: 'Forms' },
   { href: '/admin/submissions/', label: 'Submissions' },
   ...(ticketsOn ? [{ href: '/admin/tickets/', label: 'Tickets' }] : []),
+  ...(mailOn ? [{ href: '/admin/mailing/', label: 'Mailing' }] : []),
   { href: '/admin/settings/', label: 'Settings', admin: true },
   { href: '/admin/users/', label: 'Users', admin: true },
   ...(membersOn ? [{ href: '/admin/members/', label: 'Members', admin: true }] : []),

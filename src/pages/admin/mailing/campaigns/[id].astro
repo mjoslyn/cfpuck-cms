@@ -1,0 +1,30 @@
+---
+// A campaign: its editor, and once it has gone out its numbers and links (src/admin/CampaignEditor.tsx).
+import Admin from '../../../../layouts/Admin.astro';
+import CampaignEditor from '../../../../admin/CampaignEditor';
+import { SITE_TZ } from '../../../../lib/site';
+import type { Campaign, CampaignStats, MailList } from '../../../../lib/mailing/config';
+import { memberSettings } from '../../../../lib/members/config';
+import { mailgunStatus } from '../../../../lib/mailing/mailgun';
+import { linkStats } from '../../../../lib/mailing/tracking';
+import { mailingPaused } from '../../../../lib/mailing/state';
+
+const db = Astro.locals.db;
+const id = Number(Astro.params.id);
+const { data: campaign } = await db.from('campaigns').select('*').eq('id', id).maybeSingle<Campaign>();
+if (!campaign) return Astro.redirect('/admin/mailing/?error=No%20such%20campaign.');
+const [{ data: lists }, { data: siteRow }, { data: stats }, links, paused] = await Promise.all([
+  db.from('mail_lists').select('*').order('sort').order('id'),
+  db.from('settings').select('value').eq('key', 'site').maybeSingle(),
+  db.rpc('campaign_stats', { p_id: id }),
+  linkStats(db, id),
+  mailingPaused(db),
+]);
+const members = memberSettings(siteRow?.value);
+const { data: digest } = campaign.digest_id ? await db.from('digests').select('id, name').eq('id', campaign.digest_id).maybeSingle() : { data: null };
+// The frozen copy isn't needed in the browser.
+const { html: _html, text_rendered: _text, vars: _vars, ...rest } = campaign;
+---
+<Admin title={campaign.name || 'Campaign'}>
+  <CampaignEditor client:load campaign={{ ...rest, html: null, text_rendered: null, vars: null } as Campaign} lists={(lists ?? []) as MailList[]} levels={members.enabled ? members.levels : null} stats={stats as CampaignStats | null} links={links as any} admin={Astro.locals.user?.role === 'admin'} mailgun={mailgunStatus().configured} tz={SITE_TZ} digest={digest} paused={paused} />
+</Admin>
