@@ -1,6 +1,6 @@
 # supapuck-cms
 
-A CMS for small organisation sites: Astro rendering on
+A CMS for small business and organisation sites: Astro rendering on
 Netlify, content in Supabase, the Puck visual editor, and Compose, which writes pages with Claude from
 the documents, images and links an editor adds.
 

@@ -9,7 +9,7 @@ export default defineConfig({
   integrations: [
     starlight({
       title: 'supapuck-cms',
-      description: 'A CMS for small organisation sites: Astro on Netlify, Supabase, the Puck editor and Compose.',
+      description: 'A CMS for small business and organisation sites: Astro on Netlify, Supabase, the Puck editor and Compose.',
       social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/mjoslyn/supapuck-cms' }],
       editLink: { baseUrl: 'https://github.com/mjoslyn/supapuck-cms/edit/main/docs-site/' },
       lastUpdated: true,
