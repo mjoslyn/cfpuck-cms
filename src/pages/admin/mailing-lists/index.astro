@@ -235,7 +235,15 @@ const contactQuery = (patch: Record<string, string>) => `?${new URLSearchParams(
           {contacts.map((c) => (
             <tr class="border-t border-admin-ink/5 align-top">
               <td class="px-4 py-2.5"><a class="font-medium hover:text-admin-accent" href={`/admin/mailing-lists/contacts/${c.id}/`}>{c.email}</a>{c.name && <div class="text-xs text-admin-muted">{c.name}</div>}</td>
-              <td class="px-4 py-2.5">{CONTACT_STATUS[c.status as ContactStatus] ?? c.status}</td>
+              <td class="px-4 py-2.5">
+                {CONTACT_STATUS[c.status as ContactStatus] ?? c.status}
+                {isAdmin && c.status === 'pending' && (
+                  <form method="post" action="/api/admin/mailing/contacts" class="text-xs">
+                    <input type="hidden" name="action" value="resend" /><input type="hidden" name="id" value={c.id} />
+                    <button class="text-admin-muted underline hover:text-admin-accent">Resend confirmation</button>
+                  </form>
+                )}
+              </td>
               <td class="px-4 py-2.5 text-xs">{(c.tags ?? []).map((t) => <a class="mr-1 inline-block rounded bg-admin-soft px-1.5 py-0.5 hover:text-admin-accent" href={contactQuery({ tag: t, page: '1' })}>{t}</a>)}</td>
               <td class="px-4 py-2.5 text-xs text-admin-muted">{c.consent_source}<br />{when(c.confirmed_at ?? c.consent_at)}</td>
             </tr>

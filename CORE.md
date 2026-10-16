@@ -703,7 +703,7 @@ never subscribes anyone again); the settings are, with the others. Migration `*_
   confirmation link opens the preferences page, whose button (a GET never confirms: mail scanners
   follow links) posts to `/api/mail/confirm`. Admins add people who agreed elsewhere (Add a contact,
   Import a CSV, Add members to a list), naming how they agreed; those who unsubscribed, bounced,
-  complained or were erased are skipped. Unconfirmed sign-ups are deleted after 30 days.
+  complained or were erased are skipped. Admins can **Resend confirmation** (the Subscribers tab or a contact's page, `resendConfirmation`) to anyone with lists still waiting, within the same daily limit, never to a bounced or complained address. Unconfirmed sign-ups are deleted after 30 days.
 - **Pages**: `/subscribe/` (a Subscribe block), `/unsubscribe/` and `/email-preferences/` (the **Email
   preferences** block, `mail-preferences`, `view` unsubscribe or preferences): a page with one of these
   addresses takes its place (`MAILING_PAGES` in `src/render/page.ts`). The preferences block shows whose

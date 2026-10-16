@@ -35,7 +35,7 @@ the email preferences page; the others are for people you add yourself.
 Put the **Subscribe** block (Mailing group in the block list) anywhere: email, an optional name, the
 public lists to choose from when there are several, the consent wording and a button. The site also has
 a page at **/subscribe/**. Every sign-up gets an email with a link to confirm, and nothing is sent until
-they do (a sign-up never confirmed is deleted after 30 days).
+they do (a sign-up never confirmed is deleted after 30 days). Admins can send the email again with **Resend confirmation**, on the Subscribers tab or the person's page (at most 3 confirmation emails a day to one address).
 
 People manage their subscription from the links at the bottom of every email: **/email-preferences/**
 (which lists) and **/unsubscribe/**. Mail apps' own one-click unsubscribe (Gmail, Yahoo, Apple Mail)

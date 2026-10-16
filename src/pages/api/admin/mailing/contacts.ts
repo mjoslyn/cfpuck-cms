@@ -1,12 +1,12 @@
 // Contacts (admins; see the middleware). Form posts, back to the contacts list or a contact:
 // add (email, name, list, source note: subscribed at once, as an admin vouches for their consent);
-// update (id, name, notes, lists[]: their lists); unsubscribe (id); erase (id: gone, with a hash kept so
+// update (id, name, notes, lists[]: their lists); resend (id: the confirmation email again); unsubscribe (id); erase (id: gone, with a hash kept so
 // they're never mailed again without signing up anew); import (file: CSV with email and name columns,
 // list, source: who agreed and how); members (list, levels[], vouch: active members join a list).
 // GET ?export=csv: every contact as CSV.
 import type { APIRoute } from 'astro';
 import { serviceClient } from '../../../../lib/supabase';
-import { contactsCsv, erase, importContacts, parseCsv, unsubscribe } from '../../../../lib/mailing/contacts';
+import { contactsCsv, erase, importContacts, parseCsv, resendConfirmation, unsubscribe } from '../../../../lib/mailing/contacts';
 import type { Contact } from '../../../../lib/mailing/config';
 import { EMAIL_RE, normalEmail } from '../../../../lib/mailing/config';
 import { isActive, type MemberRow } from '../../../../lib/members/config';
@@ -15,7 +15,7 @@ import { cleanTags, fieldKey } from '../../../../lib/mailing/segments';
 /** CSV columns that aren't fields: the address, the name's parts and the tags. */
 const OWN_COLUMNS = new Set(['email', 'name', 'first name', 'first_name', 'last name', 'last_name', 'full name', 'tags', 'tag']);
 
-export const POST: APIRoute = async ({ request, locals, redirect }) => {
+export const POST: APIRoute = async ({ request, locals, redirect, url }) => {
   if (locals.user?.role !== 'admin') return new Response('Admins only', { status: 403 });
   const form = await request.formData();
   const action = String(form.get('action') ?? '');
@@ -93,6 +93,10 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
       if (e3) return back(e3.message);
     }
     return back('Saved.', true);
+  }
+  if (action === 'resend') {
+    const r = await resendConfirmation(db, id, url.origin);
+    return r.ok ? back('Confirmation email sent again.', true) : back(r.error ?? 'Not sent.');
   }
   if (action === 'unsubscribe') return (await unsubscribe(db, id)) ? back('Unsubscribed from everything.', true) : back('No such contact.');
   if (action === 'erase') {

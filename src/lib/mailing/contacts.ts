@@ -120,6 +120,22 @@ async function sendConfirmation(db: SupabaseClient, contact: Contact, lists: Mai
   });
 }
 
+/**
+ * The confirmation email again (an admin's Resend confirmation), for a contact with lists still waiting
+ * for it: the same email and limit as a sign-up's. Never to an address that bounced or complained.
+ */
+export async function resendConfirmation(db: SupabaseClient, id: number, origin: string): Promise<{ ok: boolean; error?: string }> {
+  const found = await loadContact(db, id);
+  if (!found) return { ok: false, error: 'No such contact.' };
+  const { contact } = found;
+  if (contact.status === 'bounced' || contact.status === 'complained') return { ok: false, error: `${contact.email} ${contact.status === 'bounced' ? 'bounced' : 'marked an email as spam'}, so nothing more is sent to them.` };
+  const { data: rows } = await db.from('contact_lists').select('list_id').eq('contact_id', id).eq('status', 'pending');
+  const waiting = new Set((rows ?? []).map((r) => Number(r.list_id)));
+  const lists = (await loadLists(db)).filter((l) => waiting.has(l.id));
+  if (!lists.length) return { ok: false, error: 'Nothing is waiting for their confirmation.' };
+  return (await sendConfirmation(db, contact, lists, origin)) ? { ok: true } : { ok: false, error: 'Not sent: they already had 3 confirmation emails today, or the email failed.' };
+}
+
 /** A confirmation link was followed (and its button pressed): the contact and their waiting lists are subscribed. */
 export async function confirm(db: SupabaseClient, id: number): Promise<Contact | null> {
   const found = await loadContact(db, id);
