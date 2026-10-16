@@ -63,7 +63,7 @@ SEO** panel has the same button, which writes its `{term}` title and description
 Under **Settings > Types**, each taxonomy with term pages has an **SEO** button beside its template's Edit, opening its featured image and SEO: an image, a
 search title, a meta description and noindex that its term pages use when a term has none of its own
 (for the meta description, a term's own description comes first too).
-In the title and description, `{term}` is replaced by the term's name, so `Ellicottville {term}
+In the title and description, `{term}` is replaced by the term's name, so `Example Town {term}
 businesses` gives each category page its own title.
 
 ### On the term page

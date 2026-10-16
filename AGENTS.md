@@ -3,8 +3,8 @@
 # Working on the core
 
 This repository is supapuck-cms: the CMS (everything outside `src/site/`) and an example site in
-`src/site/` (Example Town). Real sites are forks with this repository as their `upstream` remote; the
-first is the Ellicottville Chamber site (`../evl-chamber`, https://ellicottvilleny.robotofthefuture.com).
+`src/site/` (Example Town). Real sites are forks with this repository as their `upstream` remote, kept
+beside it (`../<site>`).
 `CORE.md`, imported above, is the reference for how the core works, and every site's `AGENTS.md` imports
 it too. This file is about working here.
 
@@ -47,7 +47,7 @@ Update the docs in the same commit as the change, not afterwards:
 
 1. Change and commit here. `npm run check` (TypeScript) must pass.
 2. Test on the example site, and for anything that real content exercises, in a site: in
-   `../evl-chamber`, `git fetch <path to this repository> main && git merge --no-commit FETCH_HEAD`,
+   `../<site>`, `git fetch <path to this repository> main && git merge --no-commit FETCH_HEAD`,
    restart its dev server if config or dependencies changed, and test there.
 3. Push supapuck-cms (it deploys nothing), then in the site `git fetch upstream && git merge upstream/main`
    and commit; a site keeps its own `AGENTS.md`, `README.md`, `.env.example` and `supabase/config.toml`
@@ -57,7 +57,7 @@ Update the docs in the same commit as the change, not afterwards:
 
 ## Local setup
 
-- `npx supabase start` (ports 5652x; sites use their own, Ellicottville 5642x) and
+- `npx supabase start` (ports 5652x; each site uses its own) and
   `npx astro dev --background` (http://localhost:4321).
 - Netlify's edge-function emulation is off under `astro dev` (`astro.config.mjs`): its Deno runtime
   ran out of memory on the editor's image requests.

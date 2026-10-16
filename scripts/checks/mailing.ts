@@ -54,8 +54,8 @@ want('the full name is first and last', v[r.vars.find((x) => x.field === 'name')
 
 // The site's contact fields as tags: {town} for a field with that key; an unknown key stays as written.
 const rf = renderCampaign({ campaignId: 8, subject: '{last_name} in {town|your town} {shoe_size}', design: { root: { props: {} }, content: [] } as any, siteName: 'T', address: 'A', origin: 'https://site.example', fields: ['town'] });
-const vf = recipientValues(rf.vars, { email: 'a@x.org', last_name: 'Bo', attributes: { town: 'Olean' } }, { t: 'T', ct: 'C' });
-want('a field is a tag', rf.subject.replace(/%recipient\.(v\d+)%/g, (_, k) => vf[k]) === 'Bo in Olean {shoe_size}', rf.subject);
+const vf = recipientValues(rf.vars, { email: 'a@x.org', last_name: 'Bo', attributes: { town: 'Riverton' } }, { t: 'T', ct: 'C' });
+want('a field is a tag', rf.subject.replace(/%recipient\.(v\d+)%/g, (_, k) => vf[k]) === 'Bo in Riverton {shoe_size}', rf.subject);
 const vg = recipientValues(rf.vars, { email: 'a@x.org' }, { t: 'T', ct: 'C' });
 want('an empty field takes the fallback', rf.subject.replace(/%recipient\.(v\d+)%/g, (_, k) => vg[k]) === ' in your town {shoe_size}');
 
@@ -120,7 +120,7 @@ want('bounces pause', unhealthy({ ...base, bounced: 30 }, { complaintRate: 0.1, 
 const rows = parseCsv('﻿Email;Name\nann@x.org;"Smith; Ann"\n\nbo@x.org;Bo\n');
 want('CSV with semicolons and quotes', rows.length === 2 && rows[0].email === 'ann@x.org' && rows[0].name === 'Smith; Ann', JSON.stringify(rows));
 want('CSV without a header', parseCsv('ann@x.org,Ann\nbo@x.org\n').map((r) => r.email).join() === 'ann@x.org,bo@x.org');
-want('export has the fields as columns', contactsCsv([{ id: 1, email: 'a@x.org', first_name: 'Ann', last_name: 'Lee', attributes: { town: 'Olean', extra: 'x' }, status: 'subscribed', lists: [], created_at: '' } as any], [{ key: 'town', label: 'Town', type: 'text' }, { key: 'size', label: 'Size', type: 'text' }]).startsWith('email,first_name,last_name,status,lists,tags,town,size,extra,'));
+want('export has the fields as columns', contactsCsv([{ id: 1, email: 'a@x.org', first_name: 'Ann', last_name: 'Lee', attributes: { town: 'Riverton', extra: 'x' }, status: 'subscribed', lists: [], created_at: '' } as any], [{ key: 'town', label: 'Town', type: 'text' }, { key: 'size', label: 'Size', type: 'text' }]).startsWith('email,first_name,last_name,status,lists,tags,town,size,extra,'));
 want('export guards formulas', contactsCsv([{ id: 1, email: 'a@x.org', first_name: '=HYPERLINK("x")', last_name: '', attributes: {}, status: 'subscribed', lists: ['News'], consent_source: '', consent_at: null, confirmed_at: null, unsubscribed_at: null, created_at: '' } as any]).includes(`"'=HYPERLINK(""x"")"`));
 
 // Segments: rules cleaned (empty ones dropped, values bounded), tags normalised, rules in words.

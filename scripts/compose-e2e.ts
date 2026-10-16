@@ -24,7 +24,7 @@ try {
   // 1. Start a page from the admin.
   await page.goto(`${origin}/admin/compose/`);
   await page.locator('textarea').fill('A short page about fall foliage weekends in our town: when to come, where to see the colours, and what else to do that weekend. Keep it to about four sections.');
-  await page.locator('input[type=file]').setInputFiles({ name: 'foliage-notes.txt', mimeType: 'text/plain', buffer: Buffer.from('Peak colour is usually the first two weeks of October. The Sky High chairlift at Holiday Valley runs scenic rides on fall weekends. The Fall Festival is the weekend after Columbus Day.') });
+  await page.locator('input[type=file]').setInputFiles({ name: 'foliage-notes.txt', mimeType: 'text/plain', buffer: Buffer.from('Peak colour is usually the first two weeks of October. The chairlift at the ski hill runs scenic rides on fall weekends. The Fall Festival is the weekend after Columbus Day.') });
   await page.getByRole('button', { name: 'Media library' }).click();
   const tiles = page.locator('button[aria-pressed]');
   await tiles.nth(0).click();

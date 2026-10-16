@@ -67,10 +67,10 @@ try {
   ok('subscribe page has the form', html.includes('action="/api/mail/subscribe"') && html.includes('c-subscribe__consent'));
   ok('cross-site form posts are refused', (await form('/api/mail/subscribe', { email: who, lists: String(news) }, { Origin: 'https://evil.example' })).status === 403);
   ok('a field named like a built-in tag is left out', JSON.stringify((await db.from('settings').select('value').eq('key', 'site').single()).data?.value.mailing.fields.map((f: any) => f.key)) === '["town","shirt_size"]');
-  r = await form('/api/mail/subscribe', { email: who, first_name: 'Ann', last_name: 'E2E & Co', cf_town: 'Olean', cf_shirt_size: 'large', cf_other: 'x', lists: [String(news), String(board)], back: '/subscribe/', consent: 'I agree' }, { Origin: base });
+  r = await form('/api/mail/subscribe', { email: who, first_name: 'Ann', last_name: 'E2E & Co', cf_town: 'Riverton', cf_shirt_size: 'large', cf_other: 'x', lists: [String(news), String(board)], back: '/subscribe/', consent: 'I agree' }, { Origin: base });
   ok('sign-up answers with "check your email"', r.status === 303 && r.headers.get('location')?.includes('subscribe=sent'), `${r.status} ${r.headers.get('location')}`);
   const { data: c1 } = await db.from('contacts').select('id, status, consent_text, first_name, last_name, name, attributes').eq('email', who).single();
-  ok('first and last name and the site’s fields kept', c1?.first_name === 'Ann' && c1.last_name === 'E2E & Co' && c1.name === 'Ann E2E & Co' && c1.attributes.town === 'Olean' && c1.attributes.shirt_size === 'Large' && Object.keys(c1.attributes).length === 2, JSON.stringify(c1));
+  ok('first and last name and the site’s fields kept', c1?.first_name === 'Ann' && c1.last_name === 'E2E & Co' && c1.name === 'Ann E2E & Co' && c1.attributes.town === 'Riverton' && c1.attributes.shirt_size === 'Large' && Object.keys(c1.attributes).length === 2, JSON.stringify(c1));
   const { data: cl1 } = await db.from('contact_lists').select('list_id, status').eq('contact_id', c1!.id);
   ok('contact waits for confirmation, on the public list only', c1?.status === 'pending' && cl1?.length === 1 && cl1[0].list_id === news && cl1[0].status === 'pending', JSON.stringify(cl1));
   const confirmMail = await inbox(who, 'Confirm');
@@ -104,7 +104,7 @@ try {
   const { data: sentRow } = await db.from('campaigns').select('status, recipients, error').eq('id', cid).single();
   ok('campaign sent', sentRow?.status === 'sent', JSON.stringify(sentRow));
   const email = await inbox(who, `E2E ${stamp}`);
-  ok('subject and heading carry the names and a field, escaped in HTML', email?.Subject === `E2E ${stamp} for Ann in Olean` && email.HTML.includes('Hello Ann E2E &amp; Co') && !email.HTML.includes('%recipient'), email?.Subject);
+  ok('subject and heading carry the names and a field, escaped in HTML', email?.Subject === `E2E ${stamp} for Ann in Riverton` && email.HTML.includes('Hello Ann E2E &amp; Co') && !email.HTML.includes('%recipient'), email?.Subject);
   ok('footer: address, unsubscribe, preferences', !!email?.HTML.includes('1 Main St, Example Town') && email.HTML.includes('/unsubscribe/?t=') && email.HTML.includes('/email-preferences/?t='));
   const tracked = [...(email?.HTML.matchAll(/href="([^"]*\/m\/c\/\d+\/[^"]+)"/g) ?? [])].map((m) => m[1]);
   ok('links are tracked, with the hidden link', tracked.length === 3, String(tracked.length));
@@ -198,7 +198,7 @@ try {
   // Segments: an import with tags and a field column, a segment by tag, a campaign to it only.
   const farmer = `mailing-e2e-farm-${stamp}@example.org`;
   const shop = `mailing-e2e-shop-${stamp}@example.org`;
-  const csv = `email,first name,last name,tags,Town,Shirt Size,Hobby\n${farmer},Fay,Farmer,farm;Market,Ellicottville,small,Goats\n${shop},Sam,Shop,shop,Salamanca,XXL,\n`;
+  const csv = `email,first name,last name,tags,Town,Shirt Size,Hobby\n${farmer},Fay,Farmer,farm;Market,Brookville,small,Goats\n${shop},Sam,Shop,shop,Lakeside,XXL,\n`;
   const fd = new FormData();
   for (const [k, v] of Object.entries({ action: 'import', list: String(made.lists[0]), source: 'e2e import', tags: 'e2e' })) fd.append(k, v);
   fd.append('file', new File([csv], 'people.csv', { type: 'text/csv' }));
@@ -206,7 +206,7 @@ try {
   ok('CSV import with tags and a field', r.status === 303 && decodeURIComponent(r.headers.get('location') ?? '').includes('2 added'), decodeURIComponent(r.headers.get('location') ?? ''));
   const { data: fay } = await db.from('contacts').select('id, tags, attributes, first_name, last_name').eq('email', farmer).single();
   const { data: sam } = await db.from('contacts').select('attributes').eq('email', shop).single();
-  ok('tags and fields stored: a column named like a field fills it, others are fields of their own', fay?.tags.join() === 'farm,market,e2e' && fay?.attributes.town === 'Ellicottville' && fay.attributes.shirt_size === 'Small' && fay.attributes.hobby === 'Goats' && Object.keys(fay.attributes).length === 3 && fay?.first_name === 'Fay' && fay.last_name === 'Farmer', JSON.stringify(fay));
+  ok('tags and fields stored: a column named like a field fills it, others are fields of their own', fay?.tags.join() === 'farm,market,e2e' && fay?.attributes.town === 'Brookville' && fay.attributes.shirt_size === 'Small' && fay.attributes.hobby === 'Goats' && Object.keys(fay.attributes).length === 3 && fay?.first_name === 'Fay' && fay.last_name === 'Farmer', JSON.stringify(fay));
   ok('a value that isn’t one of the options is left out', !('shirt_size' in (sam?.attributes ?? {})), JSON.stringify(sam));
   const page1 = await (await fetch(`${base}/admin/mailing-lists/contacts/${fay!.id}/`, { headers: { Cookie: cookie } })).text();
   ok('the contact page has the fields as inputs', /name="cf_shirt_size"/.test(page1) && /<option selected[^>]*>Small<\/option>/.test(page1.replace(/ data-astro-source-[a-z]+="[^"]*"/g, '')) && page1.includes('value="Goats"'));

@@ -22,6 +22,10 @@ const publish = async () => {
   await page.getByRole('button', { name: /^Publish( changes)?$/ }).click();
   await page.waitForTimeout(1500);
 };
+// A venue to choose, made here so the check doesn't depend on a site's venues.
+const chosen = `E2E Town Hall ${Date.now()}`;
+const { data: made } = await sb.from('entries').insert({ type: 'venue', slug: chosen.toLowerCase().replace(/\s+/g, '-'), title: chosen, status: 'publish', published_at: new Date().toISOString(), content: { root: { props: {} }, content: [] } }).select('id').single();
+if (made) created.push(made.id);
 try {
   await sb.from('entries').update({ fields: { ...ev!.fields, venue: null } }).eq('id', ev!.id);
   await page.goto(`${origin}/admin/login/`);
@@ -32,10 +36,10 @@ try {
   // Choose an existing venue.
   await page.goto(`${origin}/admin/edit/${ev!.id}/`, { waitUntil: 'networkidle' });
   await page.getByRole('button', { name: 'Choose venue' }).click();
-  await page.getByPlaceholder('Search venues').fill('Holiday Valley');
+  await page.getByPlaceholder('Search venues').fill(chosen);
   await page.waitForTimeout(800);
-  out.searchResults = await page.locator('li button:has-text("Holiday Valley")').count();
-  await page.locator('li button:has-text("Holiday Valley")').first().click();
+  out.searchResults = await page.locator(`li button:has-text("${chosen}")`).count();
+  await page.locator(`li button:has-text("${chosen}")`).first().click();
   await page.screenshot({ path: 'reference/venue-e2e-picked.png' });
   await publish();
   out.pickedOnPage = venueOnPage(await eventPage());

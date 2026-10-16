@@ -54,7 +54,7 @@ Suggested order: 1, then 2, then 3 to 5 together around `ruleCovers`, then 6.
 - **Fixed (b4c3062). A malformed `%` in a /media/ URL returned a 500** for the whole page (verified;
   `modernize.ts:20`, decodeURIComponent without try).
 - **Fixed (70bea0e). Slider collections didn't work without a site Swiper script** (verified): they call
-  `new Swiper(...)` but the core loads only Swiper's CSS. (The Ellicottville site loads the script in
+  `new Swiper(...)` but the core loads only Swiper's CSS. (A site loaded the script in
   its pageScripts; the example site doesn't.)
 - **Fixed (70bea0e).** All collections on a page shared one `?query-page=`: paging one moves the others
   (`prepare.ts:144`).
