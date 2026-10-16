@@ -77,4 +77,4 @@ With [Mailing](../mailing/) on, choose **Lists offered to members** under Settin
 sign-up then offers them (unticked; ticking it sends a confirmation email like any sign-up), and the
 account page shows the member's lists to change. Campaigns and digests can go to **only members** (of
 some levels) or **only people who aren't members**, matched by email address, and **Add members to a
-list** on the Mailing screen's Contacts tab puts active members on a list when they agreed to it.
+list** on the Mailing Lists screen's Subscribers tab puts active members on a list when they agreed to it.

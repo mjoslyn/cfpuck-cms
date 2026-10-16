@@ -26,7 +26,7 @@ const error = Astro.url.searchParams.get('error');
 const VERDICT: Record<string, string> = { human: 'Person (confirmed)', likely_human: 'Likely a person', machine: 'Machine' };
 ---
 <Admin title={contact.email}>
-  <p class="text-sm text-admin-muted"><a class="underline" href="/admin/mailing/?tab=contacts">Mailing › Contacts</a></p>
+  <p class="text-sm text-admin-muted"><a class="underline" href="/admin/mailing/?tab=contacts">Mailing Lists › Subscribers</a></p>
   <h1 class="text-3xl font-normal">{contact.email}</h1>
   <p class="mt-1 text-sm"><strong>{CONTACT_STATUS[contact.status as ContactStatus]}</strong>{contact.unsubscribed_at && ` since ${when(contact.unsubscribed_at)}`}{member && <span class="text-admin-muted"> · a member ({member.level || 'no level'}, {member.status})</span>}</p>
   {ok && <p class="mt-4 rounded bg-[#6db56d]/15 px-3 py-2 text-sm text-[#3f7a3f]">{ok}</p>}
@@ -36,7 +36,7 @@ const VERDICT: Record<string, string> = { human: 'Person (confirmed)', likely_hu
     <form method="post" action="/api/admin/mailing/contacts" class="rounded bg-white p-4 shadow-[0_0_0_1px_rgba(26,26,46,0.08)]">
       <input type="hidden" name="action" value="update" /><input type="hidden" name="id" value={id} />
       <label class="mb-3 block text-xs text-admin-muted">Name<br /><input name="name" value={contact.name} class={`${input} w-full`} disabled={!isAdmin} /></label>
-      <fieldset class="mb-3">
+      <fieldset class="mb-3 border-0 p-0">
         <legend class="mb-1 text-xs text-admin-muted">Lists</legend>
         {((lists ?? []) as MailList[]).map((l) => {
           const r = status.get(l.id);
@@ -44,11 +44,22 @@ const VERDICT: Record<string, string> = { human: 'Person (confirmed)', likely_hu
             <label class="mb-1 flex items-center gap-2 text-sm">
               <input type="checkbox" name="lists" value={l.id} checked={r?.status === 'subscribed'} disabled={!isAdmin || (contact.status !== 'subscribed' && r?.status !== 'subscribed')} />
               {l.name}
-              <span class="text-xs text-admin-muted">{r ? (r.status === 'subscribed' ? `since ${when(r.subscribed_at)}` : r.status === 'pending' ? 'waiting for confirmation' : `left ${when(r.unsubscribed_at)}`) : ''}</span>
+              <span class="text-xs text-admin-muted">{r ? (r.status === 'subscribed' ? (r.subscribed_at ? `since ${when(r.subscribed_at)}` : '') : r.status === 'pending' ? 'waiting for confirmation' : `left ${when(r.unsubscribed_at)}`) : ''}</span>
             </label>
           );
         })}
         {contact.status !== 'subscribed' && <p class="text-xs text-admin-muted">Lists can only be added while they are subscribed: they sign up (or confirm) themselves.</p>}
+      </fieldset>
+      <label class="mb-3 block text-xs text-admin-muted">Tags (comma separated)<br /><input name="tags" value={(contact.tags ?? []).join(', ')} placeholder="farm, vip" class={`${input} w-full`} disabled={!isAdmin} /></label>
+      <fieldset class="mb-3 border-0 p-0">
+        <legend class="mb-1 text-xs text-admin-muted">Fields (for segments: town, business type...)</legend>
+        {[...Object.entries(contact.attributes ?? {}), ...(isAdmin ? [['', '']] : [])].map(([k, v]) => (
+          <div class="mb-1 flex gap-2">
+            <input name="field_key" value={k} placeholder="field" aria-label="Field" class={`${input} w-36`} disabled={!isAdmin} />
+            <input name="field_value" value={String(v ?? '')} placeholder="value" aria-label="Value" class={`${input} w-full`} disabled={!isAdmin} />
+          </div>
+        ))}
+        {isAdmin && <p class="text-xs text-admin-muted">Fill in the empty row to add a field; clear a value to remove one.</p>}
       </fieldset>
       <label class="mb-3 block text-xs text-admin-muted">Notes<br /><textarea name="notes" rows="2" class={`${input} w-full`} disabled={!isAdmin}>{contact.notes}</textarea></label>
       {isAdmin && <button class="rounded-sm bg-admin-ink px-4 py-2 text-xs font-semibold tracking-wider text-white uppercase hover:bg-admin-accent">Save</button>}

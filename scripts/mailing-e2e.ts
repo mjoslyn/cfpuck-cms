@@ -47,7 +47,7 @@ const who = `mailing-e2e-${stamp}@example.org`;
 const { data: siteRow } = await db.from('settings').select('value').eq('key', 'site').single();
 const before = siteRow!.value;
 const putSettings = (site: Record<string, unknown>) => fetch(`${base}/api/admin/settings`, { method: 'PUT', headers: { ...H, 'content-type': 'application/json' }, body: JSON.stringify({ site }) });
-const made = { lists: [] as number[], campaigns: [] as number[], digests: [] as number[], posts: [] as number[], users: [] as string[] };
+const made = { lists: [] as number[], campaigns: [] as number[], digests: [] as number[], posts: [] as number[], users: [] as string[], segments: [] as number[] };
 
 try {
   // Off: no pages.
@@ -191,10 +191,50 @@ try {
   if (mu) made.users.push(mu.user_id);
   html = await (await fetch(`${base}/account/`, { headers: { Cookie: memberCookie } })).text();
   ok('the account page shows their email choices', html.includes('Save email choices') && html.includes('waiting for you to confirm'));
+
+  // Segments: an import with tags and a field column, a segment by tag, a campaign to it only.
+  const farmer = `mailing-e2e-farm-${stamp}@example.org`;
+  const shop = `mailing-e2e-shop-${stamp}@example.org`;
+  const csv = `email,name,tags,Town\n${farmer},Fay Farmer,farm;Market,Ellicottville\n${shop},Sam Shop,shop,Salamanca\n`;
+  const fd = new FormData();
+  for (const [k, v] of Object.entries({ action: 'import', list: String(made.lists[0]), source: 'e2e import', tags: 'e2e' })) fd.append(k, v);
+  fd.append('file', new File([csv], 'people.csv', { type: 'text/csv' }));
+  r = await fetch(`${base}/api/admin/mailing/contacts`, { method: 'POST', redirect: 'manual', headers: H, body: fd });
+  ok('CSV import with tags and a field', r.status === 303 && decodeURIComponent(r.headers.get('location') ?? '').includes('2 added'), decodeURIComponent(r.headers.get('location') ?? ''));
+  const { data: fay } = await db.from('contacts').select('id, tags, attributes').eq('email', farmer).single();
+  ok('tags and fields stored', fay?.tags.join() === 'farm,market,e2e' && fay?.attributes.town === 'Ellicottville', JSON.stringify(fay));
+  r = await json('/api/admin/mailing/segments', { action: 'create' });
+  const sid = (await r.json()).id;
+  made.segments.push(sid);
+  r = await json('/api/admin/mailing/segments', { action: 'save', id: sid, segment: { name: `E2E farms ${stamp}`, rules: { match: 'all', rules: [{ type: 'tag', tags: ['FARM'] }, { type: 'field', key: 'town', op: 'contains', value: 'ville' }] } } });
+  ok('segment saved', r.ok, await r.text());
+  r = await json('/api/admin/mailing/segments', { action: 'people', rules: { match: 'all', rules: [{ type: 'tag', tags: ['farm'] }, { type: 'field', key: 'town', op: 'contains', value: 'ville' }] } });
+  const seg = await r.json();
+  ok('segment matches the farm only', seg.people.some((p: any) => p.email === farmer) && !seg.people.some((p: any) => p.email === shop), JSON.stringify(seg));
+  r = await json('/api/admin/mailing/campaigns', { action: 'create' });
+  const scid = (await r.json()).id;
+  made.campaigns.push(scid);
+  await json('/api/admin/mailing/campaigns', { action: 'save', id: scid, campaign: { name: `E2E seg ${stamp}`, subject: `E2E segment ${stamp}`, list_ids: [made.lists[0]], design, segment_id: sid, track_links: false, audience: {} } });
+  r = await json('/api/admin/mailing/campaigns', { action: 'count', id: scid });
+  ok('the campaign counts its segment only', (await r.json()).count === 1);
+  r = await json('/api/admin/mailing/segments', { action: 'delete', id: sid });
+  ok('a segment in use can’t be deleted', r.status === 400, await r.text());
+  await json('/api/admin/mailing/campaigns', { action: 'send', id: scid });
+  for (let i = 0; i < 60 && (await db.from('campaigns').select('status').eq('id', scid).single()).data?.status !== 'sent'; i++) await sleep(500);
+  ok('the segment gets it, the rest of the list doesn’t', !!(await inbox(farmer, `E2E segment ${stamp}`)) && !(await fetch(`${mail}/api/v1/search?query=${encodeURIComponent(`to:${shop} subject:"E2E segment ${stamp}"`)}`).then((x) => x.json())).messages?.length);
+  // The views: a list's subscribers, a tag, the segments, a segment, a campaign's recipients.
+  const admin = async (path: string) => (await fetch(base + path, { headers: { Cookie: cookie } })).text();
+  ok('a list’s subscribers', (await admin(`/admin/mailing/?tab=contacts&list=${made.lists[0]}`)).includes('Subscribers to E2E News'));
+  ok('filtered by tag', (await admin('/admin/mailing/?tab=contacts&tag=farm')).includes(farmer));
+  ok('segments tab counts', (await admin('/admin/mailing/?tab=segments')).includes(`E2E farms ${stamp}`));
+  ok('segment page', (await admin(`/admin/mailing/segments/${sid}/`)).includes(`E2E seg ${stamp}`));
+  const rec = await admin(`/admin/mailing/campaigns/${scid}/?who=all`);
+  ok('campaign recipients', rec.includes('Recipients') && rec.includes(farmer) && !rec.includes(shop));
 } finally {
   // Clean up.
   for (const id of made.campaigns) await db.from('campaigns').delete().eq('id', id);
   for (const id of made.digests) await db.from('digests').delete().eq('id', id);
+  for (const id of made.segments) await db.from('mail_segments').delete().eq('id', id);
   for (const id of made.posts) await db.from('entries').delete().eq('id', id);
   const { data: people } = await db.from('contacts').select('id, email').like('email', `mailing-e2e-%${stamp}@example.org`);
   for (const p of people ?? []) await db.from('contacts').delete().eq('id', p.id);

@@ -1,0 +1,29 @@
+---
+// A segment and who matches it now (src/admin/SegmentEditor.tsx).
+import Admin from '../../../../layouts/Admin.astro';
+import SegmentEditor from '../../../../admin/SegmentEditor';
+import type { MailList } from '../../../../lib/mailing/config';
+import { cleanRules, type Segment } from '../../../../lib/mailing/segments';
+import { memberSettings } from '../../../../lib/members/config';
+
+const db = Astro.locals.db;
+const id = Number(Astro.params.id);
+const { data: row } = await db.from('mail_segments').select('*').eq('id', id).maybeSingle();
+if (!row) return Astro.redirect('/admin/mailing/?tab=segments&error=No%20such%20segment.');
+const [{ data: lists }, { data: siteRow }, { data: known }, { data: campaigns }, { data: digests }] = await Promise.all([
+  db.from('mail_lists').select('*').order('sort').order('id'),
+  db.from('settings').select('value').eq('key', 'site').maybeSingle(),
+  // The tags and fields contacts have, to suggest.
+  db.from('contacts').select('tags, attributes').limit(5000),
+  db.from('campaigns').select('id, name').eq('segment_id', id).order('id', { ascending: false }).limit(20),
+  db.from('digests').select('id, name').eq('segment_id', id),
+]);
+const tags = [...new Set((known ?? []).flatMap((c) => c.tags ?? []))].sort();
+const fields = [...new Set((known ?? []).flatMap((c) => Object.keys(c.attributes ?? {})))].sort();
+const members = memberSettings(siteRow?.value);
+const segment: Segment = { id: row.id, name: row.name, description: row.description, rules: cleanRules(row.rules), updated_at: row.updated_at };
+const usedBy = [...(campaigns ?? []).map((c) => ({ ...c, kind: 'campaign' as const })), ...(digests ?? []).map((d) => ({ ...d, kind: 'digest' as const }))];
+---
+<Admin title={row.name}>
+  <SegmentEditor client:load segment={segment} lists={(lists ?? []) as MailList[]} levels={members.enabled ? members.levels : null} tags={tags} fields={fields} usedBy={usedBy} />
+</Admin>

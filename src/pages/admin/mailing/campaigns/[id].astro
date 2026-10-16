@@ -20,11 +20,53 @@ const [{ data: lists }, { data: siteRow }, { data: stats }, links, paused] = awa
   linkStats(db, id),
   mailingPaused(db),
 ]);
+const { data: segments } = await db.from('mail_segments').select('id, name').order('name');
 const members = memberSettings(siteRow?.value);
 const { data: digest } = campaign.digest_id ? await db.from('digests').select('id, name').eq('id', campaign.digest_id).maybeSingle() : { data: null };
+// Who it went to: each recipient and how their email went, filtered (?who=) and paged (?page=).
+const WHO: [string, string][] = [['all', 'Everyone'], ['delivered', 'Delivered'], ['opened', 'Opened'], ['clicked', 'Clicked'], ['bounced', 'Bounced'], ['complained', 'Marked as spam'], ['unsubscribed', 'Unsubscribed'], ['dropped', 'Not sent']];
+const who = WHO.some(([k]) => k === Astro.url.searchParams.get('who')) ? Astro.url.searchParams.get('who')! : 'all';
+const page = Math.max(1, Number(Astro.url.searchParams.get('page')) || 1);
+let rq = db.from('campaign_sends').select('contact_id, email, status, delivered_at, opened_at, clicked_at, human_confirmed_at, machine_clicked_at, bounced_at, complained_at, unsubscribed_at, contacts(name)', { count: 'exact' }).eq('campaign_id', id).order('email').range((page - 1) * 100, page * 100 - 1);
+if (who === 'dropped') rq = rq.eq('status', 'dropped');
+else if (who !== 'all') rq = rq.not(`${who === 'delivered' ? 'delivered' : who}_at`, 'is', null);
+const { data: recipients, count: recipientCount } = await rq;
+const when = (s?: string | null) => (s ? new Date(s).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: SITE_TZ }) : '');
+const outcome = (r: any) => (r.complained_at ? 'Marked as spam' : r.bounced_at ? 'Bounced' : r.status === 'dropped' ? 'Not sent (unsubscribed first)' : r.status === 'queued' ? 'Waiting' : r.delivered_at ? 'Delivered' : 'Sent');
 // The frozen copy isn't needed in the browser.
 const { html: _html, text_rendered: _text, vars: _vars, ...rest } = campaign;
 ---
 <Admin title={campaign.name || 'Campaign'}>
-  <CampaignEditor client:load campaign={{ ...rest, html: null, text_rendered: null, vars: null } as Campaign} lists={(lists ?? []) as MailList[]} levels={members.enabled ? members.levels : null} stats={stats as CampaignStats | null} links={links as any} admin={Astro.locals.user?.role === 'admin'} mailgun={mailgunStatus().configured} tz={SITE_TZ} digest={digest} paused={paused} />
+  <CampaignEditor client:load campaign={{ ...rest, html: null, text_rendered: null, vars: null } as Campaign} lists={(lists ?? []) as MailList[]} levels={members.enabled ? members.levels : null} stats={stats as CampaignStats | null} links={links as any} admin={Astro.locals.user?.role === 'admin'} mailgun={mailgunStatus().configured} tz={SITE_TZ} digest={digest} paused={paused} segments={segments ?? []} />
+  {(recipientCount ?? 0) > 0 || who !== 'all' ? (
+    <section class="mt-8 max-w-5xl">
+      <h2 class="mb-2 text-xl">Recipients</h2>
+      <nav class="mb-3 flex flex-wrap gap-1 text-sm" aria-label="Recipients">
+        {WHO.map(([k, label]) => <a href={`?who=${k}`} class={`rounded px-3 py-1 ${who === k ? 'bg-admin-ink text-white' : 'hover:bg-admin-soft'}`} aria-current={who === k ? 'page' : undefined}>{label}</a>)}
+      </nav>
+      <table class="w-full border-collapse overflow-hidden rounded bg-white text-sm shadow-[0_0_0_1px_rgba(26,26,46,0.08)]">
+        <thead class="bg-admin-soft text-left text-xs tracking-wider text-admin-muted uppercase">
+          <tr><th class="px-3 py-2 font-semibold">Recipient</th><th class="px-3 py-2 font-semibold">Delivery</th><th class="px-3 py-2 font-semibold">Opened</th><th class="px-3 py-2 font-semibold">Clicked</th></tr>
+        </thead>
+        <tbody>
+          {(recipients ?? []).map((r: any) => (
+            <tr class="border-t border-admin-ink/5 align-top">
+              <td class="px-3 py-2"><a class="hover:text-admin-accent" href={`/admin/mailing/contacts/${r.contact_id}/`}>{r.email}</a>{r.contacts?.name && <div class="text-xs text-admin-muted">{r.contacts.name}</div>}</td>
+              <td class="px-3 py-2">{outcome(r)} <span class="text-xs text-admin-muted">{when(r.delivered_at ?? r.bounced_at)}</span>{r.unsubscribed_at && <div class="text-xs text-admin-muted">Unsubscribed {when(r.unsubscribed_at)}</div>}</td>
+              <td class="px-3 py-2">{when(r.opened_at) || '–'}</td>
+              <td class="px-3 py-2">{r.human_confirmed_at ? `Confirmed ${when(r.human_confirmed_at)}` : when(r.clicked_at) || '–'}{r.machine_clicked_at && <div class="text-xs text-admin-muted">Machine clicks too</div>}</td>
+            </tr>
+          ))}
+          {!recipients?.length && <tr><td colspan="4" class="px-3 py-6 text-center text-admin-muted">No one.</td></tr>}
+        </tbody>
+      </table>
+      {(recipientCount ?? 0) > 100 && (
+        <p class="mt-3 flex gap-4 text-sm">
+          <span class="text-admin-muted">{recipientCount} recipients</span>
+          {page > 1 && <a class="underline" href={`?who=${who}&page=${page - 1}`}>Previous</a>}
+          {page * 100 < (recipientCount ?? 0) && <a class="underline" href={`?who=${who}&page=${page + 1}`}>Next</a>}
+        </p>
+      )}
+    </section>
+  ) : null}
 </Admin>

@@ -7,6 +7,7 @@ import { site as config } from '../site';
 import { sendMail } from '../forms/mail';
 import { CONSENT_TEXT, EMAIL_RE, PREFERENCES_PATH, mailingSettings, normalEmail, type Contact, type MailList, type MailingSettings } from './config';
 import { emailHash, sign } from './tokens';
+import { cleanTags } from './segments';
 import { addUnsubscribe, removeUnsubscribe } from './mailgun';
 
 const env = (k: string) => (import.meta.env?.[k] as string | undefined) ?? process.env[k];
@@ -53,6 +54,8 @@ export interface SignUp {
   ip?: string;
   /** The site's address, for the confirmation link. */
   origin: string;
+  /** Tags for the sign-up (a Subscribe block's), added to a new or unconfirmed contact. */
+  tags?: string[];
 }
 
 export type SignUpResult = { ok: true; sent: boolean } | { ok: false; error: string };
@@ -72,13 +75,14 @@ export async function signUp(db: SupabaseClient, s: SignUp): Promise<SignUpResul
   const consent = { consent_source: s.source.slice(0, 200), consent_text: (s.consentText || CONSENT_TEXT).slice(0, 1000), consent_at: new Date().toISOString(), consent_ip: (s.ip ?? '').slice(0, 64) };
   let contact = await contactByEmail(db, email);
   if (!contact) {
-    const { data, error } = await db.from('contacts').insert({ email, name, status: 'pending', ...consent }).select('*').single();
+    const { data, error } = await db.from('contacts').insert({ email, name, status: 'pending', tags: cleanTags(s.tags ?? []), ...consent }).select('*').single();
     // Two sign-ups at once: the other one made the row.
     if (error?.code === '23505') contact = await contactByEmail(db, email);
     else if (error) return { ok: false, error: error.message };
     else contact = data as Contact;
   } else if (contact.status !== 'subscribed') {
-    await db.from('contacts').update({ ...consent, ...(name && !contact.name ? { name } : {}) }).eq('id', contact.id);
+    // Tags only for an address not yet confirmed: a form can't retag someone already subscribed.
+    await db.from('contacts').update({ ...consent, ...(name && !contact.name ? { name } : {}), ...(s.tags?.length ? { tags: cleanTags([...(contact.tags ?? []), ...s.tags]) } : {}) }).eq('id', contact.id);
   } else if (name && !contact.name) {
     await db.from('contacts').update({ name }).eq('id', contact.id);
   }
@@ -195,8 +199,13 @@ export async function erase(db: SupabaseClient, id: number): Promise<{ ok: boole
 export interface ImportRow {
   email: string;
   name?: string;
+  /** Fields to segment by (empty values are left out). */
   attributes?: Record<string, string>;
+  tags?: string[];
 }
+
+/** A contact's fields with new ones laid over them (an empty value leaves the old one). */
+const mergeFields = (old: Record<string, unknown> | null | undefined, add: Record<string, string> = {}) => ({ ...(old ?? {}), ...Object.fromEntries(Object.entries(add).filter(([, v]) => v !== '')) });
 
 /**
  * Add people to a list who agreed to it elsewhere (admins): subscribed at once, with the source named.
@@ -216,7 +225,7 @@ export async function importContacts(db: SupabaseClient, rows: ImportRow[], list
   for (let i = 0; i < clean.length; i += 500) {
     const chunk = clean.slice(i, i + 500);
     const [{ data: existing }, { data: suppressed }] = await Promise.all([
-      db.from('contacts').select('id, email, status, name').in('email', chunk.map((r) => r.email)),
+      db.from('contacts').select('id, email, status, name, tags, attributes').in('email', chunk.map((r) => r.email)),
       db.from('mail_suppressions').select('email_hash').in('email_hash', chunk.map((r) => emailHash(r.email))),
     ]);
     const known = new Map((existing ?? []).map((c) => [c.email as string, c]));
@@ -230,10 +239,17 @@ export async function importContacts(db: SupabaseClient, rows: ImportRow[], list
         continue;
       }
       if (c) {
-        if (c.status !== 'subscribed') await db.from('contacts').update({ status: 'subscribed', confirmed_at: now, consent_source: source, consent_at: now }).eq('id', c.id);
+        // Known: their tags and fields gain the import's, and a name fills an empty one.
+        const patch: Record<string, unknown> = {};
+        if (c.status !== 'subscribed') Object.assign(patch, { status: 'subscribed', confirmed_at: now, consent_source: source, consent_at: now });
+        const tags = cleanTags([...(c.tags ?? []), ...(r.tags ?? [])]);
+        if (tags.length !== (c.tags ?? []).length) patch.tags = tags;
+        if (r.attributes && Object.values(r.attributes).some((v) => v !== '')) patch.attributes = mergeFields(c.attributes, r.attributes);
+        if (r.name && !c.name) patch.name = r.name.slice(0, 100);
+        if (Object.keys(patch).length) await db.from('contacts').update(patch).eq('id', c.id);
         ids.push(c.id);
         out.updated++;
-      } else fresh.push({ email: r.email, name: (r.name ?? '').slice(0, 100), attributes: r.attributes ?? {}, status: 'subscribed', consent_source: source, consent_text: 'Imported by an admin', consent_at: now, confirmed_at: now });
+      } else fresh.push({ email: r.email, name: (r.name ?? '').slice(0, 100), attributes: mergeFields({}, r.attributes), tags: cleanTags(r.tags ?? []), status: 'subscribed', consent_source: source, consent_text: 'Imported by an admin', consent_at: now, confirmed_at: now });
     }
     if (fresh.length) {
       const { data, error } = await db.from('contacts').insert(fresh).select('id');
@@ -257,8 +273,8 @@ export function contactsCsv(contacts: (Contact & { lists: string[] })[]): string
     const safe = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
     return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
   };
-  const head = ['email', 'name', 'status', 'lists', 'consent_source', 'consent_at', 'confirmed_at', 'unsubscribed_at', 'created_at'];
-  return [head.join(','), ...contacts.map((c) => [c.email, c.name, c.status, c.lists.join('; '), c.consent_source, c.consent_at, c.confirmed_at, c.unsubscribed_at, c.created_at].map(cell).join(','))].join('\r\n') + '\r\n';
+  const head = ['email', 'name', 'status', 'lists', 'tags', 'consent_source', 'consent_at', 'confirmed_at', 'unsubscribed_at', 'created_at'];
+  return [head.join(','), ...contacts.map((c) => [c.email, c.name, c.status, c.lists.join('; '), (c.tags ?? []).join('; '), c.consent_source, c.consent_at, c.confirmed_at, c.unsubscribed_at, c.created_at].map(cell).join(','))].join('\r\n') + '\r\n';
 }
 
 /** A CSV's rows as objects by its header (lowercased); quoted fields and doubled quotes are understood. */

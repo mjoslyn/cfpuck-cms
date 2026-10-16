@@ -2,7 +2,7 @@
 // the postal address every email carries, the consent wording, the lists offered to members, link
 // tracking and UTM defaults, and the health thresholds that pause sending. Mailgun's keys are in the
 // environment (src/lib/mailing/mailgun.ts); this shows which are missing. Lists, contacts, campaigns and
-// digests are on the Mailing screen.
+// digests are on the Mailing Lists screen.
 import { useEffect, useState } from 'react';
 import { Num, Text, Toggle } from '../puck/fields';
 import { CONSENT_TEXT, HEALTH, PREFERENCES_PATH, SUBSCRIBE_PATH, UNSUBSCRIBE_PATH, type MailList, type MailingSettings } from '../lib/mailing/config';
@@ -29,6 +29,9 @@ export default function MailingSettingsPanel({ value, mailgun, lists, membersOn,
       <Toggle title="Mailing on" value={value.enabled} onChange={(enabled) => set({ enabled })} />
       {value.enabled && (
         <>
+          <p className="mb-3 rounded bg-admin-soft p-2 text-sm">
+            Lists, subscribers, segments, campaigns and the weekly digest are on the <a className="underline" href="/admin/mailing/?tab=lists">Mailing Lists</a> screen (in the menu once these settings are saved).
+          </p>
           {mailgun.configured ? (
             <p className="mb-3 text-xs text-admin-muted">
               Sending through Mailgun from <strong>{mailgun.domain}</strong> ({mailgun.region.toUpperCase()}){mailgun.testMode ? ', in test mode: Mailgun accepts emails and delivers none' : ''}.
@@ -67,7 +70,7 @@ export default function MailingSettingsPanel({ value, mailgun, lists, membersOn,
                   </label>
                 ))
               ) : (
-                <p className="text-xs text-admin-muted">No lists yet: add them on the <a className="underline" href="/admin/mailing/?tab=lists">Mailing screen</a>.</p>
+                <p className="text-xs text-admin-muted">No lists yet: add them on the <a className="underline" href="/admin/mailing/?tab=lists">Mailing Lists screen</a>.</p>
               )}
               <p className="mt-1 text-xs text-admin-muted">Offered (unticked) when someone creates a member account, and on a member's account page, where they choose their lists.</p>
             </fieldset>
@@ -80,7 +83,7 @@ export default function MailingSettingsPanel({ value, mailgun, lists, membersOn,
           <span className="mt-4 mb-1 block text-xs font-semibold tracking-wider text-admin-muted uppercase">Pause sending when</span>
           <Num title={`Spam complaints pass (% of delivered; default ${HEALTH.complaintRate})`} value={value.complaintRate} min={0.01} max={100} onChange={(complaintRate) => set({ complaintRate })} />
           <Num title={`Bounces pass (% of sent; default ${HEALTH.bounceRate})`} value={value.bounceRate} min={0.1} max={100} onChange={(bounceRate) => set({ bounceRate })} />
-          <p className="text-xs text-admin-muted">Checked once a campaign has {HEALTH.minDelivered} deliveries. Everything stops, digests included, and the admins are emailed, until an admin resumes sending on the Mailing screen.</p>
+          <p className="text-xs text-admin-muted">Checked once a campaign has {HEALTH.minDelivered} deliveries. Everything stops, digests included, and the admins are emailed, until an admin resumes sending on the Mailing Lists screen.</p>
         </>
       )}
     </>

@@ -113,4 +113,12 @@ want('CSV with semicolons and quotes', rows.length === 2 && rows[0].email === 'a
 want('CSV without a header', parseCsv('ann@x.org,Ann\nbo@x.org\n').map((r) => r.email).join() === 'ann@x.org,bo@x.org');
 want('export guards formulas', contactsCsv([{ id: 1, email: 'a@x.org', name: '=HYPERLINK("x")', status: 'subscribed', lists: ['News'], consent_source: '', consent_at: null, confirmed_at: null, unsubscribed_at: null, created_at: '' } as any]).includes(`"'=HYPERLINK(""x"")"`));
 
+// Segments: rules cleaned (empty ones dropped, values bounded), tags normalised, rules in words.
+const { cleanRules, cleanTags, describeSegment, fieldKey } = await import('../../src/lib/mailing/segments');
+const rules = cleanRules({ match: 'any', rules: [{ type: 'tag', tags: 'Farm, VIP;farm' }, { type: 'list', lists: [] }, { type: 'field', key: 'Business Type', op: 'equals', value: 'Dairy' }, { type: 'opened', days: 99999, not: true }, { type: 'nope' }] });
+want('rules cleaned', JSON.stringify(rules) === JSON.stringify({ match: 'any', rules: [{ type: 'tag', tags: ['farm', 'vip'] }, { type: 'field', key: 'business_type', op: 'equals', value: 'Dairy' }, { type: 'opened', days: 3650, not: true }] }), JSON.stringify(rules));
+want('tags normalised', cleanTags(' Trade Show 2026 ; <b>x</b>, , trade show 2026').join('|') === 'trade show 2026|bxb' && fieldKey('First Name!') === 'first_name');
+want('rules in words', describeSegment(rules) === 'is tagged farm or vip, or has business_type equal to “Dairy”, or hasn’t opened an email in the last 3650 days', describeSegment(rules));
+want('no rules is everyone', describeSegment(cleanRules({})) === 'Everyone on the campaign’s lists');
+
 process.exitCode = bad ? 1 : 0;

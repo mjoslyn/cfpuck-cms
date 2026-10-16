@@ -654,7 +654,8 @@ An optional feature, on under Settings > Mailing (`settings.site.mailing`, `mail
 `src/lib/mailing/config.ts`, `src/admin/MailingSettings.tsx`): mailing lists people sign up to, campaigns
 and a weekly digest sent through Mailgun from a marketing subdomain, and each email's deliveries, opens
 and clicks. The site's other email (form notifications, tickets, confirmations) goes over SMTP as before.
-Off, the Mailing screen, its blocks and pages are gone (`mailingOn`). Contacts, campaigns, sends, clicks
+Off, the Mailing Lists screen (`/admin/mailing/`), its blocks and pages are gone (`mailingOn`). Lists,
+subscribers and segments are for anyone, members or not. Contacts, campaigns, sends, clicks
 and Mailgun's events aren't synced or backed up (they stay on the copy where they were made, so a restore
 never subscribes anyone again); the settings are, with the others. Migration `*_mailing.sql`.
 
@@ -676,11 +677,24 @@ never subscribes anyone again); the settings are, with the others. Migration `*_
   `contact_lists` (per list: `pending`, `subscribed`, `unsubscribed`); `mail_suppressions` (SHA-256 of
   addresses erased, bounced or complained, never mailed again without a confirmed sign-up); `campaigns`,
   `campaign_batches`, `campaign_sends`, `campaign_links`, `link_clicks`, `mail_events`, `mailgun_tokens`,
-  `digests`. Editors read; admins change lists and contacts; editors write campaigns only as drafts and
+  `digests`, `mail_segments`; contacts' `tags` (lowercased, `cleanTags`) and `attributes` (fields to
+  segment by, keys from `fieldKey`). Editors read; admins change lists and contacts; editors write segments; editors write campaigns only as drafts and
   digests only while off (RLS), and the send routes check the role too. `mail_audience` (a campaign's
   recipients: subscribed, on any of its lists, not suppressed, optionally only active members of some
   levels or only non-members, matched by address), `mail_still_subscribed`, `mail_claim`,
-  `mail_digest_claim` (server only) and `campaign_stats` (editors).
+  `mail_digest_claim`, `mail_rule`, `mail_segment_match` (server only) and `campaign_stats` (editors).
+- **Segments** (`src/lib/mailing/segments.ts`, `src/admin/SegmentEditor.tsx`, `/api/admin/mailing/segments`;
+  migration `*_mailing_segments.sql`): saved rules, all or any of them, that pick some of the people on
+  a campaign's or digest's lists (`segment_id`; `mail_audience`'s `p_segment`): on a list, tagged, a
+  field set, equal to or containing a value, an active member (of some levels; offered while Members is
+  on), signed up, opened or clicked (people's, not machines') in the last N days, or signed up from a
+  source; each can be turned round. `cleanRules` keeps them to known shapes; the database evaluates
+  them (`mail_rule`). The editor shows who matches now (subscribed, on any list) with a count. A segment
+  a campaign or digest names can't be deleted, so no audience widens on its own.
+- **Tags and fields**: set on a contact's page; Add a contact takes tags; an import's `tags` column
+  (separated by `;` or `|`) tags each person and its other columns become fields (merged into a known
+  contact's), with tags for everyone imported; a Subscribe block can tag its sign-ups (`attrs.tags`;
+  added only to a new or unconfirmed address, so a form can't retag someone subscribed).
 - **Signing up** (`src/lib/mailing/contacts.ts`): always confirmed by email (double opt-in, over SMTP,
   at most 3 confirmation emails a day to one address; 30 sign-ups a minute site-wide). The **Subscribe**
   block (`subscribe`, `src/render/c/mailing.ts`; Mailing category in the editor) posts to
@@ -761,7 +775,9 @@ never subscribes anyone again); the settings are, with the others. Migration `*_
   A campaign's numbers (`campaign_stats`): delivered, bounce and complaint rates, opens (indicative),
   people who clicked (human and likely human), confirmed, machine clicks, unsubscribes, and each link's;
   Compare with Mailgun's totals reads the campaign tag's stats.
-- **Contacts screen** (admins change, editors read): search and filters, each contact's consent, lists,
+- **Subscribers** (the Subscribers tab: every contact; admins change, editors read): search and
+  filters (status, list, tag), a list's subscribers (Lists > View subscribers), a campaign's recipients
+  with how each email went (its page, filtered by delivered, opened, clicked, bounced...), each contact's consent, lists,
   notes, sends and clicks with their verdicts, Unsubscribe, **Erase** (deletes the contact, their sends
   and clicks, keeps the hash, adds them to Mailgun's unsubscribes) and Export as CSV (formulas guarded).
 

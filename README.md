@@ -140,8 +140,8 @@ The Supabase CLI runs through `npx`, so you don't need to install it.
   Members' emails (confirming an address, resetting a password, invitations) go through Supabase
   Auth; locally they arrive in the mail catcher.
 - **Mailing.** Turn it on under Settings > Mailing (admins) and fill in the postal address every email
-  carries (nothing sends without it). Add lists on the Mailing screen, put a **Subscribe** block where
-  people should sign up (or link to `/subscribe/`), then write campaigns or set up a weekly digest there.
+  carries (nothing sends without it). Add lists on the Mailing Lists screen (Lists tab), put a **Subscribe** block where
+  people should sign up (or link to `/subscribe/`), then write campaigns or set up a weekly digest there. Segments (tags, fields, sign-up date, opens and clicks) send to part of a list, members or not.
   Sign-ups are confirmed by email over SMTP. Sending needs Mailgun (see Hosting): `MAILGUN_API_KEY`,
   `MAILGUN_DOMAIN`, `MAILGUN_REGION` (`eu` for EU accounts) and `MAILGUN_WEBHOOK_SIGNING_KEY`, plus
   `MAIL_LINK_SECRET` for the signed links in emails. Locally, without Mailgun, campaigns go to the mail

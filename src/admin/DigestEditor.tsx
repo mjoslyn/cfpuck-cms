@@ -30,7 +30,7 @@ async function post(body: Record<string, unknown>) {
   return res.json();
 }
 
-export default function DigestEditor({ digest, lists, levels, issues, admin, tz, lastSent }: { digest: Digest; lists: MailList[]; levels: MemberLevel[] | null; issues: Issue[]; admin: boolean; tz: string; lastSent: string | null }) {
+export default function DigestEditor({ digest, lists, levels, issues, admin, tz, lastSent, segments }: { digest: Digest; lists: MailList[]; levels: MemberLevel[] | null; issues: Issue[]; admin: boolean; tz: string; lastSent: string | null; segments: { id: number; name: string }[] }) {
   const [d, setD] = useState(digest);
   const [saved, setSaved] = useState(() => JSON.stringify(digest));
   const [status, setStatus] = useState('');
@@ -69,7 +69,7 @@ export default function DigestEditor({ digest, lists, levels, issues, admin, tz,
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm text-admin-muted">
-            <a className="underline" href="/admin/mailing/?tab=digests">Mailing › Weekly digests</a>
+            <a className="underline" href="/admin/mailing/?tab=digests">Mailing Lists › Weekly digests</a>
           </p>
           <h1 className="text-3xl font-normal">{d.name}</h1>
           <p className="mt-1 text-sm">
@@ -144,6 +144,20 @@ export default function DigestEditor({ digest, lists, levels, issues, admin, tz,
               </label>
             ))}
           </fieldset>
+          <label className="mb-3 block">
+              <span className={label}>Segment</span>
+              <select className={input} value={d.segment_id ?? ''} onChange={(e) => set({ segment_id: Number(e.target.value) || null })}>
+                <option value="">Everyone on those lists</option>
+                {segments.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
+              <span className="mt-1 block text-xs text-admin-muted">
+                Only the people on the lists who match it. <a className="underline" href={d.segment_id ? `/admin/mailing/segments/${d.segment_id}/` : '/admin/mailing/?tab=segments'}>{d.segment_id ? 'See who matches' : 'Segments'}</a>
+              </span>
+            </label>
           {levels && (
             <label className="mb-3 block">
               <span className={label}>Members</span>

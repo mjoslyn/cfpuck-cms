@@ -55,6 +55,6 @@ export async function checkHealth(db: SupabaseClient, campaignId: number): Promi
   const admin = env('FORMS_ADMIN_EMAIL') || config.adminEmail;
   if (admin) {
     const link = `${mailOrigin()}/admin/mailing/`;
-    await sendMail({ to: [admin], subject: 'Mailing paused', html: `<p>Sending is paused: ${why.replace(/[<>&]/g, '')}.</p><p>Nothing more goes out, digests included, until an admin resumes it on the <a href="${link}">Mailing screen</a>.</p>` }).catch((e) => console.error(`mailing: pause email failed: ${e.message}`));
+    await sendMail({ to: [admin], subject: 'Mailing paused', html: `<p>Sending is paused: ${why.replace(/[<>&]/g, '')}.</p><p>Nothing more goes out, digests included, until an admin resumes it on the <a href="${link}">Mailing Lists screen</a>.</p>` }).catch((e) => console.error(`mailing: pause email failed: ${e.message}`));
   }
 }

@@ -7,6 +7,9 @@ import { CAMPAIGN_STATUS, CONTACT_STATUS, WEEKDAYS, mailingSettings, type Campai
 import { mailingState } from '../../../lib/mailing/state';
 import { mailgunStatus } from '../../../lib/mailing/mailgun';
 import { memberSettings } from '../../../lib/members/config';
+import { serviceClient } from '../../../lib/supabase';
+import { cleanRules, describeSegment, type Segment } from '../../../lib/mailing/segments';
+import { audienceOfRules } from '../../../lib/mailing/send';
 
 const db = Astro.locals.db;
 const isAdmin = Astro.locals.user?.role === 'admin';
@@ -15,7 +18,7 @@ const settings = mailingSettings(siteRow?.value);
 const members = memberSettings(siteRow?.value);
 const state = await mailingState(db);
 const mailgun = mailgunStatus();
-const TABS: [string, string][] = [['campaigns', 'Campaigns'], ['digests', 'Weekly digests'], ['contacts', 'Contacts'], ['lists', 'Lists']];
+const TABS: [string, string][] = [['campaigns', 'Campaigns'], ['digests', 'Weekly digests'], ['contacts', 'Subscribers'], ['lists', 'Lists'], ['segments', 'Segments']];
 const tab = TABS.some(([k]) => k === Astro.url.searchParams.get('tab')) ? Astro.url.searchParams.get('tab')! : 'campaigns';
 const ok = Astro.url.searchParams.get('ok');
 const error = Astro.url.searchParams.get('error');
@@ -42,6 +45,9 @@ let contactTotal = 0;
 const q = (Astro.url.searchParams.get('q') ?? '').trim();
 const status = Object.keys(CONTACT_STATUS).includes(Astro.url.searchParams.get('status') ?? '') ? Astro.url.searchParams.get('status')! : '';
 const onList = Number(Astro.url.searchParams.get('list')) || 0;
+const tag = (Astro.url.searchParams.get('tag') ?? '').trim().toLowerCase();
+let segments: (Segment & { count: number })[] = [];
+let knownTags: string[] = [];
 const page = Math.max(1, Number(Astro.url.searchParams.get('page')) || 1);
 const PER_PAGE = 100;
 if (tab === 'campaigns') {
@@ -57,18 +63,28 @@ if (tab === 'contacts') {
   let query = db.from('contacts').select(onList ? '*, contact_lists!inner(list_id, status)' : '*', { count: 'exact' }).order('created_at', { ascending: false }).range((page - 1) * PER_PAGE, page * PER_PAGE - 1);
   if (onList) query = query.eq('contact_lists.list_id', onList).eq('contact_lists.status', 'subscribed');
   if (status) query = query.eq('status', status);
+  if (tag) query = query.contains('tags', [tag]);
   if (q) query = query.or(`email.ilike.%${q.replace(/[%_,()*]/g, ' ')}%,name.ilike.%${q.replace(/[%_,()*]/g, ' ')}%`);
   const { data, count } = await query;
   contacts = (data ?? []) as unknown as Contact[];
   contactTotal = count ?? 0;
+  const { data: tagged } = await db.from('contacts').select('tags').neq('tags', '{}').limit(5000);
+  knownTags = [...new Set((tagged ?? []).flatMap((c) => c.tags ?? []))].sort();
 }
+if (tab === 'segments') {
+  const { data } = await db.from('mail_segments').select('*').order('name');
+  // Who each matches now (subscribed, on any list), read with the site's key like the editor's count.
+  segments = await Promise.all(((data ?? []) as Segment[]).slice(0, 50).map(async (g) => ({ ...g, rules: cleanRules(g.rules), count: (await audienceOfRules(serviceClient(), { lists: null, rules: cleanRules(g.rules) }).catch(() => [])).length })));
+}
+const names = { lists: new Map(lists.map((l) => [l.id, l.name])), levels: new Map(members.levels.map((l) => [l.id, l.name])) };
+const listShown = lists.find((l) => l.id === onList);
 const STATUS_TONE: Record<string, string> = { sent: 'text-[#3f7a3f]', sending: 'text-admin-accent', scheduled: 'text-admin-accent', review: 'text-[#b26a00]', failed: 'text-[#c4592a]', paused: 'text-[#b26a00]' };
-const contactQuery = (patch: Record<string, string>) => `?${new URLSearchParams({ tab: 'contacts', ...(q ? { q } : {}), ...(status ? { status } : {}), ...(onList ? { list: String(onList) } : {}), ...patch })}`;
+const contactQuery = (patch: Record<string, string>) => `?${new URLSearchParams({ tab: 'contacts', ...(q ? { q } : {}), ...(status ? { status } : {}), ...(onList ? { list: String(onList) } : {}), ...(tag ? { tag } : {}), ...patch })}`;
 ---
-<Admin title="Mailing">
+<Admin title="Mailing Lists">
   <div class="flex flex-wrap items-end justify-between gap-6">
     <div>
-      <h1 class="text-3xl font-normal">Mailing</h1>
+      <h1 class="text-3xl font-normal">Mailing Lists</h1>
       <p class="mt-1 text-sm text-admin-muted">
         {settings.enabled ? 'Campaigns and weekly digests to the people on your mailing lists.' : 'Mailing is off: turn it on under Settings > Mailing.'}
         {' '}The sender, postal address and tracking are under <a class="underline" href="/admin/settings/#mailing">Settings &gt; Mailing</a>.
@@ -99,6 +115,7 @@ const contactQuery = (patch: Record<string, string>) => `?${new URLSearchParams(
 
   {tab === 'campaigns' && (
     <section>
+      {!lists.length && <p class="mt-4 rounded bg-admin-soft px-3 py-2 text-sm">Campaigns go to lists: <a class="underline" href="/admin/mailing/?tab=lists">add a list first</a>.</p>}
       <form method="post" action="/api/admin/mailing/campaigns" class="mt-4">
         <input type="hidden" name="action" value="create" />
         <button class={btn}>New campaign</button>
@@ -166,6 +183,7 @@ const contactQuery = (patch: Record<string, string>) => `?${new URLSearchParams(
               <label class="text-xs text-admin-muted">Email<br /><input name="email" type="email" required class={`${input} w-full`} /></label>
               <label class="text-xs text-admin-muted">Name<br /><input name="name" class={`${input} w-full`} /></label>
               <label class="text-xs text-admin-muted">List<br /><select name="list" class={`${input} w-full`}>{lists.map((l) => <option value={l.id}>{l.name}</option>)}</select></label>
+              <label class="text-xs text-admin-muted">Tags (optional, comma separated)<br /><input name="tags" placeholder="farm, vip" class={`${input} w-full`} /></label>
               <label class="text-xs text-admin-muted">How they agreed (kept as their consent)<br /><input name="source" required placeholder="Asked at the front desk, 12 Oct" class={`${input} w-full`} /></label>
               <button class={btn}>Add</button>
             </form>
@@ -174,11 +192,12 @@ const contactQuery = (patch: Record<string, string>) => `?${new URLSearchParams(
             <summary class="cursor-pointer text-sm font-semibold">Import a CSV</summary>
             <form method="post" action="/api/admin/mailing/contacts" enctype="multipart/form-data" class="mt-3 grid gap-2">
               <input type="hidden" name="action" value="import" />
-              <label class="text-xs text-admin-muted">File (columns: email, name)<br /><input name="file" type="file" accept=".csv,text/csv,text/plain" required class="text-sm" /></label>
+              <label class="text-xs text-admin-muted">File (an email column; name, tags and any others)<br /><input name="file" type="file" accept=".csv,text/csv,text/plain" required class="text-sm" /></label>
               <label class="text-xs text-admin-muted">Onto the list<br /><select name="list" class={`${input} w-full`}>{lists.map((l) => <option value={l.id}>{l.name}</option>)}</select></label>
               <label class="text-xs text-admin-muted">How these people agreed<br /><input name="source" required placeholder="Signed up on the old site's newsletter form" class={`${input} w-full`} /></label>
               <button class={btn}>Import</button>
-              <p class="text-xs text-admin-muted">Only people who agreed to receive this email. Anyone who unsubscribed, bounced or was erased before is skipped.</p>
+              <label class="text-xs text-admin-muted">Tag everyone imported (optional)<br /><input name="tags" placeholder="trade show 2026" class={`${input} w-full`} /></label>
+              <p class="text-xs text-admin-muted">Only people who agreed to receive this email. A tags column (separated by ; or |) tags each person; other columns become fields to segment by. Anyone who unsubscribed, bounced or was erased before is skipped.</p>
             </form>
           </details>
           {members.enabled && (
@@ -202,23 +221,26 @@ const contactQuery = (patch: Record<string, string>) => `?${new URLSearchParams(
           <input name="q" value={q} type="search" placeholder="Search names and emails" class={`${input} w-64`} />
           <select name="status" class={input}><option value="">Any status</option>{Object.entries(CONTACT_STATUS).map(([k, l]) => <option value={k} selected={k === status}>{l}</option>)}</select>
           <select name="list" class={input}><option value="">Any list</option>{lists.map((l) => <option value={l.id} selected={l.id === onList}>{l.name}</option>)}</select>
+          {knownTags.length > 0 && <select name="tag" class={input}><option value="">Any tag</option>{knownTags.map((t) => <option value={t} selected={t === tag}>{t}</option>)}</select>}
           <button class="rounded-sm border border-admin-ink/20 px-3 py-1 text-xs font-semibold hover:border-admin-ink/50">Filter</button>
         </form>
         {isAdmin && <a class="ml-auto text-sm underline hover:text-admin-accent" href="/api/admin/mailing/contacts?export=csv">Export all as CSV</a>}
       </div>
+      {listShown && <h2 class="mt-6 text-xl">Subscribers to {listShown.name}: {contactTotal}</h2>}
       <table class={table}>
         <thead class="bg-admin-soft text-left text-xs tracking-wider text-admin-muted uppercase">
-          <tr><th class={th}>Contact</th><th class={th}>Status</th><th class={th}>Agreed</th></tr>
+          <tr><th class={th}>Contact</th><th class={th}>Status</th><th class={th}>Tags</th><th class={th}>Agreed</th></tr>
         </thead>
         <tbody>
           {contacts.map((c) => (
             <tr class="border-t border-admin-ink/5 align-top">
               <td class="px-4 py-2.5"><a class="font-medium hover:text-admin-accent" href={`/admin/mailing/contacts/${c.id}/`}>{c.email}</a>{c.name && <div class="text-xs text-admin-muted">{c.name}</div>}</td>
               <td class="px-4 py-2.5">{CONTACT_STATUS[c.status as ContactStatus] ?? c.status}</td>
+              <td class="px-4 py-2.5 text-xs">{(c.tags ?? []).map((t) => <a class="mr-1 inline-block rounded bg-admin-soft px-1.5 py-0.5 hover:text-admin-accent" href={contactQuery({ tag: t, page: '1' })}>{t}</a>)}</td>
               <td class="px-4 py-2.5 text-xs text-admin-muted">{c.consent_source}<br />{when(c.confirmed_at ?? c.consent_at)}</td>
             </tr>
           ))}
-          {!contacts.length && <tr><td colspan="3" class="px-4 py-6 text-center text-admin-muted">No contacts{q || status || onList ? ' match' : ' yet'}.</td></tr>}
+          {!contacts.length && <tr><td colspan="4" class="px-4 py-6 text-center text-admin-muted">No one{q || status || onList || tag ? ' matches' : ' yet'}.</td></tr>}
         </tbody>
       </table>
       {contactTotal > PER_PAGE && (
@@ -233,10 +255,20 @@ const contactQuery = (patch: Record<string, string>) => `?${new URLSearchParams(
 
   {tab === 'lists' && (
     <section>
-      <p class="mt-4 text-sm text-admin-muted">Public lists are offered by Subscribe blocks and on the email preferences page; the others are for people an admin adds (and members, when offered to them under Settings &gt; Mailing).</p>
+      <p class="mt-4 text-sm text-admin-muted">Anyone can be on a list, members or not. Public lists are offered by Subscribe blocks and on the email preferences page; the others are for people an admin adds or imports on the Subscribers tab (and members, when offered to them under Settings &gt; Mailing).</p>
+      {isAdmin && (
+        <form method="post" action="/api/admin/mailing/lists" class="mt-4 flex flex-wrap items-end gap-3 rounded bg-white p-4 shadow-[0_0_0_1px_rgba(26,26,46,0.08)]">
+          <input type="hidden" name="action" value="add" />
+          <label class="text-xs text-admin-muted">Name<br /><input name="name" required placeholder="Newsletter" class={`${input} w-56`} /></label>
+          <label class="text-xs text-admin-muted">Description<br /><input name="description" placeholder="News and events, once a month" class={`${input} w-80`} /></label>
+          <label class="inline-flex items-center gap-1 pb-1 text-sm"><input type="checkbox" name="public" value="1" checked />Public</label>
+          <button class={btn}>Add list</button>
+        </form>
+      )}
+
       <table class={table}>
         <thead class="bg-admin-soft text-left text-xs tracking-wider text-admin-muted uppercase">
-          <tr><th class={th}>List</th><th class={th}>Subscribed</th><th class={th}><span class="sr-only">Actions</span></th></tr>
+          <tr><th class={th}>List</th><th class={th}>Subscribers</th><th class={th}><span class="sr-only">Actions</span></th></tr>
         </thead>
         <tbody>
           {lists.map((l) => (
@@ -249,7 +281,7 @@ const contactQuery = (patch: Record<string, string>) => `?${new URLSearchParams(
                   <label class="inline-flex items-center gap-1 text-sm"><input form={`list-${l.id}`} type="checkbox" name="public" value="1" checked={l.public} disabled={!isAdmin} />Public</label>
                 </div>
               </td>
-              <td class="px-4 py-2.5"><a class="underline hover:text-admin-accent" href={`/admin/mailing/?tab=contacts&list=${l.id}`}>{counts.get(l.id) ?? 0}</a></td>
+              <td class="px-4 py-2.5 whitespace-nowrap"><a class="underline hover:text-admin-accent" href={`/admin/mailing/?tab=contacts&list=${l.id}`}>View {counts.get(l.id) ?? 0} subscriber{counts.get(l.id) === 1 ? '' : 's'}</a></td>
               <td class="px-4 py-2.5 whitespace-nowrap">
                 {isAdmin && (
                   <>
@@ -269,15 +301,31 @@ const contactQuery = (patch: Record<string, string>) => `?${new URLSearchParams(
           {!lists.length && <tr><td colspan="3" class="px-4 py-6 text-center text-admin-muted">No lists yet.</td></tr>}
         </tbody>
       </table>
-      {isAdmin && (
-        <form method="post" action="/api/admin/mailing/lists" class="mt-4 flex flex-wrap items-end gap-3 rounded bg-white p-4 shadow-[0_0_0_1px_rgba(26,26,46,0.08)]">
-          <input type="hidden" name="action" value="add" />
-          <label class="text-xs text-admin-muted">Name<br /><input name="name" required placeholder="Newsletter" class={`${input} w-56`} /></label>
-          <label class="text-xs text-admin-muted">Description<br /><input name="description" placeholder="News and events, once a month" class={`${input} w-80`} /></label>
-          <label class="inline-flex items-center gap-1 pb-1 text-sm"><input type="checkbox" name="public" value="1" checked />Public</label>
-          <button class={btn}>Add list</button>
-        </form>
-      )}
+    </section>
+  )}
+
+  {tab === 'segments' && (
+    <section>
+      <p class="mt-4 text-sm text-admin-muted">A segment picks some of the people on a campaign's lists, members or not: by tag, a field (town, business type), another list, when they signed up, whether they opened or clicked lately, or where they signed up. Choose one on a campaign or digest.</p>
+      <form method="post" action="/api/admin/mailing/segments" class="mt-4">
+        <input type="hidden" name="action" value="create" />
+        <button class={btn}>New segment</button>
+      </form>
+      <table class={table}>
+        <thead class="bg-admin-soft text-left text-xs tracking-wider text-admin-muted uppercase">
+          <tr><th class={th}>Segment</th><th class={th}>Who</th><th class={th}>Matches now</th></tr>
+        </thead>
+        <tbody>
+          {segments.map((g) => (
+            <tr class="border-t border-admin-ink/5 align-top">
+              <td class="px-4 py-2.5"><a class="font-medium hover:text-admin-accent" href={`/admin/mailing/segments/${g.id}/`}>{g.name}</a>{g.description && <div class="text-xs text-admin-muted">{g.description}</div>}</td>
+              <td class="px-4 py-2.5 text-admin-muted">{describeSegment(g.rules, names)}</td>
+              <td class="px-4 py-2.5"><a class="underline hover:text-admin-accent" href={`/admin/mailing/segments/${g.id}/`}>{g.count} {g.count === 1 ? 'person' : 'people'}</a></td>
+            </tr>
+          ))}
+          {!segments.length && <tr><td colspan="3" class="px-4 py-6 text-center text-admin-muted">No segments yet.</td></tr>}
+        </tbody>
+      </table>
     </section>
   )}
 </Admin>

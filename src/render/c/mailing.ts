@@ -35,7 +35,7 @@ const subscribe: Renderer = (b, env) => {
   const s = mailingSettings(ctx.settings.site);
   if (!s.enabled) return ctx.editor ? '<div class="cms-editor-note">Mailing is off (Settings &gt; Mailing): this block shows nothing.</div>' : '';
   const choices = offered(ctx, a.lists);
-  if (!choices.length) return ctx.editor ? '<div class="cms-editor-note">No mailing lists yet: add one on the Mailing screen.</div>' : '';
+  if (!choices.length) return ctx.editor ? '<div class="cms-editor-note">No mailing lists yet: add one on the Mailing Lists screen.</div>' : '';
   const id = `subscribe-${b.id}`;
   const q = ctx.queried.url.searchParams;
   const mine = q.get('subscribe_block') === b.id || (!q.get('subscribe_block') && ctx.queried.url.pathname === SUBSCRIBE_PATH);
@@ -57,7 +57,7 @@ const subscribe: Renderer = (b, env) => {
   const back = ctx.queried.url.pathname;
   const form =
     `<form class="c-subscribe__form${a.layout === 'inline' ? ' is-inline' : ''}" method="post" action="/api/mail/subscribe">` +
-    `<input type="hidden" name="back" value="${escAttr(back)}" /><input type="hidden" name="block" value="${escAttr(b.id)}" /><input type="hidden" name="consent" value="${escAttr(consent)}" />` +
+    `<input type="hidden" name="back" value="${escAttr(back)}" /><input type="hidden" name="block" value="${escAttr(b.id)}" /><input type="hidden" name="consent" value="${escAttr(consent)}" />${a.tags ? `<input type="hidden" name="tags" value="${escAttr(String(a.tags))}" />` : ''}` +
     `<div class="c-subscribe__fields">${a.showName ? field('name', 'Name', 'text', 'name', false) : ''}${field('email', 'Email', 'email', 'email', true)}${a.layout === 'inline' ? `<button type="submit" class="c-button__link c-subscribe__submit">${esc(a.button || 'Subscribe')}</button>` : ''}</div>` +
     listField +
     p('c-subscribe__consent', esc(consent)) +

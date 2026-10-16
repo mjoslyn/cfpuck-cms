@@ -7,6 +7,7 @@ import { SUBSCRIBE_PATH } from '../../../lib/mailing/config';
 import { loadLists, loadMailing, signUp } from '../../../lib/mailing/contacts';
 import { safeNext } from '../../../lib/members/account';
 import { clientIp } from '../../../lib/mailing/request';
+import { cleanTags } from '../../../lib/mailing/segments';
 
 /** Sign-ups a minute, site-wide, before the form answers "try again in a minute". */
 const PER_MINUTE = 30;
@@ -39,6 +40,8 @@ export const POST: APIRoute = async ({ request, redirect, url }) => {
     consentText: String(form.get('consent') ?? '').slice(0, 1000),
     ip: clientIp(request),
     origin: url.origin,
+    // The block's tags (signUp adds them only to a new or unconfirmed address).
+    tags: cleanTags(String(form.get('tags') ?? '')).slice(0, 5),
   });
   return result.ok ? to({ subscribe: 'sent' }) : to({ subscribe_error: result.error });
 };

@@ -18,6 +18,7 @@ import { BATCH_SIZE, MailgunError, mailgunStatus, sendBatch, tagSeen } from './m
 import { addHoneypot, findLinks, plainText, recipientValues, renderCampaign, trackLinks, trackText, utmLinks, withUtm, type VarSpec } from './render';
 import { sign } from './tokens';
 import { mailingPaused } from './state';
+import { cleanRules, type SegmentRules } from './segments';
 
 /** A run stops starting new batches after this long, well inside the background function's 15 minutes. */
 const RUN_MS = 12 * 60 * 1000;
@@ -41,16 +42,28 @@ interface Frozen {
   origin: string;
 }
 
-/** Everyone the campaign goes to now (paged: the API returns at most 1,000 rows a request). */
-export async function audience(db: SupabaseClient, c: Pick<Campaign, 'list_ids' | 'audience'>): Promise<{ id: number; email: string; name: string }[]> {
-  const a = audienceOf(c.audience);
+/** Everyone the campaign goes to now: its lists, members or not, and its segment (paged: the API returns at most 1,000 rows a request). */
+export async function audience(db: SupabaseClient, c: Pick<Campaign, 'list_ids' | 'audience'> & { segment_id?: number | null }): Promise<{ id: number; email: string; name: string }[]> {
+  if (!c.list_ids?.length) return [];
+  let rules: SegmentRules | null = null;
+  if (c.segment_id) {
+    const { data, error } = await db.from('mail_segments').select('rules').eq('id', c.segment_id).maybeSingle();
+    if (error || !data) throw new Error(error?.message ?? 'The campaign’s segment is gone.');
+    rules = cleanRules(data.rules);
+  }
+  return audienceOfRules(db, { lists: c.list_ids, audience: c.audience, rules });
+}
+
+/** The subscribed people a segment's rules pick: on any of `lists` (null: on any list), members or not. */
+export async function audienceOfRules(db: SupabaseClient, q: { lists: number[] | null; audience?: Campaign['audience']; rules: SegmentRules | null; limit?: number }): Promise<{ id: number; email: string; name: string }[]> {
+  const a = audienceOf(q.audience);
   const out: { id: number; email: string; name: string }[] = [];
-  if (!c.list_ids?.length) return out;
   for (let from = 0; ; from += 1000) {
-    const { data, error } = await db.rpc('mail_audience', { p_lists: c.list_ids, p_members: a.members, p_levels: a.levels }).range(from, from + 999);
+    const to = q.limit ? Math.min(from + 999, q.limit - 1) : from + 999;
+    const { data, error } = await db.rpc('mail_audience', { p_lists: q.lists, p_members: a.members, p_levels: a.levels, p_segment: q.rules }).range(from, to);
     if (error) throw new Error(error.message);
     out.push(...((data ?? []) as any[]).map((r) => ({ id: Number(r.id), email: String(r.email), name: String(r.name ?? '') })));
-    if (!data || data.length < 1000) return out;
+    if (!data || data.length < 1000 || (q.limit && out.length >= q.limit)) return out;
   }
 }
 

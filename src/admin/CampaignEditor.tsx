@@ -35,6 +35,7 @@ interface Props {
   digest?: { id: number; name: string } | null;
   /** Sending is paused site-wide (why). */
   paused: string;
+  segments: { id: number; name: string }[];
 }
 
 const input = 'w-full rounded border border-admin-ink/15 bg-white px-2 py-1.5 text-sm outline-none focus:border-admin-accent';
@@ -56,7 +57,7 @@ function localNow(tz: string, plusHours = 1): string {
   return `${p.year}-${p.month}-${p.day}T${p.hour}:00`;
 }
 
-export default function CampaignEditor({ campaign, lists, levels, stats, links, admin, mailgun, tz, digest, paused }: Props) {
+export default function CampaignEditor({ campaign, lists, levels, stats, links, admin, mailgun, tz, digest, paused, segments }: Props) {
   const [c, setC] = useState(campaign);
   const [saved, setSaved] = useState(() => JSON.stringify(campaign));
   const [status, setStatus] = useState('');
@@ -130,7 +131,7 @@ export default function CampaignEditor({ campaign, lists, levels, stats, links, 
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm text-admin-muted">
-            <a className="underline" href="/admin/mailing/">Mailing</a> › {digest ? <a className="underline" href={`/admin/mailing/digests/${digest.id}/`}>{digest.name}</a> : 'Campaigns'}
+            <a className="underline" href="/admin/mailing/">Mailing Lists</a> › {digest ? <a className="underline" href={`/admin/mailing/digests/${digest.id}/`}>{digest.name}</a> : 'Campaigns'}
           </p>
           <h1 className="text-3xl font-normal">{c.name || 'Untitled campaign'}</h1>
           <p className="mt-1 text-sm">
@@ -202,6 +203,20 @@ export default function CampaignEditor({ campaign, lists, levels, stats, links, 
                 </p>
               )}
             </fieldset>
+            <label className="mb-3 block">
+              <span className={label}>Segment</span>
+              <select className={input} value={c.segment_id ?? ''} onChange={(e) => set({ segment_id: Number(e.target.value) || null })}>
+                <option value="">Everyone on those lists</option>
+                {segments.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
+              <span className="mt-1 block text-xs text-admin-muted">
+                Only the people on the lists who match it. <a className="underline" href={c.segment_id ? `/admin/mailing/segments/${c.segment_id}/` : '/admin/mailing/?tab=segments'}>{c.segment_id ? 'See who matches' : 'Segments'}</a>
+              </span>
+            </label>
             {levels && (
               <fieldset className="mb-3 border-0 p-0">
                 <legend className={label}>Members</legend>
@@ -293,6 +308,7 @@ export default function CampaignEditor({ campaign, lists, levels, stats, links, 
           <span>
             “{c.subject}” to {listNames || 'no lists'}
             {audience.members === 'members' ? ', members only' : audience.members === 'non-members' ? ', non-members only' : ''}
+            {c.segment_id ? `, segment “${segments.find((g) => g.id === c.segment_id)?.name ?? c.segment_id}”` : ''}
           </span>
           {admin && c.status === 'sending' && (
             <button type="button" className={secondary} disabled={busy} onClick={() => run(() => post({ action: 'pause', id: c.id }), 'Paused.', true)}>
@@ -325,7 +341,8 @@ export default function CampaignEditor({ campaign, lists, levels, stats, links, 
             <h2 className="mb-2 text-lg font-semibold">{confirming.action === 'approve' ? 'Approve this issue?' : confirming.action === 'schedule' ? 'Schedule this campaign?' : 'Send this campaign now?'}</h2>
             <p className="mb-3 text-sm">
               “{c.subject || '(no subject)'}” to {listNames || 'no lists'}
-              {audience.members === 'members' ? ' (members only)' : audience.members === 'non-members' ? ' (non-members only)' : ''}: {confirming.count === null ? 'counting…' : <strong>{confirming.count} {confirming.count === 1 ? 'person' : 'people'}</strong>} now
+              {audience.members === 'members' ? ' (members only)' : audience.members === 'non-members' ? ' (non-members only)' : ''}
+              {c.segment_id ? ` matching “${segments.find((g) => g.id === c.segment_id)?.name ?? c.segment_id}”` : ''}: {confirming.count === null ? 'counting…' : <strong>{confirming.count} {confirming.count === 1 ? 'person' : 'people'}</strong>} now
               {confirming.action === 'schedule' ? `, at ${at.replace('T', ' ')} (${tz.replace(/_/g, ' ')})` : ''}. Who is still subscribed when it goes is who gets it.
             </p>
             <label className="mb-4 flex items-start gap-2 text-sm">

@@ -23,11 +23,13 @@ Under **Settings > Mailing** (admins):
 - **Track links** and **UTM parameters** for new campaigns.
 - **Pause sending when** spam complaints or bounces pass a rate (default 0.1% and 2%), checked once a
   campaign has 500 deliveries. Everything stops, digests included, and the admins are emailed, until an
-  admin resumes sending on the Mailing screen.
+  admin resumes sending on the Mailing Lists screen.
 
 ## Lists and signing up
 
-Add lists on the Mailing screen's **Lists** tab. **Public** lists are offered by sign-up forms and on
+Add lists on the **Mailing Lists** screen (in the admin menu once Mailing is on), **Lists** tab: name,
+description and Public, then **Add list**. Lists are for anyone, members or not. **View subscribers**
+on each list shows who is on it. **Public** lists are offered by sign-up forms and on
 the email preferences page; the others are for people you add yourself.
 
 Put the **Subscribe** block (Mailing group in the block list) anywhere: email, an optional name, the
@@ -40,12 +42,32 @@ People manage their subscription from the links at the bottom of every email: **
 works too, at once. A page with one of these addresses takes its place: put the **Email preferences**
 block on it.
 
-On the **Contacts** tab admins search and filter contacts, see each one's consent (where, when, the
+On the **Subscribers** tab admins search and filter everyone (by status, list or tag), see each one's consent (where, when, the
 wording, confirmed when), lists, emails and clicks, and can **Add a contact**, **Import a CSV** (email
 and name columns), **Add members to a list**, **Unsubscribe**, **Erase** and **Export as CSV**. Adding
 or importing asks how those people agreed to get your email. Anyone who unsubscribed, bounced, marked
 an email as spam or was erased is skipped: they have to sign up themselves. Erasing deletes a contact
 and keeps only a one-way hash of the address, so they're never mailed again unless they sign up.
+
+## Tags, fields and segments
+
+Each person can have **tags** (farm, vip, trade show 2026) and **fields** (town, business type), set on
+their page, given when adding them, or taken from an import: a `tags` column (separated by `;` or `|`)
+and any other column becomes a field. A Subscribe block can tag the people who sign up through it.
+
+A **segment** (the **Segments** tab) picks some of the people on a campaign's lists, members or not. Its
+rules, all or any of which must match, can each be turned round:
+
+- on a list;
+- tagged (any of some tags);
+- a field filled in, equal to or containing a value;
+- a member (of some levels), while Members is on;
+- signed up, opened an email or clicked a link in the last so many days (clicks by people, not mail
+  scanners);
+- signed up from a page, form or import.
+
+Its page shows who matches now, with a count. Choose a segment on a campaign or digest: it then goes to
+the people on its lists who match. A segment that a campaign or digest uses can't be deleted.
 
 ## Campaigns
 
@@ -66,7 +88,8 @@ confirmation that shows how many people it goes to, and can **Pause**, **Resume*
 is still subscribed when each batch goes out gets it.
 
 Once it has gone out, the campaign shows its numbers: delivered, bounces, spam complaints, opens,
-clicks, unsubscribes, and each link's clicks.
+clicks, unsubscribes, and each link's clicks, and its **Recipients**: everyone it went to, filtered by
+delivered, opened, clicked, bounced, marked as spam, unsubscribed or not sent.
 
 ## Clicks: people and machines
 

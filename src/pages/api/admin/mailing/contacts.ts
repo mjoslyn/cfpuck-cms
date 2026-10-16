@@ -10,6 +10,10 @@ import { contactsCsv, erase, importContacts, parseCsv, unsubscribe } from '../..
 import type { Contact } from '../../../../lib/mailing/config';
 import { EMAIL_RE, normalEmail } from '../../../../lib/mailing/config';
 import { isActive, type MemberRow } from '../../../../lib/members/config';
+import { cleanTags, fieldKey } from '../../../../lib/mailing/segments';
+
+/** CSV columns that aren't fields: the address, the name's parts and the tags. */
+const OWN_COLUMNS = new Set(['email', 'name', 'first name', 'first_name', 'last name', 'last_name', 'full name', 'tags', 'tag']);
 
 export const POST: APIRoute = async ({ request, locals, redirect }) => {
   if (locals.user?.role !== 'admin') return new Response('Admins only', { status: 403 });
@@ -20,13 +24,15 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
   const db = locals.db;
   const list = Number(form.get('list')) || 0;
   const vouch = String(form.get('source') ?? '').trim().slice(0, 150);
+  // Tags for everyone added (comma separated).
+  const extraTags = cleanTags(String(form.get('tags') ?? ''));
 
   if (action === 'add') {
     const email = normalEmail(form.get('email'));
     if (!EMAIL_RE.test(email)) return back('Enter an email address.');
     if (!list) return back('Choose a list.');
     if (!vouch) return back('Say how they agreed to receive email.');
-    const r = await importContacts(db, [{ email, name: String(form.get('name') ?? '') }], list, `admin: ${vouch}`);
+    const r = await importContacts(db, [{ email, name: String(form.get('name') ?? ''), tags: extraTags }], list, `admin: ${vouch}`);
     if (r.skipped.length) return back(`${email} unsubscribed, bounced, complained or was erased before: they need to sign up themselves.`);
     return back(`${email} ${r.added ? 'added' : 'updated'}.`, true);
   }
@@ -36,7 +42,13 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
     if (file.size > 5 * 1024 * 1024) return back('That file is over 5 MB.');
     if (!list) return back('Choose a list.');
     if (!vouch) return back('Say how these people agreed to receive email.');
-    const rows = parseCsv(await file.text()).map((r) => ({ email: r.email ?? '', name: r.name || [r['first name'] ?? r.first_name, r['last name'] ?? r.last_name].filter(Boolean).join(' ') }));
+    // A tags column (separated by ; or |) tags each person; other columns become their fields.
+    const rows = parseCsv(await file.text()).map((r) => ({
+      email: r.email ?? '',
+      name: r.name || r['full name'] || [r['first name'] ?? r.first_name, r['last name'] ?? r.last_name].filter(Boolean).join(' '),
+      tags: cleanTags([...String(r.tags ?? r.tag ?? '').split(/[;|]/), ...extraTags]),
+      attributes: Object.fromEntries(Object.entries(r).filter(([k]) => !OWN_COLUMNS.has(k)).map(([k, v]) => [fieldKey(k), String(v).slice(0, 500)]).filter(([k]) => k)),
+    }));
     try {
       const r = await importContacts(db, rows, list, `import: ${vouch} (${file.name.slice(0, 80)})`);
       return back(`${r.added} added, ${r.updated} already known${r.skipped.length ? `, ${r.skipped.length} skipped (unsubscribed, bounced or erased before)` : ''}${r.invalid.length ? `, ${r.invalid.length} not email addresses` : ''}.`, true);
@@ -49,13 +61,17 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
     if (!vouch) return back('Say how these members agreed to receive email.');
     const levels = form.getAll('levels').map(String).filter(Boolean);
     const { data } = await db.from('members').select('*');
-    const rows = ((data ?? []) as MemberRow[]).filter((m) => isActive(m) && (!levels.length || levels.includes(m.level))).map((m) => ({ email: m.email, name: m.name }));
+    const rows = ((data ?? []) as MemberRow[]).filter((m) => isActive(m) && (!levels.length || levels.includes(m.level))).map((m) => ({ email: m.email, name: m.name, tags: extraTags }));
     const r = await importContacts(db, rows, list, `members: ${vouch}`);
     return back(`${r.added + r.updated} members on the list${r.skipped.length ? `; ${r.skipped.length} skipped (unsubscribed, bounced or erased before)` : ''}.`, true);
   }
   if (!id) return back('No contact.');
   if (action === 'update') {
-    const { error } = await db.from('contacts').update({ name: String(form.get('name') ?? '').trim().slice(0, 100), notes: String(form.get('notes') ?? '').slice(0, 2000) }).eq('id', id);
+    // Fields come as field_key / field_value pairs; an empty key or value drops the field.
+    const keys = form.getAll('field_key').map(fieldKey);
+    const values = form.getAll('field_value').map((v) => String(v).trim().slice(0, 500));
+    const attributes = Object.fromEntries(keys.map((k, i) => [k, values[i] ?? '']).filter(([k, v]) => k && v));
+    const { error } = await db.from('contacts').update({ name: String(form.get('name') ?? '').trim().slice(0, 100), notes: String(form.get('notes') ?? '').slice(0, 2000), tags: cleanTags(String(form.get('tags') ?? '')), attributes }).eq('id', id);
     if (error) return back(error.message);
     // Lists: ticked ones subscribed (only while the contact is), the rest unsubscribed.
     const ticked = form.getAll('lists').map(Number);

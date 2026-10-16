@@ -1,4 +1,4 @@
-// Weekly digests (the Mailing screen and the digest editor). JSON posts { action, id, ... }: create (a
+// Weekly digests (the Mailing Lists screen and the digest editor). JSON posts { action, id, ... }: create (a
 // form post from the list goes to its editor), save (editors while it is off; admins turn it on and
 // change it while on), test (this week's issue as it would be now, to the signed-in editor), issue
 // (admins: make this week's issue now, outside its schedule), delete (admins). Writes here don't change
@@ -58,6 +58,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
         text: text(f.text, 100_000),
         list_ids: ids(f.list_ids),
         audience: audienceOf(f.audience),
+        segment_id: Number(f.segment_id) > 0 && (await db.from('mail_segments').select('id').eq('id', Number(f.segment_id)).maybeSingle()).data ? Number(f.segment_id) : null,
         weekday: Math.min(6, Math.max(0, Math.round(Number(f.weekday)) || 0)),
         send_time: /^\d{2}:\d{2}$/.test(String(f.send_time)) ? f.send_time : '09:00',
         mode: f.mode === 'auto' ? 'auto' : 'review',
@@ -77,7 +78,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
       const { data: last } = await db.from('campaigns').select('sent_at').eq('digest_id', id).eq('status', 'sent').order('sent_at', { ascending: false }).limit(1);
       const since = last?.[0]?.sent_at ?? new Date(Date.now() - 7 * 86_400_000).toISOString();
       const week = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-      const issue = { id: 0, name: d.name, subject: (d.subject || d.name).replace(/\{week_of\}/g, week).replace(/\{date\}/g, week), from_name: d.from_name, reply_to: d.reply_to, design: d.design, text: d.text, since, list_ids: d.list_ids, audience: d.audience } as unknown as Campaign;
+      const issue = { id: 0, name: d.name, subject: (d.subject || d.name).replace(/\{week_of\}/g, week).replace(/\{date\}/g, week), from_name: d.from_name, reply_to: d.reply_to, design: d.design, text: d.text, since, list_ids: d.list_ids, audience: d.audience, segment_id: d.segment_id } as unknown as Campaign;
       try {
         await sendTest(serviceClient(), issue, [{ email: locals.user!.email, name: locals.user!.name || '' }]);
       } catch (e) {

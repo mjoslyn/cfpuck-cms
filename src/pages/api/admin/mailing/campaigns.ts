@@ -1,4 +1,4 @@
-// Campaigns (the Mailing screen and the campaign editor). JSON posts { action, id, ... }:
+// Campaigns (the Mailing Lists screen and the campaign editor). JSON posts { action, id, ... }:
 // create (a draft; a form post from the list goes to its editor), save, test (to the signed-in editor,
 // and up to 5 more addresses), count (who it would go to now), duplicate, delete (drafts and campaigns
 // that sent nothing). Admins only: schedule (at: local "Y-m-dTH:i"), send (now), pause, resume, cancel,
@@ -52,6 +52,13 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
   const id = Number(body.id);
   const { data: c } = await db.from('campaigns').select('*').eq('id', id).maybeSingle<Campaign>();
   if (!c) return fail('No such campaign.', 404);
+  /** A segment that exists, else none. */
+  async function segmentId(v: unknown): Promise<number | null> {
+    const n = Number(v);
+    if (!Number.isInteger(n) || n <= 0) return null;
+    const { data } = await db.from('mail_segments').select('id').eq('id', n).maybeSingle();
+    return data ? n : null;
+  }
   const adminOnly = () => (admin ? null : fail('Only admins send, schedule and change campaigns that are sending.', 403));
 
   switch (action) {
@@ -68,6 +75,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
         text: text(f.text, 100_000),
         list_ids: ids(f.list_ids),
         audience: audienceOf(f.audience),
+        segment_id: await segmentId(f.segment_id),
         track_links: f.track_links !== false,
         utm: !!f.utm,
       };
@@ -89,7 +97,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
       return Response.json({ ok: true, sent: to.map((t) => t.email), mailgun: mailgunStatus().configured });
     }
     case 'duplicate': {
-      const { data, error } = await db.from('campaigns').insert({ name: `${c.name} (copy)`, subject: c.subject, from_name: c.from_name, reply_to: c.reply_to, design: c.design, text: c.text, list_ids: c.list_ids, audience: c.audience, track_links: c.track_links, utm: c.utm, created_by: locals.user!.id }).select('id').single();
+      const { data, error } = await db.from('campaigns').insert({ name: `${c.name} (copy)`, subject: c.subject, from_name: c.from_name, reply_to: c.reply_to, design: c.design, text: c.text, list_ids: c.list_ids, audience: c.audience, segment_id: c.segment_id, track_links: c.track_links, utm: c.utm, created_by: locals.user!.id }).select('id').single();
       return error ? fail(error.message) : Response.json({ id: data.id });
     }
     case 'delete': {

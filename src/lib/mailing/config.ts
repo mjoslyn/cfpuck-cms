@@ -97,6 +97,8 @@ export interface Contact {
   name: string;
   attributes: Record<string, unknown>;
   status: ContactStatus;
+  /** Lowercased, for segments (src/lib/mailing/segments.ts). */
+  tags: string[];
   consent_source: string;
   consent_text: string;
   consent_at: string | null;
@@ -145,6 +147,8 @@ export interface Campaign {
   text: string;
   list_ids: number[];
   audience: Audience;
+  /** Only the people on its lists who match this segment (none: everyone on them). */
+  segment_id: number | null;
   status: CampaignStatus;
   scheduled_at: string | null;
   started_at: string | null;
@@ -170,6 +174,7 @@ export interface Digest {
   name: string;
   list_ids: number[];
   audience: Audience;
+  segment_id: number | null;
   weekday: number;
   send_time: string;
   subject: string;

@@ -26,13 +26,14 @@ export function SubscribePanel({ a, set }: { a: Attrs; set: (patch: Attrs) => vo
               {l.name}
             </label>
           ))}
-          {!lists.length && <p className="text-xs text-admin-muted">No public lists yet: add them on the Mailing screen.</p>}
+          {!lists.length && <p className="text-xs text-admin-muted">No public lists yet: add them on the Mailing Lists screen.</p>}
         </fieldset>
       )}
       <Text title="Heading" value={a.heading} placeholder="(none)" onChange={(v) => set({ heading: v || undefined })} />
       <Text title="Text" value={a.text} placeholder="(none)" onChange={(v) => set({ text: v || undefined })} />
       <Text title="Button" value={a.button} placeholder="Subscribe" onChange={(v) => set({ button: v || undefined })} />
       <Text title="Consent wording" value={a.consentText} placeholder="Settings > Mailing's" onChange={(v) => set({ consentText: v || undefined })} />
+      <Text title="Tag sign-ups with (comma separated)" value={a.tags} placeholder="(none)" onChange={(v) => set({ tags: v || undefined })} />
       <Toggle title="Ask for a name" value={a.showName} onChange={(showName) => set({ showName: showName || undefined })} />
       <Segmented title="Layout" value={a.layout === 'inline' ? 'inline' : 'stacked'} options={[['stacked', 'Stacked'], ['inline', 'In a row']]} onChange={(v) => set({ layout: v === 'inline' ? 'inline' : undefined })} />
       <p className="mb-2 text-xs text-admin-muted">Sign-ups get an email with a link to confirm; nothing is sent until they do. With several lists, visitors tick the ones they want.</p>
