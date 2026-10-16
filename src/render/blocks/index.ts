@@ -18,7 +18,7 @@ import { TICKETS_RENDERERS } from '../c/tickets';
 import { MEMBERS_RENDERERS } from '../c/members';
 import { MAILING_RENDERERS } from '../c/mailing';
 import { embedForm } from '../forms/embed';
-import { formStyleDecls } from '../forms/style';
+import { formStyleClass, formStyleDecls } from '../forms/style';
 import { attrs } from '../c/style';
 import type { FormRow } from '../../lib/forms/types';
 
@@ -34,7 +34,7 @@ register(
       const html = embedForm(env, row, { title: !!b.attrs.showTitle, description: !!b.attrs.showDescription });
       // The block's form style (colours, corners) as custom properties on a wrapper.
       const decls = formStyleDecls(b.attrs.formStyle);
-      return decls.length ? `<div ${attrs(['c-form-style'], decls)}>${html}</div>` : html;
+      return decls.length ? `<div ${attrs(['c-form-style', formStyleClass(b.attrs.formStyle)], decls)}>${html}</div>` : html;
     },
     ...CONTENT_RENDERERS,
     ...ENTRY_RENDERERS,

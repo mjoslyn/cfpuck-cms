@@ -24,9 +24,11 @@ The markup comes from `src/render/forms/form.ts`, styled by `src/styles/forms.cs
 the browser. Everything is validated again on the server.
 
 Fields are white with black text by default, and labels take the colour of the text around them. The
-Form block's **Form style** settings (also on the Subscribe and Newsletter blocks) change the field
-background, text and border, the labels, the button's colours and the fields' corners (square,
-slightly rounded, rounded or pill), each from the site's palette or a hex colour.
+Form block's **Form style** settings (also on the Subscribe and Newsletter blocks) set the form's own
+background, border and text colour (a background or border puts the form in a box with room round it),
+the field background, text and border, the labels, the button's colours, and the corners of the fields
+and of the button (square, slightly rounded, rounded or pill), each colour from the site's palette or
+a hex colour.
 
 ## Submissions
 

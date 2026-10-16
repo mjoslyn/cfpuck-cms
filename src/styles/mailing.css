@@ -36,12 +36,12 @@
 }
 .c-subscribe__desc {
   display: block;
-  color: var(--color-muted);
+  color: var(--form-muted, var(--color-muted));
   font-size: 0.875rem;
 }
 .c-subscribe__consent {
   margin: 0.75rem 0 0;
-  color: var(--color-muted);
+  color: var(--form-muted, var(--color-muted));
   font-size: 0.875rem;
 }
 .c-subscribe__footer,
@@ -52,7 +52,7 @@
 .c-prefs .c-button__link {
   width: auto;
   min-width: 12rem;
-  border-radius: var(--form-radius, 2px);
+  border-radius: var(--form-button-radius, 2px);
   cursor: pointer;
 }
 .c-subscribe .is-inline .c-subscribe__submit {

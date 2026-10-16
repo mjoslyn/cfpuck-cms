@@ -1,16 +1,23 @@
 /* Forms (src/render/forms/form.ts). Fields are white with black text unless a block's form style
-   (src/render/forms/style.ts) sets --form-input-bg, --form-input-text, --form-border, --form-label or
-   --form-radius; its button colours are the button's --button-bg and --button-color. */
+   (src/render/forms/style.ts) sets --form-input-bg, --form-input-text, --form-border, --form-label,
+   --form-radius or --form-button-radius; its button colours are the button's --button-bg and
+   --button-color. */
 .c-form {
   --form-error: #b42318;
   max-width: 100%;
+}
+/* A form style's background or border: the form sits in a box with room round it. */
+.has-form-box {
+  box-sizing: border-box;
+  padding: 1.5rem 1.75rem;
+  border-radius: 6px;
 }
 .c-form__title {
   margin: 0 0 0.5rem;
 }
 .c-form__desc {
   margin: 0 0 1.5rem;
-  color: var(--color-muted);
+  color: var(--form-muted, var(--color-muted));
 }
 .c-form__fields {
   display: grid;
@@ -44,13 +51,13 @@
   line-height: 1.4;
 }
 .c-field__req {
-  color: var(--color-muted);
+  color: var(--form-muted, var(--color-muted));
   font-size: 0.8125rem;
   font-weight: 400;
 }
 .c-field__desc {
   margin: 0.375rem 0 0;
-  color: var(--color-muted);
+  color: var(--form-muted, var(--color-muted));
   font-size: 0.8125rem;
   line-height: 1.5;
 }
@@ -65,7 +72,7 @@
 }
 .c-field__count {
   margin: 0.25rem 0 0;
-  color: var(--color-muted);
+  color: var(--form-muted, var(--color-muted));
   font-size: 0.75rem;
   text-align: right;
 }
@@ -136,7 +143,7 @@ select.c-input {
 .c-subfield__label {
   display: block;
   margin-top: 0.25rem;
-  color: var(--color-muted);
+  color: var(--form-muted, var(--color-muted));
   font-size: 0.8125rem;
 }
 .c-form__section {
@@ -158,7 +165,7 @@ select.c-input {
 .c-form .c-form__submit {
   width: auto;
   min-width: 12rem;
-  border-radius: var(--form-radius, 2px);
+  border-radius: var(--form-button-radius, 2px);
   cursor: pointer;
 }
 .c-form__errors {
@@ -226,7 +233,7 @@ select.c-input {
 }
 .c-choice .c-product__price {
   margin-left: 0.25rem;
-  color: var(--color-muted);
+  color: var(--form-muted, var(--color-muted));
   font-weight: 400;
 }
 .c-product__amount {
@@ -237,7 +244,7 @@ select.c-input {
   top: 50%;
   left: 0.875rem;
   transform: translateY(-50%);
-  color: var(--color-muted);
+  color: var(--form-muted, var(--color-muted));
   pointer-events: none;
 }
 .c-product__amount .c-input {

@@ -420,10 +420,12 @@ confirmation; editors read them, the site with its key). The markup comes from
 logic, US phone formatting and character counters; everything is validated on the server). Place forms
 with the `form` block. Fields are white with black text by default and labels take the colour around
 them; the Form, Subscribe and Newsletter blocks' **Form style** (`attrs.formStyle`,
-`src/render/forms/style.ts`, `src/puck/FormStyle.tsx`) sets field background, text and border, labels,
-button colours and corners, as custom properties `forms.css` reads (`--form-input-bg`,
-`--form-input-text`, `--form-border`, `--form-label`, `--form-radius`, `--button-bg`, `--button-color`;
-palette colours, hex values and a few keywords only). Submissions POST back to the page (`src/lib/forms/submit.ts`: validation that
+`src/render/forms/style.ts`, `src/puck/FormStyle.tsx`) sets the form's background, border and text
+(a background or border puts it in a padded box, `has-form-box`; its text colours headings and small
+print too, `--heading-color`, `--form-muted`), field background, text and border, labels, button
+colours, and field and button corners, as custom properties `forms.css` reads (`--form-input-bg`,
+`--form-input-text`, `--form-border`, `--form-label`, `--form-radius`, `--form-button-radius`,
+`--button-bg`, `--button-color`; palette colours, hex values and a few keywords only). Submissions POST back to the page (`src/lib/forms/submit.ts`: validation that
 skips fields hidden by conditional logic, honeypot, limits (an answer is cut at 10,000 characters, a
 form takes 20 submissions a minute, then answers 429), storage, notifications to the form's addresses or
 `FORMS_ADMIN_EMAIL` / the config's `adminEmail`). A notification's email is built in the email builder

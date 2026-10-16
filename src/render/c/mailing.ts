@@ -10,7 +10,7 @@ import { esc } from '../html';
 import { attrs, escAttr, styleDecls } from './style';
 import { CONSENT_TEXT, PREFERENCES_PATH, SUBSCRIBE_PATH, mailingSettings, type ContactField, type MailList } from '../../lib/mailing/config';
 import type { PrefsData } from '../../lib/mailing/page-data';
-import { formStyleDecls } from '../forms/style';
+import { formStyleClass, formStyleDecls } from '../forms/style';
 
 export const LISTS_KEY = 'mail-lists';
 export const PREFS_KEY = 'mail-prefs';
@@ -45,7 +45,7 @@ const subscribe: Renderer = (b, env) => {
   const error = mine && q.get('subscribe_error') ? q.get('subscribe_error')!.slice(0, 300) : '';
   const heading = a.heading ? `<h2 class="c-subscribe__heading">${esc(a.heading)}</h2>` : '';
   const intro = a.text ? p('c-subscribe__text', esc(a.text)) : '';
-  if (sent) return `<section ${attrs(['c-subscribe', a.className], [...styleDecls(a.style), ...formStyleDecls(a.formStyle)], { id })}>${heading}<p class="c-subscribe__message" role="status" tabindex="-1" data-focus>${SUBSCRIBE_MESSAGES.sent}</p></section>`;
+  if (sent) return `<section ${attrs(['c-subscribe', formStyleClass(a.formStyle), a.className], [...styleDecls(a.style), ...formStyleDecls(a.formStyle)], { id })}>${heading}<p class="c-subscribe__message" role="status" tabindex="-1" data-focus>${SUBSCRIBE_MESSAGES.sent}</p></section>`;
   // Compact (the Newsletter signup block): the label is for screen readers, the field says what it is.
   const field = (name: string, label: string, type: string, auto: string, required: boolean) =>
     `<div class="c-field c-subscribe__field"><label class="${a.compact ? 'c-sr-only' : 'c-field__label'}" for="${id}-${name}">${label}</label><input class="c-input" id="${id}-${name}" name="${name}" type="${type}" autocomplete="${auto}"${a.compact ? ` placeholder="${escAttr(a.placeholder || `Your ${label.toLowerCase()} address`)}"` : ''}${required ? ' required' : ''} /></div>`;
@@ -79,7 +79,7 @@ const subscribe: Renderer = (b, env) => {
     (a.layout === 'inline' ? '' : `<div class="c-subscribe__footer"><button type="submit" class="c-button__link c-subscribe__submit">${esc(a.button || 'Subscribe')}</button></div>`) +
     `</form>`;
   const err = error ? `<p class="c-subscribe__message is-error" role="alert" tabindex="-1" data-focus>${esc(error)}</p>` : '';
-  return `<section ${attrs(['c-subscribe', a.className], [...styleDecls(a.style), ...formStyleDecls(a.formStyle)], { id })}>${heading}${intro}${err}${form}</section>`;
+  return `<section ${attrs(['c-subscribe', formStyleClass(a.formStyle), a.className], [...styleDecls(a.style), ...formStyleDecls(a.formStyle)], { id })}>${heading}${intro}${err}${form}</section>`;
 };
 
 const PREFS_MESSAGES: Record<string, string> = {
