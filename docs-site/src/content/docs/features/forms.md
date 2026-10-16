@@ -23,6 +23,11 @@ The markup comes from `src/render/forms/form.ts`, styled by `src/styles/forms.cs
 `public/assets/js/forms.js` runs conditional logic, US phone formatting and character counters in
 the browser. Everything is validated again on the server.
 
+Fields are white with black text by default, and labels take the colour of the text around them. The
+Form block's **Form style** settings (also on the Subscribe and Newsletter blocks) change the field
+background, text and border, the labels, the button's colours and the fields' corners (square,
+slightly rounded, rounded or pill), each from the site's palette or a hex colour.
+
 ## Submissions
 
 Submissions POST back to the page (`src/lib/forms/submit.ts`):

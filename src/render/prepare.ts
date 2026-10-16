@@ -251,6 +251,7 @@ async function walk(items: PuckItem[], ctx: RenderCtx, state: WalkState) {
         }
         break;
       case 'subscribe':
+      case 'newsletter':
         await loadMailLists(ctx);
         // A sign-up's outcome is for that visitor only.
         if (['subscribe', 'subscribe_error'].some((k) => ctx.queried.url.searchParams.has(k))) ctx.personal = true;

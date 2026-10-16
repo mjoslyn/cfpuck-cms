@@ -18,6 +18,8 @@ import { TICKETS_RENDERERS } from '../c/tickets';
 import { MEMBERS_RENDERERS } from '../c/members';
 import { MAILING_RENDERERS } from '../c/mailing';
 import { embedForm } from '../forms/embed';
+import { formStyleDecls } from '../forms/style';
+import { attrs } from '../c/style';
 import type { FormRow } from '../../lib/forms/types';
 
 register(
@@ -29,7 +31,10 @@ register(
     'form': (b, env) => {
       const row = (env.ctx.data.get('forms') as FormRow[] | undefined)?.find((f) => f.id === Number(b.attrs.formId));
       if (!row) return env.ctx.editor ? '<p style="padding:1rem;border:1px dashed #ccc">Choose a form in the block settings.</p>' : '';
-      return embedForm(env, row, { title: !!b.attrs.showTitle, description: !!b.attrs.showDescription });
+      const html = embedForm(env, row, { title: !!b.attrs.showTitle, description: !!b.attrs.showDescription });
+      // The block's form style (colours, corners) as custom properties on a wrapper.
+      const decls = formStyleDecls(b.attrs.formStyle);
+      return decls.length ? `<div ${attrs(['c-form-style'], decls)}>${html}</div>` : html;
     },
     ...CONTENT_RENDERERS,
     ...ENTRY_RENDERERS,

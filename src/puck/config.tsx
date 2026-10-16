@@ -4,7 +4,8 @@ import { BlockView } from './BlockView';
 import { JsonAttrs, Row, Select, Text, Toggle, inputClass, type Attrs } from './fields';
 import { EntryField } from './entry-fields';
 import { MembersPanel } from './MembersPanel';
-import { SubscribePanel } from './SubscribePanel';
+import { NewsletterPanel, SubscribePanel } from './SubscribePanel';
+import { FormStylePanel } from './FormStyle';
 import { EVENT_BLOCKS } from '../lib/events/on';
 import { SITE_BLOCKS } from '../lib/site/render';
 import { taxonomiesOf } from '../lib/site';
@@ -62,6 +63,7 @@ Object.assign(PANELS, {
     </>
   ),
   subscribe: (a: Attrs, set: (p: Attrs) => void) => <SubscribePanel a={a} set={set} />,
+  newsletter: (a: Attrs, set: (p: Attrs) => void) => <NewsletterPanel a={a} set={set} />,
   'mail-preferences': (a: Attrs, set: (p: Attrs) => void) => (
     <>
       <Select title="Shows first" value={a.view === 'unsubscribe' ? 'unsubscribe' : 'preferences'} options={[['preferences', 'Email preferences'], ['unsubscribe', 'Unsubscribe']]} onChange={(v) => set({ view: v === 'unsubscribe' ? 'unsubscribe' : undefined })} />
@@ -73,6 +75,7 @@ Object.assign(PANELS, {
       <FormPicker value={a.formId} onChange={(formId) => set({ formId })} />
       <Toggle title="Show the form title" value={a.showTitle} onChange={(v) => set({ showTitle: v || undefined })} />
       <Toggle title="Show the form description" value={a.showDescription} onChange={(v) => set({ showDescription: v || undefined })} />
+      <FormStylePanel a={a} set={set} />
     </>
   ),
 });
@@ -158,6 +161,7 @@ const LABELS: Record<string, string> = {
   'member-account': 'Member account',
   'member-link': 'Member sign-in link',
   subscribe: 'Subscribe',
+  newsletter: 'Newsletter signup',
   'mail-preferences': 'Email preferences',
   'events-calendar': 'Events page (list, month, day)',
   'event-calendar': 'Events calendar',
@@ -238,7 +242,7 @@ export function buildConfig(types: string[], entryType?: string, opts: { members
       // Offered while Members is on (Settings > Members); blocks already placed stay editable.
       ...(opts.members ? { members: { title: 'Members', components: ['members', 'member-account', 'member-link'] } } : {}),
       // Offered while Mailing is on (Settings > Mailing Lists).
-      ...(opts.mailing ? { mailing: { title: 'Mailing Lists', components: ['subscribe', 'mail-preferences'] } } : {}),
+      ...(opts.mailing ? { mailing: { title: 'Mailing Lists', components: ['newsletter', 'subscribe', 'mail-preferences'] } } : {}),
       advanced: { title: 'Advanced', components: withSite('advanced', ['html', 'part', 'entry-content']) },
       // Collection internals (items, empty state, pagination) are managed from the collection's settings.
       other: { visible: false },
@@ -252,7 +256,7 @@ export const EDITABLE_TYPES = [
   'collection',
   'event-date', 'event-details', 'event-schedule', 'tickets', 'events-calendar', 'event-calendar',
   'members', 'member-account', 'member-link',
-  'subscribe', 'mail-preferences',
+  'subscribe', 'newsletter', 'mail-preferences',
   'entry-field', 'form', 'pattern',
   ...Object.keys(SITE_BLOCKS),
 ];

@@ -1,5 +1,6 @@
 // Mailing (src/lib/mailing/): the Subscribe block (a sign-up form for the public lists, anywhere on the
-// site; it posts to /api/mail/subscribe, which emails a confirmation link) and the Email preferences
+// site; it posts to /api/mail/subscribe, which emails a confirmation link), the Newsletter signup block
+// (the same form, compact: one list, an email field and a button in a row) and the Email preferences
 // block (confirming a sign-up, unsubscribing, and choosing lists, for whoever the page's signed link is
 // for, or the signed-in visitor). The built-in /subscribe/, /unsubscribe/ and /email-preferences/ pages
 // show them; a page with one of those addresses takes its place. The preferences block's pages depend on
@@ -9,6 +10,7 @@ import { esc } from '../html';
 import { attrs, escAttr, styleDecls } from './style';
 import { CONSENT_TEXT, PREFERENCES_PATH, SUBSCRIBE_PATH, mailingSettings, type ContactField, type MailList } from '../../lib/mailing/config';
 import type { PrefsData } from '../../lib/mailing/page-data';
+import { formStyleDecls } from '../forms/style';
 
 export const LISTS_KEY = 'mail-lists';
 export const PREFS_KEY = 'mail-prefs';
@@ -43,9 +45,10 @@ const subscribe: Renderer = (b, env) => {
   const error = mine && q.get('subscribe_error') ? q.get('subscribe_error')!.slice(0, 300) : '';
   const heading = a.heading ? `<h2 class="c-subscribe__heading">${esc(a.heading)}</h2>` : '';
   const intro = a.text ? p('c-subscribe__text', esc(a.text)) : '';
-  if (sent) return `<section ${attrs(['c-subscribe', a.className], styleDecls(a.style), { id })}>${heading}<p class="c-subscribe__message" role="status" tabindex="-1" data-focus>${SUBSCRIBE_MESSAGES.sent}</p></section>`;
+  if (sent) return `<section ${attrs(['c-subscribe', a.className], [...styleDecls(a.style), ...formStyleDecls(a.formStyle)], { id })}>${heading}<p class="c-subscribe__message" role="status" tabindex="-1" data-focus>${SUBSCRIBE_MESSAGES.sent}</p></section>`;
+  // Compact (the Newsletter signup block): the label is for screen readers, the field says what it is.
   const field = (name: string, label: string, type: string, auto: string, required: boolean) =>
-    `<div class="c-field c-subscribe__field"><label class="c-field__label" for="${id}-${name}">${label}</label><input class="c-input" id="${id}-${name}" name="${name}" type="${type}" autocomplete="${auto}"${required ? ' required' : ''} /></div>`;
+    `<div class="c-field c-subscribe__field"><label class="${a.compact ? 'c-sr-only' : 'c-field__label'}" for="${id}-${name}">${label}</label><input class="c-input" id="${id}-${name}" name="${name}" type="${type}" autocomplete="${auto}"${a.compact ? ` placeholder="${escAttr(a.placeholder || `Your ${label.toLowerCase()} address`)}"` : ''}${required ? ' required' : ''} /></div>`;
   // The site's contact fields the block asks for (attrs.fields: keys), each optional.
   const asked = (Array.isArray(a.fields) ? a.fields : []).map((k: unknown) => s.fields?.find((f) => f.key === k)).filter((f: ContactField | undefined): f is ContactField => !!f);
   const custom = (f: ContactField) => {
@@ -76,7 +79,7 @@ const subscribe: Renderer = (b, env) => {
     (a.layout === 'inline' ? '' : `<div class="c-subscribe__footer"><button type="submit" class="c-button__link c-subscribe__submit">${esc(a.button || 'Subscribe')}</button></div>`) +
     `</form>`;
   const err = error ? `<p class="c-subscribe__message is-error" role="alert" tabindex="-1" data-focus>${esc(error)}</p>` : '';
-  return `<section ${attrs(['c-subscribe', a.className], styleDecls(a.style), { id })}>${heading}${intro}${err}${form}</section>`;
+  return `<section ${attrs(['c-subscribe', a.className], [...styleDecls(a.style), ...formStyleDecls(a.formStyle)], { id })}>${heading}${intro}${err}${form}</section>`;
 };
 
 const PREFS_MESSAGES: Record<string, string> = {
@@ -172,7 +175,38 @@ export function accountEmail(ctx: RenderCtx): string {
   );
 }
 
+/**
+ * Newsletter signup: a compact Subscribe for a band or a footer. One list (`attrs.list`, else the first
+ * public one), a heading and a line of text above an email field and a button in a row, the consent
+ * wording small below. Posts and confirms like any Subscribe block.
+ */
+const newsletter: Renderer = (b, env, inner) => {
+  const a = b.attrs;
+  return subscribe(
+    {
+      ...b,
+      attrs: {
+        heading: a.heading ?? 'Get our newsletter',
+        text: a.text ?? 'News and events, straight to your inbox.',
+        button: a.button || 'Sign up',
+        placeholder: a.placeholder,
+        consentText: a.consentText,
+        tags: a.tags,
+        lists: [Number(a.list) || lists(env.ctx).find((l) => l.public)?.id].filter(Boolean),
+        layout: 'inline',
+        compact: true,
+        className: ['c-newsletter', a.align === 'left' ? '' : 'is-centered', a.className].filter(Boolean).join(' '),
+        style: a.style,
+        formStyle: a.formStyle,
+      },
+    },
+    env,
+    inner,
+  );
+};
+
 export const MAILING_RENDERERS: Record<string, Renderer> = {
   subscribe,
+  newsletter,
   'mail-preferences': mailPreferences,
 };
