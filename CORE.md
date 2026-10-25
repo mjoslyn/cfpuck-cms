@@ -988,7 +988,8 @@ deploys (`wrangler deploy`).
   which resizes but ignores crop rectangles and qualities (crops are centred locally; production cuts
   them exactly). Cron runs can be triggered at `/cdn-cgi/handler/scheduled?cron=<cron>`. Static files'
   headers are in `public/_headers`; the admin answers carry `X-Robots-Tag: noindex` (middleware), as does every answer at an
-  address other than `SITE_URL`'s (a workers.dev or preview copy; `offSite`).
+  address other than `SITE_URL`'s (a workers.dev or preview copy; `offSite`), and every answer at all
+  while `SITE_NOINDEX` is `1` or `true` (a demo or preview on its own domain; `noindexAll`).
 
 Files need an R2 bucket (`npx wrangler r2 bucket create`, its name in `wrangler.jsonc`; Media). Accounts need `AUTH_SECRET` (a long random value; changing it signs everyone out
 and breaks links already sent) and links in emails use the request's address (`SITE_URL` for Better

@@ -5,6 +5,7 @@ import { sessionDb, siteDb } from './lib/db/site';
 import { sessionUser } from './lib/auth';
 import { refreshSiteTimezone } from './lib/site/timezone';
 import { changesPages, PAGE_CACHE_TAG } from './lib/cache';
+import { env } from './lib/env';
 // Server-only work the page renderer calls (src/render/hooks.ts).
 import './lib/mailing/page-data';
 
@@ -48,6 +49,9 @@ async function noindex(res: Response | Promise<Response>) {
   return r;
 }
 
+/** Whether the whole site is kept out of search engines (SITE_NOINDEX=1 or true: a demo or preview copy). */
+const noindexAll = () => /^(1|true|yes)$/i.test(env('SITE_NOINDEX')?.trim() ?? '');
+
 /** Whether the request came to another address than the site's own (SITE_URL): a workers.dev or preview
  * copy, which search engines are kept out of. Without SITE_URL every address counts as the site's. */
 function offSite(url: URL): boolean {
@@ -69,8 +73,9 @@ export const onRequest = defineMiddleware(async (context, next) => {
   // The other copy's queries during a sync (signed; the route checks them) clear the pages as edits do.
   if (pathname === '/api/sync/remote') return purgeAfter(context, next);
   const isAdmin = pathname.startsWith('/admin') || pathname.startsWith('/api/admin');
-  // The admin is never indexed, nor is any page at an address other than the site's.
-  if (!isAdmin) return offSite(context.url) ? noindex(next()) : next();
+  // The admin is never indexed, nor is any page at an address other than the site's, nor any at all
+  // while SITE_NOINDEX is set.
+  if (!isAdmin) return noindexAll() || offSite(context.url) ? noindex(next()) : next();
   if (PUBLIC_ADMIN.some((p) => pathname.startsWith(p))) return noindex(next());
 
   const user = await sessionUser(context.request);
