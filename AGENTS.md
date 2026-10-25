@@ -70,6 +70,8 @@ Concise and factual: what changed, why, and any measurements; no editorial frami
 
 ## Open work
 
+- Moving off Netlify and Supabase to Cloudflare (Workers, D1, R2, Images, Better Auth):
+  `docs/cloudflare-migration.md`.
 - Core tests that run on the example site's content (several e2e scripts assume a site's content).
 - One fresh starting migration for new sites, so they don't inherit the first site's import
   migrations (`…0006_forms_sequence`, `…0007_move_legacy_paths`, `…0010_own_names`).
