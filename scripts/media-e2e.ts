@@ -4,6 +4,7 @@
 import { chromium } from 'playwright';
 import sharp from 'sharp';
 import { siteDb } from '../src/lib/db/site';
+import { closeLocalBindings } from '../src/lib/local-bindings';
 
 const origin = process.env.ASTRO_ORIGIN ?? 'http://localhost:4321';
 const sb = siteDb();
@@ -74,3 +75,4 @@ try {
   }
   await browser.close();
 }
+await closeLocalBindings();

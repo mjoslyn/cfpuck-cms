@@ -14,7 +14,26 @@ export interface ImageTransformer {
   output(options: { format: string; quality?: number }): Promise<{ response(): Response; contentType(): string }>;
 }
 
+/** The R2 binding, as the storage code uses it. */
+export interface R2ObjectLike {
+  key: string;
+  size: number;
+  uploaded: Date;
+  httpEtag: string;
+  range?: unknown;
+  body?: ReadableStream<Uint8Array>;
+  writeHttpMetadata(headers: Headers): void;
+}
+export interface R2BucketLike {
+  put(key: string, value: ArrayBuffer | string, options?: { httpMetadata?: { contentType?: string; cacheControl?: string }; onlyIf?: { etagDoesNotMatch?: string } }): Promise<R2ObjectLike | null>;
+  get(key: string, options?: { onlyIf?: Headers; range?: Headers }): Promise<R2ObjectLike | null>;
+  delete(key: string): Promise<void>;
+  list(options?: { prefix?: string; cursor?: string; delimiter?: string }): Promise<{ objects: R2ObjectLike[]; delimitedPrefixes?: string[]; truncated: boolean; cursor?: string }>;
+}
+
 export interface Bindings {
+  /** The site's files (src/lib/storage.ts). */
+  BUCKET?: R2BucketLike;
   /** The database (src/lib/db/d1.ts). */
   DB?: import('./db/d1').D1Database;
   IMAGES?: ImagesBinding;

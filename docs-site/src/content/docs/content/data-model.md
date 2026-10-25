@@ -1,6 +1,6 @@
 ---
 title: Data model
-description: Entries, terms, fields and settings in Supabase.
+description: Entries, terms, fields and settings in D1.
 sidebar:
   order: 1
 ---

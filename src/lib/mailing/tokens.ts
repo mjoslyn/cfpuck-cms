@@ -1,7 +1,8 @@
 // Signed links in mailing emails and pages: a contact's id with an HMAC, so the preferences, unsubscribe
 // and confirmation pages know who they are for without a stored token, and a link can't be changed to
 // reach someone else. Each use has its own purpose, so a link made for one can't serve another. The key
-// is MAIL_LINK_SECRET, else one made from the service key (changing either breaks links already sent).
+// is MAIL_LINK_SECRET, else one made from AUTH_SECRET (changing either breaks links already sent; a site
+// that moved off Supabase without one set it to `mail-links:<its old service_role key>`).
 // Server only.
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 
@@ -11,8 +12,8 @@ let key: Buffer | null = null;
 function secret(): Buffer {
   if (key) return key;
   const own = env('MAIL_LINK_SECRET');
-  const base = own || `mail-links:${env('SUPABASE_SERVICE_ROLE_KEY') ?? ''}`;
-  if (!own && !env('SUPABASE_SERVICE_ROLE_KEY')) throw new Error('Mailing links need MAIL_LINK_SECRET (or SUPABASE_SERVICE_ROLE_KEY)');
+  const base = own || `mail-links:${env('AUTH_SECRET') ?? ''}`;
+  if (!own && !env('AUTH_SECRET')) throw new Error('Mailing links need MAIL_LINK_SECRET (or AUTH_SECRET)');
   key = createHash('sha256').update(base).digest();
   return key;
 }

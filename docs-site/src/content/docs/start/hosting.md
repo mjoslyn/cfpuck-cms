@@ -10,11 +10,12 @@ for its files. Accounts are the site's own, in its database.
 
 ## 1. R2
 
-Create a private bucket for the site (**R2 > Create bucket**) and an API token with Object Read & Write
-on it (**R2 > Manage API tokens**). Set `STORAGE_ENDPOINT` to
-`https://<account-id>.r2.cloudflarestorage.com`, `STORAGE_BUCKET` to the bucket's name,
-`STORAGE_REGION` to `auto`, and `STORAGE_ACCESS_KEY_ID` / `STORAGE_SECRET_ACCESS_KEY` to the token's
-access key and secret. The site serves the media library from it at `/media/`.
+Create a private bucket for the site (`npx wrangler r2 bucket create <site>`) and put its name in
+`wrangler.jsonc` (`bucket_name`): the Worker reaches it through the `BUCKET` binding and serves the media
+library from it at `/media/`. Scripts working on the deployed files reach it over R2's S3 API instead:
+an API token with Object Read & Write (**R2 > Manage API tokens**), with `STORAGE_ENDPOINT`
+`https://<account-id>.r2.cloudflarestorage.com`, `STORAGE_BUCKET`, `STORAGE_REGION` `auto` and the
+token's `STORAGE_ACCESS_KEY_ID` / `STORAGE_SECRET_ACCESS_KEY`, in their env file only.
 
 ## 2. D1
 
@@ -56,7 +57,7 @@ npx wrangler queues create <site>-jobs
 ```
 
 Turn on Cloudflare Images for the account. Set the
-secrets with `npx wrangler secret put <NAME>` (`AUTH_SECRET`, `STORAGE_SECRET_ACCESS_KEY`, `SMTP_PASS`,
+secrets with `npx wrangler secret put <NAME>` (`AUTH_SECRET`, `SYNC_SECRET`, `SMTP_PASS`,
 and the optional Compose, payment and Mailgun keys) and the other settings as `vars` in
 `wrangler.jsonc`. Deploy with `npm run deploy`, then add your domain under the Worker's **Domains &
 Routes**. SMTP goes through the Worker's sockets: use port 587 or 465 (25 is closed to Workers).
@@ -117,9 +118,10 @@ Admins invite editors from `/admin/users/`. See [Editor and roles](../../feature
 
 | Variable | Purpose |
 | --- | --- |
-| `PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | Sync with another copy still on Supabase, over its database API |
+| `SYNC_SECRET` | Shared with another copy of the site for Settings > Sync (32 characters or more) |
+| `SYNC_REMOTE_URL`, `SYNC_REMOTE_NAME` | On the copy that starts syncs: the other copy's address and name |
 | `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, `D1_DATABASE_ID` | Scripts only: the deployed database through Cloudflare's API |
-| `STORAGE_ENDPOINT`, `STORAGE_BUCKET`, `STORAGE_REGION`, `STORAGE_ACCESS_KEY_ID`, `STORAGE_SECRET_ACCESS_KEY` | The site's files (R2) |
+| `STORAGE_ENDPOINT`, `STORAGE_BUCKET`, `STORAGE_REGION`, `STORAGE_ACCESS_KEY_ID`, `STORAGE_SECRET_ACCESS_KEY` | Scripts only: the deployed files over R2's S3 API (set, they win over the binding) |
 | `AUTH_SECRET` | Signs sessions and the site's links: a long random value (`openssl rand -hex 32`) |
 | `AUTH_CONFIRM_EMAIL` | `false` lets member sign-ups in without confirming their address |
 | `DATABASE_URL` | Moving a site only: the Postgres database `scripts/pg-to-d1.ts` copies from |
@@ -133,5 +135,5 @@ Admins invite editors from `/admin/users/`. See [Editor and roles](../../feature
 | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | Compose (`ANTHROPIC_MODEL` overrides the default model, `claude-sonnet-5-5`) |
 | `ANTHROPIC_SEO_MODEL` | SEO text generation (default Haiku 4.5) |
 | `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `MAILGUN_REGION`, `MAILGUN_WEBHOOK_SIGNING_KEY`, `MAILGUN_TEST_MODE` | Mailing through Mailgun |
-| `MAIL_LINK_SECRET` | The key for signed links in mailing emails (default: one made from the service key) |
+| `MAIL_LINK_SECRET` | The key for signed links in mailing emails (default: one made from `AUTH_SECRET`) |
 | `LOCAL_ADMIN_EMAIL`, `LOCAL_ADMIN_PASSWORD` | The admin the e2e scripts sign in as |

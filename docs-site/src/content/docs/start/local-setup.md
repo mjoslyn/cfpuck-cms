@@ -8,13 +8,12 @@ sidebar:
 ## Requirements
 
 - Node 22.12 or later
-- Docker (Docker Desktop or OrbStack), for the local Supabase stack, which serves files (S3) and
-  catches mail locally
+- Optional: a local mail catcher to see the site's email (Mailpit, through Docker or Homebrew)
 - For hosting: a Cloudflare account (Workers paid plan)
 - Optional: an Anthropic API key (Compose), an SMTP account (form notifications and ticket emails)
   and a Stripe or Square account (paid forms and tickets)
 
-The Supabase CLI runs through `npx`, so you don't need to install it.
+Wrangler (Cloudflare's CLI) is a dev dependency, so `npx wrangler` needs no install.
 
 ## Steps
 
@@ -26,32 +25,20 @@ The Supabase CLI runs through `npx`, so you don't need to install it.
    npm install
    ```
 
-2. **Start the local services and the database.** The first starts Supabase in Docker on ports
-   56520–56529 (files and the mail catcher); the second makes the local D1 database from
-   `db/migrations/` (in `.wrangler/state`, shared by the dev server and the scripts).
+2. **Make the local database.** This makes the local D1 database from `db/migrations/`, in
+   `.wrangler/state`, where the local file bucket also lives (shared by the dev server and the
+   scripts). Nothing else needs to run.
 
    ```sh
-   npx supabase start
-   npx wrangler d1 migrations apply DB --local
+   npm run db:migrate
    ```
 
-   On a machine short of memory, skip the services the CMS doesn't use:
-
-   ```sh
-   npx supabase start -x logflare,vector,studio,imgproxy,edge-runtime,realtime,supavisor,postgres-meta
-   ```
-
-3. **Configure.** Copy the example env file and fill in these (the S3 keys are what
-   `npx supabase status` prints):
+3. **Configure.** Copy the example env file and set `AUTH_SECRET` to any long random value
+   (`openssl rand -hex 32`):
 
    ```sh
    cp .env.example .env
    ```
-
-   | `.env` | value |
-   | --- | --- |
-   | `STORAGE_ACCESS_KEY_ID`, `STORAGE_SECRET_ACCESS_KEY` | S3 access key and secret (files, in the stack's `site` bucket) |
-   | `AUTH_SECRET` | any long random value (`openssl rand -hex 32`) |
 
 4. **Add starter content**: the header, footer, base templates, a home page, an About page and a
    sample event. It skips anything that already exists, so it is safe to run again.
@@ -88,8 +75,8 @@ Set either `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` and `SMTP_SECURE`,
 addresses, or to `FORMS_ADMIN_EMAIL`, or to `adminEmail` in the site config. Without SMTP,
 submissions are stored but no mail is sent.
 
-Locally, `SMTP_URL=smtp://127.0.0.1:56525` sends to the Supabase stack's mail catcher, whose inbox is
-at http://127.0.0.1:56524.
+Locally, run a mail catcher such as Mailpit (`docker run -d -p 1025:1025 -p 8025:8025 axllent/mailpit`)
+and set `SMTP_URL=smtp://127.0.0.1:1025`; its inbox is at http://127.0.0.1:8025.
 
 ### Events
 

@@ -4,6 +4,7 @@
 // Everything it makes is removed afterwards.
 //   npx tsx --env-file=.env scripts/safety-e2e.ts
 import { siteDb } from '../src/lib/db/site';
+import { closeLocalBindings } from '../src/lib/local-bindings';
 import { createUser, deleteUser } from '../src/lib/auth';
 const base = process.env.ASTRO_ORIGIN ?? 'http://localhost:4321';
 const db = siteDb();
@@ -102,3 +103,4 @@ if (media) { await db.from('media').delete().eq('id', media.id); }
 if (media) { const dir = media.path.slice(0, media.path.lastIndexOf('/')); const objs = (await db.storage.from('media').list(dir, { search: 'safety-e2e' })).data ?? []; await db.storage.from('media').remove(objs.map((o) => `${dir}/${o.name}`)); }
 await db.storage.from('sync-backups').remove([snap.path, st.result?.backup, `jobs/${job}.json`].filter(Boolean));
 process.exitCode = bad ? 1 : 0;
+await closeLocalBindings();

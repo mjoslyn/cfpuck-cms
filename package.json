@@ -10,9 +10,8 @@
     "build": "node scripts/gen-redirects.mjs && astro build",
     "preview": "astro preview",
     "astro": "astro",
-    "db:start": "supabase start",
-    "db:stop": "supabase stop",
-    "start": "supabase start && astro dev",
+    "db:migrate": "wrangler d1 migrations apply DB --local",
+    "start": "wrangler d1 migrations apply DB --local && astro dev",
     "check": "tsc --noEmit -p .",
     "seed": "tsx --env-file=.env scripts/seed.ts",
     "deploy": "npm run build && wrangler deploy"
@@ -22,7 +21,6 @@
     "@astrojs/cloudflare": "^14.4.2",
     "@astrojs/react": "^7.0.0",
     "@puckeditor/core": "^0.23.0",
-    "@supabase/supabase-js": "^2.117.2",
     "@tailwindcss/vite": "^4.3.3",
     "astro": "^7.4.1",
     "aws4fetch": "^1.0.20",
@@ -53,7 +51,6 @@
     "playwright": "^1.63.0",
     "pngjs": "^7.0.0",
     "sharp": "^0.35.5",
-    "supabase": "^2.118.0",
     "tsx": "^4.23.15",
     "wrangler": "^4.152.0"
   }

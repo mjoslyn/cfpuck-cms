@@ -1,6 +1,6 @@
 // Members (an optional feature, on under Settings > Members): the settings, who is viewing a page, what
-// they may see and what a ticket costs them. Safe in the browser; the database side is in
-// supabase/migrations/*_members.sql (the members table, member_can, members-only entries hidden by RLS).
+// they may see and what a ticket costs them. Safe in the browser; members-only entries are left out by
+// the site's loader (visibleTo in src/lib/data.ts).
 
 /** A membership level (settings.site.members.levels). */
 export interface MemberLevel {

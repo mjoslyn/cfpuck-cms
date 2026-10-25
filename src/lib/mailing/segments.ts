@@ -1,6 +1,6 @@
 // Mailing segments: saved rules that pick some of the people on a campaign's lists (members or not).
 // Each rule is one condition; a segment matches when all of them do, or any (`match`). The database
-// evaluates them (mail_rule and mail_segment_match in supabase/migrations/*_mailing_segments.sql); this
+// evaluates them (segmentSql in src/lib/db/functions.ts, for mail_audience); this
 // is their shape, cleaning and wording. Safe in the browser.
 
 export type RuleType = 'list' | 'tag' | 'field' | 'member' | 'joined' | 'opened' | 'clicked' | 'source';

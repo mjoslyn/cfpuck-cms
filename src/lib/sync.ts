@@ -1,16 +1,15 @@
 // Sync between this site and another copy of it (production and a local copy, say): entries of chosen
 // types, terms of chosen taxonomies, files (the media library and its storage objects), templates,
-// forms, settings and redirects, in either direction. The other copy is reached directly with its
-// Supabase URL and service key (SYNC_REMOTE_URL, SYNC_REMOTE_SERVICE_KEY, SYNC_REMOTE_NAME), so a sync
-// runs from the copy that has those set.
+// forms, settings and redirects, in either direction. The other copy is reached at its address with the
+// secret both copies share (SYNC_REMOTE_URL, SYNC_SECRET, SYNC_REMOTE_NAME; src/lib/sync-remote.ts), so a
+// sync runs from the copy that has the address set.
 //
 // Rows match by id (entries, terms, media, forms: copies of one site share ids, and a sync keeps them
 // so), by kind and slug (templates), by key (settings) and by old address (redirects). A sync adds and
 // overwrites; it never deletes. A site whose settings say `sync_protected` refuses any sync into it.
 // `plan` compares and lists what would change; `apply` writes one batch of it, checking again.
-import { createClient } from '@supabase/supabase-js';
 import type { Db } from './db/query';
-import { Storage, storageConfig } from './storage';
+import { remoteDb, syncSecret } from './sync-remote';
 import { allRows } from './rows';
 import { site as config, fieldsFor, taxonomyLabel } from './site';
 import { serviceClient } from './db/site';
@@ -44,7 +43,7 @@ export interface SyncPlan {
 export function remoteConfig(): { name: string; url: string; key: string } | null {
   const env = (k: string) => (import.meta.env?.[k] ?? process.env[k]) as string | undefined;
   const url = env('SYNC_REMOTE_URL');
-  const key = env('SYNC_REMOTE_SERVICE_KEY');
+  const key = syncSecret();
   if (!url || !key) return null;
   let host = 'the other copy';
   try {
@@ -56,16 +55,11 @@ export function remoteConfig(): { name: string; url: string; key: string } | nul
 /** Source and target clients for a direction: push writes to the other copy, pull to this one. */
 export function endpoints(direction: Direction): { source: Db; target: Db; sourceName: string; targetName: string } {
   const remote = remoteConfig();
-  if (!remote) throw new Error('No other copy is set up (SYNC_REMOTE_URL and SYNC_REMOTE_SERVICE_KEY).');
-  const here = (import.meta.env?.PUBLIC_SUPABASE_URL ?? process.env.PUBLIC_SUPABASE_URL ?? '').replace(/\/$/, '');
-  if (remote.url === here) throw new Error('SYNC_REMOTE_URL is this site’s own database.');
+  if (!remote) throw new Error('No other copy is set up (SYNC_REMOTE_URL, and SYNC_SECRET of at least 32 characters).');
+  const here = (import.meta.env?.SITE_URL ?? process.env.SITE_URL ?? '').replace(/\/$/, '');
+  if (remote.url === here) throw new Error('SYNC_REMOTE_URL is this site’s own address.');
   const local = serviceClient();
-  // The other copy is reached over its database API, which answers the same calls as the query layer,
-  // and its files in its own store (SYNC_REMOTE_STORAGE_*), else its Supabase Storage (a copy that
-  // hasn't moved its files yet).
-  const rest = createClient(remote.url, remote.key, { auth: { persistSession: false } });
-  const store = storageConfig('SYNC_REMOTE_STORAGE');
-  const other = { from: (t: string) => rest.from(t), rpc: (f: string, a?: object) => rest.rpc(f, a), storage: store ? new Storage(store) : rest.storage } as unknown as Db;
+  const other = remoteDb(remote.url, remote.key);
   return direction === 'push'
     ? { source: local, target: other, sourceName: 'this site', targetName: remote.name }
     : { source: other, target: local, sourceName: remote.name, targetName: 'this site' };
@@ -677,7 +671,7 @@ async function checkWritable(db: Db, name: string): Promise<void> {
   if (await isProtected(db)) throw new Error(`${capital(name)} is protected from syncs.`);
   // The id counters are moved after writing; without the function there, stop before writing.
   const { error } = await db.rpc('sync_reset_ids');
-  if (error) throw new Error(`${capital(name)} can't take a sync yet: ${error.message}. Apply the migrations there first (npx supabase db push).`);
+  if (error) throw new Error(`${capital(name)} can't take a sync yet: ${error.message}. Apply the migrations there first (npx wrangler d1 migrations apply DB --remote).`);
 }
 
 async function saveFile(db: Db, path: string, body: unknown, upsert = false): Promise<void> {

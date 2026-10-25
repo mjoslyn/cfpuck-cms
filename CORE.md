@@ -13,7 +13,8 @@ remote. Its history starts from this one, with a commit that swaps the example `
 - Core changes are made here, committed and pushed, then merged into each site:
   `git fetch upstream && git merge upstream/main`. They merge cleanly as long as the site only changes
   `src/site/`, its own migrations (`db/migrations/*_site_*.sql`: wrangler reads only that folder),
-  `AGENTS.md`, `README.md`, its env and its local ports (`supabase/config.toml`).
+  `AGENTS.md`, `README.md`, its env and its `wrangler.jsonc` (names and ids of its Worker, database,
+  bucket and queue).
 - All of a site's code and files are in `src/site/`, laid out like the core so each maps onto its
   counterpart: `render/c/` (blocks, as `src/render/c/`), `lib/` (`lib/content/cards.ts` beside
   `src/lib/content/card-presets.ts`), `pages/api/` (endpoints, listed in `routes.json`), `styles/`
@@ -29,8 +30,8 @@ remote. Its history starts from this one, with a commit that swaps the example `
   site's `styles/tokens.css` and `styles/theme.css` in `src/styles/site.css` aside). New core code must not hard-code a site's types, URLs or names.
 - Migrations (core and site, `db/migrations/`) are named with the time they were written
   (`YYYYMMDDHHMMSS_name.sql`) and applied with `npx wrangler d1 migrations apply DB --local` (or
-  `--remote`), which applies every one not yet applied, in order. `supabase/migrations/` is the
-  Postgres history from before D1, kept for sites still moving (`scripts/pg-to-d1.ts`).
+  `--remote`), which applies every one not yet applied, in order. The Postgres migrations from before
+  D1 are in the history (commit `68b7327` is the last with `supabase/migrations/`).
 - Content changes (renamed props, moved settings) ship as migrations: see Changing stored content.
 
 ## Site config
@@ -237,14 +238,17 @@ Backups) copies content
 between this site and another copy of it (production and a local copy), either way: entries of chosen
 types (with their terms and unpublished changes), terms of chosen taxonomies, files (media rows and
 every storage object: sizes, the kept original, AVIF/WebP copies), templates, parts and patterns,
-forms, settings (`site`, `options`; the site icon's files too) and redirects. The other copy is reached
-directly with `SYNC_REMOTE_URL`, `SYNC_REMOTE_SERVICE_KEY` and `SYNC_REMOTE_NAME`, and its files in its
-store with `SYNC_REMOTE_STORAGE_*` (as `STORAGE_*`; without them, its Supabase Storage), so a sync runs from
-the copy that has them set (production can't reach a local copy).
+forms, settings (`site`, `options`; the site icon's files too) and redirects. A sync runs from the copy
+that has the other's address (`SYNC_REMOTE_URL`, `SYNC_REMOTE_NAME`; production can't reach a local
+copy). Both copies share a secret (`SYNC_SECRET`, at least 32 characters): the copy running the sync
+sends its queries to the other's `/api/sync/remote` and its file calls to `/api/sync/files`
+(`src/lib/sync-remote.ts`), signed with it (HMAC-SHA256 of the time and the request, good for five
+minutes; an upload's signature covers its bytes). The other copy runs them as the server, on the tables
+and folders a sync uses only (`SYNC_TABLES`, `SYNC_FOLDERS`: `media`, `sync-backups`); without the
+secret those routes answer Not found. Its writes clear its page cache.
 
-- Rows match by id (entries, terms, media, forms: the copies share ids, and a sync keeps them; then
-  `sync_reset_ids()`, kept for copies still on Postgres, moved the id counters past them; D1's next id
-  is already past the largest), by kind and slug (templates), by key (settings)
+- Rows match by id (entries, terms, media, forms: the copies share ids, and a sync keeps them; D1's
+  next id is past the largest, so `sync_reset_ids()` has nothing to do), by kind and slug (templates), by key (settings)
   and by old address (redirects). Derived columns (`updated_at`, `body_text`, a redirect's
   `wildcard`) are neither compared nor written.
 - Compare (`plan`) lists each group's new, changed and unchanged rows and its conflicts, which are
@@ -389,14 +393,17 @@ Text materials count toward the budget of what is sent in full (`MATERIAL_BUDGET
 
 ## Media
 
-Files are kept in the site's store (`src/lib/storage.ts`): one private bucket on an S3-compatible
-service, Cloudflare R2 in production (`STORAGE_ENDPOINT`, `STORAGE_BUCKET`, `STORAGE_ACCESS_KEY_ID`,
-`STORAGE_SECRET_ACCESS_KEY`; locally the Supabase stack's S3 endpoint and its `site` bucket), with the
-folders `media/`, `compose/` and `sync-backups/`; a Db carries it as `storage`, answering the calls the
-code made of Supabase Storage. The site serves the media folder at `/media/<path>`
-(`src/pages/media/[...path].ts`: ranges for video, cached a year at the CDN), refusing paths that try to
-leave it (`unsafeMediaPath`). `scripts/copy-storage.ts` copies a site's Supabase Storage buckets into
-the store's folders (resumable).
+Files are kept in the site's store (`src/lib/storage.ts`): one private R2 bucket, the `BUCKET` binding
+(under `astro dev` a local bucket in `.wrangler/state`), with the folders `media/`, `compose/` and
+`sync-backups/`; a Db carries it as `storage`, answering the calls the code made of Supabase Storage.
+Scripts in Node reach the same local bucket through wrangler's platform proxy
+(`src/lib/local-bindings.ts`; a script that uses it calls `closeLocalBindings()` before it ends), or the
+deployed one over R2's S3 API with `STORAGE_ENDPOINT`, `STORAGE_BUCKET`, `STORAGE_ACCESS_KEY_ID` and
+`STORAGE_SECRET_ACCESS_KEY` (set, these win in the Worker too: any S3-compatible store). The site serves
+the media folder at `/media/<path>` (`src/pages/media/[...path].ts`: ranges and validators for video and
+caching, cached a year at the CDN), refusing paths that try to leave it (`unsafeMediaPath`).
+`scripts/copy-storage.ts` copies a site's files from another S3-compatible store (Supabase Storage's S3
+endpoint, whose buckets are the folders, or another copy's bucket) into the store (resumable).
 
 Uploads (`/api/admin/media`) are processed by `src/lib/media/process.ts` through an image engine
 (`src/lib/media/engine.ts`: Cloudflare Images, the Worker's `IMAGES` binding; scripts in Node pass
@@ -706,7 +713,7 @@ never subscribes anyone again); the settings are, with the others. Migration `*_
   to a mail catcher on this machine (an SMTP host of 127.0.0.1 or localhost), else is only logged.
 - **Signed links** (`src/lib/mailing/tokens.ts`): a contact's id with an HMAC per purpose (`manage`:
   preferences and unsubscribe; `confirm`; `click`; `seen`), keyed by `MAIL_LINK_SECRET` (else one made
-  from the service key; changing it breaks links already sent). No tokens are stored.
+  from `AUTH_SECRET`; changing it breaks links already sent). No tokens are stored.
 - **Data**: `mail_lists` (name, description, `public`, sort); `contacts` (email lowercased and unique,
   `first_name` and `last_name` (`name` is the two joined, a generated column; migration
   `*_mailing_name_parts.sql` split the names already kept at their first space), attributes, status `pending`/`subscribed`/`unsubscribed`/`bounced`/`complained`: anything but
@@ -955,7 +962,7 @@ deploys (`wrangler deploy`).
 
 - Each request, scheduled run and job runs in a scope of its own (`src/lib/platform.ts`, `inScope`),
   which carries the work to finish after the answer (`afterAnswer`).
-- Bindings: `DB` (D1), `IMAGES` (Cloudflare Images), `JOBS` (a queue: Compose turns, campaign
+- Bindings: `DB` (D1), `BUCKET` (R2), `IMAGES` (Cloudflare Images), `JOBS` (a queue: Compose turns, campaign
   sending runs and restores, each run once with up to 15 minutes, `src/lib/jobs.ts`),
   `CF_VERSION_METADATA` (the page cache's validators). The Cron Triggers: mailing every 5 minutes and at
   06:20 UTC, snapshots at 07:00 UTC, ticket emails hourly (`SCHEDULES`).
@@ -963,21 +970,21 @@ deploys (`wrangler deploy`).
   `npx wrangler secret put`. Mail goes over SMTP through the Worker's sockets (`worker-mailer`; port 25
   is closed to Workers). Link fetching for Compose resolves names over DNS-over-HTTPS (`addressesOf`).
   The visitor's address and country come from `CF-Connecting-IP` and `CF-IPCountry`.
-- `astro dev` runs the Worker in workerd with local bindings: D1 in `.wrangler/state` (the file scripts
-  use too), a local queue, and Miniflare's Images,
+- `astro dev` runs the Worker in workerd with local bindings: D1 and R2 in `.wrangler/state` (which
+  scripts use too), a local queue, and Miniflare's Images,
   which resizes but ignores crop rectangles and qualities (crops are centred locally; production cuts
   them exactly). Cron runs can be triggered at `/cdn-cgi/handler/scheduled?cron=<cron>`. Static files'
   headers are in `public/_headers`; the admin answers carry `X-Robots-Tag: noindex` (middleware).
 
-Files need an R2 bucket and an API token for it (Media). Accounts need `AUTH_SECRET` (a long random value; changing it signs everyone out
+Files need an R2 bucket (`npx wrangler r2 bucket create`, its name in `wrangler.jsonc`; Media). Accounts need `AUTH_SECRET` (a long random value; changing it signs everyone out
 and breaks links already sent) and links in emails use the request's address (`SITE_URL` for Better
 Auth's own). Env: `.env.example`.
 
 ## Commands
 
 ```
-npx supabase start                      # local stack: files (S3) and the mail catcher (ports in supabase/config.toml)
-npx wrangler d1 migrations apply DB --local   # the local database's schema
+npx wrangler d1 migrations apply DB --local   # the local database's schema (npm run db:migrate)
+docker run -d -p 1025:1025 -p 8025:8025 axllent/mailpit   # a local mail catcher (SMTP_URL=smtp://127.0.0.1:1025)
 npx astro dev --background              # http://localhost:4321 (the Worker, in workerd)
 npm run deploy                          # build and deploy the Worker (wrangler deploy)
 npx tsx --env-file=.env scripts/create-editor.ts you@example.org 'password' [editor|admin]   # a user
@@ -987,7 +994,7 @@ npx tsx scripts/checks/formatting.ts    # autop/texturize against scripts/checks
 npx tsx scripts/checks/recurrence.ts    # recurrence rules, DST, event date sync
 npx tsx scripts/db-schema.ts            # src/lib/db/schema.ts from the local D1, after a migration
 npx tsx --env-file=.env scripts/pg-to-d1.ts [--replace | --out data.sql]   # a Postgres copy's data into D1 (moving a site)
-npx tsx --env-file=.env scripts/checks/d1-parity.ts     # the query layer on D1 against PostgREST on the Postgres it came from
+npx tsx --env-file=.env scripts/copy-storage.ts [folder...]   # files from another store (moving a site)
 npx tsx scripts/checks/mailing.ts       # signed links, mailing emails, link tracking, click verdicts, digest times
 npx tsx --env-file=.env scripts/media-formats.ts   # backfill AVIF/WebP for existing media
 ```
@@ -997,7 +1004,8 @@ request.
 
 `scripts/safety-e2e.ts` (uploads, form limits, shared addresses, stale saves, tags, search, roles, restore as a job) and
 `scripts/sync-e2e.ts` (a sync stopped by a row made since Compare; undoing a half-finished sync; needs
-a second local stack as `SYNC_REMOTE_*`) use the running site without a browser and remove what they make.
+a second local copy as `SYNC_REMOTE_URL`, such as the built Worker under `wrangler dev` with its own
+`--persist-to` state, see the script) use the running site without a browser and remove what they make.
 `scripts/payments-e2e.ts [stripe|square]` builds a form with Product fields and a payment provider in the
 browser, submits it, pays (Stripe's checkout with its test card; a Square sandbox payment link opens
 Square's testing panel, whose Test Payment pays the order) and reports the confirmation and the stored

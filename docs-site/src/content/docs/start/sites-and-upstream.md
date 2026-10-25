@@ -32,7 +32,7 @@ Merges stay clean as long as the site only changes:
 - `src/site/`
 - its own database migrations, `db/migrations/*_site_*.sql` (wrangler reads only that folder)
 - `AGENTS.md`, `README.md`
-- its env and its local ports in `supabase/config.toml`
+- its env and its `wrangler.jsonc` (names and ids of its Worker, database, bucket and queue)
 
 ## Taking core updates
 
@@ -44,7 +44,7 @@ npx tsx --env-file=.env scripts/migrate-content.ts # if stored content needs mig
 ```
 
 On a conflict, a site keeps its own `AGENTS.md`, `README.md`, `.env.example` and
-`supabase/config.toml`.
+`wrangler.jsonc`.
 
 ### Migrations
 

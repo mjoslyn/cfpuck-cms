@@ -10,17 +10,20 @@ production and a local copy, in either direction.
 
 ## Setting it up
 
-Set these on the copy you sync from, then restart it:
+Give both copies the same secret, a long random value of at least 32 characters (on a deployed copy,
+`npx wrangler secret put SYNC_SECRET`), and set the other copy's name and address on the copy you sync
+from, then restart it:
 
 ```sh
+SYNC_SECRET=<the same long random value on both copies>
 SYNC_REMOTE_NAME=Production
-SYNC_REMOTE_URL=https://<project>.supabase.co
-SYNC_REMOTE_SERVICE_KEY=<its service_role key>
+SYNC_REMOTE_URL=https://<its address>
 ```
 
-The sync talks to the other copy's database and storage directly, so it runs from the copy that has
-these set. A local copy can push to and pull from production; production can't reach a local copy.
-Apply the migrations on both copies.
+The sync sends its queries and file calls to the other copy's `/api/sync/remote` and `/api/sync/files`,
+signed with the secret; the other copy answers only signed requests, and only for the tables and
+folders a sync uses. So it runs from the copy that has the address set: a local copy can push to and
+pull from production; production can't reach a local copy. Apply the migrations on both copies.
 
 ## What can sync
 
@@ -34,8 +37,8 @@ Apply the migrations on both copies.
 | Settings and menu | key | `site` and `options`, and the site icon's files |
 | Redirects | old address | Target, status, note |
 
-Copies of one site share ids, and a sync keeps them, then moves the id counters past them so rows added
-later don't collide.
+Copies of one site share ids, and a sync keeps them; rows added later take ids past the largest, so they
+don't collide.
 
 ## Running a sync
 
@@ -61,7 +64,7 @@ the store's `media/` folder (the R2 bucket) some other way if you need one.
 What protects images instead: the CMS never deletes or overwrites a stored image. The media library has
 no delete; a restore that removes a file's library row leaves its images in storage, so undoing the
 restore finds them again; and an upload never takes a name whose files are still in storage. Images are
-lost only if someone deletes them in Supabase directly.
+lost only if someone deletes them from the bucket directly.
 
 **Settings > Backups** has a panel for this site, and one for the copy it syncs with when one is set
 up. Each lists that site's backups and snapshots, newest first, to download, restore or delete.

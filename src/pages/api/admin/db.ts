@@ -1,4 +1,4 @@
-// The admin's queries from the browser (src/lib/supabase-browser.ts), run as the signed-in editor or
+// The admin's queries from the browser (src/lib/db/browser.ts), run as the signed-in editor or
 // admin: the policies (src/lib/db/policies.ts) decide what they read and write, as the database's row
 // security did for the database API before. Its writes clear the page cache, its reads don't
 // (src/lib/cache.ts).

@@ -1,5 +1,5 @@
 // Settings > Backups: each copy's backups and snapshots (this site always; the other copy when
-// SYNC_REMOTE_* is set): what it keeps, its snapshot schedule, Back up now, and each backup to download,
+// SYNC_REMOTE_URL and SYNC_SECRET are set): what it keeps, its snapshot schedule, Back up now, and each backup to download,
 // restore or delete. Sync backups are made by Settings > Sync before a sync writes. Backups hold rows,
 // not stored images.
 import { useEffect, useState } from 'react';

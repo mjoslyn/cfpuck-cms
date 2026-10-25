@@ -28,7 +28,7 @@ function crossSite(request: Request, url: URL): boolean {
 async function bodyAction(request: Request, pathname: string): Promise<string | undefined> {
   if (request.method !== 'POST') return undefined;
   if (pathname.startsWith('/api/admin/sync')) return (await request.clone().json().catch(() => ({})))?.action;
-  if (pathname === '/api/admin/db') {
+  if (pathname === '/api/admin/db' || pathname === '/api/sync/remote') {
     const body = await request.clone().json().catch(() => ({}));
     return body?.query?.action ?? (body?.call ? 'call' : undefined);
   }
@@ -41,6 +41,8 @@ export const onRequest = defineMiddleware(async (context, next) => {
     return new Response(`Cross-site ${context.request.method} form submissions are forbidden`, { status: 403 });
   }
   await refreshSiteTimezone();
+  // The other copy's queries during a sync (signed; the route checks them) clear the pages as edits do.
+  if (pathname === '/api/sync/remote') return purgeAfter(context, next);
   const isAdmin = pathname.startsWith('/admin') || pathname.startsWith('/api/admin');
   if (!isAdmin) return next();
   // The admin is never indexed.
@@ -73,14 +75,19 @@ export const onRequest = defineMiddleware(async (context, next) => {
   }
   context.locals.db = sessionDb({ role: profile.role, uid: user.id });
   context.locals.user = { id: user.id, email: user.email ?? '', role: profile.role, name: profile.display_name ?? '' };
-  // An edit clears the CDN's cached pages once it succeeds (src/lib/cache.ts), so it shows at once.
+  return purgeAfter(context, () => noindex(next()));
+});
+
+/** Answers the request, then clears the CDN's cached pages if it was an edit that succeeded (src/lib/cache.ts), so it shows at once. */
+async function purgeAfter(context: Parameters<Parameters<typeof defineMiddleware>[0]>[0], answer: () => Promise<Response>): Promise<Response> {
   const { method } = context.request;
+  const { pathname } = context.url;
   const action = await bodyAction(context.request, pathname);
-  const response = await noindex(next());
+  const response = await answer();
   if ((response.ok || response.status === 303) && changesPages(method, pathname, action) && context.cache.enabled) {
     // 303: form posts (bulk actions, terms) answer with a redirect back to the list.
     // A failed purge is logged, not the edit's failure: the pages refresh within the minute anyway.
     await context.cache.invalidate({ tags: [PAGE_CACHE_TAG] }).catch((e: Error) => console.error(`page cache purge failed: ${e.message}`));
   }
   return response;
-});
+}

@@ -1,10 +1,14 @@
-// The site's files (server only): one private bucket on an S3-compatible store (Cloudflare R2 in
-// production), reached with STORAGE_ENDPOINT, STORAGE_BUCKET, STORAGE_ACCESS_KEY_ID and
-// STORAGE_SECRET_ACCESS_KEY. What were Supabase Storage buckets are folders in it: `media/` (the media
-// library, served by the site at /media/, src/pages/media/[...path].ts), `compose/` (Compose's
-// documents) and `sync-backups/` (Settings > Backups). The calls are the ones the code made of
-// Supabase Storage (`storage.from(folder).upload/download/list/remove`), answering { data, error }.
+// The site's files (server only): one private R2 bucket. In the Worker it is the BUCKET binding (under
+// astro dev, a local bucket in .wrangler/state); scripts in Node reach it over R2's S3 API with
+// STORAGE_ENDPOINT, STORAGE_BUCKET, STORAGE_ACCESS_KEY_ID and STORAGE_SECRET_ACCESS_KEY (set, these win
+// in the Worker too: any S3-compatible store works). What were Supabase Storage buckets are folders in
+// it: `media/` (the media library, served by the site at /media/, src/pages/media/[...path].ts),
+// `compose/` (Compose's documents) and `sync-backups/` (Settings > Backups). The calls are the ones the
+// code made of Supabase Storage (`storage.from(folder).upload/download/list/remove`), answering
+// { data, error }.
 import { AwsClient } from 'aws4fetch';
+import { bindings, type R2BucketLike } from './platform';
+import { localBindings } from './local-bindings';
 
 export interface StorageConfig {
   endpoint: string;
@@ -15,7 +19,7 @@ export interface StorageConfig {
 }
 
 export interface StorageError { message: string; statusCode?: string }
-type Res<T> = { data: T; error: null } | { data: null; error: StorageError };
+export type Res<T> = { data: T; error: null } | { data: null; error: StorageError };
 
 /** A file or folder in a listing, as Supabase Storage listed them (folders have no id). */
 export interface ListedFile {
@@ -42,8 +46,21 @@ const xmlText = (xml: string, tag: string) => [...xml.matchAll(new RegExp(`<${ta
 const decodeXml = (s: string) => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
 const encodeKey = (key: string) => key.split('/').map(encodeURIComponent).join('/');
 
-/** The store: objects by key, path-style (`<endpoint>/<bucket>/<key>`). */
-export class Storage {
+type PutOptions = { contentType?: string; cacheControl?: string; upsert?: boolean };
+type Listing = { keys: { key: string; size: number; modified: string }[]; folders: string[] };
+
+/** Where objects are kept: answers as HTTP responses (404, 412 when an object exists and upsert is off). */
+interface Backend {
+  put(key: string, body: BodyInit, options: PutOptions): Promise<Response>;
+  get(key: string, headers: Record<string, string>): Promise<Response>;
+  delete(key: string): Promise<Response>;
+  listKeys(prefix: string, delimit: boolean): Promise<Listing>;
+}
+
+const cacheControl = (v?: string) => (v && /^\d+$/.test(v) ? `max-age=${v}` : v);
+
+/** An S3-compatible store, path-style (`<endpoint>/<bucket>/<key>`). */
+class S3 implements Backend {
   private client: AwsClient;
 
   constructor(readonly config: StorageConfig) {
@@ -54,25 +71,14 @@ export class Storage {
     return `${this.config.endpoint}/${this.config.bucket}${key ? `/${encodeKey(key)}` : ''}${query ? `?${query}` : ''}`;
   }
 
-  /** A folder of the bucket (what were Supabase Storage buckets). */
-  from(folder: string): Folder {
-    return new Folder(this, folder.replace(/\/+$/, ''));
-  }
-
-  /** Folders need no making; kept so callers that made a bucket first still read the same. */
-  async createBucket(_name: string, _options?: unknown): Promise<Res<null>> {
-    return { data: null, error: null };
-  }
-
-  async put(key: string, body: BodyInit, options: { contentType?: string; cacheControl?: string; upsert?: boolean } = {}): Promise<Response> {
+  put(key: string, body: BodyInit, options: PutOptions): Promise<Response> {
     const headers: Record<string, string> = { 'Content-Type': options.contentType || 'application/octet-stream' };
-    if (options.cacheControl) headers['Cache-Control'] = /^\d+$/.test(options.cacheControl) ? `max-age=${options.cacheControl}` : options.cacheControl;
+    if (options.cacheControl) headers['Cache-Control'] = cacheControl(options.cacheControl)!;
     if (options.upsert === false) headers['If-None-Match'] = '*';
     return this.client.fetch(this.url(key), { method: 'PUT', headers, body });
   }
 
-  /** An object, passing on the request's Range and validators (for serving it). */
-  get(key: string, headers: Record<string, string> = {}): Promise<Response> {
+  get(key: string, headers: Record<string, string>): Promise<Response> {
     return this.client.fetch(this.url(key), { headers });
   }
 
@@ -80,9 +86,8 @@ export class Storage {
     return this.client.fetch(this.url(key), { method: 'DELETE' });
   }
 
-  /** Every key under a prefix, with its folders at the next level when `delimit` (ListObjectsV2, every page). */
-  async listKeys(prefix: string, delimit: boolean): Promise<{ keys: { key: string; size: number; modified: string }[]; folders: string[] }> {
-    const keys: { key: string; size: number; modified: string }[] = [];
+  async listKeys(prefix: string, delimit: boolean): Promise<Listing> {
+    const keys: Listing['keys'] = [];
     const folders: string[] = [];
     let token = '';
     for (;;) {
@@ -98,6 +103,110 @@ export class Storage {
       if (xmlText(xml, 'IsTruncated')[0] !== 'true' || !token) break;
     }
     return { keys, folders };
+  }
+}
+
+/** The Worker's R2 binding (in a script, the local one, once the platform proxy is up). */
+class R2 implements Backend {
+  constructor(private ready: R2BucketLike | Promise<R2BucketLike>) {}
+
+  private get bucket(): Promise<R2BucketLike> {
+    return Promise.resolve(this.ready);
+  }
+
+  async put(key: string, body: BodyInit, options: PutOptions): Promise<Response> {
+    const value = body instanceof Blob ? await body.arrayBuffer() : (body as ArrayBuffer | string);
+    const made = await (await this.bucket).put(key, value, {
+      httpMetadata: { contentType: options.contentType || 'application/octet-stream', ...(options.cacheControl ? { cacheControl: cacheControl(options.cacheControl) } : {}) },
+      ...(options.upsert === false ? { onlyIf: { etagDoesNotMatch: '*' } } : {}),
+    });
+    return new Response(null, { status: made ? 200 : 412 });
+  }
+
+  async get(key: string, headers: Record<string, string>): Promise<Response> {
+    const h = new Headers(headers);
+    const range = h.get('range');
+    const obj = await (await this.bucket).get(key, { onlyIf: h, ...(range ? { range: h } : {}) });
+    if (!obj) return new Response('Not found', { status: 404 });
+    const out = new Headers({ etag: obj.httpEtag, 'last-modified': obj.uploaded.toUTCString(), 'accept-ranges': 'bytes' });
+    obj.writeHttpMetadata(out);
+    // No body: a validator matched.
+    if (!('body' in obj) || !obj.body) return new Response(null, { status: 304, headers: out });
+    const r = obj.range as { offset?: number; length?: number; suffix?: number } | undefined;
+    if (range && r) {
+      const offset = r.suffix !== undefined ? obj.size - r.suffix : (r.offset ?? 0);
+      const length = r.suffix ?? r.length ?? obj.size - offset;
+      out.set('content-range', `bytes ${offset}-${offset + length - 1}/${obj.size}`);
+      out.set('content-length', String(length));
+      return new Response(obj.body, { status: 206, headers: out });
+    }
+    out.set('content-length', String(obj.size));
+    return new Response(obj.body, { status: 200, headers: out });
+  }
+
+  async delete(key: string): Promise<Response> {
+    await (await this.bucket).delete(key);
+    return new Response(null, { status: 204 });
+  }
+
+  async listKeys(prefix: string, delimit: boolean): Promise<Listing> {
+    const keys: Listing['keys'] = [];
+    const folders: string[] = [];
+    let cursor: string | undefined;
+    for (;;) {
+      const page = await (await this.bucket).list({ prefix, cursor, ...(delimit ? { delimiter: '/' } : {}) });
+      for (const o of page.objects) keys.push({ key: o.key, size: o.size, modified: o.uploaded.toISOString() });
+      folders.push(...(page.delimitedPrefixes ?? []));
+      if (!page.truncated) break;
+      cursor = page.cursor;
+    }
+    return { keys, folders };
+  }
+}
+
+/** A folder's calls (what Supabase Storage's bucket had). */
+export type FolderCalls = Pick<Folder, 'upload' | 'download' | 'list' | 'remove'>;
+
+/** Files as a Db carries them: this site's store, or the other copy's through Sync (src/lib/sync-remote.ts). */
+export interface Files {
+  from(folder: string): FolderCalls;
+  createBucket(name: string, options?: unknown): Promise<Res<null>>;
+}
+
+/** The store: objects by key, on R2's binding or an S3-compatible store. */
+export class Storage implements Files {
+  private backend: Backend;
+
+  constructor(source: StorageConfig | R2BucketLike | Promise<R2BucketLike>) {
+    this.backend = 'endpoint' in source ? new S3(source) : new R2(source);
+  }
+
+  /** A folder of the bucket (what were Supabase Storage buckets). */
+  from(folder: string): Folder {
+    return new Folder(this, folder.replace(/\/+$/, ''));
+  }
+
+  /** Folders need no making; kept so callers that made a bucket first still read the same. */
+  async createBucket(_name: string, _options?: unknown): Promise<Res<null>> {
+    return { data: null, error: null };
+  }
+
+  put(key: string, body: BodyInit, options: PutOptions = {}): Promise<Response> {
+    return this.backend.put(key, body, options);
+  }
+
+  /** An object, passing on the request's Range and validators (for serving it). */
+  get(key: string, headers: Record<string, string> = {}): Promise<Response> {
+    return this.backend.get(key, headers);
+  }
+
+  delete(key: string): Promise<Response> {
+    return this.backend.delete(key);
+  }
+
+  /** Every key under a prefix, with its folders at the next level when `delimit` (every page). */
+  listKeys(prefix: string, delimit: boolean): Promise<Listing> {
+    return this.backend.listKeys(prefix, delimit);
   }
 }
 
@@ -178,10 +287,18 @@ export class Folder {
 }
 
 let site: Storage | null = null;
-/** This site's store (STORAGE_*). */
+/**
+ * This site's store: STORAGE_* when set, else the Worker's BUCKET binding; in a script with neither,
+ * the local bucket astro dev uses (src/lib/local-bindings.ts).
+ */
 export function siteStorage(): Storage {
   if (site) return site;
   const config = storageConfig();
-  if (!config) throw new Error('Storage is not set up (STORAGE_ENDPOINT, STORAGE_BUCKET, STORAGE_ACCESS_KEY_ID, STORAGE_SECRET_ACCESS_KEY)');
-  return (site = new Storage(config));
+  if (config) return (site = new Storage(config));
+  const bucket = bindings()?.BUCKET;
+  if (bucket) return (site = new Storage(bucket));
+  return (site = new Storage(localBindings().then((p) => {
+    if (!p.env.BUCKET) throw new Error('Storage is not set up: the BUCKET binding (wrangler.jsonc), or STORAGE_ENDPOINT, STORAGE_BUCKET, STORAGE_ACCESS_KEY_ID and STORAGE_SECRET_ACCESS_KEY');
+    return p.env.BUCKET as R2BucketLike;
+  })));
 }

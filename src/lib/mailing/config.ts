@@ -1,8 +1,8 @@
 // Mailing (an optional feature, on under Settings > Mailing Lists): mailing lists people sign up to, campaigns
 // and weekly digests sent to them through Mailgun, separate from the site's transactional mail (form
 // notifications and tickets go over SMTP as before). The settings, the site's addresses for signing up
-// and managing a subscription, and the shapes the screens share. Safe in the browser; the database side
-// is supabase/migrations/*_mailing.sql.
+// and managing a subscription, and the shapes the screens share. Safe in the browser; the tables are in
+// db/migrations and the functions in src/lib/db/functions.ts.
 import { fieldKey } from './segments';
 
 /** settings.site.mailing. */

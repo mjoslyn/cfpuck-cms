@@ -50,17 +50,18 @@ Update the docs in the same commit as the change, not afterwards:
    `../<site>`, `git fetch <path to this repository> main && git merge --no-commit FETCH_HEAD`,
    restart its dev server if config or dependencies changed, and test there.
 3. Push supapuck-cms (it deploys nothing), then in the site `git fetch upstream && git merge upstream/main`
-   and commit; a site keeps its own `AGENTS.md`, `README.md`, `.env.example` and `supabase/config.toml`
+   and commit; a site keeps its own `AGENTS.md`, `README.md`, `.env.example` and `wrangler.jsonc`
    when they conflict. The site's owner pushes the site, which deploys it.
 4. Stored content changes and how to check changes: `CORE.md` (Changing stored content, Checking
    changes).
 
 ## Local setup
 
-- `npx supabase start` (files and the mail catcher; ports 5652x, each site uses its own),
-  `npx wrangler d1 migrations apply DB --local` (the database, in `.wrangler/state`) and
-  `npx astro dev --background` (http://localhost:4321).
-- The dev server and scripts share the local D1 file. Two dev servers sharing `node_modules` (a
+- `npm run db:migrate` (the local database; it and the local file bucket are in `.wrangler/state`) and
+  `npx astro dev --background` (http://localhost:4321). A mail catcher for the e2e scripts that read
+  email: `docker run -d -p 1025:1025 -p 8025:8025 axllent/mailpit`, `SMTP_URL=smtp://127.0.0.1:1025`.
+- The dev server and scripts share `.wrangler/state`: the database through `node:sqlite`, files through
+  wrangler's platform proxy (`closeLocalBindings()` at a script's end). Two dev servers sharing `node_modules` (a
   worktree with a symlink) share Vite's dependency cache too, and break each other's: give a second
   checkout its own install, or `rm -rf node_modules/.vite` and restart.
 - `astro dev` runs the site in workerd, as a Worker (CORE.md, Hosting): code that only works in Node
@@ -74,8 +75,8 @@ Concise and factual: what changed, why, and any measurements; no editorial frami
 
 ## Open work
 
-- Moving off Netlify and Supabase to Cloudflare (Workers, D1, R2, Images, Better Auth):
-  `docs/cloudflare-migration.md`.
+- The move to Cloudflare is built (`docs/cloudflare-migration.md`); still to check on the first real
+  deploy: Images' trim, the cache purge, SMTP over sockets, and a real site's move (its own tables,
+  row sizes against D1's 2 MB).
+- Search on FTS5 (today: word matching in `Loader.queryRanked`).
 - Core tests that run on the example site's content (several e2e scripts assume a site's content).
-- One fresh starting migration for new sites, so they don't inherit the first site's import
-  migrations (`…0006_forms_sequence`, `…0007_move_legacy_paths`, `…0010_own_names`).

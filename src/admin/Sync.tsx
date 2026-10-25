@@ -151,8 +151,8 @@ export default function Sync() {
       {!remote ? (
         <section className="text-sm text-[#475569]">
           <p className="mb-2">No other copy is set up, so this site can't start a sync. To sync with another copy of the site (production and a local copy, say), set these on the copy you sync from and restart it:</p>
-          <pre className="rounded-sm bg-[#f1f5f9] p-3 text-xs">{'SYNC_REMOTE_NAME=Production\nSYNC_REMOTE_URL=https://<project>.supabase.co\nSYNC_REMOTE_SERVICE_KEY=<its service_role key>'}</pre>
-          <p className="mt-2 text-xs text-admin-muted">The other copy can still protect itself here.</p>
+          <pre className="rounded-sm bg-[#f1f5f9] p-3 text-xs">{'SYNC_REMOTE_NAME=Production\nSYNC_REMOTE_URL=https://<its address>\nSYNC_SECRET=<the same long random value on both copies>'}</pre>
+          <p className="mt-2 text-xs text-admin-muted">The other copy needs the same SYNC_SECRET (at least 32 characters) to answer, and syncing files needs its store as SYNC_REMOTE_STORAGE_*. It can still protect itself here.</p>
         </section>
       ) : (
         <>

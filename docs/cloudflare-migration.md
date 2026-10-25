@@ -1,7 +1,7 @@
 # Moving to Cloudflare
 
 Plan for moving the core off Netlify and Supabase onto Cloudflare Workers, D1, R2, Cloudflare Images
-and Better Auth. Phases 1 to 5 are done (each with what was built); phase 6 is next. Each phase leaves the site working and can ship by itself;
+and Better Auth. All six phases are done (each with what was built); what is left is checking on a first real deploy and moving the first real site. Each phase leaves the site working and can ship by itself;
 CORE.md, README.md and docs-site change in the same commits as the code.
 
 ## Decisions
@@ -120,7 +120,7 @@ local Images ignores `trim` (the same geometry through sharp gives the old resul
 `/cdn-cgi/handler/scheduled`. `wrangler deploy --dry-run` bundles (8.5 MB, 2 MB gzipped).
 
 To check on the first real deploy: Images' `trim` (production only), `cache.purge` by tag, SMTP over
-the Worker's sockets with the site's provider, and Hyperdrive to the Supabase project.
+the Worker's sockets with the site's provider.
 
 ### 5. Database to D1: done
 
@@ -143,30 +143,40 @@ the Worker's sockets with the site's provider, and Hyperdrive to the Supabase pr
   file for `wrangler d1 execute`; long values split under D1's statement limit).
 - Hyperdrive, `src/lib/db/sql.ts` and `pg` at runtime are gone (`pg` stays for the two scripts).
 - Not done: FTS5. Search keeps `Loader.queryRanked`'s word matching, which renders the same results.
-- Checked: `scripts/checks/d1-parity.ts` (PostgREST on Postgres against the layer on D1, same data:
+- Checked: `scripts/checks/d1-parity.ts` (removed in phase 6 with Supabase; in commit `68b7327`; PostgREST on Postgres against the layer on D1, same data:
   reads, writes, functions, editor, admin and viewer; one difference: Postgres refuses invalid JSON in
   a `cs` filter, D1 doesn't), HTML of every page type identical before and after, auth (30), safety
   (28) and mailing (64) e2e, roles, publishing, revisions, forms, events, venue and media e2e as before,
   and the built Worker under `wrangler dev`.
 
-### 6. Sync, backups, tooling, docs
+### 6. Sync, files, tooling, docs: done
 
-- Sync: the other copy is reached through a signed endpoint on it (`/api/sync/remote`, HMAC with a
-  shared `SYNC_SECRET`) instead of its service key; rows are matched as today. Snapshots and backups
-  write to R2. `sync_reset_ids` goes. Until then Sync reaches the other copy through Supabase's API, so
-  it works only between copies still on Postgres.
-- e2e scripts and `scripts/checks/*` run against `wrangler dev`; `create-editor.ts` and `seed.ts` use
-  the new layer.
-- Docs: CORE.md (Hosting, Database access, Media, Sync, Commands, every RLS reference), README.md
-  (new site setup on Cloudflare, taking core updates), AGENTS.md (local setup), docs-site.
+- Sync reaches the other copy through signed routes on it: `/api/sync/remote` (queries, on the tables a
+  sync uses) and `/api/sync/files` (file calls, on `media` and `sync-backups`; an upload's signature
+  covers its bytes), HMAC-SHA256 with the shared `SYNC_SECRET` over the time and the request, good for
+  five minutes (`src/lib/sync-remote.ts`). No service key and no store keys for the other copy: one
+  secret. A remote write clears that copy's page cache.
+- Files on the R2 binding (`BUCKET`; `src/lib/storage.ts` keeps the S3 client for scripts and other
+  stores). `astro dev` uses a local bucket; scripts reach it through wrangler's platform proxy
+  (`src/lib/local-bindings.ts`), so local work needs no Docker. `scripts/copy-storage.ts` reads any
+  S3-compatible source (Supabase Storage's S3 endpoint for a moving site).
+- Supabase is gone: `@supabase/supabase-js`, the `supabase` CLI, `supabase/` (its migrations are in the
+  history), the `PUBLIC_SUPABASE_*` and `SUPABASE_SERVICE_ROLE_KEY` variables. Mailing's link key
+  falls back to `AUTH_SECRET`. Local mail: any catcher (Mailpit).
+- Checked with the Supabase stack stopped: auth (30), safety (28) and mailing (64) e2e; roles,
+  publishing, revisions, forms, events, venue and media e2e; sync e2e between `astro dev` and the built
+  Worker under `wrangler dev` with its own state, and a full sync of every group (files included) into
+  an empty copy, whose pages then matched the source's; `/media/` from R2 answers 200, 304, 206 and 404.
 
 ## Moving an existing site
 
-1. Merge the core, create D1, an R2 bucket, Images, Workflows; set secrets. A site that never set
-   `MAIL_LINK_SECRET` sets it to `mail-links:<its old Supabase service_role key>`, so mailing links
-   already sent keep working.
-2. `scripts/copy-storage.ts` (Supabase Storage to R2), `scripts/pg-to-d1.ts` (the data, accounts
-   included: migration `*_auth_tables.sql` already moved them out of Supabase Auth). A site with tables
+1. Bring the Postgres database up to date with the core first: merge the core up to commit `68b7327`
+   (the last with `supabase/migrations/`) and `npx supabase db push --linked`. Then merge the rest,
+   create D1, an R2 bucket, a queue, Images; set secrets. A site that never set `MAIL_LINK_SECRET` sets
+   it to `mail-links:<its old Supabase service_role key>`, so mailing links already sent keep working.
+2. `scripts/copy-storage.ts` (Supabase Storage's S3 endpoint to R2, with `STORAGE_*` set to the R2
+   bucket's S3 API), `scripts/pg-to-d1.ts` (the data, accounts included: migration `*_auth_tables.sql`
+   already moved them out of Supabase Auth). A site with tables
    of its own (`*_site_*.sql` in `supabase/migrations/`) writes their D1 migration first
    (`scripts/pg-to-d1-schema.ts` prints every table). Check the largest rows (entries' content,
    compose sessions) against D1's 2 MB.

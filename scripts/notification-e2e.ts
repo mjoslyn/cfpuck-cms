@@ -6,7 +6,7 @@
 import { chromium } from 'playwright';
 import { siteDb } from '../src/lib/db/site';
 
-const MAIL = process.env.LOCAL_MAIL_URL ?? 'http://127.0.0.1:56524';
+const MAIL = process.env.LOCAL_MAIL_URL ?? 'http://127.0.0.1:8025';
 const origin = 'http://localhost:4321';
 const sb = siteDb();
 const out: any = {};

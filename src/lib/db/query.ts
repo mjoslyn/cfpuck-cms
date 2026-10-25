@@ -3,7 +3,7 @@
 // query (a QuerySpec); an Executor runs it: on the server, compiled to SQL (src/lib/db/sql.ts); in the
 // admin's browser, posted to /api/admin/db, which runs it as the signed-in editor. Safe in the browser.
 
-import type { Storage } from '../storage';
+import type { Files } from '../storage';
 
 export type Op = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'like' | 'ilike' | 'is' | 'in' | 'cs' | 'cd';
 
@@ -320,10 +320,10 @@ export class CallBuilder implements PromiseLike<Result> {
 export class Db {
   constructor(
     private exec: Executor,
-    private storageOf?: () => Storage,
+    private storageOf?: () => Files,
   ) {}
 
-  get storage(): Storage {
+  get storage(): Files {
     if (!this.storageOf) throw new Error('No storage here');
     return this.storageOf();
   }

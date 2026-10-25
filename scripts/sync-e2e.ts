@@ -1,13 +1,16 @@
-// Sync safeguards, through the running site, pushing pages to the other copy (SYNC_REMOTE_*): a row
-// made on the target since Compare stops the sync, and undoing a sync that stopped halfway deletes only
-// the rows it wrote. It writes to the other copy, so that must be a local stack too, with no pages yet
-// (a second `supabase start` on other ports).
+// Sync safeguards, through the running site, pushing pages to the other copy (SYNC_REMOTE_URL and
+// SYNC_SECRET): a row made on the target since Compare stops the sync, and undoing a sync that stopped
+// halfway deletes only the rows it wrote. It writes to the other copy, so that must be local too, with
+// no pages yet: the built Worker with a database of its own, for instance
+//   npx astro build && npx wrangler dev -c dist/server/wrangler.json --port 8788 --persist-to .wrangler/remote-state --var SYNC_SECRET:<the secret>
+// (its migrations applied with `npx wrangler d1 migrations apply DB --local --persist-to .wrangler/remote-state`).
 //   npx tsx --env-file=.env scripts/sync-e2e.ts
-import { createClient } from '@supabase/supabase-js';
 import { siteDb } from '../src/lib/db/site';
+import { closeLocalBindings } from '../src/lib/local-bindings';
+import { remoteDb } from '../src/lib/sync-remote';
 const base = process.env.ASTRO_ORIGIN ?? 'http://localhost:4321';
-if (!/^https?:\/\/(127\.0\.0\.1|localhost)[:/]/.test(process.env.SYNC_REMOTE_URL ?? '')) throw new Error('SYNC_REMOTE_URL must be a local stack: this test writes to it.');
-const remote = createClient(process.env.SYNC_REMOTE_URL!, process.env.SYNC_REMOTE_SERVICE_KEY!);
+if (!/^https?:\/\/(127\.0\.0\.1|localhost)[:/]/.test(process.env.SYNC_REMOTE_URL ?? '')) throw new Error('SYNC_REMOTE_URL must be a local copy: this test writes to it.');
+const remote = remoteDb(process.env.SYNC_REMOTE_URL!.replace(/\/$/, ''), process.env.SYNC_SECRET!);
 let bad = 0;
 const ok = (name: string, cond: unknown, extra = '') => (cond || bad++, console.log(`${cond ? 'ok  ' : 'FAIL'} ${name} ${extra}`));
 const login = await fetch(`${base}/api/auth/login`, { method: 'POST', redirect: 'manual', headers: { Origin: base }, body: new URLSearchParams({ email: process.env.LOCAL_ADMIN_EMAIL!, password: process.env.LOCAL_ADMIN_PASSWORD! }) });
@@ -31,7 +34,12 @@ res = await post({ action: 'apply', direction: 'push', groups: [group], group, k
 const w = await remote.storage.from('sync-backups').download(`written/${path}`); ok('written recorded', JSON.stringify(JSON.parse(await w.data!.text())) === JSON.stringify({ [group]: [a] }), await w.data!.text());
 r = await remote.from('entries').insert(row(b, 'made-by-hand')); ok('hand-made row takes the next id', !r.error, r.error?.message);
 res = await post({ action: 'restoreBackup', site: 'remote', path }); 
-const st = await (await fetch(`${base}/api/admin/sync?restoreJob=${res.body.job}`, { headers: H })).json(); ok('undo done', st.status === 'done', JSON.stringify(st).slice(0, 300));
+let st: any = {};
+// A restore runs as a job: wait for it.
+for (let i = 0; i < 60 && !['done', 'failed'].includes(st.status); i++) {
+  if (i) await new Promise((r) => setTimeout(r, 1000));
+  st = await (await fetch(`${base}/api/admin/sync?restoreJob=${res.body.job}`, { headers: H })).json();
+} ok('undo done', st.status === 'done', JSON.stringify(st).slice(0, 300));
 ok('synced row deleted', !(await remote.from('entries').select('id').eq('id', Number(a)).maybeSingle()).data);
 ok('hand-made row kept', (await remote.from('entries').select('slug').eq('id', Number(b)).maybeSingle()).data?.slug === 'made-by-hand');
 await remote.from('entries').delete().eq('id', Number(b));
@@ -39,3 +47,4 @@ await remote.storage.from('sync-backups').remove([path, `written/${path}`, st.re
 const local = siteDb();
 await local.storage.from('sync-backups').remove([`jobs/${res.body.job}.json`]);
 process.exitCode = bad ? 1 : 0;
+await closeLocalBindings();

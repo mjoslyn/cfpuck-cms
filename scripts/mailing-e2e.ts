@@ -12,7 +12,7 @@ import { siteDb } from '../src/lib/db/site';
 import { deleteUser } from '../src/lib/auth';
 
 const base = process.env.ASTRO_ORIGIN ?? 'http://localhost:4321';
-const mail = process.env.LOCAL_MAIL_URL ?? 'http://127.0.0.1:54324';
+const mail = process.env.LOCAL_MAIL_URL ?? 'http://127.0.0.1:8025';
 const db = siteDb();
 let bad = 0;
 const ok = (name: string, cond: unknown, extra = '') => (cond || bad++, console.log(`${cond ? 'ok  ' : 'FAIL'} ${name} ${cond ? '' : extra}`));

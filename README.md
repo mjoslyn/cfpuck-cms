@@ -31,13 +31,12 @@ What you get:
 ## Requirements
 
 - Node 22.12 or later
-- Docker (Docker Desktop or OrbStack), for the local Supabase stack, which serves files (S3) and
-  catches mail locally
+- Optional: a local mail catcher to see the site's email (Mailpit, through Docker or Homebrew)
 - For hosting: a Cloudflare account (Workers paid plan: the jobs queue and CPU time)
 - Optional: an Anthropic API key (Compose), an SMTP account (form notifications and ticket emails)
   and a Stripe or Square account (paid forms and tickets)
 
-The Supabase CLI runs through `npx`, so you don't need to install it.
+Wrangler (Cloudflare's CLI) is a dev dependency, so `npx wrangler` needs no install.
 
 ## Local setup
 
@@ -49,17 +48,19 @@ The Supabase CLI runs through `npx`, so you don't need to install it.
    npm install
    ```
 
-2. **Start the local services and the database.** The first starts Supabase in Docker on ports
-   56520–56529 (files and the mail catcher); the second makes the local D1 database from
-   `db/migrations/` (in `.wrangler/state`).
+2. **Make the local database.** This makes the local D1 database from `db/migrations/`, in
+   `.wrangler/state`, where the local file bucket also lives. Nothing else needs to run.
 
    ```
-   npx supabase start
-   npx wrangler d1 migrations apply DB --local
+   npm run db:migrate
    ```
 
-   On a machine short of memory, skip the services the CMS doesn't use:
-   `npx supabase start -x logflare,vector,studio,imgproxy,edge-runtime,realtime,supavisor,postgres-meta`.
+   To see the site's email, run a mail catcher and set `SMTP_URL=smtp://127.0.0.1:1025` in `.env`
+   (its inbox is at http://127.0.0.1:8025):
+
+   ```
+   docker run -d -p 1025:1025 -p 8025:8025 axllent/mailpit
+   ```
 
 3. **Configure.** Copy the example env file:
 
@@ -67,12 +68,7 @@ The Supabase CLI runs through `npx`, so you don't need to install it.
    cp .env.example .env
    ```
 
-   Then fill in these (the S3 keys are what `npx supabase status` prints):
-
-   | `.env` | value |
-   | --- | --- |
-   | `STORAGE_ACCESS_KEY_ID`, `STORAGE_SECRET_ACCESS_KEY` | S3 access key and secret (the rest of `STORAGE_*` is in `.env.example`) |
-   | `AUTH_SECRET` | any long random value (`openssl rand -hex 32`) |
+   Then set `AUTH_SECRET` to any long random value (`openssl rand -hex 32`).
 
 4. **Add starter content.** This adds the header, footer, base templates, a home page, an About page
    and a sample event. It skips anything that already exists, so it is safe to run again.
@@ -105,8 +101,8 @@ The Supabase CLI runs through `npx`, so you don't need to install it.
   `SMTP_SECURE`, or a single `SMTP_URL` such as `smtp://user:pass@host:587`. Also set `MAIL_FROM`.
   Notifications go to each form's addresses, or to `FORMS_ADMIN_EMAIL`, or to `adminEmail` in the
   site config. Without SMTP, submissions are stored but no mail is sent.
-  Locally, `SMTP_URL=smtp://127.0.0.1:56525` sends to the Supabase stack's mail catcher (inbox at
-  http://127.0.0.1:56524).
+  Locally, `SMTP_URL=smtp://127.0.0.1:1025` sends to a mail catcher such as Mailpit (inbox at
+  http://127.0.0.1:8025).
 - **Events.** Turn them on under Settings > Events (admins): event and venue types, the calendar at
   `/events/`, event categories, `.ics` feeds and the event blocks, plus the default time zone (an event
   can choose its own). Run `npm run seed` again afterwards for the event templates and a sample
@@ -141,8 +137,8 @@ The Supabase CLI runs through `npx`, so you don't need to install it.
     `/account/`; to design that page, make a page with that address and put the **Member account**
     block on it.
 
-  Members' emails (confirming an address, resetting a password, invitations) go through Supabase
-  Auth; locally they arrive in the mail catcher.
+  Members' emails (confirming an address, resetting a password, invitations) are sent by the site
+  over SMTP; locally they arrive in the mail catcher.
 - **Mailing.** Turn it on under Settings > Mailing Lists (admins) and fill in the postal address every email
   carries (nothing sends without it). Add lists on the Mailing Lists screen (Lists tab), put a **Subscribe** block where
   people should sign up (or link to `/subscribe/`), then write campaigns or set up a weekly digest there. Segments (tags, fields, sign-up date, opens and clicks) send to part of a list, members or not.
@@ -181,23 +177,23 @@ follow the config. `CORE.md` describes each option.
 
 ## Hosting
 
-1. **Cloudflare R2** (files). Create a bucket for the site (R2 > Create bucket; private) and an API
-   token with Object Read & Write on it (R2 > Manage API tokens). `STORAGE_ENDPOINT` is
-   `https://<account-id>.r2.cloudflarestorage.com`, `STORAGE_BUCKET` the bucket's name, and the token's
-   access key and secret are `STORAGE_ACCESS_KEY_ID` and `STORAGE_SECRET_ACCESS_KEY`.
-2. **D1** (the database). Give the Worker and its database names of the site's own in
-   `wrangler.jsonc` (`name`, `database_name`, and the queue's), then:
+1. **Cloudflare resources.** Give the Worker, its database, bucket and queue names of the site's own
+   in `wrangler.jsonc` (`name`, `database_name`, `bucket_name`, the queue's), then:
    ```
    npx wrangler login
    npx wrangler d1 create <site>
    npx wrangler d1 migrations apply DB --remote
+   npx wrangler r2 bucket create <site>
    npx wrangler queues create <site>-jobs
    ```
    Put the database's id in `wrangler.jsonc` (`database_id`). Images needs Cloudflare Images turned on
    for the account.
-3. **Seed and create an admin.** Scripts reach the deployed database through Cloudflare's API: in a
-   copy of `.env`, set `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` (a token with D1 edit) and
-   `D1_DATABASE_ID`, then run the same two commands as locally:
+2. **Scripts on the deployed site** (optional) reach its database through Cloudflare's API and its
+   files over R2's S3 API: an API token with D1 edit (`CLOUDFLARE_API_TOKEN`, with
+   `CLOUDFLARE_ACCOUNT_ID` and `D1_DATABASE_ID`) and an R2 API token (R2 > Manage API tokens:
+   `STORAGE_ENDPOINT` `https://<account-id>.r2.cloudflarestorage.com`, `STORAGE_BUCKET`,
+   `STORAGE_ACCESS_KEY_ID`, `STORAGE_SECRET_ACCESS_KEY`), in a copy of `.env` such as `.env.production`.
+3. **Seed and create an admin**, with the database settings above, by the same two commands as locally:
    ```
    npx tsx --env-file=.env.production scripts/seed.ts
    npx tsx --env-file=.env.production scripts/create-editor.ts you@example.org 'a-password' admin
@@ -206,10 +202,10 @@ follow the config. `CORE.md` describes each option.
    with `scripts/pg-to-d1.ts` instead (`docs/cloudflare-migration.md`, Moving an existing site).
 4. **The Worker.**
    Set the secrets (`npx wrangler secret put <NAME>`): `AUTH_SECRET` (a long random value of its own,
-   e.g. `openssl rand -hex 32`), `STORAGE_SECRET_ACCESS_KEY`, `SMTP_PASS` (invitations, password links
-   and confirmations are sent over SMTP; port 587 or 465), and the optional Compose, payment and Mailgun
-   keys; the rest (`STORAGE_ENDPOINT`, `STORAGE_BUCKET`, `STORAGE_ACCESS_KEY_ID`, `SMTP_HOST`,
-   `SMTP_USER`, `MAIL_FROM`, `SITE_URL`...) as `vars` in `wrangler.jsonc` or as secrets too. Deploy with
+   e.g. `openssl rand -hex 32`), `SMTP_PASS` (invitations, password links and confirmations are sent
+   over SMTP; port 587 or 465), `SYNC_SECRET` (to sync with another copy: the same long random value on
+   both) and the optional Compose, payment and Mailgun keys; the rest (`SMTP_HOST`, `SMTP_USER`,
+   `MAIL_FROM`, `SITE_URL`...) as `vars` in `wrangler.jsonc` or as secrets too. Deploy with
    `npm run deploy`, then add your domain to the Worker (Workers > the Worker > Domains & Routes).
    - Taking payments (forms or tickets): add the payment provider's webhook. One endpoint serves both:
      - Stripe: `https://<your-domain>/api/payments/stripe`, with the `checkout.session.*`,

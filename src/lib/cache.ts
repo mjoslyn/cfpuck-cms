@@ -26,7 +26,10 @@ const SYNC_WRITES = ['apply', 'restoreBackup'];
  * for the admin's queries from the browser (/api/admin/db) the query's (`select` reads; a call reads).
  */
 export function changesPages(method: string, pathname: string, action?: string): boolean {
-  if (!pathname.startsWith('/api/admin/') || ['GET', 'HEAD', 'OPTIONS'].includes(method)) return false;
+  if (['GET', 'HEAD', 'OPTIONS'].includes(method)) return false;
+  // The other copy's writes during a sync into this one.
+  if (pathname === '/api/sync/remote') return !!action && action !== 'select' && action !== 'call';
+  if (!pathname.startsWith('/api/admin/')) return false;
   if (pathname.endsWith('/notification-preview') || NO_PURGE.some((p) => pathname.startsWith(p))) return false;
   if (pathname.startsWith('/api/admin/sync')) return SYNC_WRITES.includes(action ?? '');
   if (pathname === '/api/admin/db') return !!action && action !== 'select' && action !== 'call';

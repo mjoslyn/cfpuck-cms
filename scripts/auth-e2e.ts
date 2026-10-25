@@ -9,7 +9,7 @@ import { siteDb } from '../src/lib/db/site';
 import { confirmToken, createUser, deleteUser, userByEmail } from '../src/lib/auth';
 
 const base = process.env.ASTRO_ORIGIN ?? 'http://localhost:4321';
-const mail = process.env.LOCAL_MAIL_URL ?? 'http://127.0.0.1:56524';
+const mail = process.env.LOCAL_MAIL_URL ?? 'http://127.0.0.1:8025';
 const db = siteDb();
 const stamp = Date.now().toString(36);
 let failed = 0;
