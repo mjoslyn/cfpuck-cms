@@ -219,8 +219,8 @@ rest fills a `*` in the target (`src/lib/redirects.ts`, tables `redirects` and `
 rule covers an address is decided in one place, `ruleCovers`: an exact rule covers its own path, a
 wildcard every path under its prefix. Redirects apply when an address would otherwise be Not found
 (`renderRequest`, before the slug guess), so they never hide a live page: the exact rule first, else
-the wildcard with the longest prefix (the `wildcard` column; in a PostgREST like pattern `*` means
-`%`). Uses are counted (`redirect_hit`). A rule that would lead back to itself is refused
+the wildcard with the longest prefix (the `wildcard` column; in a like pattern of the query layer, as
+in PostgREST's, `*` means `%`). Uses are counted (`redirect_hit`). A rule that would lead back to itself is refused
 (`loopReason`: a wildcard whose target is under its own prefix). A published entry whose address
 changes gets one automatically (`redirectMovedEntry`, from the entries API).
 
@@ -700,10 +700,10 @@ never subscribes anyone again); the settings are, with the others. Migration `*_
   `campaign_batches`, `campaign_sends`, `campaign_links`, `link_clicks`, `mail_events`, `mailgun_tokens`,
   `digests`, `mail_segments`; contacts' `tags` (lowercased, `cleanTags`) and `attributes` (fields to
   segment by, keys from `fieldKey`). Editors read; admins change lists and contacts; editors write segments; editors write campaigns only as drafts and
-  digests only while off (RLS), and the send routes check the role too. `mail_audience` (a campaign's
+  digests only while off (`src/lib/db/policies.ts`), and the send routes check the role too. `mail_audience` (a campaign's
   recipients: subscribed, on any of its lists, not suppressed, optionally only active members of some
   levels or only non-members, matched by address), `mail_still_subscribed`, `mail_claim`,
-  `mail_digest_claim`, `mail_rule`, `mail_segment_match` (server only) and `campaign_stats` (editors).
+  `mail_digest_claim` (server only) and `campaign_stats` (editors), in `src/lib/db/functions.ts`.
 - **Segments** (`src/lib/mailing/segments.ts`, `src/admin/SegmentEditor.tsx`, `/api/admin/mailing/segments`;
   migration `*_mailing_segments.sql`): saved rules, all or any of them, that pick some of the people on
   a campaign's or digest's lists (`segment_id`; `mail_audience`'s `p_segment`): on a list, tagged, a
@@ -815,8 +815,8 @@ never subscribes anyone again); the settings are, with the others. Migration `*_
 
 `/admin/` (Supabase Auth; `profiles.role`: editor, admin, or viewer = no access). Editors manage content,
 templates, media, forms and compose; site settings and users (`/admin/users/`: roles, invitations, Resend invitation for those invited who haven't set a password, signed in by a link or not, `src/lib/admin/invite.ts`; Delete, not your own account: the profile and any membership go, what they made stays with its author left empty) are
-for admins, as is the redirects API (`ADMIN_ONLY` in `src/middleware.ts`; settings writes are admin-only in RLS via
-`is_admin()`; the users API checks the role itself too, since invitations use the service key). `src/puck/Editor.tsx` renders blocks through the same string renderer inside Puck
+for admins, as is the redirects API (`ADMIN_ONLY` in `src/middleware.ts`; settings writes are admin-only in the policies,
+`src/lib/db/policies.ts`; the users API checks the role itself too, since invitations use the service key). `src/puck/Editor.tsx` renders blocks through the same string renderer inside Puck
 (`BlockView.tsx` parses HTML to React; slots become the block's inner wrapper element). The left rail
 has Blocks (and Patterns), Outline and an accessibility check (`A11yPanel.tsx`). Problems a person has to judge
 (warnings, and text over an image, which is always a problem since its contrast can't be measured) can be
@@ -849,7 +849,7 @@ accent, soft background, the bar's text) on every admin page, and Puck's blue sc
 accent (`src/styles/admin.css`). The admin uses the system font (`--font-admin`).
 
 Saving: **Save draft** keeps changes to a published page aside (table `entry_drafts`, editors only:
-like everything else, they're read through the editor's session) with the live page
+like everything else, they're read as the editor, `locals.db`) with the live page
 unchanged; unpublished pages save in place as drafts. **Publish** / **Publish changes** makes them live;
 the header also offers Discard changes and Unpublish (`PUT /api/admin/entries/:id` with `action`).
 **Preview** opens `/admin/preview/<id>/` with the editor's current state (POST) or the saved draft
@@ -868,32 +868,47 @@ titled, returns the id).
 
 ## Database access
 
-The database API (Supabase's REST API, reached with the public key the browser has for signing in)
-answers editors only (migration `*_closed_api.sql`). Anonymous requests have no grants on our tables,
-sequences or functions; signed-in accounts that aren't editors (members, sign-ups) get nothing back,
-since every table's policies check `is_editor()` / `is_admin()`, and the server's functions
-(`not_found_hit`, `redirect_hit`, `ticket_order_status`, `sync_*`, `ticket_order_create`, `mail_*`) are
-revoked; `ticket_sold` runs with the caller's rights, so only editors see counts through it.
+The code reads and writes through the query layer (`src/lib/db`), on a direct connection to the
+database (`DATABASE_URL`; on a hosted project, its transaction pooler). Its calls are the ones the
+Supabase client had (`db.from('entries').select(...).eq(...)`, embedded relations, `or()` strings,
+`range`, `single`, `upsert`, `rpc`), so the code kept its shape: `query.ts` builds a query (safe in the
+browser), `sql.ts` compiles it to one Postgres statement that answers the JSON PostgREST did (checked
+against it by `scripts/checks/db-parity.ts`), with tables and columns checked against `schema.ts`
+(generated by `scripts/db-schema.ts`; run it after a migration that changes tables) and every value
+bound. The server's functions (`db.rpc`) are in `functions.ts`: counters, ticket holds (an advisory
+lock per event and date), mailing claims and audiences (a segment's rules as SQL), campaign numbers.
+This is the first step off Supabase (`docs/cloudflare-migration.md`); Auth and Storage are still
+Supabase's, carried by a Db as `auth` and `storage`.
 
-- The editor and admin screens read and write through the editor's own session (`browserClient`,
-  `locals.db`), as the policies allow.
-- The site reads on the server with the service key, `siteDb()` (`src/lib/supabase.ts`), which the
-  database doesn't filter: public pages, feeds, search, ticket availability, member endpoints, the admin
-  login page's theme. Its `Loader`s take a scope (`PUBLIC_SCOPE`, or `{ published, viewer }` from
-  `renderRequest`) that limits entries to published ones and members-only ones to who may see them
-  (`visibleTo`: `entry`, `entryById`, `entriesByIds`, `query`, `termCounts`, `lockedEntry`). Code that
-  queries entries for visitors without a Loader applies `visibleTo` itself. Previews render with the
-  editor's session and no scope.
-- New tables get no anonymous grants (default privileges); give them policies that check
-  `is_editor()`. A new function that editors call through the API needs `grant execute ... to
-  authenticated` and its own check; anything else is for the server's key.
+- A Db reads and writes as a role. The server's (`siteDb()`, `serviceClient()` in
+  `src/lib/supabase.ts`) isn't checked: public pages, feeds, search, ticket availability, member
+  endpoints, the admin login page's theme. Its `Loader`s take a scope (`PUBLIC_SCOPE`, or
+  `{ published, viewer }` from `renderRequest`) that limits entries to published ones and members-only
+  ones to who may see them (`visibleTo`: `entry`, `entryById`, `entriesByIds`, `query`, `termCounts`,
+  `lockedEntry`). Code that queries entries for visitors without a Loader applies `visibleTo` itself.
+  Previews render as the editor with no scope.
+- A signed-in person's (`locals.db`, set by the middleware: `sessionDb`) follows the policies in
+  `src/lib/db/policies.ts`, the database's row security as it was: editors read every table and write
+  content, media, forms, templates, compose and segments; admins also write settings, lists, contacts
+  and members; editors save campaigns only as drafts, change digests only while off and change their
+  own profile but not its role; anyone else gets nothing. Reads a role may not make return no rows;
+  refused inserts, and writes whose rows fail a check, are errors (and rolled back).
+- The admin screens in the browser (`browserClient`, `src/lib/supabase-browser.ts`) send their queries
+  to `POST /api/admin/db`, which runs them as the signed-in editor; only its writes clear the page
+  cache. Of the functions, editors may call `campaign_stats` and `ticket_sold`; the rest are the
+  server's.
+- Supabase's database API is still there for Auth and for Sync's other copy, and still answers
+  editors only (migration `*_closed_api.sql`); the site no longer uses it for data. New tables get a
+  line in `POLICIES` (none: the server's only).
 
 ## Hosting
 
 Netlify, with a hosted Supabase project (`npx supabase link`). Migrations: `npx supabase db push
---linked`; SQL: `npx supabase db query --linked`. Hosted projects don't grant the API roles access to
-new tables (the local stack does): migration 0019 grants them and sets default privileges, and RLS
-does the rest (see Database access). `scripts/copy-storage.ts` copies storage objects from the local stack to a hosted
+--linked`; SQL: `npx supabase db query --linked`. The site connects to the database with
+`DATABASE_URL`: on Netlify, the project's transaction pooler (Connect > Transaction pooler, port 6543),
+since each function instance opens its own connections (`DATABASE_POOL_MAX`, default 5). Hosted
+projects don't grant the API roles access to new tables (the local stack does): migration 0019 grants
+them and sets default privileges, and RLS does the rest for the database API (see Database access). `scripts/copy-storage.ts` copies storage objects from the local stack to a hosted
 project (resumable). Editors set their password at `/admin/set-password/` (invitation and reset links
 land there; reset links with the session in the fragment, which the page hands to `/api/auth/session`, so
 they work in any browser), so Supabase Auth's Site URL and redirect URLs must include the site's domain.
@@ -911,6 +926,8 @@ npm run seed                            # starter templates, home page, sample e
 npx tsx --env-file=.env scripts/migrate-content.ts [--dry-run]   # site then core content migrations
 npx tsx scripts/checks/formatting.ts    # autop/texturize against scripts/checks/formatting-cases.json
 npx tsx scripts/checks/recurrence.ts    # recurrence rules, DST, event date sync
+npx tsx --env-file=.env scripts/db-schema.ts            # src/lib/db/schema.ts from the database, after a migration
+npx tsx --env-file=.env scripts/checks/db-parity.ts     # the query layer against PostgREST (local stack)
 npx tsx scripts/checks/mailing.ts       # signed links, mailing emails, link tracking, click verdicts, digest times
 npx tsx --env-file=.env scripts/media-formats.ts   # backfill AVIF/WebP for existing media
 ```

@@ -2,11 +2,10 @@
 // manages roles and invites on /admin/users/. Uses temporary accounts, removed afterwards.
 //   npx tsx --env-file=.env scripts/roles-e2e.ts
 import { chromium, type Page } from 'playwright';
-import { createClient } from '@supabase/supabase-js';
+import { siteDb } from '../src/lib/supabase';
 
 const origin = process.env.ASTRO_ORIGIN ?? 'http://localhost:4321';
-const url = process.env.PUBLIC_SUPABASE_URL!;
-const sb = createClient(url, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
+const sb = siteDb();
 const email = 'e2e-editor@example.com';
 const invitee = 'e2e-invitee@example.com';
 // A throwaway password per run; the account is deleted at the end.
@@ -41,11 +40,10 @@ try {
   out.editorSettingsApi = (await ed.request.put(`${origin}/api/admin/settings`, { data: { site: {} }, headers: { Origin: origin } })).status();
   out.editorRedirectsApi = (await ed.request.delete(`${origin}/api/admin/redirects?id=0`, { headers: { Origin: origin } })).status();
   out.editorUsersApi = (await ed.request.post(`${origin}/api/admin/users`, { form: { action: 'role', id: created.user.id, role: 'admin' }, headers: { Origin: origin }, maxRedirects: 0 })).status();
-  // Straight to the database with the editor's own session: settings writes are refused.
-  const userDb = createClient(url, process.env.PUBLIC_SUPABASE_ANON_KEY!, { auth: { persistSession: false } });
-  await userDb.auth.signInWithPassword({ email, password });
-  const { data: wrote } = await userDb.from('settings').update({ value: { hacked: true } }).eq('key', 'options').select('key');
-  out.editorDbSettingsWrite = wrote?.length ?? 0;
+  // A query of the editor's own, as the admin screens send them: settings writes are refused.
+  const query = { table: 'settings', action: 'update', columns: 'key', returning: true, values: { value: { hacked: true } }, filters: [{ path: '', item: { col: 'key', op: 'eq', value: 'options' } }], order: [] };
+  const wrote = await (await ed.request.post(`${origin}/api/admin/db`, { data: { query }, headers: { Origin: origin } })).json();
+  out.editorDbSettingsWrite = wrote.data?.length ?? 0;
   const { data: about } = await sb.from('entries').select('id').eq('slug', 'about').eq('type', 'page').single();
   await ed.goto(`${origin}/admin/edit/${about!.id}/`);
   await ed.frameLocator('iframe').first().locator('h2').first().waitFor();

@@ -3,10 +3,10 @@
 //   npx tsx --env-file=.env scripts/media-e2e.ts
 import { chromium } from 'playwright';
 import sharp from 'sharp';
-import { createClient } from '@supabase/supabase-js';
+import { siteDb } from '../src/lib/supabase';
 
 const origin = process.env.ASTRO_ORIGIN ?? 'http://localhost:4321';
-const sb = createClient(process.env.PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
+const sb = siteDb();
 const out: Record<string, unknown> = {};
 let id = 0;
 

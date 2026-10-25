@@ -4,7 +4,7 @@
 // the profile and membership are read with the site's key, since the database API is closed to
 // everyone but editors.
 import type { AstroCookies } from 'astro';
-import { serverClient, siteDb } from '../supabase';
+import { authClient, siteDb } from '../supabase';
 import type { MemberRow, Viewer } from './config';
 
 /** Whether a request carries a Supabase sign-in cookie. */
@@ -15,7 +15,7 @@ export async function viewerOf(request: Request, cookies: AstroCookies): Promise
   if (!hasSession(request)) return null;
   const {
     data: { user },
-  } = await serverClient(request, cookies).auth.getUser();
+  } = await authClient(request, cookies).auth.getUser();
   if (!user) return null;
   const db = siteDb();
   const [{ data: profile }, { data: member }] = await Promise.all([

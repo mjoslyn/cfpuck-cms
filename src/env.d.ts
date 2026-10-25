@@ -2,7 +2,7 @@
 
 declare namespace App {
   interface Locals {
-    db: import('@supabase/supabase-js').SupabaseClient;
+    db: import('./lib/db/query').Db;
     user: { id: string; email: string; role: 'editor' | 'admin'; name: string };
   }
 }

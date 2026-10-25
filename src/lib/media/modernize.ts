@@ -1,7 +1,7 @@
 // Page-level pass: images that reference /media/ files directly (HTML blocks, theme sections, inline
 // backgrounds) get their AVIF/WebP copies too. Images rendered from the media library already carry
 // <picture> sources and are left alone.
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Db } from '../db/query';
 import { UPLOADS_BASE } from './image';
 import { safeDecode } from '../url';
 
@@ -20,7 +20,7 @@ function candidates(path: string): string[] {
 
 const pathOf = (url: string) => safeDecode(url.split(/[?#]/)[0].slice(UPLOADS_BASE.length));
 
-export async function modernizeImages(html: string, db: SupabaseClient): Promise<string> {
+export async function modernizeImages(html: string, db: Db): Promise<string> {
   if (!html.includes(UPLOADS_BASE)) return html;
   // Leave existing <picture> elements untouched.
   const parts = html.split(/(<picture>[\s\S]*?<\/picture>)/);

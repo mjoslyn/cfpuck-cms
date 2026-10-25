@@ -2,7 +2,7 @@
 // may run on Netlify, so the API queues the turn in compose_jobs and hands it to the background function
 // (netlify/functions/compose-background.mts, up to 15 minutes); where there is none (astro dev) it runs
 // in-process. The runner writes progress to the job row and the panel polls it.
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Db } from '../db/query';
 import { refreshSiteTimezone } from '../site/timezone';
 import { serviceClient } from '../supabase';
 import { MediaStore } from '../media/process';
@@ -77,14 +77,14 @@ const slugify = (s: string) =>
   s.toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'composed-page';
 
 /** Queue a turn; returns the job id and the token the worker must present. */
-export async function queueJob(db: SupabaseClient, sessionId: string, authorId: string, input: JobInput) {
+export async function queueJob(db: Db, sessionId: string, authorId: string, input: JobInput) {
   const { data, error } = await db.from('compose_jobs').insert({ session_id: sessionId, author_id: authorId, input }).select('id, token').single();
   if (error) throw error;
   return data as { id: string; token: string };
 }
 
 /** Record the outcome. The row is the only way a worker nobody is awaiting can report anything. */
-async function finish(db: SupabaseClient, id: string, patch: { status: 'done' | 'error'; result?: unknown; error?: string }) {
+async function finish(db: Db, id: string, patch: { status: 'done' | 'error'; result?: unknown; error?: string }) {
   await db.from('compose_jobs').update(patch).eq('id', id);
 }
 

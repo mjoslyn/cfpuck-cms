@@ -36,16 +36,18 @@ Migration 0019 grants them and sets default privileges; row-level security does 
 
 :::caution[The database API is for editors only]
 The anon key is public (the browser needs it to sign in), so the database's API is closed to everyone
-but editors (migration `*_closed_api.sql`): anonymous requests and signed-in accounts that aren't
-editors, such as members, get nothing from it. The site reads on the server with the service_role key
-and shows visitors only published, permitted content. Keep `SUPABASE_SERVICE_ROLE_KEY` out of anything
-the browser loads (only `PUBLIC_` variables reach it).
+but editors (migration `*_closed_api.sql`); the site doesn't use it for data. The site reads and
+writes on the server over `DATABASE_URL` and shows visitors only published, permitted content; the
+admin screens' queries go through the site, which checks each person's role. Keep
+`SUPABASE_SERVICE_ROLE_KEY` and `DATABASE_URL` out of anything the browser loads (only `PUBLIC_`
+variables reach it).
 :::
 
 ## 2. Seed and create an admin
 
 Point a copy of `.env` at the hosted project (its URL, anon key and service_role key, from
-**Project Settings > API**) and run the same commands as locally:
+**Project Settings > API**, and `DATABASE_URL`, its transaction pooler's connection string from
+**Connect > Transaction pooler**) and run the same commands as locally:
 
 ```sh
 npx tsx --env-file=.env.production scripts/seed.ts
@@ -120,7 +122,9 @@ Admins invite editors from `/admin/users/`. See [Editor and roles](../../feature
 | Variable | Purpose |
 | --- | --- |
 | `PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_ANON_KEY` | The Supabase project |
-| `SUPABASE_SERVICE_ROLE_KEY` | Server-side access |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server-side access to Supabase Auth and Storage |
+| `DATABASE_URL` | The database, through the project's transaction pooler (port 6543) |
+| `DATABASE_POOL_MAX` | Database connections per server instance (default 5) |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE` or `SMTP_URL` | Outgoing mail |
 | `MAIL_FROM` | Sender, overriding the config's `mailFrom` |
 | `FORMS_ADMIN_EMAIL` | Where form notifications go when a form doesn't say |

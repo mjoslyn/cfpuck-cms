@@ -3,9 +3,9 @@
 // and a snapshot restore run as a job (rows made since deleted, a form with submissions kept).
 // Everything it makes is removed afterwards.
 //   npx tsx --env-file=.env scripts/safety-e2e.ts
-import { createClient } from '@supabase/supabase-js';
+import { siteDb } from '../src/lib/supabase';
 const base = process.env.ASTRO_ORIGIN ?? 'http://localhost:4321';
-const db = createClient(process.env.PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+const db = siteDb();
 let bad = 0;
 const ok = (name: string, cond: unknown, extra = '') => (cond || bad++, console.log(`${cond ? 'ok  ' : 'FAIL'} ${name} ${extra}`));
 // sign in

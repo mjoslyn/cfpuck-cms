@@ -3,10 +3,10 @@
 // skipped by validation), then delete the page, form and submissions.
 //   npx tsx --env-file=.env scripts/forms-e2e.ts
 import { chromium } from 'playwright';
-import { createClient } from '@supabase/supabase-js';
+import { siteDb } from '../src/lib/supabase';
 
 const origin = process.env.ASTRO_ORIGIN ?? 'http://localhost:4321';
-const sb = createClient(process.env.PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
+const sb = siteDb();
 const out: Record<string, unknown> = {};
 const errors: string[] = [];
 let formId = 0;

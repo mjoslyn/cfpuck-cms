@@ -40,8 +40,8 @@ A membership counts while it is active and not past its expiry date.
 In a page's settings (the editor's sidebar), **Members** > **Members only**, and optionally the levels.
 It applies when the page is published. Everyone else sees the page's title, excerpt and featured image
 with a sign-in link in place of its content, and it's left out of lists, search and emails for them.
-Its content is never sent to anyone else: the site checks who is looking before it reads it, and the
-database API is closed to everyone but editors, so it can't be read any other way.
+Its content is never sent to anyone else: the site checks who is looking before it reads it, and only
+editors can query the site's data, so it can't be read any other way.
 
 ## Members only block
 
@@ -49,8 +49,8 @@ The **Members only** block (the Members group in the block list) holds other blo
 levels (and editors) see them; everyone else sees a message and a sign-in link, or nothing. The rest of
 the page stays public.
 
-Its contents are as safe as a members-only page's: the database API answers editors only, so the page's
-stored content can't be read around the block.
+Its contents are as safe as a members-only page's: only editors can query the site's data, so the
+page's stored content can't be read around the block.
 
 The **Member sign-in link** block is a "Sign in" link to the account page that reads "My account" for
 signed-in visitors, for a header or menu.

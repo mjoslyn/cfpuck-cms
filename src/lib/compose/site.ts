@@ -1,7 +1,7 @@
 // search_site: Claude looks up the site's own content (every listable type, and pages) to feature or
 // link to it. Featured images (or logos, for types with a logoField) join the conversation's
 // materials so the page can use them.
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Db } from '../db/query';
 import { Loader } from '../data';
 import { permalink } from '../permalink';
 import { formatDate } from '../date-format';
@@ -28,7 +28,7 @@ const logoOf = (e: Entry) => {
   return field ? Number(e.fields?.[field]) || null : null;
 };
 
-export async function searchSite(db: SupabaseClient, reg: Registry, input: Record<string, any>): Promise<{ results: unknown[]; summary: string }> {
+export async function searchSite(db: Db, reg: Registry, input: Record<string, any>): Promise<{ results: unknown[]; summary: string }> {
   const loader = new Loader(db);
   const types = Array.isArray(input.types) && input.types.length ? input.types.filter((t: string) => ALL.includes(t)) : ALL;
   const terms: Record<string, number[]> = {};

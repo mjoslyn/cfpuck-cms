@@ -21,10 +21,14 @@ const NO_PURGE = ['/api/admin/mailing/campaigns', '/api/admin/mailing/contacts',
 // Settings > Sync: only syncing into this copy and restoring a backup here change its content.
 const SYNC_WRITES = ['apply', 'restoreBackup'];
 
-/** Whether an admin request changes what the public pages show (`syncAction`: a sync request's action). */
-export function changesPages(method: string, pathname: string, syncAction?: string): boolean {
+/**
+ * Whether an admin request changes what the public pages show. `action`: a sync request's action, or
+ * for the admin's queries from the browser (/api/admin/db) the query's (`select` reads; a call reads).
+ */
+export function changesPages(method: string, pathname: string, action?: string): boolean {
   if (!pathname.startsWith('/api/admin/') || ['GET', 'HEAD', 'OPTIONS'].includes(method)) return false;
   if (pathname.endsWith('/notification-preview') || NO_PURGE.some((p) => pathname.startsWith(p))) return false;
-  if (pathname.startsWith('/api/admin/sync')) return SYNC_WRITES.includes(syncAction ?? '');
+  if (pathname.startsWith('/api/admin/sync')) return SYNC_WRITES.includes(action ?? '');
+  if (pathname === '/api/admin/db') return !!action && action !== 'select' && action !== 'call';
   return true;
 }

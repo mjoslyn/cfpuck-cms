@@ -26,7 +26,7 @@ What you get:
   built in the email builder, one-click unsubscribe, and opens and clicks with mail scanners' clicks
   told apart from people's
 - Compose: pages and edits written by Claude from your materials
-- Roles: editor and admin, with invitations; the database API answers editors only
+- Roles: editor and admin, with invitations; what each may read and change is checked on the server
 
 ## Requirements
 
@@ -71,6 +71,7 @@ The Supabase CLI runs through `npx`, so you don't need to install it.
    | `PUBLIC_SUPABASE_URL` | API URL (`http://127.0.0.1:56521`) |
    | `PUBLIC_SUPABASE_ANON_KEY` | anon key |
    | `SUPABASE_SERVICE_ROLE_KEY` | service_role key |
+   | `DATABASE_URL` | DB URL (`postgresql://postgres:postgres@127.0.0.1:56522/postgres`) |
 
 4. **Add starter content.** This adds the header, footer, base templates, a home page, an About page
    and a sample event. It skips anything that already exists, so it is safe to run again.
@@ -189,7 +190,8 @@ follow the config. `CORE.md` describes each option.
    - Using Members: also add `https://<your-domain>/account/**`, where members' sign-up,
      invitation and password links land.
 2. **Seed and create an admin.** Point a copy of `.env` at the hosted project: its URL, anon key and
-   service_role key, from Project Settings > API. Then run the same two commands as locally:
+   service_role key, from Project Settings > API, and `DATABASE_URL`, its transaction pooler's
+   connection string (Connect > Transaction pooler). Then run the same two commands as locally:
    ```
    npx tsx --env-file=.env.production scripts/seed.ts
    npx tsx --env-file=.env.production scripts/create-editor.ts you@example.org 'a-password' admin
@@ -197,7 +199,7 @@ follow the config. `CORE.md` describes each option.
    To move local media to the hosted storage bucket, use `scripts/copy-storage.ts`.
 3. **Netlify.**
    - Create a site from your repository. The build settings are in `netlify.toml`.
-   - Set the same environment variables as `.env`: the Supabase URL and keys, plus the optional
+   - Set the same environment variables as `.env`: the Supabase URL and keys, `DATABASE_URL` (the transaction pooler), plus the optional
      Compose, SMTP and ticket payment (Stripe or Square) ones.
    - Add your domain.
    - Taking payments (forms or tickets): add the payment provider's webhook. One endpoint serves both:

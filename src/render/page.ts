@@ -2,7 +2,7 @@
 // resolve the queried object, pick a template via the template hierarchy, render blocks,
 // then texturize the result (get_the_block_template_html) and wrap it in the page shell.
 import { VENDOR_CSS } from './vendor';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Db } from '../lib/db/query';
 import { Loader } from '../lib/data';
 import { recurrenceOf, expandEntry, defaultHorizon } from '../lib/recurrence';
 import { permalink } from '../lib/permalink';
@@ -248,7 +248,7 @@ export interface PreviewOverride {
   template?: PuckItem[];
 }
 
-export async function renderRequest(url: URL, db: SupabaseClient, form?: FormResult, preview?: PreviewOverride, viewer?: Viewer | null): Promise<PageResult> {
+export async function renderRequest(url: URL, db: Db, form?: FormResult, preview?: PreviewOverride, viewer?: Viewer | null): Promise<PageResult> {
   // The site's view: published entries, members-only ones for whoever may see them. Previews read with
   // the editor's own session, whose database policies decide instead.
   const loader = new Loader(db, undefined, preview ? undefined : { published: true, viewer });

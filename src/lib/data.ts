@@ -1,6 +1,6 @@
 // Per-request data loader with caches. Everything a page needs is fetched here before rendering,
 // because the block renderers are synchronous.
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Db } from './db/query';
 import type { Data } from '@puckeditor/core';
 import { ENTRY_COLUMNS, type Entry, type Media, type Term } from './types';
 import { RECURRENCE_KEY, expandEntry, defaultHorizon } from './recurrence';
@@ -82,7 +82,7 @@ export class Loader {
   private recurring?: Promise<boolean>;
   private formsCache?: Promise<FormRow[]>;
 
-  constructor(public db: SupabaseClient, public now = new Date(), public scope?: LoaderScope) {}
+  constructor(public db: Db, public now = new Date(), public scope?: LoaderScope) {}
 
   private visible<Q>(q: Q): Q {
     return visibleTo(q, this.scope);

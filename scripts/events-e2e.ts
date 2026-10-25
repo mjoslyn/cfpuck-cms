@@ -1,11 +1,11 @@
 // Events calendar check: a temporary weekly event shows as occurrences in the list, month and day
 // views and in search, each occurrence page and .ics works, old calendar URLs redirect. Cleans up.
 //   npx tsx --env-file=.env scripts/events-e2e.ts
-import { createClient } from '@supabase/supabase-js';
+import { siteDb } from '../src/lib/supabase';
 import { eventDates } from '../src/lib/admin/save';
 
 const origin = process.env.ASTRO_ORIGIN ?? 'http://localhost:4321';
-const sb = createClient(process.env.PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
+const sb = siteDb();
 const slug = 'e2e-trivia-night';
 const get = async (p: string) => {
   const r = await fetch(origin + p, { redirect: 'manual' });

@@ -2,7 +2,7 @@
 // and the health check that pauses it: a campaign whose complaint or bounce rate passes the thresholds
 // under Settings > Mailing Lists, once it has enough deliveries to judge, pauses every send (digests too)
 // until an admin looks and resumes. The admins are told by email. Server only.
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Db } from '../db/query';
 import { site as config } from '../site';
 import { sendMail } from '../forms/mail';
 import { HEALTH, mailingSettings, type CampaignStats } from './config';
@@ -14,17 +14,17 @@ export interface MailingState {
   paused?: { reason: string; at: string; campaign?: number };
 }
 
-export async function mailingState(db: SupabaseClient): Promise<MailingState> {
+export async function mailingState(db: Db): Promise<MailingState> {
   const { data } = await db.from('settings').select('value').eq('key', 'mailing').maybeSingle();
   return (data?.value as MailingState) ?? {};
 }
 
 /** Why sending is paused ('' when it isn't). */
-export async function mailingPaused(db: SupabaseClient): Promise<string> {
+export async function mailingPaused(db: Db): Promise<string> {
   return (await mailingState(db)).paused?.reason ?? '';
 }
 
-export async function setPaused(db: SupabaseClient, paused: MailingState['paused'] | null): Promise<void> {
+export async function setPaused(db: Db, paused: MailingState['paused'] | null): Promise<void> {
   const state = await mailingState(db);
   const value = { ...state, paused: paused ?? undefined };
   const { error } = await db.from('settings').upsert({ key: 'mailing', value }, { onConflict: 'key' });
@@ -42,7 +42,7 @@ export function unhealthy(s: CampaignStats, thresholds: { complaintRate: number;
 }
 
 /** Check a campaign after a bounce or complaint; pause everything and tell the admins when it fails. */
-export async function checkHealth(db: SupabaseClient, campaignId: number): Promise<void> {
+export async function checkHealth(db: Db, campaignId: number): Promise<void> {
   const [{ data: stats }, { data: site }, state] = await Promise.all([db.rpc('campaign_stats', { p_id: campaignId }), db.from('settings').select('value').eq('key', 'site').maybeSingle(), mailingState(db)]);
   if (!stats || state.paused) return;
   const s = mailingSettings(site?.value);

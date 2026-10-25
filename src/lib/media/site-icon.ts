@@ -2,7 +2,7 @@
 // home screens (180 for iOS, 192 and 512 for Android) and the site's own header (192). Stored in the
 // media bucket under site-icon/, named by the image and size; the page head links them.
 import sharp from 'sharp';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Db } from '../db/query';
 import { MediaStore } from './process';
 import { mediaUrl, versioned } from './image';
 import type { Media } from '../types';
@@ -10,7 +10,7 @@ import type { Media } from '../types';
 export const ICON_SIZES = [32, 180, 192, 270, 512] as const;
 
 /** The icons' URLs by size, made from media `id` (cropped square around its focal point). */
-export async function makeSiteIcons(db: SupabaseClient, store: MediaStore, id: number): Promise<Record<string, string>> {
+export async function makeSiteIcons(db: Db, store: MediaStore, id: number): Promise<Record<string, string>> {
   const { data: m, error } = await db.from('media').select('*').eq('id', id).single();
   if (error || !m) throw new Error('That image is no longer in the library.');
   if (!String(m.mime_type).startsWith('image/')) throw new Error('Choose an image for the site icon.');

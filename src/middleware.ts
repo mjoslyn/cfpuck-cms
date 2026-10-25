@@ -1,7 +1,7 @@
 // Admin routes require a Supabase session whose profile role is editor or admin. Site settings and
-// users are for admins only.
+// users are for admins only. locals.db reads and writes as that role (src/lib/db/policies.ts).
 import { defineMiddleware } from 'astro:middleware';
-import { serverClient } from './lib/supabase';
+import { authClient, sessionDb, siteDb } from './lib/supabase';
 import { refreshSiteTimezone } from './lib/site/timezone';
 import { changesPages, PAGE_CACHE_TAG } from './lib/cache';
 // Server-only work the page renderer calls (src/render/hooks.ts).
@@ -23,6 +23,17 @@ function crossSite(request: Request, url: URL): boolean {
   return type === null || FORM_TYPES.some((t) => type.toLowerCase().includes(t));
 }
 
+/** What a sync request or an admin query from the browser does, for changesPages. */
+async function bodyAction(request: Request, pathname: string): Promise<string | undefined> {
+  if (request.method !== 'POST') return undefined;
+  if (pathname.startsWith('/api/admin/sync')) return (await request.clone().json().catch(() => ({})))?.action;
+  if (pathname === '/api/admin/db') {
+    const body = await request.clone().json().catch(() => ({}));
+    return body?.query?.action ?? (body?.call ? 'call' : undefined);
+  }
+  return undefined;
+}
+
 export const onRequest = defineMiddleware(async (context, next) => {
   const { pathname } = context.url;
   if (crossSite(context.request, context.url) && !CROSS_SITE_POSTS.includes(pathname)) {
@@ -32,13 +43,13 @@ export const onRequest = defineMiddleware(async (context, next) => {
   const isAdmin = pathname.startsWith('/admin') || pathname.startsWith('/api/admin');
   if (!isAdmin || PUBLIC_ADMIN.some((p) => pathname.startsWith(p))) return next();
 
-  const db = serverClient(context.request, context.cookies);
-  const { data: { user } } = await db.auth.getUser();
+  const auth = authClient(context.request, context.cookies);
+  const { data: { user } } = await auth.auth.getUser();
   if (!user) {
     if (pathname.startsWith('/api/')) return new Response('Unauthorized', { status: 401 });
     return context.redirect(`/admin/login/?next=${encodeURIComponent(pathname)}`);
   }
-  const { data: profile } = await db.from('profiles').select('role, display_name').eq('id', user.id).maybeSingle();
+  const { data: profile } = await siteDb().from('profiles').select('role, display_name').eq('id', user.id).maybeSingle();
   if (!profile || !['editor', 'admin'].includes(profile.role)) {
     if (pathname.startsWith('/api/')) return new Response('Forbidden', { status: 403 });
     return context.redirect('/admin/login/?error=forbidden');
@@ -47,13 +58,13 @@ export const onRequest = defineMiddleware(async (context, next) => {
     if (pathname.startsWith('/api/')) return new Response('Admins only', { status: 403 });
     return context.redirect('/admin/?error=admins-only');
   }
-  context.locals.db = db;
+  context.locals.db = sessionDb({ role: profile.role, uid: user.id }, auth);
   context.locals.user = { id: user.id, email: user.email ?? '', role: profile.role, name: profile.display_name ?? '' };
   // An edit clears the CDN's cached pages once it succeeds (src/lib/cache.ts), so it shows at once.
   const { method } = context.request;
-  const syncAction = pathname.startsWith('/api/admin/sync') && method === 'POST' ? (await context.request.clone().json().catch(() => ({})))?.action : undefined;
+  const action = await bodyAction(context.request, pathname);
   const response = await next();
-  if ((response.ok || response.status === 303) && changesPages(method, pathname, syncAction) && context.cache.enabled) {
+  if ((response.ok || response.status === 303) && changesPages(method, pathname, action) && context.cache.enabled) {
     // 303: form posts (bulk actions, terms) answer with a redirect back to the list.
     // A failed purge is logged, not the edit's failure: the pages refresh within the minute anyway.
     await context.cache.invalidate({ tags: [PAGE_CACHE_TAG] }).catch((e: Error) => console.error(`page cache purge failed: ${e.message}`));

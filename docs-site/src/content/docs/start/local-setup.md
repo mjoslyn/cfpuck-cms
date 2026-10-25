@@ -49,6 +49,7 @@ The Supabase CLI runs through `npx`, so you don't need to install it.
    | `PUBLIC_SUPABASE_URL` | API URL (`http://127.0.0.1:56521`) |
    | `PUBLIC_SUPABASE_ANON_KEY` | anon key |
    | `SUPABASE_SERVICE_ROLE_KEY` | service_role key |
+   | `DATABASE_URL` | DB URL (`postgresql://postgres:postgres@127.0.0.1:56522/postgres`) |
 
 4. **Add starter content**: the header, footer, base templates, a home page, an About page and a
    sample event. It skips anything that already exists, so it is safe to run again.

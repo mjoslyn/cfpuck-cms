@@ -1,10 +1,10 @@
 // Create (or promote) an editor account.
 //   npx tsx --env-file=.env scripts/create-editor.ts you@example.com 'password' [editor|admin]
-import { createClient } from '@supabase/supabase-js';
+import { siteDb } from '../src/lib/supabase';
 
 const [email, password, role = 'admin'] = process.argv.slice(2);
 if (!email || !password) throw new Error('usage: create-editor.ts <email> <password> [editor|admin]');
-const sb = createClient(process.env.PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
+const sb = siteDb();
 
 let { data: list } = await sb.auth.admin.listUsers();
 let user = list?.users.find((u) => u.email === email);

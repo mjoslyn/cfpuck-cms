@@ -2,10 +2,10 @@
 // revision previews as it was and restores into the editor as undoable, unsaved changes.
 //   npx tsx --env-file=.env scripts/revisions-e2e.ts
 import { chromium, type Page } from 'playwright';
-import { createClient } from '@supabase/supabase-js';
+import { siteDb } from '../src/lib/supabase';
 
 const origin = process.env.ASTRO_ORIGIN ?? 'http://localhost:4321';
-const sb = createClient(process.env.PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
+const sb = siteDb();
 const content = { root: { props: {} }, zones: {}, content: [{ type: 'section', props: { id: 'r1', attrs: { layout: { type: 'constrained', contentSize: '720px' } }, children: [{ type: 'heading', props: { id: 'r1h', attrs: { level: 2, content: 'Version A' } } }] } }] };
 await sb.from('entries').delete().eq('type', 'page').eq('slug', 'e2e-revisions');
 const { data: row, error } = await sb.from('entries').insert({ type: 'page', slug: 'e2e-revisions', title: 'E2E Revisions', status: 'publish', fields: {}, content }).select('id').single();

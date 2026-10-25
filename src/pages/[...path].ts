@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import type { AstroCookies } from 'astro';
 import { renderRequest, type PageResult } from '../render/page';
-import { serverClient } from '../lib/supabase';
+import { authClient } from '../lib/supabase';
 import { viewerOf } from '../lib/members/viewer';
 import { ACCOUNT_PATH, type Viewer } from '../lib/members/config';
 import { eventsOnIn } from '../lib/events/on';
@@ -57,7 +57,7 @@ export const GET: APIRoute = async ({ url, request, cache, cookies }) => {
   // someone not signed in: a member who is can carry on.
   const code = url.searchParams.get('code');
   if (url.pathname === ACCOUNT_PATH && code) {
-    const db = serverClient(request, cookies);
+    const db = authClient(request, cookies);
     const { error } = await db.auth.exchangeCodeForSession(code);
     const next = new URL(url);
     next.searchParams.delete('code');

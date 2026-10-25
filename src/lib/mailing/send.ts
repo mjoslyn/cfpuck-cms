@@ -7,7 +7,7 @@
 // request got no answer is "unknown" and is never sent again blindly: Mailgun's events for its tag decide.
 // A run that runs out of time lets go of the campaign, and the scheduler's next run carries on. Server only.
 import { randomUUID } from 'node:crypto';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Db } from '../db/query';
 import { serviceClient } from '../supabase';
 import { emailEvents } from '../events/email';
 import { refreshSiteTimezone } from '../site/timezone';
@@ -43,7 +43,7 @@ interface Frozen {
 }
 
 /** Everyone the campaign goes to now: its lists, members or not, and its segment (paged: the API returns at most 1,000 rows a request). */
-export async function audience(db: SupabaseClient, c: Pick<Campaign, 'list_ids' | 'audience'> & { segment_id?: number | null }): Promise<{ id: number; email: string; name: string }[]> {
+export async function audience(db: Db, c: Pick<Campaign, 'list_ids' | 'audience'> & { segment_id?: number | null }): Promise<{ id: number; email: string; name: string }[]> {
   if (!c.list_ids?.length) return [];
   let rules: SegmentRules | null = null;
   if (c.segment_id) {
@@ -55,7 +55,7 @@ export async function audience(db: SupabaseClient, c: Pick<Campaign, 'list_ids' 
 }
 
 /** The subscribed people a segment's rules pick: on any of `lists` (null: on any list), members or not. */
-export async function audienceOfRules(db: SupabaseClient, q: { lists: number[] | null; audience?: Campaign['audience']; rules: SegmentRules | null; limit?: number }): Promise<{ id: number; email: string; name: string }[]> {
+export async function audienceOfRules(db: Db, q: { lists: number[] | null; audience?: Campaign['audience']; rules: SegmentRules | null; limit?: number }): Promise<{ id: number; email: string; name: string }[]> {
   const a = audienceOf(q.audience);
   const out: { id: number; email: string; name: string }[] = [];
   for (let from = 0; ; from += 1000) {
@@ -68,7 +68,7 @@ export async function audienceOfRules(db: SupabaseClient, q: { lists: number[] |
 }
 
 /** The email as it will go out (rendered now: events and entries as they are now). */
-export async function renderFor(db: SupabaseClient, c: Campaign, origin: string) {
+export async function renderFor(db: Db, c: Campaign, origin: string) {
   const { name, settings } = await loadMailing(db);
   const [events, entries] = await Promise.all([emailEvents(db, c.design, origin), emailEntries(db, c.design, origin, c.since)]);
   const rendered = renderCampaign({ campaignId: c.id, subject: c.subject, design: c.design ?? { root: { props: {} }, content: [] }, text: c.text, siteName: name, address: settings.address ?? '', origin, events, entries, fields: settings.fields?.map((f) => f.key) });
@@ -76,7 +76,7 @@ export async function renderFor(db: SupabaseClient, c: Campaign, origin: string)
 }
 
 /** Freeze a campaign: render it, make its links, write its recipients and batches. Returns an error message, or '' when done. */
-async function freeze(db: SupabaseClient, c: Campaign): Promise<string> {
+async function freeze(db: Db, c: Campaign): Promise<string> {
   const origin = mailOrigin();
   const { rendered, name, settings } = await renderFor(db, c, origin);
   if (!settings.address) return 'Add the postal address under Settings > Mailing Lists: every email must carry it.';
@@ -145,7 +145,7 @@ export async function startSending(id: number, base?: string): Promise<boolean> 
   return true;
 }
 
-async function release(db: SupabaseClient, id: number, patch: Record<string, unknown> = {}) {
+async function release(db: Db, id: number, patch: Record<string, unknown> = {}) {
   await db.from('campaigns').update({ claim_token: null, claimed_at: null, ...patch }).eq('id', id);
 }
 
@@ -201,13 +201,13 @@ export async function runCampaign(id: number, token: string): Promise<void> {
   }
 }
 
-async function markAccepted(db: SupabaseClient, batch: number, mailgunId: string) {
+async function markAccepted(db: Db, batch: number, mailgunId: string) {
   await db.from('campaign_batches').update({ status: 'accepted', mailgun_id: mailgunId, error: '' }).eq('id', batch);
   await db.from('campaign_sends').update({ status: 'sent' }).eq('batch_id', batch).eq('status', 'queued');
 }
 
 /** Send one batch. 'ok', 'stop' (try again on a later run) or 'failed:<why>'. */
-async function sendOne(db: SupabaseClient, c: Campaign, frozen: Frozen, b: { id: number; n: number; attempts: number }): Promise<string> {
+async function sendOne(db: Db, c: Campaign, frozen: Frozen, b: { id: number; n: number; attempts: number }): Promise<string> {
   const { data: rows, error } = await db.from('campaign_sends').select('contact_id, email, status, contacts(first_name, last_name, attributes)').eq('batch_id', b.id);
   if (error) throw new Error(error.message);
   const queued = (rows ?? []).filter((r: any) => r.status === 'queued');
@@ -269,7 +269,7 @@ async function sendOne(db: SupabaseClient, c: Campaign, frozen: Frozen, b: { id:
 }
 
 /** A test send to a few addresses (the campaign as it would go now; no tracking, not counted). */
-export async function sendTest(db: SupabaseClient, c: Campaign, to: Recipient[]): Promise<string> {
+export async function sendTest(db: Db, c: Campaign, to: Recipient[]): Promise<string> {
   const origin = mailOrigin();
   const { rendered, name, settings } = await renderFor(db, c, origin);
   if (!settings.address) throw new Error('Add the postal address under Settings > Mailing Lists first: every email must carry it.');

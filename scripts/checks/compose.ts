@@ -3,14 +3,14 @@
 // materials step reads text documents and video links and refuses private addresses.
 //   npx tsx --env-file=.env scripts/checks/compose.ts
 import { chromium } from 'playwright';
-import { createClient } from '@supabase/supabase-js';
+import { siteDb } from '../../src/lib/supabase';
 import { blocksFor, buildMaterials, emptyRegistry, ingest } from '../../src/lib/compose/materials';
 import { buildPage } from '../../src/lib/compose/build';
 import { MediaStore } from '../../src/lib/media/process';
 import type { PagePlan } from '../../src/lib/compose/spec';
 
 const origin = process.env.ASTRO_ORIGIN ?? 'http://localhost:4321';
-const sb = createClient(process.env.PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
+const sb = siteDb();
 const { data: imgs } = await sb.from('media').select('id').like('mime_type', 'image/jpeg').gt('width', 1200).order('id', { ascending: false }).limit(4);
 
 const doc = new File(['Summer Music Festival 2026\n\nThree days of live music on the village square, July 10-12.'], 'notes.txt', { type: 'text/plain' });

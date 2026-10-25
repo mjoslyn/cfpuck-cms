@@ -3,7 +3,7 @@
 // project asks addresses to be confirmed, they confirm by email first (the link signs them in on the
 // account page). The site's admin address is told of each sign-up.
 import type { APIRoute } from 'astro';
-import { serverClient, serviceClient, siteDb } from '../../../lib/supabase';
+import { authClient, serviceClient, siteDb } from '../../../lib/supabase';
 import { EMAIL, accountUrl, loadMemberSettings, safeNext } from '../../../lib/members/account';
 import { sendMail } from '../../../lib/forms/mail';
 import { site } from '../../../lib/site';
@@ -28,7 +28,7 @@ export const POST: APIRoute = async ({ request, cookies, redirect, url }) => {
   if (password.length < 10) return back('Use a password of at least 10 characters.');
   if (password !== String(form.get('confirm') ?? '')) return back('The two passwords don’t match.');
 
-  const { data, error } = await serverClient(request, cookies).auth.signUp({ email, password, options: { data: { name }, emailRedirectTo: `${url.origin}${accountUrl()}` } });
+  const { data, error } = await authClient(request, cookies).auth.signUp({ email, password, options: { data: { name }, emailRedirectTo: `${url.origin}${accountUrl()}` } });
   if (error) return back(/already registered|already exists/i.test(error.message) ? 'That email already has an account. Sign in, or reset your password.' : error.message);
   // An address that already has an account comes back with no identities (and no new account).
   if (!data.user || !data.user.identities?.length) return back('That email already has an account. Sign in, or reset your password.');

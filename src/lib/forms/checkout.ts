@@ -4,7 +4,7 @@
 // the same. Either way the site asks the provider where the checkout stands (nothing in a redirect or a
 // webhook is taken as given): once it is paid, the submission is marked paid and its notifications go,
 // exactly once (the update that flips it to paid is the one that sends).
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Db } from '../db/query';
 import type { FormResult, FormRow, SubmissionPayment, Values } from './types';
 import { MAX_CHARGE, currencyOf, totalOf, type LineItem } from './payment';
 import { MIN_CHARGE, formatMoney } from '../payments/money';
@@ -28,7 +28,7 @@ interface Stored {
 }
 
 /** Store the submission as pending and start a checkout for it; the visitor is sent to `url`. */
-export async function startCheckout(db: SupabaseClient, form: FormRow, data: Stored, items: LineItem[], request: Request): Promise<{ url: string } | { error: string }> {
+export async function startCheckout(db: Db, form: FormRow, data: Stored, items: LineItem[], request: Request): Promise<{ url: string } | { error: string }> {
   const settings = form.definition.payment!;
   const name = pickProvider(settings.provider);
   const provider = name && PROVIDERS[name];
@@ -90,7 +90,7 @@ interface Submission {
  * Ask the provider where a submission's checkout stands and record it. Paid: marked paid and notified
  * (only by the call whose update flips it). Returns the submission as it now is.
  */
-export async function confirmPayment(db: SupabaseClient, sub: Submission): Promise<Submission> {
+export async function confirmPayment(db: Db, sub: Submission): Promise<Submission> {
   const p = sub.payment;
   if (!p?.ref || p.status === 'paid' || p.status === 'failed') return sub;
   const state = await PROVIDERS[p.provider].check({ ref: p.ref, order: p.order });
@@ -118,25 +118,25 @@ export async function confirmPayment(db: SupabaseClient, sub: Submission): Promi
 }
 
 /** A bank payment that failed after checkout (from a signed webhook). */
-export async function markPaymentFailed(db: SupabaseClient, sub: Submission) {
+export async function markPaymentFailed(db: Db, sub: Submission) {
   if (sub.payment.status !== 'processing' && sub.payment.status !== 'pending') return;
   await db.from('form_submissions').update({ payment: { ...sub.payment, status: 'failed' } }).eq('id', sub.id).eq('payment->>status', sub.payment.status);
 }
 
-async function loadSubmission(db: SupabaseClient, id: number): Promise<Submission | null> {
+async function loadSubmission(db: Db, id: number): Promise<Submission | null> {
   const { data, error } = await db.from('form_submissions').select('id, form_id, data, payment').eq('id', id).maybeSingle();
   if (error) throw error;
   return data?.payment ? (data as Submission) : null;
 }
 
-async function loadForm(db: SupabaseClient, id: number): Promise<FormRow | null> {
+async function loadForm(db: Db, id: number): Promise<FormRow | null> {
   const { data, error } = await db.from('forms').select('*').eq('id', id).maybeSingle();
   if (error) throw error;
   return (data as FormRow) ?? null;
 }
 
 /** The submission a provider's checkout (`ref`) or order (`order`) belongs to. */
-async function submissionBy(db: SupabaseClient, key: 'ref' | 'order', value: unknown): Promise<Submission | null> {
+async function submissionBy(db: Db, key: 'ref' | 'order', value: unknown): Promise<Submission | null> {
   if (!value) return null;
   const { data, error } = await db.from('form_submissions').select('id, form_id, data, payment').eq(`payment->>${key}`, String(value)).limit(1).maybeSingle();
   if (error) throw error;
@@ -160,7 +160,7 @@ export async function formsWebhook(provider: PaymentProvider, event: PaymentEven
  * A visitor back from checkout (?form_payment=<id>.<token>): the confirmation once paid (or a bank
  * payment is on its way), else the form again with their answers and a note that it wasn't sent.
  */
-export async function paymentReturn(db: SupabaseClient, param: string): Promise<FormResult | null> {
+export async function paymentReturn(db: Db, param: string): Promise<FormResult | null> {
   const m = param.match(/^(\d+)\.([0-9a-f]{36})$/);
   if (!m) return null;
   let sub = await loadSubmission(db, Number(m[1]));

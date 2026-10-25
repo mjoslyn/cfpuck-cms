@@ -8,7 +8,8 @@
 // so), by kind and slug (templates), by key (settings) and by old address (redirects). A sync adds and
 // overwrites; it never deletes. A site whose settings say `sync_protected` refuses any sync into it.
 // `plan` compares and lists what would change; `apply` writes one batch of it, checking again.
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
+import type { Db } from './db/query';
 import { allRows } from './rows';
 import { site as config, fieldsFor, taxonomyLabel } from './site';
 import { serviceClient } from './supabase';
@@ -52,20 +53,21 @@ export function remoteConfig(): { name: string; url: string; key: string } | nul
 }
 
 /** Source and target clients for a direction: push writes to the other copy, pull to this one. */
-export function endpoints(direction: Direction): { source: SupabaseClient; target: SupabaseClient; sourceName: string; targetName: string } {
+export function endpoints(direction: Direction): { source: Db; target: Db; sourceName: string; targetName: string } {
   const remote = remoteConfig();
   if (!remote) throw new Error('No other copy is set up (SYNC_REMOTE_URL and SYNC_REMOTE_SERVICE_KEY).');
   const here = (import.meta.env?.PUBLIC_SUPABASE_URL ?? process.env.PUBLIC_SUPABASE_URL ?? '').replace(/\/$/, '');
   if (remote.url === here) throw new Error('SYNC_REMOTE_URL is this site’s own database.');
   const local = serviceClient();
-  const other = createClient(remote.url, remote.key, { auth: { persistSession: false } });
+  // The other copy is reached over its database API, which answers the same calls as the query layer.
+  const other = createClient(remote.url, remote.key, { auth: { persistSession: false } }) as unknown as Db;
   return direction === 'push'
     ? { source: local, target: other, sourceName: 'this site', targetName: remote.name }
     : { source: other, target: local, sourceName: remote.name, targetName: 'this site' };
 }
 
 /** Whether a copy refuses syncs into it (its settings.site.sync_protected). */
-export async function isProtected(db: SupabaseClient): Promise<boolean> {
+export async function isProtected(db: Db): Promise<boolean> {
   const { data, error } = await db.from('settings').select('value').eq('key', 'site').maybeSingle();
   if (error) throw new Error(`Could not read the settings: ${error.message}`);
   return !!(data?.value as any)?.sync_protected;
@@ -101,7 +103,7 @@ async function must<T = any>(q: any, what: string): Promise<T[]> {
 }
 /** Rows whose `column` is one of `ids`, 200 ids a request, each read in pages (ordered by `order`,
  *  which must end on a unique column) so none past PostgREST's 1000-row limit are lost. */
-async function byIds<T = any>(db: SupabaseClient, table: string, select: string, column: string, ids: (number | string)[], order: string[] = [column]): Promise<T[]> {
+async function byIds<T = any>(db: Db, table: string, select: string, column: string, ids: (number | string)[], order: string[] = [column]): Promise<T[]> {
   const out: T[] = [];
   for (let i = 0; i < ids.length; i += 200) {
     let q = db.from(table).select(select).in(column, ids.slice(i, i + 200));
@@ -147,8 +149,8 @@ const FORM_FIELDS = ['title', 'definition', 'notifications', 'is_active'];
 const REDIRECT_FIELDS = ['to_url', 'status', 'note'];
 
 interface Context {
-  source: SupabaseClient;
-  target: SupabaseClient;
+  source: Db;
+  target: Db;
   /** The groups chosen for this sync. */
   chosen: Set<string>;
   /** Comparing: rows the chosen groups bring count as on the target. Writing: only what is there. */
@@ -546,7 +548,7 @@ const applyRedirects: Applier = async (ctx, _group, keys) => {
 // ---- one row, for the diff ------------------------------------------------------------------------
 
 /** A row as a sync compares it (what it would write), on one copy, or null when it isn't there. */
-async function record(db: SupabaseClient, kind: string, group: string, key: string): Promise<unknown> {
+async function record(db: Db, kind: string, group: string, key: string): Promise<unknown> {
   const one = async (q: any) => {
     const { data, error } = await q.maybeSingle();
     if (error) throw new Error(error.message);
@@ -626,14 +628,14 @@ export interface BackupInfo {
 }
 
 /** The database and display name of a copy. */
-export function siteClient(site: Site): { db: SupabaseClient; name: string } {
+export function siteClient(site: Site): { db: Db; name: string } {
   if (site === 'here') return { db: serviceClient(), name: 'this site' };
   return { db: endpoints('push').target, name: remoteConfig()!.name };
 }
 const capital = (s: string) => s.replace(/^./, (c) => c.toUpperCase());
 
 /** The target's rows a sync is about to overwrite, as they are now: whole rows, as stored. */
-async function currentRows(target: SupabaseClient, kind: string, keys: string[]): Promise<Record<string, unknown>> {
+async function currentRows(target: Db, kind: string, keys: string[]): Promise<Record<string, unknown>> {
   if (!keys.length) return {};
   const ids = keys.map(Number);
   switch (kind) {
@@ -666,21 +668,21 @@ async function currentRows(target: SupabaseClient, kind: string, keys: string[])
 }
 
 /** Whether a copy can take writes from this tool: not protected, and with its migrations. Throws if not. */
-async function checkWritable(db: SupabaseClient, name: string): Promise<void> {
+async function checkWritable(db: Db, name: string): Promise<void> {
   if (await isProtected(db)) throw new Error(`${capital(name)} is protected from syncs.`);
   // The id counters are moved after writing; without the function there, stop before writing.
   const { error } = await db.rpc('sync_reset_ids');
   if (error) throw new Error(`${capital(name)} can't take a sync yet: ${error.message}. Apply the migrations there first (npx supabase db push).`);
 }
 
-async function saveFile(db: SupabaseClient, path: string, body: unknown, upsert = false): Promise<void> {
+async function saveFile(db: Db, path: string, body: unknown, upsert = false): Promise<void> {
   const { error: bucketError } = await db.storage.createBucket(BACKUP_BUCKET, { public: false });
   if (bucketError && !/exists|duplicate/i.test(bucketError.message)) throw new Error(`Could not make the backup bucket: ${bucketError.message}`);
   const { error } = await db.storage.from(BACKUP_BUCKET).upload(path, new Blob([JSON.stringify(body, null, 1)], { type: 'application/json' }), { contentType: 'application/json', upsert });
   if (error) throw new Error(`Could not save the backup: ${error.message}`);
 }
 /** A small JSON file beside the backups (in a folder, so the backup list leaves it out), or null. */
-async function readFile(db: SupabaseClient, path: string): Promise<any | null> {
+async function readFile(db: Db, path: string): Promise<any | null> {
   const { data } = await db.storage.from(BACKUP_BUCKET).download(path);
   return data ? JSON.parse(await data.text()) : null;
 }
@@ -689,10 +691,10 @@ async function readFile(db: SupabaseClient, path: string): Promise<any | null> {
 // ids it never reached then go to rows made by hand).
 const writtenPath = (backup: string) => `written/${backup}`;
 /** Which of these keys are rows on the target now. */
-const presentKeys = async (target: SupabaseClient, kind: string, keys: string[]) => backupKeys(kind, (await currentRows(target, kind, keys)) as Record<string, any[]>);
+const presentKeys = async (target: Db, kind: string, keys: string[]) => backupKeys(kind, (await currentRows(target, kind, keys)) as Record<string, any[]>);
 const stamp = () => new Date().toISOString().replace(/[:.]/g, '-');
 
-async function saveRowsBackup(db: SupabaseClient, meta: { source: string; target: string; direction?: Direction }, items: { group: string; added: string[]; changed: string[] }[], label: string, spare?: string) {
+async function saveRowsBackup(db: Db, meta: { source: string; target: string; direction?: Direction }, items: { group: string; added: string[]; changed: string[] }[], label: string, spare?: string) {
   const groups: Record<string, { added: string[]; overwritten: Record<string, unknown> }> = {};
   for (const it of items) groups[it.group] = { added: it.added, overwritten: await currentRows(db, groupDef(it.group).kind, it.changed) };
   const path = `${stamp()}-${label}.json`;
@@ -734,12 +736,12 @@ export interface SnapshotSchedule {
   every: 'daily' | 'weekly';
   keep: number;
 }
-async function siteSettings(db: SupabaseClient): Promise<Record<string, any>> {
+async function siteSettings(db: Db): Promise<Record<string, any>> {
   const { data, error } = await db.from('settings').select('value').eq('key', 'site').maybeSingle();
   if (error) throw new Error(`Could not read the settings: ${error.message}`);
   return (data?.value as Record<string, any>) ?? {};
 }
-async function setSiteSettings(db: SupabaseClient, patch: Record<string, unknown>): Promise<void> {
+async function setSiteSettings(db: Db, patch: Record<string, unknown>): Promise<void> {
   const value = { ...(await siteSettings(db)), ...patch };
   const { error } = await db.from('settings').upsert({ key: 'site', value }, { onConflict: 'key' });
   if (error) throw new Error(`Could not save: ${error.message}`);
@@ -750,7 +752,7 @@ function retention(v: Record<string, any>): { backups: number; schedule: Snapsho
   return { backups: whole(v.sync_backups_keep, DEFAULT_BACKUPS_KEPT), schedule: { enabled: !!s.enabled, every: s.every === 'weekly' ? 'weekly' : 'daily', keep: whole(s.keep, DEFAULT_SNAPSHOTS_KEPT) } };
 }
 
-async function listFiles(db: SupabaseClient): Promise<BackupInfo[]> {
+async function listFiles(db: Db): Promise<BackupInfo[]> {
   const { data, error } = await db.storage.from(BACKUP_BUCKET).list('', { limit: 1000, sortBy: { column: 'name', order: 'desc' } });
   if (error) {
     if (/not found/i.test(error.message)) return [];
@@ -761,7 +763,7 @@ async function listFiles(db: SupabaseClient): Promise<BackupInfo[]> {
 
 /** Delete the oldest backups and snapshots beyond the numbers a copy keeps (each counted apart; 0 keeps
  *  all), except `spare`: a restore's own backup is never deleted by the backup the restore saves first. */
-async function pruneBackups(db: SupabaseClient, spare?: string): Promise<string[]> {
+async function pruneBackups(db: Db, spare?: string): Promise<string[]> {
   const { backups: keepBackups, schedule } = retention(await siteSettings(db));
   const files = await listFiles(db);
   const old = [
@@ -831,7 +833,7 @@ const SNAPSHOT_TABLES: [string, string[]][] = [
 ];
 
 /** Everything a sync covers on one copy, as stored (settings `site` and `options`); not stored images. */
-async function readSnapshot(db: SupabaseClient): Promise<Record<string, any[]>> {
+async function readSnapshot(db: Db): Promise<Record<string, any[]>> {
   const tables: Record<string, any[]> = {};
   for (const [table, order] of SNAPSHOT_TABLES) {
     let q = db.from(table).select('*');
@@ -845,7 +847,7 @@ async function readSnapshot(db: SupabaseClient): Promise<Record<string, any[]>> 
 }
 
 /** Take a snapshot of a copy and keep it there; older snapshots beyond the number kept go. */
-export async function takeSnapshot(db: SupabaseClient, trigger: 'scheduled' | 'manual' | 'before-restore', spare?: string): Promise<{ path: string; rows: number }> {
+export async function takeSnapshot(db: Db, trigger: 'scheduled' | 'manual' | 'before-restore', spare?: string): Promise<{ path: string; rows: number }> {
   const tables = await readSnapshot(db);
   const path = `${stamp()}-snapshot-${trigger}.json`;
   await saveFile(db, path, { kind: 'snapshot', created_at: new Date().toISOString(), trigger, note: 'Stored images are not included: files are backed up as their library rows only.', tables });
@@ -908,7 +910,7 @@ export async function snapshotPreview(site: Site, path: string): Promise<{ creat
  * made since the snapshot are deleted too (files: their library rows; stored images stay). A snapshot
  * of the current state is taken first, so the restore can be undone the same way.
  */
-async function restoreSnapshot(db: SupabaseClient, name: string, file: any, path: string, deleteSince: boolean): Promise<{ restored: number; removed: number; problems: string[]; backup: string }> {
+async function restoreSnapshot(db: Db, name: string, file: any, path: string, deleteSince: boolean): Promise<{ restored: number; removed: number; problems: string[]; backup: string }> {
   await checkWritable(db, name);
   const saved = await takeSnapshot(db, 'before-restore', path);
   const t = file.tables as Record<string, any[]>;
@@ -978,7 +980,7 @@ function backupKeys(kind: string, rows: Record<string, any[]>): string[] {
  * back (an address another row has now) is reported on its own and the rest are written. Returns the
  * keys written and the problems.
  */
-async function writeRows(db: SupabaseClient, table: string, data: any[], onConflict: string, key: (r: any) => string): Promise<{ written: Set<string>; problems: string[] }> {
+async function writeRows(db: Db, table: string, data: any[], onConflict: string, key: (r: any) => string): Promise<{ written: Set<string>; problems: string[] }> {
   const written = new Set<string>();
   const problems: string[] = [];
   for (let i = 0; i < data.length; i += 100) {
@@ -1002,7 +1004,7 @@ async function writeRows(db: SupabaseClient, table: string, data: any[], onConfl
  * upserted, then those of the entries that aren't in the saved set are deleted (only entries with any
  * get a request of their own).
  */
-async function putBackLinks(db: SupabaseClient, ids: number[], links: any[], drafts: any[]): Promise<string[]> {
+async function putBackLinks(db: Db, ids: number[], links: any[], drafts: any[]): Promise<string[]> {
   const problems: string[] = [];
   const want = new Set(links.map((l) => `${l.entry_id}:${l.term_id}`));
   for (let i = 0; i < links.length; i += 500) {
@@ -1032,7 +1034,7 @@ async function putBackLinks(db: SupabaseClient, ids: number[], links: any[], dra
 }
 
 /** Put a group's saved rows back as they were. Returns problems, if any. */
-async function putBack(db: SupabaseClient, kind: string, rows: Record<string, any[]>): Promise<string[]> {
+async function putBack(db: Db, kind: string, rows: Record<string, any[]>): Promise<string[]> {
   const byId = (r: any) => String(r.id);
   switch (kind) {
     case 'type': {
@@ -1061,7 +1063,7 @@ async function putBack(db: SupabaseClient, kind: string, rows: Record<string, an
 }
 
 /** Delete the rows a sync added (an added file's library row, not its stored images). Returns problems, if any. */
-async function removeAdded(db: SupabaseClient, kind: string, keys: string[]): Promise<string[]> {
+async function removeAdded(db: Db, kind: string, keys: string[]): Promise<string[]> {
   if (!keys.length) return [];
   const problems: string[] = [];
   const del = async (table: string, column: string, values: (string | number)[]) => {

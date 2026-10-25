@@ -4,6 +4,7 @@
 // (a second `supabase start` on other ports).
 //   npx tsx --env-file=.env scripts/sync-e2e.ts
 import { createClient } from '@supabase/supabase-js';
+import { siteDb } from '../src/lib/supabase';
 const base = process.env.ASTRO_ORIGIN ?? 'http://localhost:4321';
 if (!/^https?:\/\/(127\.0\.0\.1|localhost)[:/]/.test(process.env.SYNC_REMOTE_URL ?? '')) throw new Error('SYNC_REMOTE_URL must be a local stack: this test writes to it.');
 const remote = createClient(process.env.SYNC_REMOTE_URL!, process.env.SYNC_REMOTE_SERVICE_KEY!);
@@ -35,6 +36,6 @@ ok('synced row deleted', !(await remote.from('entries').select('id').eq('id', Nu
 ok('hand-made row kept', (await remote.from('entries').select('slug').eq('id', Number(b)).maybeSingle()).data?.slug === 'made-by-hand');
 await remote.from('entries').delete().eq('id', Number(b));
 await remote.storage.from('sync-backups').remove([path, `written/${path}`, st.result?.backup].filter(Boolean));
-const local = createClient(process.env.PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+const local = siteDb();
 await local.storage.from('sync-backups').remove([`jobs/${res.body.job}.json`]);
 process.exitCode = bad ? 1 : 0;

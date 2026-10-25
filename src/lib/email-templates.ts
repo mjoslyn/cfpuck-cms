@@ -4,7 +4,7 @@
 // notifications) or ticket (ticket emails). A template can be the default for one kind of email: new
 // campaigns, digests and form notifications start from it, and a ticket email nobody has changed (the
 // event's own, else the site's) is sent from it. Safe in the browser.
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Db } from './db/query';
 import type { EmailDoc } from './forms/email';
 
 export type TemplateKit = 'mailing' | 'form' | 'ticket';
@@ -37,13 +37,13 @@ export const TEMPLATE_DEFAULTS: Record<TemplateKit, [string, string][]> = {
 };
 
 /** The design and text the default template for `key` holds, if one is set. */
-export async function defaultTemplate(db: SupabaseClient, key: string): Promise<{ design: EmailDoc; text: string } | null> {
+export async function defaultTemplate(db: Db, key: string): Promise<{ design: EmailDoc; text: string } | null> {
   const { data } = await db.from('email_templates').select('design, text').eq('default_for', key).maybeSingle();
   return data ? { design: data.design as EmailDoc, text: String(data.text ?? '') } : null;
 }
 
 /** Every default of a kind, by key (ticket emails read them all at once). */
-export async function defaultTemplates(db: SupabaseClient, prefix: string): Promise<Record<string, { design: EmailDoc; text: string }>> {
+export async function defaultTemplates(db: Db, prefix: string): Promise<Record<string, { design: EmailDoc; text: string }>> {
   const { data } = await db.from('email_templates').select('default_for, design, text').like('default_for', `${prefix}%`);
   return Object.fromEntries((data ?? []).map((r) => [String(r.default_for), { design: r.design as EmailDoc, text: String(r.text ?? '') }]));
 }

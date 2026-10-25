@@ -4,12 +4,12 @@
 // cleared, warning? }) so the screen drops exactly those.
 // DELETE ?id=: remove a redirect; DELETE ?notFound=<path>|all: clear Not found entries.
 import type { APIRoute } from 'astro';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Db } from '../../../lib/db/query';
 import { cleanTarget, loopReason, normalizePath, ruleCovers } from '../../../lib/redirects';
 import { allRows } from '../../../lib/rows';
 
 /** Clear the Not found entries a rule covers; returns their paths, or the error. */
-async function clearCovered(db: SupabaseClient, from: string): Promise<{ cleared: string[]; error?: string }> {
+async function clearCovered(db: Db, from: string): Promise<{ cleared: string[]; error?: string }> {
   const { data, error } = await allRows<{ path: string }>(db.from('not_found').select('path').order('path'));
   if (error) return { cleared: [], error: error.message };
   const covered = data.map((r) => r.path).filter((path) => ruleCovers(from, path));

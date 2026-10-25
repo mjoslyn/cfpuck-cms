@@ -3,10 +3,10 @@
 // live version; unpublish takes the page off the site and publish brings it back.
 //   npx tsx --env-file=.env scripts/publishing-e2e.ts
 import { chromium, type Page } from 'playwright';
-import { createClient } from '@supabase/supabase-js';
+import { siteDb } from '../src/lib/supabase';
 
 const origin = process.env.ASTRO_ORIGIN ?? 'http://localhost:4321';
-const sb = createClient(process.env.PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
+const sb = siteDb();
 const content = { root: { props: {} }, zones: {}, content: [{ type: 'section', props: { id: 'p1', attrs: { layout: { type: 'constrained', contentSize: '720px' }, style: { padding: { top: 'var(--space-80)', bottom: 'var(--space-80)' } } }, children: [{ type: 'heading', props: { id: 'p1h', attrs: { level: 2, content: 'Original heading' } } }] } }] };
 await sb.from('entries').delete().eq('type', 'page').eq('slug', 'e2e-publishing');
 const { data: row, error } = await sb.from('entries').insert({ type: 'page', slug: 'e2e-publishing', title: 'E2E Publishing', status: 'publish', fields: {}, content }).select('id').single();

@@ -4,7 +4,7 @@
 // stored, and come back when Events is turned on) and the site doesn't show them: no event pages,
 // calendar views, feeds or ticket sales; lists, search, menus and emails leave them out; and the editor
 // doesn't offer event or ticket blocks. Safe in the browser.
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Db } from '../db/query';
 import { site, typesOfTaxonomy } from '../site';
 import { EVENT_TYPES } from './types';
 
@@ -15,7 +15,7 @@ export const EVENT_BLOCKS = ['event-date', 'event-details', 'event-schedule', 'e
 export const eventsOn = (site: Record<string, any> | null | undefined): boolean => site?.events?.enabled === true;
 
 /** Whether events are on, read from the settings (for endpoints that have no loaded settings). */
-export async function eventsOnIn(db: SupabaseClient): Promise<boolean> {
+export async function eventsOnIn(db: Db): Promise<boolean> {
   const { data } = await db.from('settings').select('value').eq('key', 'site').maybeSingle();
   return eventsOn(data?.value);
 }

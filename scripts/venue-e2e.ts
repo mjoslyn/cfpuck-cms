@@ -2,10 +2,10 @@
 // inline and use it; remove it; create a venue from the admin list. Restores the event afterwards.
 //   npx tsx --env-file=.env scripts/venue-e2e.ts
 import { chromium } from 'playwright';
-import { createClient } from '@supabase/supabase-js';
+import { siteDb } from '../src/lib/supabase';
 
 const origin = process.env.ASTRO_ORIGIN ?? 'http://localhost:4321';
-const sb = createClient(process.env.PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
+const sb = siteDb();
 const { data: ev } = await sb.from('entries').select('id, slug, fields, content, title').eq('type', 'event').eq('status', 'publish').order('event_start', { ascending: false }).limit(1).single();
 const eventPage = async () => (await fetch(`${origin}/event/${ev!.slug}/`, { redirect: 'follow' })).text();
 const venueOnPage = (html: string) => html.match(/c-event__venue">([^<]*)/)?.[1] ?? null;

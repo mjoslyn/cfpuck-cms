@@ -2,7 +2,7 @@
 // confirming, changing which lists they're on, unsubscribing, and an admin's erasing and importing. A
 // contact's status is global (anything but subscribed: no marketing mail at all); each list has its own
 // row. Server only, with the service key (public routes) or an admin's session (the Mailing screens).
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Db } from '../db/query';
 import { site as config } from '../site';
 import { sendMail } from '../forms/mail';
 import { CONSENT_TEXT, EMAIL_RE, PREFERENCES_PATH, mailingSettings, nameParts, normalEmail, type Contact, type ContactField, type MailList, type MailingSettings } from './config';
@@ -17,14 +17,14 @@ const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '
 export const mailOrigin = (fallback?: string) => (env('SITE_URL') || env('URL') || fallback || 'http://localhost:4321').replace(/\/$/, '');
 
 /** The site's name and mailing settings. */
-export async function loadMailing(db: SupabaseClient): Promise<{ name: string; settings: MailingSettings; site: Record<string, any> }> {
+export async function loadMailing(db: Db): Promise<{ name: string; settings: MailingSettings; site: Record<string, any> }> {
   const { data } = await db.from('settings').select('value').eq('key', 'site').maybeSingle();
   const site = data?.value ?? {};
   return { name: site.name || config.name, settings: mailingSettings(site), site };
 }
 
 /** The lists, in their order (public ones only, for visitors). */
-export async function loadLists(db: SupabaseClient, publicOnly = false): Promise<MailList[]> {
+export async function loadLists(db: Db, publicOnly = false): Promise<MailList[]> {
   let q = db.from('mail_lists').select('*').order('sort').order('id');
   if (publicOnly) q = q.eq('public', true);
   const { data } = await q;
@@ -32,13 +32,13 @@ export async function loadLists(db: SupabaseClient, publicOnly = false): Promise
 }
 
 /** A contact and their lists' statuses. */
-export async function loadContact(db: SupabaseClient, id: number): Promise<{ contact: Contact; lists: Map<number, string> } | null> {
+export async function loadContact(db: Db, id: number): Promise<{ contact: Contact; lists: Map<number, string> } | null> {
   const [{ data: contact }, { data: rows }] = await Promise.all([db.from('contacts').select('*').eq('id', id).maybeSingle(), db.from('contact_lists').select('list_id, status').eq('contact_id', id)]);
   if (!contact) return null;
   return { contact: contact as Contact, lists: new Map((rows ?? []).map((r) => [Number(r.list_id), String(r.status)])) };
 }
 
-export async function contactByEmail(db: SupabaseClient, email: string): Promise<Contact | null> {
+export async function contactByEmail(db: Db, email: string): Promise<Contact | null> {
   const { data } = await db.from('contacts').select('*').eq('email', normalEmail(email)).maybeSingle();
   return (data as Contact | null) ?? null;
 }
@@ -70,7 +70,7 @@ export type SignUpResult = { ok: true; sent: boolean } | { ok: false; error: str
  * a subscribed one's new lists wait too, and the confirmation email covers them. Nothing tells the
  * visitor whether the address was known: the answer is the same either way.
  */
-export async function signUp(db: SupabaseClient, s: SignUp): Promise<SignUpResult> {
+export async function signUp(db: Db, s: SignUp): Promise<SignUpResult> {
   const email = normalEmail(s.email);
   if (!EMAIL_RE.test(email)) return { ok: false, error: 'Enter your email address.' };
   const offered = await loadLists(db);
@@ -110,7 +110,7 @@ export async function signUp(db: SupabaseClient, s: SignUp): Promise<SignUpResul
 }
 
 /** The confirmation email, at most 3 a day to one address. Sent over SMTP like the site's other transactional mail. */
-async function sendConfirmation(db: SupabaseClient, contact: Contact, lists: MailList[], origin: string): Promise<boolean> {
+async function sendConfirmation(db: Db, contact: Contact, lists: MailList[], origin: string): Promise<boolean> {
   const today = new Date().toISOString().slice(0, 10);
   const { data: row } = await db.from('contacts').select('confirm_day, confirm_count').eq('id', contact.id).single();
   const count = row?.confirm_day === today ? Number(row.confirm_count) : 0;
@@ -133,7 +133,7 @@ async function sendConfirmation(db: SupabaseClient, contact: Contact, lists: Mai
  * The confirmation email again (an admin's Resend confirmation), for a contact with lists still waiting
  * for it: the same email and limit as a sign-up's. Never to an address that bounced or complained.
  */
-export async function resendConfirmation(db: SupabaseClient, id: number, origin: string): Promise<{ ok: boolean; error?: string }> {
+export async function resendConfirmation(db: Db, id: number, origin: string): Promise<{ ok: boolean; error?: string }> {
   const found = await loadContact(db, id);
   if (!found) return { ok: false, error: 'No such contact.' };
   const { contact } = found;
@@ -146,7 +146,7 @@ export async function resendConfirmation(db: SupabaseClient, id: number, origin:
 }
 
 /** A confirmation link was followed (and its button pressed): the contact and their waiting lists are subscribed. */
-export async function confirm(db: SupabaseClient, id: number): Promise<Contact | null> {
+export async function confirm(db: Db, id: number): Promise<Contact | null> {
   const found = await loadContact(db, id);
   if (!found) return null;
   const now = new Date().toISOString();
@@ -163,7 +163,7 @@ export async function confirm(db: SupabaseClient, id: number): Promise<Contact |
  * Which public lists a contact is on, as they chose on the preferences page. Someone who unsubscribed
  * can come back this way (the link reached their inbox); bounced and complained addresses can't.
  */
-export async function setLists(db: SupabaseClient, id: number, chosen: number[]): Promise<{ ok: boolean; error?: string }> {
+export async function setLists(db: Db, id: number, chosen: number[]): Promise<{ ok: boolean; error?: string }> {
   const found = await loadContact(db, id);
   if (!found) return { ok: false, error: 'No such subscription.' };
   const { contact, lists } = found;
@@ -192,7 +192,7 @@ export async function setLists(db: SupabaseClient, id: number, chosen: number[])
 }
 
 /** Unsubscribe from everything (or one list), at once; the campaign it came from records it. */
-export async function unsubscribe(db: SupabaseClient, id: number, opts: { list?: number; campaign?: number } = {}): Promise<boolean> {
+export async function unsubscribe(db: Db, id: number, opts: { list?: number; campaign?: number } = {}): Promise<boolean> {
   const now = new Date().toISOString();
   if (opts.list) {
     const { data } = await db.from('contact_lists').update({ status: 'unsubscribed', unsubscribed_at: now }).eq('contact_id', id).eq('list_id', opts.list).select('contact_id');
@@ -209,7 +209,7 @@ export async function unsubscribe(db: SupabaseClient, id: number, opts: { list?:
 }
 
 /** Erase a contact (admins): their row, sends and clicks go; a hash of the address stays, so they're never mailed again without signing up anew. */
-export async function erase(db: SupabaseClient, id: number): Promise<{ ok: boolean; error?: string }> {
+export async function erase(db: Db, id: number): Promise<{ ok: boolean; error?: string }> {
   const { data } = await db.from('contacts').select('email').eq('id', id).maybeSingle();
   if (!data) return { ok: false, error: 'No such contact.' };
   const { error: e1 } = await db.from('mail_suppressions').upsert({ email_hash: emailHash(data.email), reason: 'erased' }, { onConflict: 'email_hash' });
@@ -239,7 +239,7 @@ const mergeFields = (old: Record<string, unknown> | null | undefined, add: Recor
  * Add people to a list who agreed to it elsewhere (admins): subscribed at once, with the source named.
  * Addresses that unsubscribed, bounced, complained or were erased are skipped and counted.
  */
-export async function importContacts(db: SupabaseClient, rows: ImportRow[], list: number, source: string): Promise<{ added: number; updated: number; skipped: string[]; invalid: string[] }> {
+export async function importContacts(db: Db, rows: ImportRow[], list: number, source: string): Promise<{ added: number; updated: number; skipped: string[]; invalid: string[] }> {
   const out = { added: 0, updated: 0, skipped: [] as string[], invalid: [] as string[] };
   const now = new Date().toISOString();
   const seen = new Set<string>();

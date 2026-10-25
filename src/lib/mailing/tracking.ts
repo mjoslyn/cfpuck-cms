@@ -3,7 +3,7 @@
 // the site itself gets #mc=<click>.<signature>; the page's mail-seen.js reports the visitor's first
 // interaction there (POST /api/mail/seen), which marks the click as a person's. Every click is judged
 // with the send's others (src/lib/mailing/clicks.ts). Server only.
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Db } from '../db/query';
 import { ipPrefix, judge, scannerAddress, type Click } from './clicks';
 import { sign, verify } from './tokens';
 import { mailOrigin } from './contacts';
@@ -19,7 +19,7 @@ export interface ClickRequest {
 }
 
 /** Record a click; where to send the visitor (null: no such link). */
-export async function recordClick(db: SupabaseClient, r: ClickRequest): Promise<string | null> {
+export async function recordClick(db: Db, r: ClickRequest): Promise<string | null> {
   const { data: link } = await db.from('campaign_links').select('id, campaign_id, url, kind').eq('id', r.linkId).maybeSingle();
   if (!link) return null;
   const contact = verify('click', r.ct);
@@ -47,7 +47,7 @@ export function withSeen(url: string, clickId: number): string {
 }
 
 /** The visitor interacted with the page a tracked link led to: that click was a person's. */
-export async function confirmSeen(db: SupabaseClient, token: unknown): Promise<boolean> {
+export async function confirmSeen(db: Db, token: unknown): Promise<boolean> {
   const id = verify('seen', token);
   if (!id) return false;
   const { data } = await db.from('link_clicks').update({ confirmed_at: new Date().toISOString() }).eq('id', id).is('confirmed_at', null).select('campaign_id, contact_id');
@@ -57,7 +57,7 @@ export async function confirmSeen(db: SupabaseClient, token: unknown): Promise<b
 }
 
 /** Judge one send's clicks again and write each verdict, and the send's first person's and machine's click. */
-export async function rejudgeSend(db: SupabaseClient, campaign: number, contact: number): Promise<void> {
+export async function rejudgeSend(db: Db, campaign: number, contact: number): Promise<void> {
   const [{ data: rows }, { data: send }, { data: traps }] = await Promise.all([
     db.from('link_clicks').select('id, link_id, at, method, user_agent, ip_prefix, scanner_ip, confirmed_at, verdict, reasons').eq('campaign_id', campaign).eq('contact_id', contact).order('at').limit(500),
     db.from('campaign_sends').select('delivered_at').eq('campaign_id', campaign).eq('contact_id', contact).maybeSingle(),
@@ -84,7 +84,7 @@ export async function rejudgeSend(db: SupabaseClient, campaign: number, contact:
 }
 
 /** A campaign's links with their clicks by verdict (all clicks, and distinct people). */
-export async function linkStats(db: SupabaseClient, campaign: number) {
+export async function linkStats(db: Db, campaign: number) {
   const [{ data: links }, { data: clicks }] = await Promise.all([
     db.from('campaign_links').select('id, url, label, position, kind').eq('campaign_id', campaign).order('position'),
     db.from('link_clicks').select('link_id, contact_id, verdict').eq('campaign_id', campaign).limit(100_000),

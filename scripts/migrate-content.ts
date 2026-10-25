@@ -1,8 +1,8 @@
 // Content migrations: rewrite stored Puck documents (entries, unpublished drafts, templates, revisions)
 // with the site's migrations (src/site/migrations). Idempotent; --dry-run only counts. Runs against the
-// local stack from .env, or a hosted project with TARGET_SUPABASE_URL and TARGET_SERVICE_ROLE_KEY.
+// database in .env (DATABASE_URL), or another with TARGET_DATABASE_URL.
 //   npx tsx --env-file=.env scripts/migrate-content.ts [--dry-run]
-import { createClient } from '@supabase/supabase-js';
+import { siteDb } from '../src/lib/supabase';
 import type { PuckItem } from '../src/lib/puck/types';
 import { MIGRATIONS as SITE_MIGRATIONS } from '../src/site/migrations';
 import { migrateCollectionLayout } from '../src/lib/content/collections';
@@ -11,10 +11,9 @@ import { migrateCollectionLayout } from '../src/lib/content/collections';
 const MIGRATIONS: ((items: PuckItem[]) => PuckItem[])[] = [...SITE_MIGRATIONS, migrateCollectionLayout];
 
 const dry = process.argv.includes('--dry-run');
-const url = process.env.TARGET_SUPABASE_URL || process.env.PUBLIC_SUPABASE_URL!;
-const key = process.env.TARGET_SUPABASE_URL ? process.env.TARGET_SERVICE_ROLE_KEY! : process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const db = createClient(url, key, { auth: { persistSession: false } });
-console.log(`${dry ? 'Dry run on' : 'Migrating'} ${url}`);
+if (process.env.TARGET_DATABASE_URL) process.env.DATABASE_URL = process.env.TARGET_DATABASE_URL;
+const db = siteDb();
+console.log(`${dry ? 'Dry run on' : 'Migrating'} ${new URL(process.env.DATABASE_URL!).host}`);
 
 /** A document with the migrations applied, or null when nothing changed. */
 function migrate(doc: { content?: PuckItem[] } | null | undefined): typeof doc | null {

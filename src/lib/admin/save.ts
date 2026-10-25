@@ -1,5 +1,5 @@
 // Server-side helpers for saving editor output.
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Db } from '../db/query';
 import { texturize } from '../text/formatting';
 import { trimWords, esc } from '../../render/html';
 import type { PuckItem } from '../puck/types';
@@ -27,7 +27,7 @@ export function renderedExcerpt(excerpt: string, content: PuckItem[] | undefined
 export const renderedTitle = (title: string) => texturize(esc(title).replace(/&#039;/g, "'"));
 
 /** Resolve a media URL chosen in the editor to its media row id. */
-export async function mediaIdForUrl(db: SupabaseClient, url: string | null | undefined): Promise<number | null> {
+export async function mediaIdForUrl(db: Db, url: string | null | undefined): Promise<number | null> {
   if (!url) return null;
   const path = url.replace(/^.*\/media\//, '');
   const { data } = await db.from('media').select('id').eq('path', path).maybeSingle();
@@ -93,7 +93,7 @@ const slugify = (s: string) =>
   s.toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80);
 
 /** An entry's current links to terms of one taxonomy. */
-async function linkedTerms(db: SupabaseClient, entryId: number, taxonomy: string): Promise<number[]> {
+async function linkedTerms(db: Db, entryId: number, taxonomy: string): Promise<number[]> {
   const { data, error } = await db.from('entry_terms').select('term_id, terms!inner(taxonomy)').eq('entry_id', entryId).eq('terms.taxonomy', taxonomy);
   if (error) throw error;
   return (data ?? []).map((r) => r.term_id);
@@ -101,7 +101,7 @@ async function linkedTerms(db: SupabaseClient, entryId: number, taxonomy: string
 
 /** Link an entry to exactly `links` within a taxonomy. The new links go in first and only then do the
  *  others go, so a failure leaves the old links rather than none. */
-async function setLinks(db: SupabaseClient, entryId: number, taxonomy: string, links: { term_id: number; sort: number }[]) {
+async function setLinks(db: Db, entryId: number, taxonomy: string, links: { term_id: number; sort: number }[]) {
   const before = await linkedTerms(db, entryId, taxonomy);
   if (links.length) {
     const { error } = await db.from('entry_terms').upsert(links.map((l) => ({ entry_id: entryId, ...l })), { onConflict: 'entry_id,term_id' });
@@ -116,7 +116,7 @@ async function setLinks(db: SupabaseClient, entryId: number, taxonomy: string, l
 }
 
 /** Set an entry's tags by name: missing tags are created, the entry's other terms are kept. */
-export async function setEntryTags(db: SupabaseClient, entryId: number, names: string[]) {
+export async function setEntryTags(db: Db, entryId: number, names: string[]) {
   const wanted = [...new Map(names.map((n) => n.trim()).filter(Boolean).map((n) => [slugify(n), n] as const)).entries()].filter(([slug]) => slug);
   const slugs = wanted.map(([slug]) => slug);
   const find = () => db.from('terms').select('id, slug').eq('taxonomy', 'tag').in('slug', slugs.concat(['']));
@@ -136,7 +136,7 @@ export async function setEntryTags(db: SupabaseClient, entryId: number, names: s
 }
 
 /** Set an entry's terms of one taxonomy to `ids` (terms of other taxonomies stay), in the order given. */
-export async function setEntryTerms(db: SupabaseClient, entryId: number, taxonomy: string, ids: number[]) {
+export async function setEntryTerms(db: Db, entryId: number, taxonomy: string, ids: number[]) {
   const asked = [...new Set(ids.map(Number))];
   const { data: real, error } = await db.from('terms').select('id').eq('taxonomy', taxonomy).in('id', asked.concat([-1]));
   if (error) throw error;
@@ -149,7 +149,7 @@ export const isStale = (base: unknown, stored: string | null | undefined) => typ
 export const STALE = 'Someone else saved this since you opened it.';
 
 /** A slug for an entry of a type, from `base`, not used by another entry at the same addresses (base, base-2, ...). */
-export async function uniqueSlug(db: SupabaseClient, type: string, base: string, exceptId?: number): Promise<string> {
+export async function uniqueSlug(db: Db, type: string, base: string, exceptId?: number): Promise<string> {
   let q = db.from('entries').select('slug').in('type', typesSharingAddresses(type)).like('slug', `${base}%`);
   if (exceptId) q = q.neq('id', exceptId);
   const { data } = await q;

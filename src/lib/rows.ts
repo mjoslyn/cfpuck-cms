@@ -1,5 +1,5 @@
-// PostgREST answers with at most 1000 rows (max_rows in supabase/config.toml, and hosted projects'
-// default), so a query that needs more reads them a page at a time.
+// A query that needs many rows reads them a page at a time (PostgREST answered at most 1000 rows; the
+// query layer has no cap, and pages keep each answer small).
 export const MAX_ROWS = 1000;
 
 /**

@@ -2,7 +2,7 @@
 // src/styles/tailwind.css (--color-admin-*); the admin pages write the chosen ones, and the colors made
 // from them, after the stylesheet (AdminTheme.astro), and the settings screen sets them on the page as
 // they are picked.
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Db } from './db/query';
 
 export interface AdminTheme {
   accent?: string;
@@ -102,7 +102,7 @@ export function adminThemeCss(theme: AdminTheme | undefined): string {
 let cached: { at: number; theme: AdminTheme | undefined } | null = null;
 
 /** The saved theme, read at most once a minute per server instance (at once after a save: `force`). */
-export async function loadAdminTheme(db: SupabaseClient, force = false): Promise<AdminTheme | undefined> {
+export async function loadAdminTheme(db: Db, force = false): Promise<AdminTheme | undefined> {
   if (!force && cached && Date.now() - cached.at < 60_000) return cached.theme;
   const { data } = await db.from('settings').select('value').eq('key', 'site').maybeSingle();
   cached = { at: Date.now(), theme: adminThemeFrom(data?.value?.admin_theme) };

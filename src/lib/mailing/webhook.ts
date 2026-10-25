@@ -2,7 +2,7 @@
 // events for the marketing domain. The signature is checked (and its token may be used once), every
 // event is logged once by Mailgun's event id (a repeat is answered and ignored), then the send and the
 // contact are updated. Clicks aren't Mailgun's: the site tracks them itself. Server only.
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Db } from '../db/query';
 import { webhookSigned } from './mailgun';
 import { openVerdict } from './clicks';
 import { emailHash } from './tokens';
@@ -12,7 +12,7 @@ import { rejudgeSend } from './tracking';
 export type WebhookResult = { status: number; body: string };
 
 /** Handle one webhook post (its parsed JSON). */
-export async function handleWebhook(db: SupabaseClient, body: any, now = Date.now()): Promise<WebhookResult> {
+export async function handleWebhook(db: Db, body: any, now = Date.now()): Promise<WebhookResult> {
   if (!webhookSigned(body?.signature, now)) return { status: 406, body: 'bad signature' };
   // A token used once only (a replayed post).
   const { error: te } = await db.from('mailgun_tokens').insert({ token: String(body.signature.token).slice(0, 200) });

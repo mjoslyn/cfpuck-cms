@@ -2,7 +2,7 @@
 // and WebP/AVIF copies of every size, stored next to the originals in the `media` bucket.
 // Server-only (sharp).
 import sharp, { type Sharp } from 'sharp';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Db } from '../db/query';
 import type { Media, MediaSize } from '../types';
 import { focalFor } from './focal';
 
@@ -63,7 +63,7 @@ function fitDims(W: number, H: number, bw: number, bh: number): [number, number]
 }
 
 export class MediaStore {
-  constructor(private db: SupabaseClient) {}
+  constructor(private db: Db) {}
 
   async put(path: string, body: Buffer, mime: string) {
     const { error } = await this.db.storage.from('media').upload(path, body, { contentType: mime, upsert: true, cacheControl: '31536000' });

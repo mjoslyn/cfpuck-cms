@@ -4,7 +4,7 @@
 // (digest_id and the ISO week as issue_key, so it is made once), skipped when it has too little in it.
 // Automatic digests send at once; reviewed ones wait for an admin's approval until review_hours later,
 // and are cancelled if nobody approves them. Server only.
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Db } from '../db/query';
 import { SITE_TZ, site as config } from '../site';
 import { sendMail } from '../forms/mail';
 import { emailEvents } from '../events/email';
@@ -54,7 +54,7 @@ export function digestDue(d: Pick<Digest, 'weekday' | 'send_time' | 'last_run_ke
 const longDate = (date: string) => new Date(`${date}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', day: 'numeric', year: 'numeric' });
 
 /** Make this week's issue of a digest (when another run hasn't). Returns what happened. */
-export async function runDigest(db: SupabaseClient, d: Digest, now = new Date(), opts: { force?: boolean } = {}): Promise<string> {
+export async function runDigest(db: Db, d: Digest, now = new Date(), opts: { force?: boolean } = {}): Promise<string> {
   const { due, key, monday } = digestDue(d, now);
   if (!due && !opts.force) return 'not due';
   const issueKey = opts.force ? `${key}-${now.getTime()}` : key;

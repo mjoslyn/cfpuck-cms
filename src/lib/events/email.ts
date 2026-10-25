@@ -2,7 +2,7 @@
 // events (optionally of some categories, or featured ones only), or events picked by hand, each at its
 // next date. The renderer is synchronous, so they are loaded here before an email is rendered, by
 // block id. Past events are left out: an email can go out long after it was designed. Server only.
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Db } from '../db/query';
 import { Loader, PUBLIC_SCOPE } from '../data';
 import { downsize, mediaUrl } from '../media/image';
 import { permalink } from '../permalink';
@@ -32,7 +32,7 @@ function eventBlocks(items: EmailItem[] = []): EmailItem[] {
 
 const ids = (v: unknown) => (Array.isArray(v) ? v.map(Number).filter((n) => Number.isInteger(n) && n > 0) : []);
 
-async function load(db: SupabaseClient, q: EmailEventsQuery, origin: string): Promise<EmailEvent[]> {
+async function load(db: Db, q: EmailEventsQuery, origin: string): Promise<EmailEvent[]> {
   // Emails can go to anyone: published events that aren't members-only.
   const loader = new Loader(db, undefined, PUBLIC_SCOPE);
   const picked = q.source === 'picked';
@@ -84,7 +84,7 @@ async function load(db: SupabaseClient, q: EmailEventsQuery, origin: string): Pr
 const cache = new Map<string, { at: number; events: Promise<EmailEvent[]> }>();
 
 /** Each Events block's events, by block id (empty when the document has none or Events is off). */
-export async function emailEvents(db: SupabaseClient, doc: EmailDoc | null | undefined, origin: string): Promise<Record<string, EmailEvent[]>> {
+export async function emailEvents(db: Db, doc: EmailDoc | null | undefined, origin: string): Promise<Record<string, EmailEvent[]>> {
   const blocks = eventBlocks(doc?.content);
   if (!blocks.length || !(await eventsOnIn(db))) return {};
   const now = Date.now();

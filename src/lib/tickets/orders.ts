@@ -3,7 +3,7 @@
 // emails (confirmation at once, reminder before the event, follow-up after it, sent by the hourly
 // netlify/functions/ticket-emails.mts). Everything here runs on the server with the service key.
 import { randomBytes, randomInt } from 'node:crypto';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Db } from '../db/query';
 import { serviceClient } from '../supabase';
 import { ENTRY_COLUMNS, type Entry } from '../types';
 import { defaultHorizon, expandEntry, localToUtc, recurrenceOf } from '../recurrence';
@@ -98,7 +98,7 @@ export interface LoadedEvent {
 }
 
 /** An event (and date, for a recurring one) as tickets see it. `published`: only a published event. */
-export async function loadEvent(db: SupabaseClient, id: number, occurrence: string, published = true): Promise<LoadedEvent | null> {
+export async function loadEvent(db: Db, id: number, occurrence: string, published = true): Promise<LoadedEvent | null> {
   if (!id) return null;
   let q = db.from('entries').select(ENTRY_COLUMNS).eq('id', id).eq('type', 'event');
   if (published) q = q.eq('status', 'publish');
@@ -134,7 +134,7 @@ export function eventView(ev: LoadedEvent, origin: string): EventView {
 }
 
 /** Tickets taken per type for an event and date. */
-export async function soldCounts(db: SupabaseClient, entryId: number, occurrence: string): Promise<Record<string, number>> {
+export async function soldCounts(db: Db, entryId: number, occurrence: string): Promise<Record<string, number>> {
   const { data, error } = await db.rpc('ticket_sold', { p_entry: entryId, p_occurrence: occurrence });
   if (error) throw error;
   return Object.fromEntries(((data ?? []) as { type: string; quantity: number }[]).map((r) => [r.type, Number(r.quantity)]));
@@ -146,13 +146,13 @@ const CODE_LETTERS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const newCode = () => Array.from({ length: 8 }, (_, i) => (i === 4 ? '-' : '') + CODE_LETTERS[randomInt(CODE_LETTERS.length)]).join('');
 const newToken = () => randomBytes(24).toString('base64url');
 
-async function siteTicketSettings(db: SupabaseClient): Promise<TicketSettings> {
+async function siteTicketSettings(db: Db): Promise<TicketSettings> {
   const { data } = await db.from('settings').select('value').eq('key', 'site').maybeSingle();
   return ticketSettings(data?.value);
 }
 
 /** Expired holds: marked expired, and their checkouts closed (Square's payment links don't expire). */
-export async function expireStale(db: SupabaseClient) {
+export async function expireStale(db: Db) {
   const { data } = await db.from('ticket_orders').update({ status: 'expired' }).eq('status', 'pending').lt('expires_at', new Date().toISOString()).select('id, provider, provider_ref');
   for (const o of data ?? []) await closeCheckout(o.provider, o.provider_ref);
 }
@@ -317,7 +317,7 @@ async function paymentState(o: OrderRow): Promise<CheckoutState> {
 }
 
 /** Mark an order paid (once: a webhook and the buyer's return can both get here) and send its confirmation. */
-export async function markPaid(db: SupabaseClient, order: Pick<OrderRow, 'id'>, payment?: string) {
+export async function markPaid(db: Db, order: Pick<OrderRow, 'id'>, payment?: string) {
   const { data } = await db
     .from('ticket_orders')
     .update({ status: 'paid', paid_at: new Date().toISOString(), ...(payment ? { provider_payment: payment } : {}) })
@@ -333,7 +333,7 @@ export async function markPaid(db: SupabaseClient, order: Pick<OrderRow, 'id'>, 
  * provider has it now, so a refund that failed comes off again (and a fully refunded order whose refund
  * failed is paid again).
  */
-export async function recordRefund(db: SupabaseClient, order: OrderRow, refunded: number) {
+export async function recordRefund(db: Db, order: OrderRow, refunded: number) {
   const status = refunded >= order.amount ? (order.status === 'paid' ? 'refunded' : order.status) : order.status === 'refunded' ? 'paid' : order.status;
   if (refunded === order.refunded_amount && status === order.status) return;
   if (status !== order.status) console.warn(`tickets: order ${order.code} ${order.status} -> ${status}: ${refunded} of ${order.amount} refunded at the provider`);
@@ -342,7 +342,7 @@ export async function recordRefund(db: SupabaseClient, order: OrderRow, refunded
 
 // ---- Webhooks --------------------------------------------------------------------------------
 
-const orderBy = async (db: SupabaseClient, column: string, value: unknown) => (value ? (await db.from('ticket_orders').select('*').eq(column, String(value)).maybeSingle<OrderRow>()).data : null);
+const orderBy = async (db: Db, column: string, value: unknown) => (value ? (await db.from('ticket_orders').select('*').eq(column, String(value)).maybeSingle<OrderRow>()).data : null);
 
 /**
  * A provider's webhook (/api/payments/<provider>, signature checked there): the order's payment asked of
@@ -368,7 +368,7 @@ export async function ticketsWebhook(provider: PaymentProvider, event: PaymentEv
 // ---- The attendee list -----------------------------------------------------------------------
 
 /** Cancel an order: an unpaid one's checkout closes; its tickets go back on sale. Paid orders are refunded instead. */
-export async function cancelOrder(db: SupabaseClient, id: number) {
+export async function cancelOrder(db: Db, id: number) {
   const { data: order } = await db.from('ticket_orders').select('*').eq('id', id).maybeSingle<OrderRow>();
   if (!order) throw new Error('No such order.');
   if (order.status === 'paid' && order.amount > order.refunded_amount) throw new Error('Refund a paid order to cancel it.');
@@ -377,7 +377,7 @@ export async function cancelOrder(db: SupabaseClient, id: number) {
 }
 
 /** Refund `amount` of a paid order at its provider. All of it: the order is refunded and its tickets go back on sale. */
-export async function refundOrder(db: SupabaseClient, id: number, amount: number) {
+export async function refundOrder(db: Db, id: number, amount: number) {
   const { data: order } = await db.from('ticket_orders').select('*').eq('id', id).maybeSingle<OrderRow>();
   if (!order) throw new Error('No such order.');
   if (order.status !== 'paid') throw new Error('Only paid orders can be refunded.');
@@ -439,7 +439,7 @@ export async function joinWaitlist(data: FormData): Promise<string | null> {
 }
 
 /** Tickets on sale now (null: no limit). */
-async function availableNow(db: SupabaseClient, ev: LoadedEvent): Promise<number | null> {
+async function availableNow(db: Db, ev: LoadedEvent): Promise<number | null> {
   const occurrence = (ev.entry as { occurrence?: string }).occurrence ?? '';
   const left = remaining(ev.tickets, await soldCounts(db, ev.series.id, occurrence));
   const now = localNow(ev.tz);
@@ -455,7 +455,7 @@ async function availableNow(db: SupabaseClient, ev: LoadedEvent): Promise<number
  * Notify); otherwise as many waiting people, in the order they joined, as the free tickets cover,
  * counting those told in the last day as still deciding. Returns how many were emailed.
  */
-export async function notifyWaitlist(db: SupabaseClient, ev: LoadedEvent, origin: string, ids?: number[]): Promise<number> {
+export async function notifyWaitlist(db: Db, ev: LoadedEvent, origin: string, ids?: number[]): Promise<number> {
   const occurrence = (ev.entry as { occurrence?: string }).occurrence ?? '';
   let q = db.from('ticket_waitlist').select('*').eq('entry_id', ev.series.id).eq('occurrence', occurrence).order('id');
   q = ids ? q.in('id', ids).in('status', ['waiting', 'notified']) : q.eq('status', 'waiting');
@@ -490,7 +490,7 @@ function waitlistLink(ev: LoadedEvent, page: string, origin: string) {
 }
 
 /** After tickets free up (a cancellation or refund): the waitlist told, when the event does that itself. */
-export async function waitlistAfterRelease(db: SupabaseClient, entryId: number | null, occurrence: string, origin: string) {
+export async function waitlistAfterRelease(db: Db, entryId: number | null, occurrence: string, origin: string) {
   if (!entryId) return;
   const ev = await loadEvent(db, entryId, occurrence, false);
   if (ev?.tickets.waitlist === 'auto' && (ev.endUtc == null || ev.endUtc > Date.now())) {
@@ -535,7 +535,7 @@ async function sendOrderEmail(kind: EmailKind, o: OrderRow, ev: LoadedEvent, set
 }
 
 /** The confirmation to the buyer, and a copy for the site's admin (unless turned off). */
-export async function sendConfirmation(db: SupabaseClient, o: OrderRow, origin: string, ev?: LoadedEvent | null, settings?: TicketSettings) {
+export async function sendConfirmation(db: Db, o: OrderRow, origin: string, ev?: LoadedEvent | null, settings?: TicketSettings) {
   ev ??= o.entry_id ? await loadEvent(db, o.entry_id, o.occurrence, false) : null;
   if (!ev) return;
   settings ??= await siteTicketSettings(db);
@@ -551,7 +551,7 @@ export async function sendConfirmation(db: SupabaseClient, o: OrderRow, origin: 
 }
 
 /** Resend an order's confirmation (the attendee list). */
-export async function resendConfirmation(db: SupabaseClient, id: number, origin: string) {
+export async function resendConfirmation(db: Db, id: number, origin: string) {
   const { data: o } = await db.from('ticket_orders').select('*').eq('id', id).maybeSingle<OrderRow>();
   if (!o || o.status !== 'paid') throw new Error('Only paid orders have a confirmation.');
   const ev = o.entry_id ? await loadEvent(db, o.entry_id, o.occurrence, false) : null;

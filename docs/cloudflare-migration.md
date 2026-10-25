@@ -14,7 +14,7 @@ CORE.md, README.md and docs-site change in the same commits as the code.
 | Netlify durable cache, tag purge | Cache-Tag header and Cloudflare's purge-by-tag API |
 | Edge function `media-guard`, `_redirects` to Storage | `/media/*` served from R2 by the Worker, same headers |
 | Supabase Postgres, RLS, 24 SQL functions, 20 triggers | D1 (SQLite); permissions and functions in TypeScript |
-| `supabase-js` query builder (117 files) | Kysely (`kysely-d1`), typed schema |
+| `supabase-js` query builder (117 files) | Our query layer (`src/lib/db`): the same calls, compiled to SQL per dialect |
 | Supabase Auth | Better Auth (email and password, sessions, reset), our invitations as today |
 | Supabase Storage (`media`, `compose`, `sync-backups`) | R2 buckets of the same names |
 | `sharp` (sizes, AVIF/WebP, site icon, JPEG for Claude) | Cloudflare Images: transforms by URL and the Images binding |
@@ -23,9 +23,9 @@ CORE.md, README.md and docs-site change in the same commits as the code.
 ## What D1 changes
 
 - **No RLS.** The database API is already closed to all but editors, so every read and write is server
-  code. The 63 policies become checks in one place (`src/lib/auth/can.ts`): editor, admin, and the
+  code. The 63 policies became checks in one place (`src/lib/db/policies.ts`, phase 1): editor, admin, and the
   special cases (editors save campaigns only as drafts, digests only while off, settings writes and
-  users admin only). The 15 browser files using `browserClient` move to `/api/admin/*` endpoints.
+  users admin only). The 15 browser files using `browserClient` send their queries to `/api/admin/db`.
 - **No interactive transactions.** D1 runs `batch()` atomically and one statement at a time per
   database. `ticket_order_create` (advisory lock, count, insert) becomes one batch with a conditional
   `INSERT ... SELECT ... WHERE <sold + held + qty <= capacity>`, checked by its `changes` count.
@@ -48,19 +48,25 @@ CORE.md, README.md and docs-site change in the same commits as the code.
 
 Each phase is its own branch and PR, tested on the example site and one real site before the next.
 
-### 1. Data layer on the current Postgres (still Netlify and Supabase)
+### 1. Data layer on the current Postgres (still Netlify and Supabase): done
 
-Swap `supabase-js` queries for Kysely against the existing Postgres (direct connection), so the
-largest change is made while everything else stays put and can be compared page by page.
+Built as a query layer that keeps the Supabase client's calls (`from`, `select`, `eq`, `or`, embedded
+relations, `range`, `single`, `upsert`, `rpc`) rather than Kysely, so the 800 or so call sites kept
+their shape and the change could be checked against PostgREST directly. CORE.md, Database access.
 
-- `src/lib/db/` (new): `db()` for the request, the schema types, and helpers for what PostgREST did
-  (embedded selects in 9 places become joins; `count: 'exact'` in 11).
-- Convert module by module: `src/lib/data.ts` (Loader), `entries`, `terms`, `media`, `forms`,
-  `tickets`, `members`, `mailing`, `sync`, `redirects`, then `src/pages/api/**` and `src/admin/**`.
-- The SQL functions listed above move to TypeScript here, written so they run on Postgres and SQLite.
-- Permission checks (`can.ts`) replace RLS; browser access moves to endpoints.
-- Done when: nothing imports `@supabase/supabase-js` except auth and storage; rendered HTML of the
-  example site and a real site is unchanged (Checking changes in CORE.md); e2e scripts pass.
+- `src/lib/db/query.ts` builds a query (safe in the browser); `sql.ts` compiles it to one Postgres
+  statement answering PostgREST's JSON; `schema.ts` (generated, `scripts/db-schema.ts`) checks names
+  and gives the foreign keys for embeds; `policies.ts` is the row security as code; `functions.ts`
+  the SQL functions as TypeScript (queries through the layer where they could be; counters, the
+  ticket hold's advisory lock, mailing audiences and campaign numbers as bound SQL).
+- The admin's browser queries go through `POST /api/admin/db`, run as the signed-in editor.
+- Checked: `scripts/checks/db-parity.ts` (reads, writes, functions, and editor, admin and viewer
+  sessions, against PostgREST: identical); every page of the example site, public and admin, renders
+  the same HTML; the e2e scripts pass as before (mailing, all 64 checks).
+- Still Postgres-specific, for phase 5: `json_agg`/`jsonb` output, `json_populate_record(set)` writes,
+  `ilike`, `@>`, the advisory lock, `encode(digest(...))` for suppressions, `&&` on tags, `strpos`,
+  `awaiting_password` (Supabase Auth's users) and `sync_reset_ids` (sequences). The database's own
+  SQL functions and policies stay until then: Sync's other copy still calls them over its API.
 
 ### 2. Auth to Better Auth (still Postgres)
 
@@ -113,11 +119,12 @@ largest change is made while everything else stays put and can be compared page 
 - One fresh SQLite schema, `db/migrations/0001_init.sql`, from the current Postgres schema (also
   closes the open work item about a fresh starting migration). Site migrations move to
   `db/migrations/*_site_*.sql`; `wrangler d1 migrations apply`.
-- Switch Kysely's dialect to `kysely-d1`; fix the queries that differ (JSON operators, `ilike`,
-  `on conflict`, date arithmetic, `returning`), ticket and mail claims as batches, FTS5 search.
+- A SQLite compiler beside `src/lib/db/sql.ts` (the same QuerySpecs; JSON from `json_group_array` or
+  parsed by column type from `schema.ts`), the functions' SQL for SQLite, ticket and mail claims as
+  batches, FTS5 search.
 - `scripts/pg-to-d1.ts`: exports every table from a Postgres copy, converts types and imports into D1
   in batches; reports row counts per table on both sides.
-- Hyperdrive and the Postgres dialect are removed.
+- Hyperdrive and the Postgres compiler are removed.
 
 ### 6. Sync, backups, tooling, docs
 

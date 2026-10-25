@@ -4,11 +4,11 @@
 // temporary form and page.
 //   npx tsx --env-file=.env scripts/notification-e2e.ts
 import { chromium } from 'playwright';
-import { createClient } from '@supabase/supabase-js';
+import { siteDb } from '../src/lib/supabase';
 
 const MAIL = process.env.LOCAL_MAIL_URL ?? 'http://127.0.0.1:56524';
 const origin = 'http://localhost:4321';
-const sb = createClient(process.env.PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+const sb = siteDb();
 const out: any = {};
 const def = (id: number) => ({ id, title: 'E2E Mail', fields: [{ id: 'f1', type: 'text', label: 'Name', required: true }, { id: 'f2', type: 'email', label: 'Email' }], submitLabel: 'Send', honeypot: true, nextId: 3, confirmation: { type: 'message', message: 'Thanks' } });
 const { data: form } = await sb.from('forms').insert({ title: 'E2E Mail', definition: {}, notifications: [{ id: 'n1', name: 'Test', to: 'e2e-notify@example.com', subject: 'E2E rich message', message: 'Plain line one\nline two\n\n{all_fields}' }], is_active: true }).select('id').single();

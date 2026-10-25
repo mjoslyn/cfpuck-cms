@@ -9,7 +9,7 @@ import { isIP } from 'node:net';
 import { parse } from 'node-html-parser';
 import mammoth from 'mammoth';
 import sharp from 'sharp';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Db } from '../db/query';
 import type { Media } from '../types';
 import { downsize, mediaUrl } from '../media/image';
 import { MediaStore } from '../media/process';
@@ -141,7 +141,7 @@ const nextRef = (prefix: string, taken: { ref: string }[]) => `${prefix}-${taken
  * New materials for a turn: documents are stored (PDF) or reduced to text, library media is recorded,
  * links are fetched once. Returns the refs added and notes for the editor.
  */
-export async function ingest(db: SupabaseClient, sessionId: string, reg: Registry, input: { docs: File[]; mediaIds: number[]; links: string[] }): Promise<{ added: Added; notes: string[] }> {
+export async function ingest(db: Db, sessionId: string, reg: Registry, input: { docs: File[]; mediaIds: number[]; links: string[] }): Promise<{ added: Added; notes: string[] }> {
   const added: Added = [];
   const notes: string[] = [];
   const service = db;
@@ -247,7 +247,7 @@ export function registerImage(reg: Registry, m: Media): string {
 }
 
 /** Claude input for some registry items (images re-encoded, PDFs read from storage). */
-export async function blocksFor(db: SupabaseClient, store: MediaStore, reg: Registry, refs: string[]): Promise<Block[]> {
+export async function blocksFor(db: Db, store: MediaStore, reg: Registry, refs: string[]): Promise<Block[]> {
   const blocks: Block[] = [];
   const pdf = async (path: string) => {
     const { data, error } = await db.storage.from('compose').download(path);
@@ -314,7 +314,7 @@ export function briefBlocksFor(reg: Registry, refs: string[]): Block[] {
 }
 
 /** What the page builder needs from the registry. */
-export async function buildMaterials(db: SupabaseClient, reg: Registry): Promise<BuildMaterials> {
+export async function buildMaterials(db: Db, reg: Registry): Promise<BuildMaterials> {
   const { data: tagRows } = await db.from('terms').select('id, name').eq('taxonomy', 'tag');
   return {
     images: new Map(reg.images.map((i) => [i.ref, { mediaId: i.mediaId, src: i.src, alt: i.alt || i.title }] as [string, ImageMaterial])),

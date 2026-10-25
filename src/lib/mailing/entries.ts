@@ -2,7 +2,7 @@
 // the Events block): the latest published entries of some types, optionally of some terms, and in a
 // digest only those published since its last issue. Members-only entries are left out: an email can go
 // to anyone. Loaded before an email is rendered, by block id. Server only.
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Db } from '../db/query';
 import { Loader, PUBLIC_SCOPE } from '../data';
 import { downsize, mediaUrl } from '../media/image';
 import { permalink } from '../permalink';
@@ -42,7 +42,7 @@ export function entryTypes(q: EmailEntriesQuery, events: boolean): string[] {
   return picked.length ? picked : allowed.includes('post') ? ['post'] : allowed.slice(0, 1);
 }
 
-async function load(db: SupabaseClient, q: EmailEntriesQuery, origin: string, since: string | null, events: boolean): Promise<EmailEvent[]> {
+async function load(db: Db, q: EmailEntriesQuery, origin: string, since: string | null, events: boolean): Promise<EmailEvent[]> {
   const loader = new Loader(db, undefined, { ...PUBLIC_SCOPE, noEvents: !events });
   const count = Math.min(MAX_EMAIL_ENTRIES, Math.max(1, Math.round(Number(q.count) || 3)));
   const terms = (q.terms ?? []).map(Number).filter((n) => Number.isInteger(n) && n > 0);
@@ -72,7 +72,7 @@ async function load(db: SupabaseClient, q: EmailEntriesQuery, origin: string, si
 }
 
 /** Each Entries block's entries, by block id. `since`: a digest's last issue (for blocks showing only new entries). */
-export async function emailEntries(db: SupabaseClient, doc: EmailDoc | null | undefined, origin: string, since: string | null = null): Promise<Record<string, EmailEvent[]>> {
+export async function emailEntries(db: Db, doc: EmailDoc | null | undefined, origin: string, since: string | null = null): Promise<Record<string, EmailEvent[]>> {
   const blocks = entryBlocks(doc?.content);
   if (!blocks.length) return {};
   const events = await eventsOnIn(db);

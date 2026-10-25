@@ -1,6 +1,6 @@
 // The members' account endpoints (src/pages/api/members/): shared checks and where each answer goes
 // (back to the account page, with a message or an error). Server only.
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Db } from '../db/query';
 import { ACCOUNT_PATH, memberSettings, type MemberSettings } from './config';
 
 /** The account page with a message (`m`), an error, or a page to go back to. */
@@ -10,7 +10,7 @@ export function accountUrl(q: { m?: string; error?: string; next?: string; view?
 }
 
 /** The member settings, read with any client (settings are public). */
-export async function loadMemberSettings(db: SupabaseClient): Promise<MemberSettings> {
+export async function loadMemberSettings(db: Db): Promise<MemberSettings> {
   const { data } = await db.from('settings').select('value').eq('key', 'site').maybeSingle();
   return memberSettings(data?.value);
 }

@@ -8,11 +8,11 @@
 // makes is removed afterwards and the settings put back.
 //   npx tsx --env-file=.env scripts/mailing-e2e.ts
 import { createHmac } from 'node:crypto';
-import { createClient } from '@supabase/supabase-js';
+import { siteDb } from '../src/lib/supabase';
 
 const base = process.env.ASTRO_ORIGIN ?? 'http://localhost:4321';
 const mail = process.env.LOCAL_MAIL_URL ?? 'http://127.0.0.1:54324';
-const db = createClient(process.env.PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+const db = siteDb();
 let bad = 0;
 const ok = (name: string, cond: unknown, extra = '') => (cond || bad++, console.log(`${cond ? 'ok  ' : 'FAIL'} ${name} ${cond ? '' : extra}`));
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

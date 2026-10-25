@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Db } from '../../../lib/db/query';
 import { ARCHIVE_PATHS, CONTENT_TYPES, isTimezone, SEARCHABLE_TYPES, SITE_TZ, site as config } from '../../../lib/site';
 import { moveEventsToTimezone, refreshSiteTimezone } from '../../../lib/site/timezone';
 import { socialLinks } from '../../../lib/social/links';
@@ -77,7 +77,7 @@ function searchTypesFrom(v: unknown): string[] | undefined {
 }
 
 /** The admin theme posted, its logo's URL made here from the media row (a size fit for the menu bar). */
-async function adminThemeWithLogo(db: SupabaseClient, v: unknown): Promise<AdminTheme | undefined> {
+async function adminThemeWithLogo(db: Db, v: unknown): Promise<AdminTheme | undefined> {
   const id = Number((v as AdminTheme | undefined)?.logo) || 0;
   let logo_url: string | undefined;
   if (id > 0) {

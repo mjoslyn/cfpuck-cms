@@ -1,7 +1,7 @@
 // Form submissions: validate against the form (skipping fields conditional logic hides), store the
 // entry, send notifications, and work out the confirmation. A form that takes payment sends the
 // visitor to checkout instead, and notifies once paid (./checkout.ts).
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Db } from '../db/query';
 import type { Field, FormDef, FormResult, FormRow, NamePart, Notification, ProductValue, SubmissionPayment, Values } from './types';
 import { HONEYPOT, INPUT_TYPES, NAME_LABELS, displayValue, isFieldHidden, isProduct, visibleNameParts } from './logic';
 import { MAX_QUANTITY, currencyOf, lineItems, totalOf } from './payment';
@@ -234,7 +234,7 @@ export async function notify(row: FormRow, values: Values, origin: string, payme
 export async function handleFormPost(data: FormData, request: Request): Promise<FormResult | null> {
   const formId = Number(data.get('_form'));
   if (!formId) return null;
-  const db: SupabaseClient = serviceClient();
+  const db: Db = serviceClient();
   const { data: row, error } = await db.from('forms').select('*').eq('id', formId).eq('is_active', true).maybeSingle();
   if (error) throw error;
   if (!row) return null;
@@ -280,7 +280,7 @@ export async function handleFormPost(data: FormData, request: Request): Promise<
 }
 
 /** What the visitor sees once the form is sent (and paid for): its message, or a page or address to go to. */
-export async function confirmationResult(db: SupabaseClient, form: FormRow, entry: Values, payment?: SubmissionPayment | null): Promise<FormResult> {
+export async function confirmationResult(db: Db, form: FormRow, entry: Values, payment?: SubmissionPayment | null): Promise<FormResult> {
   const formId = form.id;
   const confirmation = form.definition.confirmation ?? { type: 'message', message: '' };
   const tags = { adminEmail: env('FORMS_ADMIN_EMAIL') || site.adminEmail, payment };

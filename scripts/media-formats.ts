@@ -1,13 +1,13 @@
 // Backfill AVIF/WebP copies for media that don't have them yet (imported or older uploads).
 //   npx tsx --env-file=.env scripts/media-formats.ts [--limit N] [--concurrency 4] [--all]
-import { createClient } from '@supabase/supabase-js';
+import { siteDb } from '../src/lib/supabase';
 import { MediaStore, addFormats } from '../src/lib/media/process';
 import type { Media } from '../src/lib/types';
 
 const arg = (k: string, d: string) => (process.argv.includes(k) ? process.argv[process.argv.indexOf(k) + 1] : d);
 const limit = Number(arg('--limit', '100000'));
 const concurrency = Number(arg('--concurrency', '4'));
-const db = createClient(process.env.PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
+const db = siteDb();
 const store = new MediaStore(db);
 
 // The API returns at most 1000 rows per request; page through.

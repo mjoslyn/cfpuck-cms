@@ -2,14 +2,14 @@
 // own address; it has the original's content (with any unpublished changes), fields, tags and other
 // terms, template, featured image and dates. Revisions and publish dates stay
 // with the original.
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Db } from '../db/query';
 import { renderedTitle, uniqueSlug } from './save';
 import { slugify } from '../slug';
 
 const copyTitle = (title: string) => (title ? `${title} (copy)` : '');
 
 /** Copy entry `id`; returns the copy's id. */
-export async function duplicateEntry(db: SupabaseClient, id: number): Promise<number> {
+export async function duplicateEntry(db: Db, id: number): Promise<number> {
   const { data: e, error } = await db.from('entries').select('*').eq('id', id).single();
   if (error || !e) throw new Error('That entry no longer exists.');
   // Unpublished changes are what the editor shows: the copy starts from them.
@@ -46,7 +46,7 @@ export async function duplicateEntry(db: SupabaseClient, id: number): Promise<nu
 }
 
 /** Copy a template, part or pattern; returns the copy's slug. */
-export async function duplicateTemplate(db: SupabaseClient, kind: string, slug: string): Promise<string> {
+export async function duplicateTemplate(db: Db, kind: string, slug: string): Promise<string> {
   const { data: t, error } = await db.from('templates').select('kind, slug, title, content').eq('kind', kind).eq('slug', slug).single();
   if (error || !t) throw new Error('That template no longer exists.');
   const { data: same } = await db.from('templates').select('slug').eq('kind', kind).like('slug', `${slug}-copy%`);
