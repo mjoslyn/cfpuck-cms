@@ -35,6 +35,31 @@ async function bodyAction(request: Request, pathname: string): Promise<string | 
   return undefined;
 }
 
+/** Marks an answer noindex for search engines. */
+async function noindex(res: Response | Promise<Response>) {
+  const r = await res;
+  if (!r.headers.has('X-Robots-Tag')) {
+    try {
+      r.headers.set('X-Robots-Tag', 'noindex');
+    } catch {
+      // A response with fixed headers (a fetched one) passes as it is.
+    }
+  }
+  return r;
+}
+
+/** Whether the request came to another address than the site's own (SITE_URL): a workers.dev or preview
+ * copy, which search engines are kept out of. Without SITE_URL every address counts as the site's. */
+function offSite(url: URL): boolean {
+  const own = process.env.SITE_URL;
+  if (!own) return false;
+  try {
+    return new URL(own).host !== url.host;
+  } catch {
+    return false;
+  }
+}
+
 export const onRequest = defineMiddleware(async (context, next) => {
   const { pathname } = context.url;
   if (crossSite(context.request, context.url) && !CROSS_SITE_POSTS.includes(pathname)) {
@@ -44,19 +69,8 @@ export const onRequest = defineMiddleware(async (context, next) => {
   // The other copy's queries during a sync (signed; the route checks them) clear the pages as edits do.
   if (pathname === '/api/sync/remote') return purgeAfter(context, next);
   const isAdmin = pathname.startsWith('/admin') || pathname.startsWith('/api/admin');
-  if (!isAdmin) return next();
-  // The admin is never indexed.
-  const noindex = async (res: Response | Promise<Response>) => {
-    const r = await res;
-    if (!r.headers.has('X-Robots-Tag')) {
-      try {
-        r.headers.set('X-Robots-Tag', 'noindex');
-      } catch {
-        // A response with fixed headers (a fetched one) passes as it is.
-      }
-    }
-    return r;
-  };
+  // The admin is never indexed, nor is any page at an address other than the site's.
+  if (!isAdmin) return offSite(context.url) ? noindex(next()) : next();
   if (PUBLIC_ADMIN.some((p) => pathname.startsWith(p))) return noindex(next());
 
   const user = await sessionUser(context.request);
