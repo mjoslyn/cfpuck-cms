@@ -80,7 +80,13 @@ await fetch(`${base}/`, { method: 'POST', headers: { Origin: base }, body: new U
 const { data: form3 } = await db.from('forms').insert({ title: 'safety-e2e', is_active: true, definition: { fields: [] }, notifications: [] }).select('id').single();
 // a form with submissions made since the snapshot must survive "also delete"
 r = await json('POST', '/api/admin/sync', { action: 'restoreBackup', site: 'here', path: snap.path, deleteSince: true }); const { job } = await r.json(); ok('restore queued', r.status === 202 && /^[a-f0-9]{32}$/.test(job), job);
-r = await fetch(`${base}/api/admin/sync?restoreJob=${job}`, { headers: H }); const st = await r.json(); ok('restore done', st.status === 'done', JSON.stringify(st).slice(0, 400));
+// The jobs queue runs it; the screen polls, and so does this.
+let st: any = {};
+for (let i = 0; i < 120 && !['done', 'error'].includes(st.status); i++) {
+  if (i) await new Promise((res) => setTimeout(res, 500));
+  st = await (await fetch(`${base}/api/admin/sync?restoreJob=${job}`, { headers: H })).json();
+}
+ok('restore done', st.status === 'done', JSON.stringify(st).slice(0, 400));
 ok('title restored', (await db.from('entries').select('title').eq('id', page!.id).single()).data?.title === page!.title);
 ok('post made since deleted', !(await db.from('entries').select('id').eq('id', made2.id).maybeSingle()).data);
 ok('form with submissions kept', !!(await db.from('forms').select('id').eq('id', form2!.id).maybeSingle()).data, JSON.stringify(st.result?.problems));

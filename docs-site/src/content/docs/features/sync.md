@@ -81,9 +81,8 @@ A snapshot is everything a sync covers on one site, as it is: entries with their
 changes, terms, library rows, templates, forms, settings and redirects.
 
 - **Back up now** takes one at once.
-- **Take one every day / every week** takes them on a schedule. A Netlify scheduled function
-  (`netlify/functions/scheduled-snapshot.mts`) runs at 07:00 UTC on the deployed site; it doesn't run
-  under `astro dev`.
+- **Take one every day / every week** takes them on a schedule: the Worker's daily run at 07:00 UTC
+  (`src/worker.ts`) on the deployed site.
 - Restoring a snapshot takes one of the current state first.
 
 ### What a site keeps
@@ -107,8 +106,7 @@ row only; its stored images stay, so undoing the restore brings the file back wh
 submissions is never deleted by a restore (its submissions would be cut loose from it); the report
 names the forms kept.
 
-A restore runs as a job (the background function `netlify/functions/restore-background.mts`, up to 15
-minutes), so a large one isn't cut off halfway; the screen waits for it and then shows the result.
+A restore runs as a job (on the Worker's jobs queue, up to 15 minutes), so a large one isn't cut off halfway; the screen waits for it and then shows the result.
 
 ## Protecting a site
 

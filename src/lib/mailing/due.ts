@@ -1,5 +1,5 @@
-// The mailing scheduler (netlify/functions/mail-due.mts, every 5 minutes on the deployed site) and the
-// nightly upkeep (netlify/functions/mail-nightly.mts). Due: scheduled campaigns whose time has come, sends
+// The mailing scheduler (src/worker.ts, every 5 minutes on the deployed site) and the nightly upkeep
+// (src/worker.ts, 06:20 UTC). Due: scheduled campaigns whose time has come, sends
 // a run let go of (out of time, or waiting on an unclear batch), digest issues waiting for review past
 // their time (cancelled), and digests due this week. Nightly: Mailgun's bounces, complaints and
 // unsubscribes for the domain reconciled with the contacts, and old events, clicks, tokens and

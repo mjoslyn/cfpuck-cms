@@ -9,11 +9,22 @@ import { SCHEMA, type TableSchema } from './schema';
 import { shape, type CallSpec, type DbError, type Executor, type Filter, type Order, type QuerySpec, type Result, type Scoped } from './query';
 import { policyFor, type Ctx, type Rule } from './policies';
 import { callFunction } from './functions';
+import { bindings, currentScope } from '../platform';
 
 let pool: pg.Pool | null = null;
 
-/** The database connection pool (DATABASE_URL; on a hosted project, its transaction pooler). */
+/**
+ * The database connections: in a Worker, the request's own (through Hyperdrive, which pools them; a
+ * Worker can't keep a connection past the request that opened it); in Node (scripts), one pool from
+ * DATABASE_URL.
+ */
 export function getPool(): pg.Pool {
+  const hyperdrive = bindings()?.HYPERDRIVE;
+  if (hyperdrive) {
+    const scope = currentScope();
+    if (!scope) throw new Error('No request to connect for');
+    return (scope.pool ??= new pg.Pool({ connectionString: hyperdrive.connectionString, max: 5 })) as pg.Pool;
+  }
   const url = process.env.DATABASE_URL ?? import.meta.env?.DATABASE_URL;
   if (!url) throw new Error('DATABASE_URL is not set');
   pool ??= new pg.Pool({ connectionString: url, max: Number(process.env.DATABASE_POOL_MAX ?? 5), idleTimeoutMillis: 10_000, allowExitOnIdle: true });

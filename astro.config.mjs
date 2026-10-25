@@ -1,8 +1,8 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
 import react from '@astrojs/react';
-import netlify from '@astrojs/netlify';
-import { cacheNetlify } from '@astrojs/netlify/cache';
+import cloudflare from '@astrojs/cloudflare';
+import { cacheCloudflare } from '@astrojs/cloudflare/cache';
 import tailwindcss from '@tailwindcss/vite';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -51,12 +51,12 @@ const sitePublic = {
 
 export default defineConfig({
   output: 'server',
-  // No edge-function emulation under astro dev: its Deno runtime ran out of memory on the editor's
-  // image requests and took the dev server down (the site has no edge functions now).
-  adapter: netlify({ devFeatures: { images: true, environmentVariables: false, edgeFunctions: false } }),
+  // A Cloudflare Worker (wrangler.jsonc; its entry is src/worker.ts). astro dev runs it in workerd too,
+  // with local bindings (Hyperdrive to the local database, the jobs queue, Images).
+  adapter: cloudflare({ imageService: 'passthrough' }),
   integrations: [react(), siteRoutes, sitePublic],
-  // Netlify's CDN caches the pages (durable, cache tags) and purges them after edits (src/lib/cache.ts).
-  cache: { provider: cacheNetlify() },
+  // Cloudflare's Workers cache keeps the pages (tagged) and purges them after edits (src/lib/cache.ts).
+  cache: { provider: cacheCloudflare() },
   // The same check runs in src/middleware.ts, which lets mail apps' one-click unsubscribe through.
   security: { checkOrigin: false },
   trailingSlash: 'ignore',

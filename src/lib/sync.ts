@@ -866,7 +866,7 @@ export async function snapshotNow(site: Site): Promise<{ path: string; rows: num
 }
 
 /**
- * The scheduled run (netlify/functions/scheduled-snapshot.mts, daily): on this site, take a snapshot
+ * The scheduled run (src/worker.ts, daily): on this site, take a snapshot
  * if they are on and the last scheduled one is older than the schedule allows.
  */
 export async function scheduledSnapshot(): Promise<string> {
@@ -1164,8 +1164,7 @@ export async function restore(site: Site, path: string, opts: { deleteSince?: bo
 //
 // A restore deletes rows and then writes thousands back, longer than a request may run; cut off
 // halfway it would leave the copy half restored. So it runs as a job: the API queues it and hands its
-// id to the background function (netlify/functions/restore-background.mts; astro dev runs it in the
-// request), and the screen polls. The job is a file in this site's backup bucket, named by an id only
+// id to the jobs queue (src/lib/jobs.ts; without one it runs in the request), and the screen polls. The job is a file in this site's backup bucket, named by an id only
 // the API and the signed-in admin's browser know.
 
 export type RestoreJob = { status: 'queued' | 'running' | 'done' | 'error'; site: Site; path: string; deleteSince: boolean; result?: Awaited<ReturnType<typeof restore>>; error?: string };

@@ -5,7 +5,7 @@
 // it, since later evidence (a click on the hidden link, a burst) changes earlier ones. The scanner lists
 // below need occasional updates; each verdict records which rule fired, so they can be tuned from real
 // data. Server only (the lists use node:net).
-import { BlockList, isIP } from 'node:net';
+import { SubnetList, isIP } from '../net';
 
 export type Verdict = 'machine' | 'likely_human' | 'human';
 
@@ -43,17 +43,14 @@ const SCANNER_NETS: [string, number, 'ipv4' | 'ipv6'][] = [
 const PRIVACY_NETS: [string, number, 'ipv4' | 'ipv6'][] = [['17.0.0.0', 8, 'ipv4']];
 
 const list = (nets: [string, number, 'ipv4' | 'ipv6'][]) => {
-  const b = new BlockList();
+  const b = new SubnetList();
   for (const [net, prefix, family] of nets) b.addSubnet(net, prefix, family);
   return b;
 };
 const SCANNERS = list(SCANNER_NETS);
 const PRIVACY = list(PRIVACY_NETS);
 
-const inList = (b: BlockList, ip: string) => {
-  const family = isIP(ip);
-  return !!family && b.check(ip, family === 6 ? 'ipv6' : 'ipv4');
-};
+const inList = (b: SubnetList, ip: string) => !!isIP(ip) && b.check(ip);
 
 export const scannerAgent = (ua: string) => !ua.trim() || SCANNER_UA.test(ua);
 export const scannerAddress = (ip: string) => inList(SCANNERS, ip);

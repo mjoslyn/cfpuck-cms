@@ -1,6 +1,6 @@
 # supapuck-cms: the core (Astro + Puck + Supabase)
 
-A CMS for small business and organisation sites: Astro SSR on Netlify, content in Supabase, a Puck visual editor,
+A CMS for small business and organisation sites: Astro SSR on a Cloudflare Worker, content in Postgres (a Supabase project) and files in R2, a Puck visual editor,
 and Compose (pages written with Claude from documents, images and links). The code is split into the
 core (everything outside `src/site/`) and a site (`src/site/`). This repository holds the core and an
 example site; a real site is a fork that replaces `src/site/` (see Upstream and sites).
@@ -261,8 +261,8 @@ the copy that has them set (production can't reach a local copy).
 - **Snapshots**: everything a sync covers on one copy (entries with their terms and unpublished
   changes, terms, media rows, templates, forms, settings `site` and `options`, redirects), in the same
   folder as `<time>-snapshot-<trigger>.json`. Taken by **Back up now** (`snapshotNow`), before a
-  snapshot restore, and on a schedule: `netlify/functions/scheduled-snapshot.mts` runs daily at 07:00
-  UTC on the deployed site (not under `astro dev`) and calls `scheduledSnapshot`, which takes one if
+  snapshot restore, and on a schedule: the Worker's daily run at 07:00 UTC (`src/worker.ts`, deployed
+  site only) calls `scheduledSnapshot`, which takes one if
   they are on and the last is due (daily or weekly).
 - **Backups and snapshots hold rows, not stored images.** A file is backed up as its media row; its
   image files in storage are not, and no restore brings them back.
@@ -282,9 +282,8 @@ the copy that has them set (production can't reach a local copy).
   terms and unpublished changes in bulk. Deleting a file deletes its media row only: its stored images
   stay. A form with submissions is never deleted (they would be cut loose from it); the report names
   it. A restore runs as a job, since it outlasts a request and must not be cut off halfway:
-  `restoreBackup` queues it (`queueRestore`, a file under `jobs/` in that folder) and the background
-  function `netlify/functions/restore-background.mts` runs it once (`runRestore`; under `astro dev` the
-  request does) and clears the page cache; the screen polls `GET /api/admin/sync?restoreJob=<id>`.
+  `restoreBackup` queues it (`queueRestore`, a file under `jobs/` in that folder) and the jobs queue runs
+  it once (`runRestore`, `src/worker.ts`; without a queue the request does) and clears the page cache; the screen polls `GET /api/admin/sync?restoreJob=<id>`.
 - Mailing's contacts, campaigns, sends and clicks aren't synced or backed up, and a restore leaves
   them alone: a snapshot restore can't subscribe anyone again (see Mailing).
 - A site with **Protect this site from syncs** on (`settings.site.sync_protected`, set on its own Sync
@@ -350,9 +349,9 @@ also call `search_site` (`src/lib/compose/site.ts`) to feature the site's own en
 `ANTHROPIC_API_KEY` (optional `ANTHROPIC_MODEL`, default claude-sonnet-5-5).
 
 A turn runs as a job (`src/lib/compose/job.ts`, table `compose_jobs`) because a build takes 30-90s or
-more, past Netlify's request limits: `POST /api/admin/compose` reads the materials, queues the turn and
-POSTs `{ jobId, token }` to the background function `netlify/functions/compose-background.mts`
-(answers 202, runs up to 15 minutes); under `astro dev` the route runs the job in-process. The runner
+more: `POST /api/admin/compose` reads the materials, queues the turn and puts `{ jobId, token }` on the
+jobs queue (`src/lib/jobs.ts`; the Worker's consumer runs it, up to 15 minutes), answering 202; without
+a queue it runs after the answer. The runner
 claims the job with its token and writes progress and the result or error to the row; the panel polls
 `GET /api/admin/compose?job=<id>`; a job silent for 3 minutes or older than 16 is reported as failed.
 One turn at a time per conversation (409 otherwise) and two per person (429). Only the latest message
@@ -374,9 +373,9 @@ Text materials count toward the budget of what is sent in full (`MATERIAL_BUDGET
   linked only on pages that use them (`ctx.assets`). Scripts are in `public/assets/js/`. A site serves
   its fonts the same way (files in `src/site/public/assets/fonts/`, `@font-face` in its `theme.css`, the
   first faces preloaded from its `render.ts` `head`).
-- Pages are cached at the CDN through Astro's route cache (`cache` in `astro.config.mjs`, the Netlify
+- Pages are cached at the CDN through Astro's route cache (`cache` in `astro.config.mjs`, the Cloudflare
   provider; `src/lib/cache.ts`): fresh for 60s, then served stale for up to a week while they refresh,
-  in Netlify's durable cache (shared by its edge servers), tagged `pages`. A successful admin write
+  in the Workers cache, tagged `pages` (and each page's path). A successful admin write
   (POST, PUT, PATCH or DELETE under `/api/admin/`) clears that tag from the middleware
   (`cache.invalidate`; a 2xx answer, or the 303 a form post such as a bulk action answers with), so edits show at once; previews (and the email builder's event lookups), Claude drafting, accessibility marks,
   submissions, users, the attendee list and sync requests other than a sync into this copy or a restore don't
@@ -397,7 +396,10 @@ code made of Supabase Storage. The site serves the media folder at `/media/<path
 leave it (`unsafeMediaPath`). `scripts/copy-storage.ts` copies a site's Supabase Storage buckets into
 the store's folders (resumable).
 
-Uploads (`/api/admin/media`) are processed by `src/lib/media/process.ts` (sharp): images over 2560px get
+Uploads (`/api/admin/media`) are processed by `src/lib/media/process.ts` through an image engine
+(`src/lib/media/engine.ts`: Cloudflare Images, the Worker's `IMAGES` binding; scripts in Node pass
+sharp, `scripts/lib/sharp-engine.ts`; crops are cut as rectangles computed here, `focalRect`, so both cut
+the same pixels): images over 2560px get
 a `-scaled` copy as the full size, the standard sizes are generated (hard crops centred on the focal
 point), and every file gets AVIF and WebP copies next to it. An SVG is stored as uploaded. It can carry script and
 `/media/` is the site's own address, so every `/media/` answer carries `Content-Security-Policy:
@@ -617,9 +619,9 @@ tickets (30-120 minutes), and the emails with the reminder's and follow-up's tim
   `src/admin/TicketEmails.tsx`; kept out of the event's fields so editor saves can't overwrite it), else
   the site's, else the default template for that kind (`ticket:<kind>`, see Forms), else `DEFAULT_EMAILS` (`emailToSend`). `src/lib/tickets/email.ts` renders them with the
   forms' renderer (`renderEmail`); the builder's kit is `src/admin/ticket-email.ts`, its preview a sample
-  order rendered in the browser. `netlify/functions/ticket-emails.mts` runs
-  `sendDueTicketEmails` hourly (deployed site only): reminders, follow-ups, expired holds, auto waitlists.
-  Links use `SITE_URL`, else Netlify's `URL`.
+  order rendered in the browser. The Worker runs `sendDueTicketEmails` hourly (`src/worker.ts`,
+  deployed site only): reminders, follow-ups, expired holds, auto waitlists. Links use `SITE_URL`, else
+  the request's address.
 - Orders, waitlists and events' own emails aren't synced or backed up: they stay on the copy where they were made.
 
 ## Members
@@ -772,7 +774,7 @@ never subscribes anyone again); the settings are, with the others. Migration `*_
   recipient's unsubscribe and preferences links when a campaign is frozen, before each batch, and
   before a test send, and refuses to send without them.
 - **Sending** (`src/lib/mailing/send.ts`): a job. `startSending` claims the campaign (`mail_claim`, a
-  token) and hands it to `netlify/functions/mail-send-background.mts` (in-process under astro dev). A run
+  token) and puts it on the jobs queue (`src/lib/jobs.ts`; in-process without one). A run
   freezes the campaign first (its HTML and text, tracked links, every recipient in `campaign_sends`, in
   batches of up to 1,000), then per batch re-checks who is still subscribed (the rest `dropped`), marks
   it `attempting` and posts it to `/v3/<domain>/messages` with each address's variables, the tags
@@ -782,9 +784,9 @@ never subscribes anyone again); the settings are, with the others. Migration `*_
   the next run asks Mailgun's events for the batch's tag, resends only if none show after 10 minutes,
   once, and otherwise pauses the campaign. A run stops starting batches after 12 minutes and lets go;
   pausing or cancelling stops it before the next batch.
-- **Scheduler**: `netlify/functions/mail-due.mts` (every 5 minutes, deployed site) runs `runDue`:
+- **Scheduler**: the Worker's run every 5 minutes (`src/worker.ts`, deployed site) runs `runDue`:
   scheduled campaigns that are due, sends a run let go of, digest issues waiting for approval past their
-  time (cancelled, the admins told), and digests due. `mail-nightly.mts` (06:20 UTC) runs `runNightly`:
+  time (cancelled, the admins told), and digests due. The nightly run (06:20 UTC) runs `runNightly`:
   Mailgun's bounces, complaints and unsubscribes reconciled with the contacts, then events and clicks
   older than 90 days, webhook tokens older than a day and unconfirmed sign-ups pruned.
 - **Weekly digest** (`src/lib/mailing/digest.ts`, `src/admin/DigestEditor.tsx`): a design, lists,
@@ -928,10 +930,31 @@ Accounts) and Storage is still Supabase's, carried by a Db as `storage`.
 
 ## Hosting
 
-Netlify, with a hosted Supabase project (`npx supabase link`). Migrations: `npx supabase db push
---linked`; SQL: `npx supabase db query --linked`. The site connects to the database with
-`DATABASE_URL`: on Netlify, the project's transaction pooler (Connect > Transaction pooler, port 6543),
-since each function instance opens its own connections (`DATABASE_POOL_MAX`, default 5). Hosted
+A Cloudflare Worker (`@astrojs/cloudflare`, `wrangler.jsonc`, entry `src/worker.ts`: Astro's `handle`
+for requests, `scheduled` for the Cron Triggers, `queue` for the jobs queue), with a hosted Supabase
+project for the database (`npx supabase link`). Migrations: `npx supabase db push --linked`; SQL:
+`npx supabase db query --linked`. `npm run deploy` builds and deploys (`wrangler deploy`).
+
+- The Worker reaches the database through Hyperdrive (the `HYPERDRIVE` binding, made from the
+  project's direct connection string). A Worker's connections can't outlive the request that opened
+  them, so each request, scheduled run and job runs in a scope of its own (`src/lib/platform.ts`,
+  `inScope`) with its own pool (`getPool`); Hyperdrive keeps the real connections. Scripts in Node
+  connect with `DATABASE_URL`.
+- Bindings: `HYPERDRIVE`, `IMAGES` (Cloudflare Images), `JOBS` (a queue: Compose turns, campaign
+  sending runs and restores, each run once with up to 15 minutes, `src/lib/jobs.ts`),
+  `CF_VERSION_METADATA` (the page cache's validators). The Cron Triggers: mailing every 5 minutes and at
+  06:20 UTC, snapshots at 07:00 UTC, ticket emails hourly (`SCHEDULES`).
+- Variables and secrets reach the code as `process.env` (`nodejs_compat`); secrets are set with
+  `npx wrangler secret put`. Mail goes over SMTP through the Worker's sockets (`worker-mailer`; port 25
+  is closed to Workers). Link fetching for Compose resolves names over DNS-over-HTTPS (`addressesOf`).
+  The visitor's address and country come from `CF-Connecting-IP` and `CF-IPCountry`.
+- `astro dev` runs the Worker in workerd with local bindings: Hyperdrive to the local database
+  (`CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE`), a local queue, and Miniflare's Images,
+  which resizes but ignores crop rectangles and qualities (crops are centred locally; production cuts
+  them exactly). Cron runs can be triggered at `/cdn-cgi/handler/scheduled?cron=<cron>`. Static files'
+  headers are in `public/_headers`; the admin answers carry `X-Robots-Tag: noindex` (middleware).
+
+Hosted
 projects don't grant the API roles access to new tables (the local stack does): migration 0019 grants
 them and sets default privileges, and RLS does the rest for the database API (see Database access). Files need an R2 bucket and an API token for it (Media). Accounts need `AUTH_SECRET` (a long random value; changing it signs everyone out
 and breaks links already sent) and links in emails use the request's address (`SITE_URL` for Better
@@ -941,7 +964,8 @@ Auth's own). Env: `.env.example`.
 
 ```
 npx supabase start                      # local stack (ports in supabase/config.toml)
-npx astro dev --background              # http://localhost:4321
+npx astro dev --background              # http://localhost:4321 (the Worker, in workerd)
+npm run deploy                          # build and deploy the Worker (wrangler deploy)
 npx tsx --env-file=.env scripts/create-editor.ts you@example.org 'password' [editor|admin]   # a user
 npm run seed                            # starter templates, home page, sample event (skips what exists)
 npx tsx --env-file=.env scripts/migrate-content.ts [--dry-run]   # site then core content migrations

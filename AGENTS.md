@@ -59,8 +59,8 @@ Update the docs in the same commit as the change, not afterwards:
 
 - `npx supabase start` (ports 5652x; each site uses its own) and
   `npx astro dev --background` (http://localhost:4321).
-- Netlify's edge-function emulation is off under `astro dev` (`astro.config.mjs`): its Deno runtime
-  ran out of memory on the editor's image requests.
+- `astro dev` runs the site in workerd, as a Worker (CORE.md, Hosting): code that only works in Node
+  (native modules, `node:net`, `node:dns`) fails there as it would in production. Scripts run in Node.
 - After merges that change dependencies, restart the dev server: stale Vite dependency caches show as
   "Outdated Optimize Dep" and islands that don't hydrate.
 

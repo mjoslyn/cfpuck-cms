@@ -1,7 +1,7 @@
 // Ticket orders (table ticket_orders): a checkout from an event's ticket form, the buyer coming back
 // from paying, the providers' webhooks, cancelling and refunding from the attendee list, and the
 // emails (confirmation at once, reminder before the event, follow-up after it, sent by the hourly
-// netlify/functions/ticket-emails.mts). Everything here runs on the server with the service key.
+// src/worker.ts). Everything here runs on the server.
 import { randomBytes, randomInt } from 'node:crypto';
 import type { Db } from '../db/query';
 import { serviceClient } from '../db/site';
@@ -74,8 +74,8 @@ export interface Address {
 
 export const addressText = (a: Address | null | undefined) => (a ? [a.line1, a.line2, [a.city, [a.state, a.zip].filter(Boolean).join(' ')].filter(Boolean).join(', '), a.country].filter(Boolean).join(', ') : '');
 
-/** The site's address for links in emails: SITE_URL, else Netlify's URL, else the request's. */
-export const siteOrigin = (fallback?: string) => (env('SITE_URL') || env('URL') || fallback || 'http://localhost:4321').replace(/\/$/, '');
+/** The site's address for links in emails: SITE_URL, else the request's. */
+export const siteOrigin = (fallback?: string) => (env('SITE_URL') || fallback || 'http://localhost:4321').replace(/\/$/, '');
 
 // ---- Events ----------------------------------------------------------------------------------
 
@@ -561,7 +561,7 @@ export async function resendConfirmation(db: Db, id: number, origin: string) {
 }
 
 /**
- * Reminders and follow-ups that are due (hourly, netlify/functions/ticket-emails.mts). A reminder goes
+ * Reminders and follow-ups that are due (hourly, src/worker.ts). A reminder goes
  * out in the hours before the event (not to orders made inside that window: their confirmation is
  * recent); a follow-up the hours after it ends, for up to three days. Orders past either are marked
  * done, so turning an email on later doesn't send it for events long gone.

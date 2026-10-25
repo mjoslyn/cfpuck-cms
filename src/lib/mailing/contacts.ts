@@ -13,8 +13,8 @@ import { addUnsubscribe, removeUnsubscribe } from './mailgun';
 const env = (k: string) => (import.meta.env?.[k] as string | undefined) ?? process.env[k];
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
-/** The site's address for links in emails: SITE_URL, else Netlify's URL, else the request's. */
-export const mailOrigin = (fallback?: string) => (env('SITE_URL') || env('URL') || fallback || 'http://localhost:4321').replace(/\/$/, '');
+/** The site's address for links in emails: SITE_URL, else the request's. */
+export const mailOrigin = (fallback?: string) => (env('SITE_URL') || fallback || 'http://localhost:4321').replace(/\/$/, '');
 
 /** The site's name and mailing settings. */
 export async function loadMailing(db: Db): Promise<{ name: string; settings: MailingSettings; site: Record<string, any> }> {

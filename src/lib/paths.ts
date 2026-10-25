@@ -1,6 +1,6 @@
 // Path prefixes that moved (the site's src/site/moved-paths.json: [old, new] pairs, e.g. from a site it
-// replaced). Old paths 301 to the new ones (src/pages/[...path].ts locally, public/_redirects on
-// Netlify); imported content is rewritten.
+// replaced). Old paths 301 to the new ones (src/pages/[...path].ts locally, public/_redirects, which the
+// Worker's static assets follow); imported content is rewritten.
 import { MOVED_PATHS } from './site';
 
 export const PATH_MOVES = MOVED_PATHS;

@@ -31,7 +31,8 @@ function makeAuth() {
   return betterAuth({
     secret,
     baseURL: env('SITE_URL') || 'http://localhost:4321',
-    database: getPool(),
+    // The connections of whatever request is running (getPool), so one instance serves them all.
+    database: { connect: () => getPool().connect(), end: async () => {} } as unknown as ReturnType<typeof getPool>,
     telemetry: { enabled: false },
     emailAndPassword: {
       enabled: true,

@@ -89,8 +89,8 @@ the usual blocks they have:
 
 Settings > Tickets holds the site's emails, when the reminder (hours before the event) and follow-up
 (hours after it) go out, and whether the admin gets a copy. An event can have its own on its attendee
-list's **Emails** tab, and turn the reminder or follow-up off. `netlify/functions/ticket-emails.mts`
-sends reminders and follow-ups hourly on the deployed site, over the same SMTP settings as form
+list's **Emails** tab, and turn the reminder or follow-up off. The Worker's hourly run (`src/worker.ts`)
+sends reminders and follow-ups on the deployed site, over the same SMTP settings as form
 notifications.
 
 ## Setting up payments

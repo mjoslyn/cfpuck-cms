@@ -1,0 +1,33 @@
+// The Worker (https://developers.cloudflare.com/workers/wrangler/configuration/). Astro builds the site
+// into it; src/worker.ts adds the scheduled runs and the background jobs. Secrets (AUTH_SECRET,
+// STORAGE_SECRET_ACCESS_KEY, SMTP_PASS, ANTHROPIC_API_KEY, payment and Mailgun keys) are set with
+// `npx wrangler secret put <NAME>`, never here. Each site gives the Worker, Hyperdrive, queue and bucket
+// names of its own.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "supapuck",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-10-01",
+  // Node's APIs (Buffer, crypto, async_hooks, sockets for the database and SMTP), with process.env
+  // carrying the variables and secrets.
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  // Background jobs run for minutes (a Compose turn, a restore, a campaign); their CPU is mostly waiting.
+  "limits": { "cpu_ms": 300000 },
+  // The database, through Hyperdrive (its id from `npx wrangler hyperdrive create`). Locally,
+  // CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE in .env points it at the local database.
+  "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "00000000000000000000000000000000" }],
+  // Cloudflare Images: the media library's sizes and modern copies (src/lib/media/engine.ts).
+  "images": { "binding": "IMAGES" },
+  // The background jobs (src/lib/jobs.ts), each run once, one at a time.
+  "queues": {
+    "producers": [{ "binding": "JOBS", "queue": "supapuck-jobs" }],
+    "consumers": [{ "queue": "supapuck-jobs", "max_batch_size": 1, "max_retries": 0 }]
+  },
+  // The scheduled runs (src/worker.ts SCHEDULES): mailing every 5 minutes and nightly, snapshots daily,
+  // ticket emails hourly.
+  "triggers": { "crons": ["*/5 * * * *", "20 6 * * *", "0 7 * * *", "0 * * * *"] },
+  // The Worker's version, for the page cache's validators (@astrojs/cloudflare/cache).
+  "version_metadata": { "binding": "CF_VERSION_METADATA" },
+  "vars": {}
+}

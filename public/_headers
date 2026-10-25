@@ -1,0 +1,4 @@
+# The Worker's static files: vendored and theme assets never change in place (CSS bundles are
+# content-hashed), so browsers keep them a year.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

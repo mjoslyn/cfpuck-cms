@@ -1,14 +1,11 @@
 // What the editor gave the composer, kept per session so later turns can use it: documents (PDFs in the
-// private "compose" bucket; Word, text, Markdown and HTML as text), library images (sent as images),
+// store's private compose/ folder; Word, text, Markdown and HTML as text), library images (sent as images),
 // videos (uploaded files and YouTube/Vimeo links) and web links (fetched once, kept as text). Each gets
 // a stable id ("image-1", "video-2", "link-1", "doc-1") that page plans refer to.
 import type Anthropic from '@anthropic-ai/sdk';
-import { lookup } from 'node:dns/promises';
-import { Agent, fetch as pinnedFetch } from 'undici';
-import { isIP } from 'node:net';
 import { parse } from 'node-html-parser';
 import mammoth from 'mammoth';
-import sharp from 'sharp';
+import { isIP } from '../net';
 import type { Db } from '../db/query';
 import type { Media } from '../types';
 import { downsize, mediaUrl } from '../media/image';
@@ -24,26 +21,30 @@ const MAX_DOC = 25 * 1024 * 1024;
 const MAX_TEXT = 60_000;
 const MAX_LINK_TEXT = 12_000;
 
-/**
- * A connection pinned to an address already checked: fetch would look the name up again, and a
- * name that answers differently the second time (DNS rebinding) would reach a private address.
- */
-function pinnedTo(address: string, family: number): Agent {
-  return new Agent({
-    connect: {
-      lookup: (_host: string, opts: any, cb: (...a: any[]) => void) => (opts?.all ? cb(null, [{ address, family }]) : cb(null, address, family)),
-    },
-  });
+/** A name's addresses (A and AAAA), over DNS-over-HTTPS: the Worker runtime has no resolver of its own. */
+async function addressesOf(host: string): Promise<string[]> {
+  if (isIP(host)) return [host];
+  const answers = await Promise.all(['A', 'AAAA'].map(async (type) => {
+    const res = await fetch(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(host)}&type=${type}`, { headers: { Accept: 'application/dns-json' }, signal: AbortSignal.timeout(5000) });
+    const json = (await res.json()) as { Answer?: { type: number; data: string }[] };
+    return (json.Answer ?? []).filter((a) => a.type === 1 || a.type === 28).map((a) => a.data);
+  }));
+  return answers.flat();
 }
 
+/**
+ * A link's page, refusing private addresses at every hop. The name is checked before the fetch (a
+ * Worker's requests can't reach private networks either, so a name that answers differently the
+ * second time gains nothing).
+ */
 async function safeFetch(raw: string, accept = 'text/html,*/*;q=0.5'): Promise<Response> {
   let url = new URL(raw);
   for (let hop = 0; hop < 5; hop++) {
     if (!/^https?:$/.test(url.protocol)) throw new Error('only http and https links');
     const host = url.hostname.replace(/^\[|\]$/g, '');
-    const addrs = isIP(host) ? [{ address: host, family: isIP(host) }] : await lookup(host, { all: true });
-    if (!addrs.length || addrs.some((a) => privateAddress(a.address))) throw new Error('private address');
-    const res = (await pinnedFetch(url, { redirect: 'manual', headers: { Accept: accept, 'User-Agent': 'Composer/1.0 (link reader)' }, signal: AbortSignal.timeout(12_000), dispatcher: pinnedTo(addrs[0].address, addrs[0].family) })) as unknown as Response;
+    const addrs = await addressesOf(host);
+    if (!addrs.length || addrs.some((a) => privateAddress(a))) throw new Error('private address');
+    const res = await fetch(url, { redirect: 'manual', headers: { Accept: accept, 'User-Agent': 'Composer/1.0 (link reader)' }, signal: AbortSignal.timeout(12_000) });
     const next = res.status >= 300 && res.status < 400 ? res.headers.get('location') : null;
     if (!next) return res;
     url = new URL(next, url);
@@ -120,8 +121,8 @@ async function videoLink(url: string): Promise<Extract<VideoMaterial, { kind: 'e
  */
 export async function imageForClaude(store: MediaStore, m: Media): Promise<string> {
   const buf = await store.get(downsize(m, 'large').path).catch(() => store.get(m.path));
-  const out = await sharp(buf).rotate().resize({ width: 1568, height: 1568, fit: 'inside', withoutEnlargement: true }).flatten({ background: '#ffffff' }).jpeg({ quality: 82 }).toBuffer();
-  return out.toString('base64');
+  const out = await store.engine.convert(buf, { format: 'image/jpeg', width: 1568, height: 1568, fit: 'inside', background: '#ffffff' });
+  return Buffer.from(out).toString('base64');
 }
 
 export interface Registry {

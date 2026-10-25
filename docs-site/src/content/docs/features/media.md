@@ -7,7 +7,8 @@ sidebar:
 
 ## Uploads
 
-Uploads (`/api/admin/media`) are processed by `src/lib/media/process.ts` with sharp:
+Uploads (`/api/admin/media`) are processed by `src/lib/media/process.ts` with Cloudflare Images (the
+Worker's `IMAGES` binding; locally Miniflare's, which centres crops):
 
 - Images over 2560px get a `-scaled` copy, used as the full size.
 - The standard sizes are generated, hard crops centred on the focal point.

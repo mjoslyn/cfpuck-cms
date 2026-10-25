@@ -1,7 +1,7 @@
 # supapuck-cms
 
-A CMS for small business and organisation sites: Astro rendering on
-Netlify, content in Supabase, the Puck visual editor, and Compose, which writes pages with Claude from
+A CMS for small business and organisation sites: Astro rendering on a
+Cloudflare Worker, content in Postgres (a Supabase project) and files in R2, the Puck visual editor, and Compose, which writes pages with Claude from
 the documents, images and links an editor adds.
 
 The core is everything outside `src/site/`. `src/site/` is an example site called Example Town, with
@@ -32,7 +32,8 @@ What you get:
 
 - Node 22.12 or later
 - Docker (Docker Desktop or OrbStack), for the local Supabase stack
-- For hosting: a Supabase project and a Netlify site
+- For hosting: a Cloudflare account (Workers paid plan: the jobs queue and CPU time), and a Supabase
+  project for the database
 - Optional: an Anthropic API key (Compose), an SMTP account (form notifications and ticket emails)
   and a Stripe or Square account (paid forms and tickets)
 
@@ -94,7 +95,10 @@ The Supabase CLI runs through `npx`, so you don't need to install it.
    npx astro dev
    ```
 
-   The site is at http://localhost:4321 and the editor at http://localhost:4321/admin/.
+   The site is at http://localhost:4321 and the editor at http://localhost:4321/admin/. It runs as the
+   Worker does in production (workerd), with local bindings: `.env`'s
+   `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE` points the database binding at the local
+   stack.
 
 ### Optional features
 
@@ -128,7 +132,7 @@ The Supabase CLI runs through `npx`, so you don't need to install it.
 
   With both set, choose one under Settings > Tickets, which also has the currency, how long an
   unpaid order holds its tickets, and the emails. Ticket emails need SMTP; their links use
-  `SITE_URL` (default Netlify's `URL`), and the copy of each order goes to `TICKETS_NOTIFY_EMAIL`
+  `SITE_URL` (default the request's address), and the copy of each order goes to `TICKETS_NOTIFY_EMAIL`
   (default `FORMS_ADMIN_EMAIL`, then `adminEmail`). Orders and the waitlist are at `/admin/tickets/`.
   The same keys take payments on forms (a form's Payment tab).
 - **Members.** Turn it on under Settings > Members (admins): membership levels, how people join
@@ -198,13 +202,19 @@ follow the config. `CORE.md` describes each option.
    npx tsx --env-file=.env.production scripts/create-editor.ts you@example.org 'a-password' admin
    ```
    A site moving from Supabase Storage copies its files into the bucket with `scripts/copy-storage.ts`.
-4. **Netlify.**
-   - Create a site from your repository. The build settings are in `netlify.toml`.
-   - Set the same environment variables as `.env`: the Supabase URL and keys, `DATABASE_URL` (the
-     transaction pooler), `STORAGE_*`, `AUTH_SECRET` (a long random value of its own, e.g. `openssl rand -hex 32`),
-     `SITE_URL`, SMTP (invitations, password links and confirmations are sent over it), plus the
-     optional Compose and ticket payment (Stripe or Square) ones.
-   - Add your domain.
+4. **The Worker.** Give it a name of the site's own in `wrangler.jsonc` (`name`, and the queue's), then:
+   ```
+   npx wrangler login
+   npx wrangler hyperdrive create <site>-db --connection-string="<the project's direct connection string>"
+   npx wrangler queues create <site>-jobs
+   ```
+   Put the Hyperdrive id in `wrangler.jsonc`. Images needs Cloudflare Images turned on for the account.
+   Set the secrets (`npx wrangler secret put <NAME>`): `AUTH_SECRET` (a long random value of its own,
+   e.g. `openssl rand -hex 32`), `STORAGE_SECRET_ACCESS_KEY`, `SMTP_PASS` (invitations, password links
+   and confirmations are sent over SMTP; port 587 or 465), and the optional Compose, payment and Mailgun
+   keys; the rest (`STORAGE_ENDPOINT`, `STORAGE_BUCKET`, `STORAGE_ACCESS_KEY_ID`, `SMTP_HOST`,
+   `SMTP_USER`, `MAIL_FROM`, `SITE_URL`...) as `vars` in `wrangler.jsonc` or as secrets too. Deploy with
+   `npm run deploy`, then add your domain to the Worker (Workers > the Worker > Domains & Routes).
    - Taking payments (forms or tickets): add the payment provider's webhook. One endpoint serves both:
      - Stripe: `https://<your-domain>/api/payments/stripe`, with the `checkout.session.*`,
        `charge.refunded` and `charge.refund.updated` events.
@@ -222,13 +232,11 @@ follow the config. `CORE.md` describes each option.
      Before the first real campaign, send tests to Gmail, Outlook and Yahoo addresses and check the
      unsubscribe link Gmail shows next to the sender.
 
-   Netlify deploys the site's functions with it: `compose-background.mts` (Compose jobs),
-   `restore-background.mts` (backup restores), `scheduled-snapshot.mts` (daily snapshots) and
-   `ticket-emails.mts`, which runs hourly to send ticket reminders and follow-ups, release expired
-   holds and notify the waitlist. Mailing adds `mail-send-background.mts` (a campaign's sending run),
-   `mail-due.mts` (every 5 minutes: scheduled campaigns and weekly digests) and `mail-nightly.mts`
-   (Mailgun's suppression lists and pruning).
-4. **Invite editors** from `/admin/users/`.
+   The Worker does the background work itself: its jobs queue runs Compose turns, backup restores and
+   campaigns' sending runs, and its Cron Triggers run ticket reminders and follow-ups (hourly),
+   snapshots (daily), and Mailing's scheduled campaigns and digests (every 5 minutes) and upkeep
+   (nightly).
+5. **Invite editors** from `/admin/users/`.
 
 ## Updating the core
 

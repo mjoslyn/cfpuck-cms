@@ -18,6 +18,7 @@
 // Backups and snapshots hold rows, not stored images.
 import type { APIRoute } from 'astro';
 import { apply, backup, backupFile, backups, deleteBackup, diff, endpoints, isProtected, plan, queueRestore, remoteConfig, restoreJob, runRestore, setRetention, snapshotNow, snapshotPreview, syncGroups, type Direction, type Site } from '../../../lib/sync';
+import { enqueue } from '../../../lib/jobs';
 import { serviceClient } from '../../../lib/db/site';
 
 const direction = (v: unknown): Direction => (v === 'pull' ? 'pull' : 'push');
@@ -75,14 +76,10 @@ export const POST: APIRoute = async ({ request, locals }) => {
         return Response.json({ ok: true });
       case 'restoreBackup': {
         const job = await queueRestore(site(body.site), String(body.path), !!body.deleteSince);
-        // The deploy's background function runs it (up to 15 minutes; it clears the page cache when
-        // done). Under astro dev, or if the worker can't be reached, it runs here before the answer.
-        let dispatched = false;
-        if (import.meta.env.PROD) {
-          const res = await fetch(new URL('/.netlify/functions/restore-background', request.url), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ job }) }).catch(() => null);
-          dispatched = !!res?.ok;
-        }
-        if (!dispatched) await runRestore(job);
+        // The jobs queue runs it (up to 15 minutes; it clears the page cache when done, src/worker.ts).
+        // Without one it runs here before the answer.
+        const queued = await enqueue({ kind: 'restore', job }).catch(() => false);
+        if (!queued) await runRestore(job);
         return Response.json({ job }, { status: 202 });
       }
     }

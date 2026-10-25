@@ -2,8 +2,8 @@
 // to Anthropic's API.
 import Anthropic from '@anthropic-ai/sdk';
 
-/** Server env: Astro exposes .env through import.meta.env; scripts and Netlify use process.env. */
-export const env = (k: string) => ((import.meta.env?.[k] as string | undefined) || process.env[k] || '').trim();
+/** Server env: the Worker's variables and secrets (process.env), else Astro's .env (import.meta.env). */
+export const env = (k: string) => (process.env[k] || (import.meta.env?.[k] as string | undefined) || '').trim();
 
 /** The message when no key is set. */
 export const NO_KEY = 'ANTHROPIC_API_KEY is not set on the server.';
@@ -12,7 +12,7 @@ export const NO_KEY = 'ANTHROPIC_API_KEY is not set on the server.';
 export function claudeClient(): Anthropic | null {
   const apiKey = env('ANTHROPIC_API_KEY');
   if (!apiKey) return null;
-  // An injected ANTHROPIC_BASE_URL (Netlify's AI Gateway sets one in linked dev servers and functions)
-  // would send this key elsewhere and fail, so the address is Anthropic's unless set on purpose.
+  // An injected ANTHROPIC_BASE_URL (some hosts' AI gateways set one) would send this key elsewhere and
+  // fail, so the address is Anthropic's unless set on purpose.
   return new Anthropic({ apiKey, baseURL: env('ANTHROPIC_API_URL') || 'https://api.anthropic.com' });
 }

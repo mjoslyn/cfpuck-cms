@@ -1,5 +1,5 @@
 // The CDN's copies of the site's pages, through Astro's route cache (the `cache` provider in
-// astro.config.mjs, Netlify's: durable, shared by its edge servers). Pages are fresh for a minute, then
+// astro.config.mjs, Cloudflare's: the Workers cache, tagged, purged by tag). Pages are fresh for a minute, then
 // served stale for up to a week while they refresh in the background; every successful admin edit
 // clears them (the middleware), so it shows on the next visit. Under astro dev nothing is cached.
 

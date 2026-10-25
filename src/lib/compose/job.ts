@@ -1,7 +1,6 @@
-// A compose turn as a job. A build takes 30-90s or more (longer with site searches), past what a request
-// may run on Netlify, so the API queues the turn in compose_jobs and hands it to the background function
-// (netlify/functions/compose-background.mts, up to 15 minutes); where there is none (astro dev) it runs
-// in-process. The runner writes progress to the job row and the panel polls it.
+// A compose turn as a job. A build takes 30-90s or more (longer with site searches), longer than a
+// request should keep its answer waiting, so the API queues the turn in compose_jobs and on the jobs
+// queue (src/lib/jobs.ts, up to 15 minutes); without a queue it runs after the answer. The runner writes progress to the job row and the panel polls it.
 import type { Db } from '../db/query';
 import { refreshSiteTimezone } from '../site/timezone';
 import { serviceClient } from '../db/site';

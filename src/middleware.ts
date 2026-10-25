@@ -42,7 +42,20 @@ export const onRequest = defineMiddleware(async (context, next) => {
   }
   await refreshSiteTimezone();
   const isAdmin = pathname.startsWith('/admin') || pathname.startsWith('/api/admin');
-  if (!isAdmin || PUBLIC_ADMIN.some((p) => pathname.startsWith(p))) return next();
+  if (!isAdmin) return next();
+  // The admin is never indexed.
+  const noindex = async (res: Response | Promise<Response>) => {
+    const r = await res;
+    if (!r.headers.has('X-Robots-Tag')) {
+      try {
+        r.headers.set('X-Robots-Tag', 'noindex');
+      } catch {
+        // A response with fixed headers (a fetched one) passes as it is.
+      }
+    }
+    return r;
+  };
+  if (PUBLIC_ADMIN.some((p) => pathname.startsWith(p))) return noindex(next());
 
   const user = await sessionUser(context.request);
   if (!user) {
@@ -63,7 +76,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
   // An edit clears the CDN's cached pages once it succeeds (src/lib/cache.ts), so it shows at once.
   const { method } = context.request;
   const action = await bodyAction(context.request, pathname);
-  const response = await next();
+  const response = await noindex(next());
   if ((response.ok || response.status === 303) && changesPages(method, pathname, action) && context.cache.enabled) {
     // 303: form posts (bulk actions, terms) answer with a redirect back to the list.
     // A failed purge is logged, not the edit's failure: the pages refresh within the minute anyway.

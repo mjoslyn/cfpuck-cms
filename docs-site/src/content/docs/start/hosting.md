@@ -1,12 +1,12 @@
 ---
 title: Hosting
-description: Put a site on Netlify with a hosted Supabase project.
+description: Put a site on a Cloudflare Worker with a hosted Supabase project.
 sidebar:
   order: 2
 ---
 
-A site runs on Netlify (Astro SSR) with a hosted Supabase project for the database and a Cloudflare R2
-bucket for its files. Accounts are the site's own, in its database.
+A site runs as a Cloudflare Worker (Astro SSR) with a hosted Supabase project for the database and a
+Cloudflare R2 bucket for its files. Accounts are the site's own, in its database.
 
 ## 1. R2
 
@@ -58,24 +58,31 @@ npx tsx --env-file=.env.production scripts/create-editor.ts you@example.org 'a-p
 A site moving from Supabase Storage copies its files into the bucket with `scripts/copy-storage.ts`
 (resumable).
 
-## 4. Netlify
+## 4. The Worker
 
-- Create a site from your repository. The build settings are in `netlify.toml`.
-- Set the same environment variables as `.env`: the Supabase URL and keys, plus the optional Compose,
-  SMTP and payment ones.
-- Add your domain.
+Give the Worker and its queue names of the site's own in `wrangler.jsonc`, then:
 
-Netlify deploys the site's functions with it:
+```sh
+npx wrangler login
+npx wrangler hyperdrive create <site>-db --connection-string="<the project's direct connection string>"
+npx wrangler queues create <site>-jobs
+```
 
-| Function | What it does |
+Put the Hyperdrive id in `wrangler.jsonc`, and turn on Cloudflare Images for the account. Set the
+secrets with `npx wrangler secret put <NAME>` (`AUTH_SECRET`, `STORAGE_SECRET_ACCESS_KEY`, `SMTP_PASS`,
+and the optional Compose, payment and Mailgun keys) and the other settings as `vars` in
+`wrangler.jsonc`. Deploy with `npm run deploy`, then add your domain under the Worker's **Domains &
+Routes**. SMTP goes through the Worker's sockets: use port 587 or 465 (25 is closed to Workers).
+
+The Worker does the background work itself (`src/worker.ts`):
+
+| What | When |
 | --- | --- |
-| `compose-background.mts` | Runs Compose jobs (up to 15 minutes) |
-| `restore-background.mts` | Runs backup restores |
-| `scheduled-snapshot.mts` | Takes scheduled snapshots, daily at 07:00 UTC |
-| `ticket-emails.mts` | Hourly: ticket reminders and follow-ups, expired holds, automatic waitlists |
-| `mail-send-background.mts` | Mailing: one sending run of a campaign (up to 15 minutes) |
-| `mail-due.mts` | Mailing, every 5 minutes: scheduled campaigns, weekly digest issues, issues not approved in time |
-| `mail-nightly.mts` | Mailing, nightly: Mailgun's bounces, complaints and unsubscribes; pruning |
+| Compose turns, backup restores, a campaign's sending run | The jobs queue (up to 15 minutes each) |
+| Ticket reminders and follow-ups, expired holds, automatic waitlists | Hourly |
+| Scheduled snapshots | Daily at 07:00 UTC |
+| Mailing: scheduled campaigns, weekly digest issues, issues not approved in time | Every 5 minutes |
+| Mailing: Mailgun's bounces, complaints and unsubscribes; pruning | Nightly at 06:20 UTC |
 
 ## Payments
 
@@ -136,7 +143,7 @@ Admins invite editors from `/admin/users/`. See [Editor and roles](../../feature
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Stripe payments |
 | `SQUARE_ACCESS_TOKEN`, `SQUARE_LOCATION_ID`, `SQUARE_ENVIRONMENT`, `SQUARE_WEBHOOK_SIGNATURE_KEY`, `SQUARE_WEBHOOK_URL` | Square payments |
 | `TICKETS_NOTIFY_EMAIL` | Where the copy of each ticket order goes (default `FORMS_ADMIN_EMAIL`, then `adminEmail`) |
-| `SITE_URL` | The site's address for links in ticket emails (default Netlify's `URL`) |
+| `SITE_URL` | The site's address for links in emails (default the request's address) |
 | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | Compose (`ANTHROPIC_MODEL` overrides the default model, `claude-sonnet-5-5`) |
 | `ANTHROPIC_SEO_MODEL` | SEO text generation (default Haiku 4.5) |
 | `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `MAILGUN_REGION`, `MAILGUN_WEBHOOK_SIGNING_KEY`, `MAILGUN_TEST_MODE` | Mailing through Mailgun |

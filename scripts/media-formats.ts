@@ -2,13 +2,14 @@
 //   npx tsx --env-file=.env scripts/media-formats.ts [--limit N] [--concurrency 4] [--all]
 import { siteDb } from '../src/lib/db/site';
 import { MediaStore, addFormats } from '../src/lib/media/process';
+import { sharpEngine } from './lib/sharp-engine';
 import type { Media } from '../src/lib/types';
 
 const arg = (k: string, d: string) => (process.argv.includes(k) ? process.argv[process.argv.indexOf(k) + 1] : d);
 const limit = Number(arg('--limit', '100000'));
 const concurrency = Number(arg('--concurrency', '4'));
 const db = siteDb();
-const store = new MediaStore(db);
+const store = new MediaStore(db, sharpEngine);
 
 // The API returns at most 1000 rows per request; page through.
 const todo: (Media & { focal_point: any })[] = [];

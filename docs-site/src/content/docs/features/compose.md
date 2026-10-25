@@ -54,12 +54,12 @@ mail, phone and site links, and raw HTML is never taken from Claude (`safe-html.
 
 ## Jobs
 
-A build takes 30–90 seconds or more, past Netlify's request limits, so a turn runs as a job
+A build takes 30–90 seconds or more, so a turn runs as a job
 (`src/lib/compose/job.ts`, table `compose_jobs`):
 
-1. `POST /api/admin/compose` reads the materials, queues the turn and POSTs `{ jobId, token }` to the
-   background function `netlify/functions/compose-background.mts`, which answers 202 and runs for up
-   to 15 minutes. Under `astro dev` the route runs the job in-process.
+1. `POST /api/admin/compose` reads the materials, queues the turn, puts `{ jobId, token }` on the
+   Worker's jobs queue (`src/lib/jobs.ts`), whose consumer runs it for up to 15 minutes, and answers
+   202.
 2. The runner claims the job with its token and writes progress, then the result or error, to the row.
 3. The panel polls `GET /api/admin/compose?job=<id>`.
 

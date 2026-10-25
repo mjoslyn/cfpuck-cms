@@ -14,7 +14,7 @@ const answer = async (request: Request, path: string | undefined, head: boolean)
   const headers = Object.fromEntries(PASSED_IN.flatMap((h) => (request.headers.get(h) ? [[h, request.headers.get(h)!]] : [])));
   const res = await siteStorage().get(`media/${path}`, headers);
   if (!res.ok && res.status !== 304) return new Response('Not found', { status: 404 });
-  const out = new Headers({ 'Cache-Control': 'public, max-age=31536000, immutable', 'Netlify-CDN-Cache-Control': 'public, durable, max-age=31536000, immutable', ...MEDIA_HEADERS });
+  const out = new Headers({ 'Cache-Control': 'public, max-age=31536000, immutable', 'Cloudflare-CDN-Cache-Control': 'public, max-age=31536000, immutable', ...MEDIA_HEADERS });
   for (const h of PASSED_OUT) if (res.headers.get(h)) out.set(h, res.headers.get(h)!);
   return new Response(head || res.status === 304 ? null : res.body, { status: res.status, headers: out });
 };

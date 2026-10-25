@@ -1,7 +1,6 @@
 // Sending a campaign. A send can take longer than a request may run, so it is a job: the API (or the
-// scheduler for scheduled campaigns and digests) claims the campaign with a token and hands it to the
-// background function netlify/functions/mail-send-background.mts (up to 15 minutes); under astro dev it
-// runs in-process. A run first freezes the campaign: renders it, makes its tracked links, and writes
+// scheduler for scheduled campaigns and digests) claims the campaign with a token and puts it on the jobs
+// queue (src/lib/jobs.ts, up to 15 minutes); without a queue it runs in-process. A run first freezes the campaign: renders it, makes its tracked links, and writes
 // every recipient (campaign_sends) in batches of up to 1,000 (campaign_batches). Then batch by batch it
 // checks who is still subscribed, marks the batch attempting and posts it to Mailgun. A batch whose
 // request got no answer is "unknown" and is never sent again blindly: Mailgun's events for its tag decide.
@@ -18,6 +17,8 @@ import { BATCH_SIZE, MailgunError, mailgunStatus, sendBatch, tagSeen } from './m
 import { addHoneypot, findLinks, plainText, recipientValues, renderCampaign, trackLinks, trackText, utmLinks, withUtm, footerProblem, type Recipient, type VarSpec } from './render';
 import { sign } from './tokens';
 import { mailingPaused } from './state';
+import { enqueue } from '../jobs';
+import { afterAnswer } from '../platform';
 import { cleanRules, type SegmentRules } from './segments';
 
 /** A run stops starting new batches after this long, well inside the background function's 15 minutes. */
@@ -121,27 +122,15 @@ async function freeze(db: Db, c: Campaign): Promise<string> {
   return '';
 }
 
-/** Claim a campaign and start its run: the background function in production, in-process otherwise. */
-export async function startSending(id: number, base?: string): Promise<boolean> {
+/** Claim a campaign and start its run: on the jobs queue, else in-process. */
+export async function startSending(id: number, _base?: string): Promise<boolean> {
   const db = serviceClient();
   const token = randomUUID();
   const { data: claimed, error } = await db.rpc('mail_claim', { p_id: id, p_token: token });
   if (error) throw new Error(error.message);
   if (!claimed) return false;
-  // On Netlify (a built site, or its scheduled functions, which run on AWS Lambda) the background
-  // function does the run; under astro dev it runs here.
-  const deployed = (import.meta.env?.PROD ?? false) || !!process.env.AWS_LAMBDA_FUNCTION_NAME || !!process.env.NETLIFY;
-  const url = base || process.env.URL || process.env.DEPLOY_URL;
-  if (deployed && url) {
-    try {
-      const res = await fetch(new URL('/.netlify/functions/mail-send-background', url), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ campaignId: id, token }) });
-      if (!res.ok) throw new Error(`worker answered ${res.status}`);
-      return true;
-    } catch (e) {
-      console.warn(`[mailing] no background worker (${(e as Error).message}); running inline`);
-    }
-  }
-  void runCampaign(id, token).catch((e) => console.error(`[mailing] campaign ${id}: ${e.message}`));
+  const queued = await enqueue({ kind: 'mail-send', campaignId: id, token }).catch((e: Error) => (console.warn(`[mailing] couldn't queue the run (${e.message}); running it here`), false));
+  if (!queued) afterAnswer(runCampaign(id, token).catch((e) => console.error(`[mailing] campaign ${id}: ${e.message}`)));
   return true;
 }
 

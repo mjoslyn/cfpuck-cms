@@ -39,9 +39,8 @@ it.
 ## Caching
 
 Pages are cached at the CDN for 60 seconds, then served stale for up to a week while they refresh in
-the background, in Netlify's durable cache (shared by its edge servers, so a quiet site isn't rendered
-afresh by each). This goes through Astro's route cache with the Netlify provider (`cache` in
-`astro.config.mjs`). Every page carries the cache tag `pages`, and any successful change made in the
+the background, in the Workers cache. This goes through Astro's route cache with the Cloudflare provider
+(`cache` in `astro.config.mjs`). Every page carries the cache tag `pages`, and any successful change made in the
 admin clears it (`src/lib/cache.ts`, `cache.invalidate` from the middleware), so edits show on the next
 visit. Under `astro dev` nothing is cached. A sync from
 another copy into production clears nothing there: its pages update within the minute. Signed-in editors'

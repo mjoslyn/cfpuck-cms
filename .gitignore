@@ -32,3 +32,7 @@ data/
 .claude/worktrees/
 public/_redirects
 deno.lock
+
+# Wrangler and the Cloudflare dev server: local state, generated deploy config
+.wrangler/
+.dev.vars

@@ -1,5 +1,5 @@
 // Compose with Claude, as a saved conversation per page (compose_sessions). A turn runs as a job
-// (src/lib/compose/job.ts): the build takes longer than a request may run on Netlify.
+// (src/lib/compose/job.ts) on the jobs queue: the build takes longer than an answer should wait.
 // POST (multipart): sessionId?, entryId?, type (a composable content type), message, docs (files), media (library
 //   ids, repeated), links (one per line), current (outline of the composed sections as they are now
 //   in the editor), other (outline of the rest of the page), entryFields (the editor's field form),
@@ -16,6 +16,8 @@ import { serviceClient } from '../../../lib/db/site';
 import { emptyRegistry, ingest, type Registry } from '../../../lib/compose/materials';
 import type { Turn } from '../../../lib/compose/claude';
 import { queueJob, runJob, SILENT_MS, STALE_MS, type JobInput } from '../../../lib/compose/job';
+import { enqueue } from '../../../lib/jobs';
+import { afterAnswer } from '../../../lib/platform';
 
 interface Session {
   id: string;
@@ -144,24 +146,9 @@ export const POST: APIRoute = async ({ request, locals }) => {
   const input: JobInput = { current: current || undefined, other: other || undefined, liveFields };
   await db.from('compose_jobs').update({ input }).eq('id', job.id);
 
-  // In production the deploy this request arrived on runs it in its background function (a branch
-  // preview uses its own worker), which answers 202 and runs on. In development (astro dev, whose
-  // emulated functions don't get the site's env) and whenever the worker can't be reached, it runs
-  // here while the browser polls: the same client path either way.
-  let dispatched = false;
-  if (import.meta.env.PROD) {
-    try {
-      const res = await fetch(new URL('/.netlify/functions/compose-background', request.url), {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ jobId: job.id, token: job.token }),
-      });
-      if (!res.ok) throw new Error(`worker answered ${res.status}`);
-      dispatched = true;
-    } catch (e) {
-      console.warn(`[compose] no background worker (${(e as Error).message}); running inline`);
-    }
-  }
-  if (!dispatched) void runJob(job.id, job.token);
+  // The jobs queue runs it (src/lib/jobs.ts), with up to 15 minutes; without one it runs after this
+  // answer. The browser polls either way.
+  const queued = await enqueue({ kind: 'compose', jobId: job.id, token: job.token }).catch((e: Error) => (console.warn(`[compose] couldn't queue the job (${e.message}); running it here`), false));
+  if (!queued) afterAnswer(runJob(job.id, job.token));
   return Response.json({ jobId: job.id, sessionId: s.id, prefix: s.block_prefix, notes }, { status: 202 });
 };

@@ -99,31 +99,28 @@ edge function. Sync reaches the other copy's store with `SYNC_REMOTE_STORAGE_*`.
   Storage rewrite.
 - `scripts/copy-storage.ts` copies Supabase Storage to R2 (resumable).
 
-### 4. Hosting to Workers (still Postgres, now via Hyperdrive)
+### 4. Hosting to Workers (still Postgres, now via Hyperdrive): done
 
-- `@astrojs/cloudflare`, `wrangler.jsonc` (bindings: `DB`/Hyperdrive, `MEDIA`, `COMPOSE`, `BACKUPS`,
-  `IMAGES`, Workflows), `nodejs_compat`. Secrets from `wrangler secret`; the 20 `process.env` reads go
-  through one `env()` helper.
-- Cron Triggers: `*/5 * * * *` mail due, `20 6 * * *` mail nightly, `0 * * * *` ticket emails,
-  `0 7 * * *` snapshot. One `scheduled` handler dispatches by cron.
-- Workflows: `ComposeTurn`, `RestoreBackup`, `MailSend`, replacing the three background functions and
-  the `/.netlify/functions/*` calls (`compose/job.ts`, `mailing/send.ts`, `sync.ts`). Their job tables
-  and polling stay.
-- Cache: pages carry `Cache-Tag: pages` and `Cache-Control` for the CDN (a Cache Rule caches HTML);
-  `cache.invalidate` calls the purge-by-tag API. Check first whether Astro's route cache has a
-  Cloudflare provider; if so, use it.
-- Images: `src/lib/media/process.ts` stops generating files. Sizes become transform URLs
-  (`/cdn-cgi/image/width=,height=,fit=cover,gravity=<x>x<y>,format=auto/...`) from the focal points
-  and crop overrides already stored; `modernize.ts` emits one `<img>` (format chosen by the CDN)
-  instead of `<picture>` sources. SVGs pass through untouched. Site icon PNGs and Compose's JPEGs use
-  the Images binding. `scripts/media-formats.ts` retires.
-- Email: SMTP through a socket mailer (same `SMTP_*` variables), or Cloudflare Email Sending if chosen.
-- Request info: `CF-Connecting-IP` and `request.cf.country` in `mailing/request.ts`.
-- Private addresses: `node:dns` lookups in `compose/materials.ts` become DNS-over-HTTPS; undici's
-  pinned dispatcher goes (Workers can't reach private networks, but the check stays).
-- Local dev: `astro dev` with the adapter's platform proxy (local D1/R2 via Miniflare) replaces
-  `npx supabase start`.
-- Remove `netlify/`, `netlify.toml`, `@astrojs/netlify`.
+As built (CORE.md, Hosting), with three changes from the plan:
+
+- **A queue, not Workflows**, for the three background jobs: each was one 15-minute run with a claim
+  token, which is what a Queue consumer gives (`max_retries: 0`, `limits.cpu_ms`); Workflows' steps
+  would have meant reshaping the jobs for nothing.
+- **The Images binding at upload, not transform URLs**: the same sizes and AVIF/WebP files are made
+  and stored as before, so pages, stored media and Sync are unchanged and nothing is billed per view.
+  Crops are rectangles computed in `engine.ts` (`trim`, then resize), so the result doesn't depend on
+  the engine's idea of gravity. Scripts in Node use sharp with the same rectangles.
+- **R2 stays on the S3 API** (phase 3's code runs in the Worker as is); the R2 binding can replace it
+  later without changing callers.
+
+Checked under `astro dev` (workerd, local Hyperdrive, queue and Images): every page answers; auth (30),
+roles, safety (28, restore through the queue), publishing, revisions, mailing (64, sending through the
+queue), forms, events and venue pass; media matches phase 3 except the focal crop, because Miniflare's
+local Images ignores `trim` (the same geometry through sharp gives the old result). Cron runs fire at
+`/cdn-cgi/handler/scheduled`. `wrangler deploy --dry-run` bundles (8.5 MB, 2 MB gzipped).
+
+To check on the first real deploy: Images' `trim` (production only), `cache.purge` by tag, SMTP over
+the Worker's sockets with the site's provider, and Hyperdrive to the Supabase project.
 
 ### 5. Database to D1
 

@@ -11,6 +11,7 @@ import { sendMail } from '../../../lib/forms/mail';
 import { site } from '../../../lib/site';
 import { mailingSettings, CONSENT_TEXT } from '../../../lib/mailing/config';
 import { signUp } from '../../../lib/mailing/contacts';
+import { clientIp } from '../../../lib/mailing/request';
 
 const env = (k: string) => (import.meta.env?.[k] as string | undefined) ?? process.env[k];
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
@@ -47,7 +48,7 @@ export const POST: APIRoute = async ({ request, redirect, url }) => {
     const { data: siteRow } = await siteDb().from('settings').select('value').eq('key', 'site').maybeSingle();
     const mail = mailingSettings(siteRow?.value);
     if (mail.enabled && mail.memberLists?.length) {
-      const ip = request.headers.get('x-nf-client-connection-ip') ?? request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? '';
+      const ip = clientIp(request);
       await signUp(db, { email, name, lists: mail.memberLists, source: 'members:signup', consentText: mail.consentText || CONSENT_TEXT, ip, origin: url.origin }).catch((e) => console.error(`members: mailing sign-up failed: ${e.message}`));
     }
   }

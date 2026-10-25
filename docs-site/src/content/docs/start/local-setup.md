@@ -9,7 +9,7 @@ sidebar:
 
 - Node 22.12 or later
 - Docker (Docker Desktop or OrbStack), for the local Supabase stack
-- For hosting: a Supabase project and a Netlify site
+- For hosting: a Cloudflare account (Workers paid plan) and a Supabase project for the database
 - Optional: an Anthropic API key (Compose), an SMTP account (form notifications and ticket emails)
   and a Stripe or Square account (paid forms and tickets)
 
@@ -108,7 +108,7 @@ Tickets); the Event details block shows the form, or place a Tickets block on an
 
 With both set, choose one under **Settings > Tickets**, which also has the currency, how long an
 unpaid order holds its tickets, and the emails. Ticket emails need SMTP; their links use `SITE_URL`
-(default Netlify's `URL`), and the copy of each order goes to `TICKETS_NOTIFY_EMAIL` (default
+(default the request's address), and the copy of each order goes to `TICKETS_NOTIFY_EMAIL` (default
 `FORMS_ADMIN_EMAIL`, then `adminEmail`). The same keys take payments on forms. See
 [Tickets](../../features/tickets/) and [Forms](../../features/forms/).
 
@@ -123,5 +123,5 @@ password, invitations) are sent by the site over SMTP and, locally, arrive in th
 
 - After merges that change dependencies, restart the dev server. Stale Vite dependency caches show
   as "Outdated Optimize Dep" and islands that don't hydrate.
-- Netlify's edge-function emulation is off under `astro dev` (`astro.config.mjs`): its Deno runtime
-  ran out of memory on the editor's image requests.
+- `astro dev` runs the site in workerd, as the Worker runs in production: code that only works in Node
+  fails there too. Locally, image crops are centred (Miniflare's Images ignores crop rectangles).

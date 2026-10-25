@@ -7,6 +7,7 @@ import { siteDb } from '../../src/lib/db/site';
 import { blocksFor, buildMaterials, emptyRegistry, ingest } from '../../src/lib/compose/materials';
 import { buildPage } from '../../src/lib/compose/build';
 import { MediaStore } from '../../src/lib/media/process';
+import { sharpEngine } from '../lib/sharp-engine';
 import type { PagePlan } from '../../src/lib/compose/spec';
 
 const origin = process.env.ASTRO_ORIGIN ?? 'http://localhost:4321';
@@ -20,7 +21,7 @@ const { added, notes } = await ingest(sb, 'check', reg, {
   mediaIds: imgs!.map((i) => i.id),
   links: ['https://www.youtube.com/watch?v=vAUEZhXa1DI', 'http://127.0.0.1:54621/rest/v1/', 'http://localhost/secret'],
 });
-const blocks = await blocksFor(sb, new MediaStore(sb), reg, added);
+const blocks = await blocksFor(sb, new MediaStore(sb, sharpEngine), reg, added);
 const materials = await buildMaterials(sb, reg);
 const out: Record<string, unknown> = {
   added,
