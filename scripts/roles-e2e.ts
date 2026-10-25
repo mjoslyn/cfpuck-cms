@@ -3,6 +3,7 @@
 //   npx tsx --env-file=.env scripts/roles-e2e.ts
 import { chromium, type Page } from 'playwright';
 import { siteDb } from '../src/lib/supabase';
+import { createUser, deleteUser, userByEmail } from '../src/lib/auth';
 
 const origin = process.env.ASTRO_ORIGIN ?? 'http://localhost:4321';
 const sb = siteDb();
@@ -11,12 +12,10 @@ const invitee = 'e2e-invitee@example.com';
 // A throwaway password per run; the account is deleted at the end.
 const password = `e2e-${crypto.randomUUID()}`;
 for (const e of [email, invitee]) {
-  const { data } = await sb.auth.admin.listUsers({ perPage: 1000 });
-  const old = data?.users.find((u) => u.email === e);
-  if (old) await sb.auth.admin.deleteUser(old.id);
+  const old = await userByEmail(e);
+  if (old) await deleteUser(old.id);
 }
-const { data: created, error } = await sb.auth.admin.createUser({ email, password, email_confirm: true });
-if (error) throw error;
+const created = { user: await createUser({ email, password, emailVerified: true }) };
 await sb.from('profiles').update({ role: 'editor' }).eq('id', created.user.id);
 
 const out: Record<string, unknown> = {};
@@ -61,8 +60,7 @@ try {
   await ad.getByRole('button', { name: 'Invite' }).click();
   await ad.waitForURL(/(ok|error)=/);
   out.invite = decodeURIComponent(new URL(ad.url()).search);
-  const { data: inv } = await sb.auth.admin.listUsers({ perPage: 1000 });
-  const invited = inv?.users.find((u) => u.email === invitee);
+  const invited = await userByEmail(invitee);
   out.invitedRole = invited ? (await sb.from('profiles').select('role').eq('id', invited.id).single()).data?.role : null;
   out.selfLocked = await ad.getByText('(you)').count();
 
@@ -76,7 +74,9 @@ try {
   out.viewerLanding = new URL(ed2.url()).pathname + new URL(ed2.url()).search;
   console.log(JSON.stringify(out, null, 1));
 } finally {
-  const { data } = await sb.auth.admin.listUsers({ perPage: 1000 });
-  for (const u of data?.users ?? []) if (u.email === email || u.email === invitee) await sb.auth.admin.deleteUser(u.id);
+  for (const e of [email, invitee]) {
+    const u = await userByEmail(e);
+    if (u) await deleteUser(u.id);
+  }
   await b.close();
 }

@@ -4,6 +4,7 @@
 // Everything it makes is removed afterwards.
 //   npx tsx --env-file=.env scripts/safety-e2e.ts
 import { siteDb } from '../src/lib/supabase';
+import { createUser, deleteUser } from '../src/lib/auth';
 const base = process.env.ASTRO_ORIGIN ?? 'http://localhost:4321';
 const db = siteDb();
 let bad = 0;
@@ -61,12 +62,12 @@ r = await fetch(`${base}/api/search?q=${encodeURIComponent(`(${page!.title})`)}`
 
 // an editor can't use the redirects API; Compose refuses a block too large to read back
 const editor = { email: 'safety-e2e-editor@example.com', password: `e2e-${crypto.randomUUID()}` };
-const { data: account } = await db.auth.admin.createUser({ ...editor, email_confirm: true }); await db.from('profiles').update({ role: 'editor' }).eq('id', account.user!.id);
+const account = { user: await createUser({ ...editor, emailVerified: true }) }; await db.from('profiles').update({ role: 'editor' }).eq('id', account.user.id);
 const edLogin = await fetch(`${base}/api/auth/login`, { method: 'POST', redirect: 'manual', headers: { Origin: base }, body: new URLSearchParams(editor) });
 const edH = { Origin: base, Cookie: edLogin.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ') };
 ok('editor signed in', (await fetch(`${base}/api/admin/me`, { headers: edH })).ok);
 ok('redirects API is for admins', (await fetch(`${base}/api/admin/redirects?id=0`, { method: 'DELETE', headers: edH })).status === 403);
-await db.auth.admin.deleteUser(account.user!.id);
+await deleteUser(account.user.id);
 const big = new FormData(); big.append('message', 'change this'); big.append('targetId', 'x'); big.append('targetJson', JSON.stringify({ type: 'text', props: { id: 'x', attrs: { content: 'x'.repeat(61_000) } } }));
 r = await fetch(`${base}/api/admin/compose`, { method: 'POST', headers: H, body: big }); ok('oversize block refused', r.status === 400 && /too large/.test(await r.text()), String(r.status));
 

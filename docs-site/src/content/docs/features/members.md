@@ -21,9 +21,11 @@ Under **Settings > Members**:
 - **Message** for visitors who can't see something (default "This is for members.").
 
 Members sign in, sign up and reset their password at **/account/**. Make a page with that address to
-design it yourself, with the **Member account** block on it. The links in members' emails go there,
-so Supabase Auth's redirect URLs must include `https://<your-domain>/account/**` (see
-[Hosting](../../start/hosting/)).
+design it yourself, with the **Member account** block on it. The links in members' emails go there:
+invitations and password links (an hour, once) open the form to set a password, and a new account's
+confirmation link (a day) confirms the address and signs them in. New accounts confirm their address
+before they can sign in unless `AUTH_CONFIRM_EMAIL=false`. The site sends these emails over its SMTP
+settings.
 
 ## Managing members
 

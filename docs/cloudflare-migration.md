@@ -68,7 +68,13 @@ their shape and the change could be checked against PostgREST directly. CORE.md,
   `awaiting_password` (Supabase Auth's users) and `sync_reset_ids` (sequences). The database's own
   SQL functions and policies stay until then: Sync's other copy still calls them over its API.
 
-### 2. Auth to Better Auth (still Postgres)
+### 2. Auth to Better Auth (still Postgres): done
+
+Built as planned, with Better Auth's own routes left unmounted: the site's endpoints call it and send
+its emails (password links and confirmations are the site's now, over SMTP, not Supabase's). Its
+Postgres adapter takes the same pool as the query layer; ids are made in code, so D1 needs nothing
+more than its adapter. `scripts/auth-e2e.ts` covers sign-in, invitations, password links, members,
+confirmation and carried-over bcrypt passwords. CORE.md, Accounts.
 
 - Better Auth with the Kysely adapter, cookie sessions; tables `user`, `session`, `account`,
   `verification`. `profiles` and `members` keep their user ids.

@@ -5,11 +5,12 @@
 import type { APIRoute } from 'astro';
 import { serviceClient } from '../../../lib/supabase';
 import { invite, resendInvite } from '../../../lib/admin/invite';
+import { deleteUser, userById } from '../../../lib/auth';
 
 const ROLES = ['viewer', 'editor', 'admin'];
 
 export const POST: APIRoute = async ({ request, locals, redirect, url }) => {
-  // Checked here as well as in the middleware: inviting uses the service key, which no database rule guards.
+  // Checked here as well as in the middleware: making and deleting accounts is the server's, which no policy guards.
   if (locals.user?.role !== 'admin') return new Response('Admins only', { status: 403 });
   const form = await request.formData();
   const action = String(form.get('action') ?? '');
@@ -29,7 +30,7 @@ export const POST: APIRoute = async ({ request, locals, redirect, url }) => {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return back('Enter an email address.');
     const res = await invite(email, 'admin', url.origin);
     if ('error' in res) return back(res.error);
-    // The profile is created by the auth trigger; give it the chosen role.
+    // The profile is made with the account (src/lib/auth); give it the chosen role.
     const { error: e2 } = await serviceClient().from('profiles').update({ role }).eq('id', res.user.id);
     return e2 ? back(e2.message) : back(`Invitation sent to ${email}. ${res.note}`, true);
   }
@@ -41,10 +42,10 @@ export const POST: APIRoute = async ({ request, locals, redirect, url }) => {
     const id = String(form.get('id') ?? '');
     if (!id) return back('No account.');
     if (id === locals.user.id) return back("You can't delete your own account.");
-    const admin = serviceClient().auth.admin;
-    const { data } = await admin.getUserById(id);
-    const { error } = await admin.deleteUser(id);
-    return error ? back(error.message) : back(`${data.user?.email ?? 'The account'} was deleted.`, true);
+    const user = await userById(id);
+    if (!user) return back('No such account.');
+    await deleteUser(id);
+    return back(`${user.email} was deleted.`, true);
   }
   return back('Unknown action.');
 };

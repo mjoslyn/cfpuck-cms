@@ -1,7 +1,8 @@
-// Admin routes require a Supabase session whose profile role is editor or admin. Site settings and
+// Admin routes require a session (src/lib/auth) whose profile role is editor or admin. Site settings and
 // users are for admins only. locals.db reads and writes as that role (src/lib/db/policies.ts).
 import { defineMiddleware } from 'astro:middleware';
-import { authClient, sessionDb, siteDb } from './lib/supabase';
+import { sessionDb, siteDb } from './lib/supabase';
+import { sessionUser } from './lib/auth';
 import { refreshSiteTimezone } from './lib/site/timezone';
 import { changesPages, PAGE_CACHE_TAG } from './lib/cache';
 // Server-only work the page renderer calls (src/render/hooks.ts).
@@ -43,8 +44,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
   const isAdmin = pathname.startsWith('/admin') || pathname.startsWith('/api/admin');
   if (!isAdmin || PUBLIC_ADMIN.some((p) => pathname.startsWith(p))) return next();
 
-  const auth = authClient(context.request, context.cookies);
-  const { data: { user } } = await auth.auth.getUser();
+  const user = await sessionUser(context.request);
   if (!user) {
     if (pathname.startsWith('/api/')) return new Response('Unauthorized', { status: 401 });
     return context.redirect(`/admin/login/?next=${encodeURIComponent(pathname)}`);
@@ -58,7 +58,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
     if (pathname.startsWith('/api/')) return new Response('Admins only', { status: 403 });
     return context.redirect('/admin/?error=admins-only');
   }
-  context.locals.db = sessionDb({ role: profile.role, uid: user.id }, auth);
+  context.locals.db = sessionDb({ role: profile.role, uid: user.id });
   context.locals.user = { id: user.id, email: user.email ?? '', role: profile.role, name: profile.display_name ?? '' };
   // An edit clears the CDN's cached pages once it succeeds (src/lib/cache.ts), so it shows at once.
   const { method } = context.request;

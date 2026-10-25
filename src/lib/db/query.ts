@@ -315,12 +315,11 @@ export class CallBuilder implements PromiseLike<Result> {
 /**
  * A connection to the site's data, as some role: the server's (`service`, everything), an editor's or
  * admin's (what the policies in src/lib/db/policies.ts allow), or anyone else's (nothing).
- * `auth` and `storage` are Supabase Auth and Storage until they move (docs/cloudflare-migration.md).
+ * `storage` is Supabase Storage until it moves (docs/cloudflare-migration.md).
  */
 export class Db {
   constructor(
     private exec: Executor,
-    readonly auth: SupabaseClient['auth'] = undefined as never,
     readonly storage: SupabaseClient['storage'] = undefined as never,
   ) {}
 

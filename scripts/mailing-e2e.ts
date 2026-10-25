@@ -9,6 +9,7 @@
 //   npx tsx --env-file=.env scripts/mailing-e2e.ts
 import { createHmac } from 'node:crypto';
 import { siteDb } from '../src/lib/supabase';
+import { deleteUser } from '../src/lib/auth';
 
 const base = process.env.ASTRO_ORIGIN ?? 'http://localhost:4321';
 const mail = process.env.LOCAL_MAIL_URL ?? 'http://127.0.0.1:54324';
@@ -252,7 +253,7 @@ try {
   for (const id of made.lists) await db.from('mail_lists').delete().eq('id', id);
   for (const id of made.users) {
     await db.from('members').delete().eq('user_id', id);
-    await db.auth.admin.deleteUser(id);
+    await deleteUser(id);
   }
   await db.from('settings').update({ value: before }).eq('key', 'site');
   await db.from('settings').delete().eq('key', 'mailing');

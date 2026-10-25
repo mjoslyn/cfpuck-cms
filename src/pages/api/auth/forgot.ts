@@ -1,14 +1,18 @@
 import type { APIRoute } from 'astro';
-import { serviceClient } from '../../../lib/supabase';
+import { passwordToken, userByEmail } from '../../../lib/auth';
+import { passwordEmail, sendLink } from '../../../lib/auth/mail';
+import { passwordPage } from '../../../lib/admin/invite';
 
 /**
- * Email a password-reset link to /admin/set-password/. The answer is the same whether or not the
- * address has an account. Sent with the service key, so the link carries its session in the address's
- * fragment (as an invitation's does) and works in any browser, not only the one that asked.
+ * Email a password link to /admin/set-password/ (an hour, once). The answer is the same whether or not
+ * the address has an account; without SMTP the link is only logged on the server.
  */
 export const POST: APIRoute = async ({ request, redirect, url }) => {
   const form = await request.formData();
-  const email = String(form.get('email') ?? '').trim();
-  if (email) await serviceClient().auth.resetPasswordForEmail(email, { redirectTo: `${url.origin}/admin/set-password/` });
+  const user = await userByEmail(String(form.get('email') ?? ''));
+  if (user) {
+    const link = `${url.origin}${passwordPage('admin', await passwordToken(user.id))}`;
+    if ((await sendLink(passwordEmail(user.email, link)).catch(() => 'no-smtp')) === 'no-smtp') console.warn(`[auth] password link for ${user.email}: ${link}`);
+  }
   return redirect('/admin/login/?sent=1');
 };

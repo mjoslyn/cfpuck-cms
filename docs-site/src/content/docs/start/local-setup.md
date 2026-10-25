@@ -114,7 +114,7 @@ unpaid order holds its tickets, and the emails. Ticket emails need SMTP; their l
 
 Turn it on under **Settings > Members** (admins): the levels, how people join and the message
 visitors see. Members sign in at `/account/`; their emails (confirming an address, resetting a
-password, invitations) go through Supabase Auth and, locally, arrive in the mail catcher. See
+password, invitations) are sent by the site over SMTP and, locally, arrive in the mail catcher. See
 [Members](../../features/members/).
 
 ## Troubleshooting

@@ -2,19 +2,19 @@
 import Admin from '../../../layouts/Admin.astro';
 import { SITE_TZ } from '../../../lib/site';
 import { serviceClient } from '../../../lib/supabase';
-import { awaitingPassword } from '../../../lib/admin/invite';
+import { awaitingPassword, listUsers } from '../../../lib/auth';
 
-// Accounts come from Supabase Auth (service key; this page is admins only), roles from profiles.
-const { data: list } = await serviceClient().auth.admin.listUsers({ perPage: 1000 });
+// Accounts (src/lib/auth; this page is admins only) with their roles from profiles.
+const list = await listUsers();
 const { data: profiles } = await serviceClient().from('profiles').select('id, role, display_name');
 const waiting = await awaitingPassword();
 const byId = new Map((profiles ?? []).map((p) => [p.id, p]));
 // Members are on the Members screen, unless they also edit the site.
 const { data: memberRows } = await serviceClient().from('members').select('user_id');
 const members = new Set((memberRows ?? []).map((m) => m.user_id));
-const users = (list?.users ?? [])
+const users = list
   .filter((u) => !members.has(u.id) || ['editor', 'admin'].includes(byId.get(u.id)?.role ?? ''))
-  .map((u) => ({ id: u.id, email: u.email ?? '', name: byId.get(u.id)?.display_name ?? '', role: byId.get(u.id)?.role ?? 'viewer', lastSignIn: u.last_sign_in_at, invited: waiting.has(u.id) }))
+  .map((u) => ({ id: u.id, email: u.email ?? '', name: byId.get(u.id)?.display_name ?? '', role: byId.get(u.id)?.role ?? 'viewer', lastSignIn: u.lastSignInAt, invited: waiting.has(u.id) }))
   .sort((a, b) => (a.role === b.role ? a.email.localeCompare(b.email) : ['admin', 'editor', 'viewer'].indexOf(a.role) - ['admin', 'editor', 'viewer'].indexOf(b.role)));
 const me = Astro.locals.user.id;
 const ok = Astro.url.searchParams.get('ok');

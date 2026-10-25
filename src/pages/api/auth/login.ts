@@ -1,11 +1,10 @@
 import type { APIRoute } from 'astro';
-import { authClient } from '../../../lib/supabase';
+import { redirectWith, signIn } from '../../../lib/auth';
 
-export const POST: APIRoute = async ({ request, cookies, redirect }) => {
+export const POST: APIRoute = async ({ request, redirect }) => {
   const form = await request.formData();
   const next = String(form.get('next') || '/admin/');
-  const db = authClient(request, cookies);
-  const { error } = await db.auth.signInWithPassword({ email: String(form.get('email') ?? ''), password: String(form.get('password') ?? '') });
-  if (error) return redirect(`/admin/login/?error=${encodeURIComponent(error.message)}&next=${encodeURIComponent(next)}`);
-  return redirect(next.startsWith('/admin') ? next : '/admin/');
+  const res = await signIn(String(form.get('email') ?? ''), String(form.get('password') ?? ''), request);
+  if (!res.ok) return redirect(`/admin/login/?error=${encodeURIComponent(res.error)}&next=${encodeURIComponent(next)}`);
+  return redirectWith(next.startsWith('/admin') ? next : '/admin/', res.cookies, 302);
 };

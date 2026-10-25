@@ -109,7 +109,9 @@ try {
     const email = `parity-${role}-${stamp}@example.org`;
     const { data: made } = await rest.auth.admin.createUser({ email, password: 'parity-password-1', email_confirm: true });
     const uid = made.user!.id;
-    await rest.from('profiles').update({ role }).eq('id', uid);
+    // The same id in the site's own accounts, for the profile (PostgREST's session is Supabase Auth's).
+    await db.from('users').insert({ id: uid, email });
+    await db.from('profiles').insert({ id: uid, role, display_name: role });
     const person = createClient(process.env.PUBLIC_SUPABASE_URL!, process.env.PUBLIC_SUPABASE_ANON_KEY!, { auth: { persistSession: false } });
     await person.auth.signInWithPassword({ email, password: 'parity-password-1' });
     const mine = new Db(new SqlExecutor({ role: (role === 'viewer' ? 'none' : role) as Role, uid }));
@@ -145,6 +147,7 @@ try {
       await rest.from('mail_lists').delete().like('name', `Parity ${role}%${stamp}`);
       await rest.from('settings').delete().like('key', `parity-${role}-${stamp}%`);
       await rest.from('terms').delete().like('slug', `parity-${role}-${stamp}%`);
+      await db.from('users').delete().eq('id', uid);
       await rest.auth.admin.deleteUser(uid);
     }
   }

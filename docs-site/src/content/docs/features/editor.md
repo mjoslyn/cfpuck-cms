@@ -5,7 +5,8 @@ sidebar:
   order: 1
 ---
 
-The admin is at `/admin/`, signed in through Supabase Auth.
+The admin is at `/admin/`. Accounts and sessions are the site's own (`src/lib/auth`, with Better
+Auth), in its database.
 
 ## Roles
 
@@ -18,8 +19,9 @@ The admin is at `/admin/`, signed in through Supabase Auth.
 | `viewer` | No access |
 
 Admin-only pages are listed in `ADMIN_ONLY` (`src/middleware.ts`); settings writes are admin-only in
-row-level security (`is_admin()`). Admins manage users at `/admin/users/`: roles and invitations, with **Resend invitation** for anyone invited who hasn't set a password yet, and **Delete** (not your own account; what they made stays).
-Editors set their password at `/admin/set-password/`, where invitation and reset links land.
+the site's policies (`src/lib/db/policies.ts`). Admins manage users at `/admin/users/`: roles and invitations, with **Resend invitation** for anyone invited who hasn't set a password yet, and **Delete** (not your own account; what they made stays).
+Editors set their password at `/admin/set-password/`, where invitations (7 days) and password links
+(Forgot password on the sign-in page; an hour) land; setting it signs them in.
 
 ## Admin colors and logo
 

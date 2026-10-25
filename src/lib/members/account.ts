@@ -3,8 +3,8 @@
 import type { Db } from '../db/query';
 import { ACCOUNT_PATH, memberSettings, type MemberSettings } from './config';
 
-/** The account page with a message (`m`), an error, or a page to go back to. */
-export function accountUrl(q: { m?: string; error?: string; next?: string; view?: string } = {}): string {
+/** The account page with a message (`m`), an error, a page to go back to, a view or a token for it. */
+export function accountUrl(q: { m?: string; error?: string; next?: string; view?: string; token?: string; confirm?: string } = {}): string {
   const params = new URLSearchParams(Object.entries(q).filter(([, v]) => v) as [string, string][]);
   return `${ACCOUNT_PATH}${params.size ? `?${params}` : ''}`;
 }

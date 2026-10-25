@@ -258,10 +258,7 @@ export const FUNCTIONS: Record<string, Fn> = {
     },
   },
 
-  // Supabase Auth's users and Postgres's id sequences: these go with them (phases 2 and 5).
-  awaiting_password: {
-    run: (exec) => rowsOf(exec.run, 'select id from public.awaiting_password()', []),
-  },
+  // Postgres's id sequences: this goes with them (phase 5).
   sync_reset_ids: {
     async run(exec) {
       await exec.run.query('select public.sync_reset_ids()');

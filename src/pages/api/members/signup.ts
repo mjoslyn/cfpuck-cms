@@ -1,10 +1,12 @@
 // A visitor creates an account (the Member account block, when Settings > Members allows sign-ups): an
-// auth account and a membership at the sign-up level, active at once or waiting for an admin. When the
-// project asks addresses to be confirmed, they confirm by email first (the link signs them in on the
-// account page). The site's admin address is told of each sign-up.
+// account and a membership at the sign-up level, active at once or waiting for an admin. Addresses are
+// confirmed by email first (AUTH_CONFIRM_EMAIL, on by default: the link signs them in on the account
+// page); otherwise they are signed in at once. The site's admin address is told of each sign-up.
 import type { APIRoute } from 'astro';
-import { authClient, serviceClient, siteDb } from '../../../lib/supabase';
+import { serviceClient, siteDb } from '../../../lib/supabase';
+import { confirmEmail, createUser, redirectWith, signIn, userByEmail } from '../../../lib/auth';
 import { EMAIL, accountUrl, loadMemberSettings, safeNext } from '../../../lib/members/account';
+import { sendConfirmation } from '../../../lib/members/confirm';
 import { sendMail } from '../../../lib/forms/mail';
 import { site } from '../../../lib/site';
 import { mailingSettings, CONSENT_TEXT } from '../../../lib/mailing/config';
@@ -13,7 +15,7 @@ import { signUp } from '../../../lib/mailing/contacts';
 const env = (k: string) => (import.meta.env?.[k] as string | undefined) ?? process.env[k];
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
-export const POST: APIRoute = async ({ request, cookies, redirect, url }) => {
+export const POST: APIRoute = async ({ request, redirect, url }) => {
   const form = await request.formData();
   const next = safeNext(form.get('next'));
   const back = (error: string) => redirect(accountUrl({ error, next }), 303);
@@ -28,15 +30,13 @@ export const POST: APIRoute = async ({ request, cookies, redirect, url }) => {
   if (password.length < 10) return back('Use a password of at least 10 characters.');
   if (password !== String(form.get('confirm') ?? '')) return back('The two passwords don’t match.');
 
-  const { data, error } = await authClient(request, cookies).auth.signUp({ email, password, options: { data: { name }, emailRedirectTo: `${url.origin}${accountUrl()}` } });
-  if (error) return back(/already registered|already exists/i.test(error.message) ? 'That email already has an account. Sign in, or reset your password.' : error.message);
-  // An address that already has an account comes back with no identities (and no new account).
-  if (!data.user || !data.user.identities?.length) return back('That email already has an account. Sign in, or reset your password.');
+  if (await userByEmail(email)) return back('That email already has an account. Sign in, or reset your password.');
+  const user = await createUser({ email, name, password }).catch((e: Error) => e);
+  if (user instanceof Error) return back(user.message);
   const status = settings.signup === 'open' ? 'active' : 'pending';
   const db = serviceClient();
-  const { error: e2 } = await db.from('members').upsert({ user_id: data.user.id, email, name, level: settings.signupLevel ?? '', status }, { onConflict: 'user_id', ignoreDuplicates: true });
+  const { error: e2 } = await db.from('members').upsert({ user_id: user.id, email, name, level: settings.signupLevel ?? '', status }, { onConflict: 'user_id', ignoreDuplicates: true });
   if (e2) return back(e2.message);
-  await db.from('profiles').update({ display_name: name }).eq('id', data.user.id);
   const admin = env('FORMS_ADMIN_EMAIL') || site.adminEmail;
   if (admin) {
     const html = `<p>${esc(name)} (${esc(email)}) created an account${status === 'pending' ? '. It is waiting for approval' : ''}.</p><p><a href="${url.origin}/admin/members/">Members</a></p>`;
@@ -51,6 +51,12 @@ export const POST: APIRoute = async ({ request, cookies, redirect, url }) => {
       await signUp(db, { email, name, lists: mail.memberLists, source: 'members:signup', consentText: mail.consentText || CONSENT_TEXT, ip, origin: url.origin }).catch((e) => console.error(`members: mailing sign-up failed: ${e.message}`));
     }
   }
-  const m = !data.session ? 'confirm' : status === 'active' ? 'signed-up' : 'pending';
-  return redirect(accountUrl({ m, next: status === 'active' ? next : undefined }), 303);
+  const after = status === 'active' ? next : '';
+  if (confirmEmail()) {
+    await sendConfirmation(email, url.origin, after).catch((e) => console.error(`members: confirmation email failed: ${e.message}`));
+    return redirect(accountUrl({ m: 'confirm' }), 303);
+  }
+  const signedIn = await signIn(email, password, request);
+  const target = accountUrl({ m: status === 'active' ? 'signed-up' : 'pending', next: after || undefined });
+  return signedIn.ok ? redirectWith(target, signedIn.cookies) : redirect(target, 303);
 };

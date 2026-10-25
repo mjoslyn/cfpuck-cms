@@ -16,18 +16,10 @@ npx supabase link --project-ref <project-ref>
 npx supabase db push --linked
 ```
 
-Under **Authentication > URL Configuration**:
-
-- set the **Site URL** to your domain;
-- add `https://<your-domain>/admin/set-password/` to the **Redirect URLs**. Invitation and
-  password-reset links land on that page;
-- using [Members](../../features/members/), also add `https://<your-domain>/account/**`, where
-  members' sign-up, invitation and password links land.
-
-Invitations to editors and members are sent by the site over its SMTP settings, and their links last
-7 days. Password links (and invitations on a site without SMTP) come from Supabase Auth and last as
-long as **Authentication > Providers > Email > Email OTP Expiration** (an hour by default, which
-Supabase recommends keeping). Set up SMTP so invitations get the longer links.
+Accounts are the site's own (in its database, not Supabase Auth), so nothing needs setting under
+Supabase's Authentication. Invitations (7 days), password links (an hour) and members' confirmation
+links (a day) are sent by the site over its SMTP settings; without SMTP, admins are shown invitation
+and password links to pass on themselves.
 
 :::note
 Hosted projects don't grant the API roles access to new tables the way the local stack does.
@@ -122,7 +114,9 @@ Admins invite editors from `/admin/users/`. See [Editor and roles](../../feature
 | Variable | Purpose |
 | --- | --- |
 | `PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_ANON_KEY` | The Supabase project |
-| `SUPABASE_SERVICE_ROLE_KEY` | Server-side access to Supabase Auth and Storage |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server-side access to Supabase Storage |
+| `AUTH_SECRET` | Signs sessions and the site's links: a long random value (`openssl rand -hex 32`) |
+| `AUTH_CONFIRM_EMAIL` | `false` lets member sign-ups in without confirming their address |
 | `DATABASE_URL` | The database, through the project's transaction pooler (port 6543) |
 | `DATABASE_POOL_MAX` | Database connections per server instance (default 5) |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE` or `SMTP_URL` | Outgoing mail |

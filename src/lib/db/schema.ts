@@ -10,6 +10,12 @@ export interface TableSchema {
 }
 
 export const SCHEMA: Record<string, TableSchema> = {
+  accounts: {
+    pk: ["id"],
+    columns: {"id":"text","user_id":"uuid","account_id":"text","provider_id":"text","password":"text","access_token":"text","refresh_token":"text","id_token":"text","access_token_expires_at":"timestamptz","refresh_token_expires_at":"timestamptz","scope":"text","created_at":"timestamptz","updated_at":"timestamptz"},
+    generated: [],
+    fks: [[["user_id"],"users",["id"]]],
+  },
   campaign_batches: {
     pk: ["id"],
     columns: {"id":"int8","campaign_id":"int8","n":"int4","status":"text","mailgun_id":"text","attempts":"int4","error":"text","attempted_at":"timestamptz","updated_at":"timestamptz"},
@@ -32,19 +38,19 @@ export const SCHEMA: Record<string, TableSchema> = {
     pk: ["id"],
     columns: {"id":"int8","name":"text","subject":"text","from_name":"text","reply_to":"text","design":"jsonb","text":"text","list_ids":"_int8","audience":"jsonb","status":"text","scheduled_at":"timestamptz","started_at":"timestamptz","sent_at":"timestamptz","digest_id":"int8","issue_key":"text","since":"timestamptz","track_links":"bool","utm":"bool","html":"text","text_rendered":"text","vars":"jsonb","recipients":"int4","claim_token":"text","claimed_at":"timestamptz","error":"text","created_by":"uuid","sent_by":"uuid","approved_by":"uuid","approved_at":"timestamptz","created_at":"timestamptz","updated_at":"timestamptz","segment_id":"int8"},
     generated: [],
-    fks: [[["digest_id"],"digests",["id"]],[["segment_id"],"mail_segments",["id"]]],
+    fks: [[["approved_by"],"users",["id"]],[["created_by"],"users",["id"]],[["digest_id"],"digests",["id"]],[["segment_id"],"mail_segments",["id"]],[["sent_by"],"users",["id"]]],
   },
   compose_jobs: {
     pk: ["id"],
     columns: {"id":"uuid","session_id":"uuid","author_id":"uuid","status":"text","input":"jsonb","progress":"text","say":"text","notes":"jsonb","result":"jsonb","error":"text","token":"text","created_at":"timestamptz","updated_at":"timestamptz"},
     generated: [],
-    fks: [[["session_id"],"compose_sessions",["id"]]],
+    fks: [[["author_id"],"users",["id"]],[["session_id"],"compose_sessions",["id"]]],
   },
   compose_sessions: {
     pk: ["id"],
     columns: {"id":"uuid","entry_id":"int8","author_id":"uuid","entry_type":"text","turns":"jsonb","materials":"jsonb","plan":"jsonb","block_prefix":"text","created_at":"timestamptz","updated_at":"timestamptz"},
     generated: [],
-    fks: [[["entry_id"],"entries",["id"]]],
+    fks: [[["author_id"],"users",["id"]],[["entry_id"],"entries",["id"]]],
   },
   contact_lists: {
     pk: ["contact_id","list_id"],
@@ -146,7 +152,7 @@ export const SCHEMA: Record<string, TableSchema> = {
     pk: ["user_id"],
     columns: {"user_id":"uuid","email":"text","name":"text","level":"text","status":"text","expires_on":"date","notes":"text","created_at":"timestamptz","updated_at":"timestamptz"},
     generated: [],
-    fks: [],
+    fks: [[["user_id"],"users",["id"]]],
   },
   not_found: {
     pk: ["path"],
@@ -158,7 +164,7 @@ export const SCHEMA: Record<string, TableSchema> = {
     pk: ["id"],
     columns: {"id":"uuid","display_name":"text","role":"text","created_at":"timestamptz"},
     generated: [],
-    fks: [],
+    fks: [[["id"],"users",["id"]]],
   },
   redirects: {
     pk: ["id"],
@@ -170,7 +176,13 @@ export const SCHEMA: Record<string, TableSchema> = {
     pk: ["id"],
     columns: {"id":"int8","entry_id":"int8","title":"text","content":"json","fields":"jsonb","author_id":"uuid","created_at":"timestamptz","action":"text","entry":"jsonb","restored_from":"int8","restored_edited":"bool"},
     generated: [],
-    fks: [[["entry_id"],"entries",["id"]],[["restored_from"],"revisions",["id"]]],
+    fks: [[["author_id"],"users",["id"]],[["entry_id"],"entries",["id"]],[["restored_from"],"revisions",["id"]]],
+  },
+  sessions: {
+    pk: ["id"],
+    columns: {"id":"text","user_id":"uuid","token":"text","expires_at":"timestamptz","ip_address":"text","user_agent":"text","created_at":"timestamptz","updated_at":"timestamptz"},
+    generated: [],
+    fks: [[["user_id"],"users",["id"]]],
   },
   settings: {
     pk: ["key"],
@@ -200,12 +212,24 @@ export const SCHEMA: Record<string, TableSchema> = {
     pk: ["id"],
     columns: {"id":"int8","token":"text","code":"text","entry_id":"int8","occurrence":"text","event_title":"text","status":"text","provider":"text","provider_ref":"text","provider_order":"text","provider_payment":"text","name":"text","email":"text","phone":"text","address":"jsonb","answers":"jsonb","items":"jsonb","quantity":"int4","amount":"int4","currency":"text","refunded_amount":"int4","expires_at":"timestamptz","paid_at":"timestamptz","checked_in_at":"timestamptz","emailed_at":"timestamptz","reminded_at":"timestamptz","followed_up_at":"timestamptz","created_at":"timestamptz","updated_at":"timestamptz","page":"text","member_id":"uuid"},
     generated: [],
-    fks: [[["entry_id"],"entries",["id"]]],
+    fks: [[["entry_id"],"entries",["id"]],[["member_id"],"users",["id"]]],
   },
   ticket_waitlist: {
     pk: ["id"],
     columns: {"id":"int8","entry_id":"int8","occurrence":"text","name":"text","email":"text","phone":"text","quantity":"int4","status":"text","notified_at":"timestamptz","created_at":"timestamptz","updated_at":"timestamptz","page":"text"},
     generated: [],
     fks: [[["entry_id"],"entries",["id"]]],
+  },
+  users: {
+    pk: ["id"],
+    columns: {"id":"uuid","email":"text","name":"text","email_verified":"bool","image":"text","invite":"text","invited_at":"timestamptz","last_sign_in_at":"timestamptz","created_at":"timestamptz","updated_at":"timestamptz"},
+    generated: [],
+    fks: [],
+  },
+  verifications: {
+    pk: ["id"],
+    columns: {"id":"text","identifier":"text","value":"text","expires_at":"timestamptz","created_at":"timestamptz","updated_at":"timestamptz"},
+    generated: [],
+    fks: [],
   },
 };

@@ -77,7 +77,11 @@ const memberAccount: Renderer = (_b, env) => {
   const next = safeNext(q.get('next'));
   const head = (title: string) => `<h2 class="c-account__heading">${title}</h2>${note}${error}`;
   let body: string;
-  if (v && q.get('view') === 'password') {
+  const token = q.get('view') === 'password' ? (q.get('token') ?? '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64) : '';
+  if (token) {
+    // An invitation or password link: setting the password signs them in.
+    body = head('Set your password') + form('/api/members/password', password('New password'), 'Save password', `<input type="hidden" name="token" value="${token}" />`);
+  } else if (v && q.get('view') === 'password') {
     body = head('Set your password') + p('c-account__note', `For ${esc(v.email)}.`) + form('/api/members/password', password('New password'), 'Save password');
   } else if (v) {
     const m = v.member;

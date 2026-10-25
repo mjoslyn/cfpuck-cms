@@ -1,7 +1,4 @@
 import type { APIRoute } from 'astro';
-import { authClient } from '../../../lib/supabase';
+import { redirectWith, signOut } from '../../../lib/auth';
 
-export const POST: APIRoute = async ({ request, cookies, redirect }) => {
-  await authClient(request, cookies).auth.signOut();
-  return redirect('/admin/login/');
-};
+export const POST: APIRoute = async ({ request }) => redirectWith('/admin/login/', await signOut(request), 302);

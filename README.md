@@ -184,11 +184,6 @@ follow the config. `CORE.md` describes each option.
      npx supabase link --project-ref <project-ref>
      npx supabase db push --linked
      ```
-   - Under Authentication > URL Configuration, set the **Site URL** to your domain.
-   - Add `https://<your-domain>/admin/set-password/` to the **Redirect URLs**. Invitation and
-     password-reset links land on that page.
-   - Using Members: also add `https://<your-domain>/account/**`, where members' sign-up,
-     invitation and password links land.
 2. **Seed and create an admin.** Point a copy of `.env` at the hosted project: its URL, anon key and
    service_role key, from Project Settings > API, and `DATABASE_URL`, its transaction pooler's
    connection string (Connect > Transaction pooler). Then run the same two commands as locally:
@@ -199,8 +194,10 @@ follow the config. `CORE.md` describes each option.
    To move local media to the hosted storage bucket, use `scripts/copy-storage.ts`.
 3. **Netlify.**
    - Create a site from your repository. The build settings are in `netlify.toml`.
-   - Set the same environment variables as `.env`: the Supabase URL and keys, `DATABASE_URL` (the transaction pooler), plus the optional
-     Compose, SMTP and ticket payment (Stripe or Square) ones.
+   - Set the same environment variables as `.env`: the Supabase URL and keys, `DATABASE_URL` (the
+     transaction pooler), `AUTH_SECRET` (a long random value of its own, e.g. `openssl rand -hex 32`),
+     `SITE_URL`, SMTP (invitations, password links and confirmations are sent over it), plus the
+     optional Compose and ticket payment (Stripe or Square) ones.
    - Add your domain.
    - Taking payments (forms or tickets): add the payment provider's webhook. One endpoint serves both:
      - Stripe: `https://<your-domain>/api/payments/stripe`, with the `checkout.session.*`,

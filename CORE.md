@@ -637,22 +637,23 @@ member (`renderRequest` drops the viewer's membership), and the editor offers no
 - **Personal pages**: what depends on the viewer (a locked entry, a Members only or Member account
   block, tickets with member prices) sets `RenderCtx.personal`. The catch-all route then doesn't cache
   the page (`private, no-store`) and, for a visitor with a sign-in cookie, renders it again as them
-  (`asViewer`: `viewerOf` in `src/lib/members/viewer.ts` checks the session with Supabase Auth and reads
-  the profile and membership with the site's key; the second render's loader scope carries them,
+  (`asViewer`: `viewerOf` in `src/lib/members/viewer.ts` looks the session up (`sessionUser`,
+  `src/lib/auth`) and reads the profile and membership as the server; the second render's loader scope carries them,
   `RenderCtx.viewer`). Pages
   that don't depend on the viewer render once, anonymously, and stay cached and shared. Previews
   render as an editor.
 - **Account page** (`ACCOUNT_PATH`, `/account/`): a page with that address, else a built-in one holding
   the **Member account** block (`member-account`): sign in, forgot password and (when sign-ups are on)
   create an account; signed in, the member's name, level, status and expiry, change password and sign out.
-  Endpoints in `src/pages/api/members/`: `login` (back to a `next` path on the site), `signup` (an auth
-  account and a membership, emailing the site's admin address), `logout`, `forgot` and `password`;
-  `session` stores an invitation link's session (from the address's fragment, by
-  `public/assets/js/member-account.js`); `me` answers the **Member sign-in link** block (`member-link`),
-  whose label `public/assets/js/member-link.js` switches in the browser, so pages with it stay cached.
-  Invitations are the site's own (see Editor); password links carry their session in the fragment (sent with the service key, so they work in
-  any browser); a sign-up's confirmation brings a `code` the route exchanges on `/account/` (a visitor
-  already signed in carries on without an error), so Supabase Auth's redirect URLs must include the site.
+  Endpoints in `src/pages/api/members/`: `login` (back to a `next` path on the site; an address not yet
+  confirmed is refused and sent a new link), `signup` (an account and a membership, emailing the site's
+  admin address), `logout`, `forgot` and `password` (a token's, which signs them in, or the signed-in
+  member's); `me` answers the **Member sign-in link** block (`member-link`), whose label
+  `public/assets/js/member-link.js` switches in the browser, so pages with it stay cached. Invitations
+  and password links (see Editor) land on `/account/?view=password&token=`, where the block shows the
+  form. Sign-ups confirm their address first (`AUTH_CONFIRM_EMAIL`, on unless `false`): the link,
+  `/account/?confirm=<token>` (a day), confirms it and signs them in (`confirmAddress`; a visitor
+  already signed in carries on without an error); with it off they are signed in at once.
 - **Members screen** (`/admin/members/`, admins; `POST /api/admin/members`): members by status (waiting
   for approval first), each one's name, level, status, expiry and notes; Approve, Resend invitation (to someone invited who hasn't set a password), Send password link,
   Remove (the membership, and the account unless it edits the site), and Add a member (an existing
@@ -813,10 +814,10 @@ never subscribes anyone again); the settings are, with the others. Migration `*_
 
 ## Editor
 
-`/admin/` (Supabase Auth; `profiles.role`: editor, admin, or viewer = no access). Editors manage content,
+`/admin/` (a session, see Accounts; `profiles.role`: editor, admin, or viewer = no access). Editors manage content,
 templates, media, forms and compose; site settings and users (`/admin/users/`: roles, invitations, Resend invitation for those invited who haven't set a password, signed in by a link or not, `src/lib/admin/invite.ts`; Delete, not your own account: the profile and any membership go, what they made stays with its author left empty) are
 for admins, as is the redirects API (`ADMIN_ONLY` in `src/middleware.ts`; settings writes are admin-only in the policies,
-`src/lib/db/policies.ts`; the users API checks the role itself too, since invitations use the service key). `src/puck/Editor.tsx` renders blocks through the same string renderer inside Puck
+`src/lib/db/policies.ts`; the users API checks the role itself too, since making accounts is the server's). `src/puck/Editor.tsx` renders blocks through the same string renderer inside Puck
 (`BlockView.tsx` parses HTML to React; slots become the block's inner wrapper element). The left rail
 has Blocks (and Patterns), Outline and an accessibility check (`A11yPanel.tsx`). Problems a person has to judge
 (warnings, and text over an image, which is always a problem since its contrast can't be measured) can be
@@ -827,17 +828,30 @@ mode: the template document itself. In content mode the template around the page
 will on the site; for admins, hovering one of its blocks, a template part or a pattern outlines it with a
 link to edit that template, part or pattern in a new tab (`markSources`, `SourceLinks`; globals get none).
 
-Invitations (Users and Members; `src/lib/admin/invite.ts`) are sent by the site over SMTP, not by
-Supabase Auth, so their link lasts `INVITE_DAYS` (7) instead of Supabase's email link lifetime (an hour
-by default, a day at most). The account is made with `generateLink` (invited, no password) and the link,
-`/api/auth/invite?t=`, is signed with a key made from the service key and names the account, its
-expiry, where it leads (set-password or the account page) and the account's open invitation
-(`app_metadata.invite`, a random value): a new invitation replaces it and setting a password clears it
-(`passwordSet`), so older and used links stop working. Opening the link signs in with a password-reset
-token made and used on the spot (a reset leaves the password empty, where Supabase's own invitation
-link sets a random one). Without SMTP, Supabase Auth sends its invitation (or a password link, once the
-address is confirmed). `awaiting_password()` (server only) lists accounts with an open invitation, or
-invited with no password, for the screens' "Invited" rows and Resend invitation.
+### Accounts
+
+Accounts are the site's own (`src/lib/auth`, server only), kept by Better Auth in `users`, `sessions`,
+`accounts` (a password) and `verifications` (one-time values; migration `*_auth_tables.sql`, which
+copied Supabase Auth's users with their ids, passwords and open invitations). Better Auth's routes
+aren't mounted: the site's endpoints call it (`signIn`, `signOut`, `sessionUser`, `createUser`,
+`setPassword`, `passwordToken`, `setPasswordWithToken`, `confirmToken`, `confirmAddress`) and send its
+emails themselves (`src/lib/auth/mail.ts`, over SMTP). The session is a signed cookie,
+`site.session_token` (seven days, renewed as it is used); `AUTH_SECRET` signs it and the site's links.
+Every account has a profile, made with it (`databaseHooks`); sign-ins set `users.last_sign_in_at`.
+Passwords are scrypt; those carried over from Supabase Auth are bcrypt, checked as such and rehashed
+on the next sign-in. Editors and admins sign in at `/admin/login/` (`/api/auth/login`); a password
+link (Forgot password, `/api/auth/forgot`) and an opened invitation both lead to
+`/admin/set-password/?token=` (a one-time token, an hour; members: the account page), where setting the
+password confirms the address, spends any invitation and signs in. Without SMTP a visitor's own request
+gets the same answer and the link is only logged; admins are shown the link to pass on.
+
+Invitations (Users and Members; `src/lib/admin/invite.ts`) last `INVITE_DAYS` (7). The account is made
+with no password and the link, `/api/auth/invite?t=`, is signed with a key made from `AUTH_SECRET` and
+names the account, its expiry, where it leads (set-password or the account page) and the account's
+open invitation (`users.invite`, a random value): a new invitation replaces it and setting a password
+clears it, so older and used links stop working. Opening it makes the one-time password token.
+`awaitingPassword` lists accounts with an open invitation, or invited with no password, for the
+screens' "Invited" rows and Resend invitation.
 
 Admin colors and logo (Settings > Admin, `settings.site.admin_theme`, `src/lib/admin-theme.ts`): accent,
 text, menu bar and background, and a logo for the menu bar in place of the site name (or beside it,
@@ -877,8 +891,8 @@ against it by `scripts/checks/db-parity.ts`), with tables and columns checked ag
 (generated by `scripts/db-schema.ts`; run it after a migration that changes tables) and every value
 bound. The server's functions (`db.rpc`) are in `functions.ts`: counters, ticket holds (an advisory
 lock per event and date), mailing claims and audiences (a segment's rules as SQL), campaign numbers.
-This is the first step off Supabase (`docs/cloudflare-migration.md`); Auth and Storage are still
-Supabase's, carried by a Db as `auth` and `storage`.
+This is the first step off Supabase (`docs/cloudflare-migration.md`); accounts are the site's own (see
+Accounts) and Storage is still Supabase's, carried by a Db as `storage`.
 
 - A Db reads and writes as a role. The server's (`siteDb()`, `serviceClient()` in
   `src/lib/supabase.ts`) isn't checked: public pages, feeds, search, ticket availability, member
@@ -897,8 +911,9 @@ Supabase's, carried by a Db as `auth` and `storage`.
   to `POST /api/admin/db`, which runs them as the signed-in editor; only its writes clear the page
   cache. Of the functions, editors may call `campaign_stats` and `ticket_sold`; the rest are the
   server's.
-- Supabase's database API is still there for Auth and for Sync's other copy, and still answers
-  editors only (migration `*_closed_api.sql`); the site no longer uses it for data. New tables get a
+- Supabase's database API is still there for Sync's other copy and still answers editors only
+  (migration `*_closed_api.sql`); the site no longer uses it for data. Accounts' tables are closed to
+  it entirely. New tables get a
   line in `POLICIES` (none: the server's only).
 
 ## Hosting
@@ -909,12 +924,9 @@ Netlify, with a hosted Supabase project (`npx supabase link`). Migrations: `npx 
 since each function instance opens its own connections (`DATABASE_POOL_MAX`, default 5). Hosted
 projects don't grant the API roles access to new tables (the local stack does): migration 0019 grants
 them and sets default privileges, and RLS does the rest for the database API (see Database access). `scripts/copy-storage.ts` copies storage objects from the local stack to a hosted
-project (resumable). Editors set their password at `/admin/set-password/` (invitation and reset links
-land there; reset links with the session in the fragment, which the page hands to `/api/auth/session`, so
-they work in any browser), so Supabase Auth's Site URL and redirect URLs must include the site's domain.
-Supabase Auth's email links last as long as its Email OTP Expiration (an hour by default, as Supabase
-recommends); the site's invitations last 7 days. Env:
-`.env.example`.
+project (resumable). Accounts need `AUTH_SECRET` (a long random value; changing it signs everyone out
+and breaks links already sent) and links in emails use the request's address (`SITE_URL` for Better
+Auth's own). Env: `.env.example`.
 
 ## Commands
 
@@ -942,6 +954,9 @@ a second local stack as `SYNC_REMOTE_*`) use the running site without a browser 
 browser, submits it, pays (Stripe's checkout with its test card; a Square sandbox payment link opens
 Square's testing panel, whose Test Payment pays the order) and reports the confirmation and the stored
 payment (that needs the provider's test keys and network access to it).
+`scripts/auth-e2e.ts` runs accounts without a browser: admin sign-in, an invitation from its email to a
+password, password links (spent once used), a member's sign-in, password link and account page, a
+sign-up's confirmation link, and a bcrypt password carried over from Supabase Auth.
 `scripts/mailing-e2e.ts` runs Mailing without Mailgun (emails read from the local mail catcher,
 `LOCAL_MAIL_URL`): sign-up and confirmation, preferences, unsubscribing (one-click from another site),
 a campaign with its variables, footer and tracked links, clicks as a person and a machine, signed and
