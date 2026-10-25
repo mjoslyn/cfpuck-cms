@@ -10,7 +10,7 @@ export const POST: APIRoute = async ({ request, redirect, url }) => {
   const user = await userByEmail(String((await request.formData()).get('email') ?? ''));
   if (user) {
     const link = `${url.origin}${passwordPage('member', await passwordToken(user.id))}`;
-    if ((await sendLink(passwordEmail(user.email, link)).catch(() => 'no-smtp')) === 'no-smtp') console.warn(`[auth] password link for ${user.email}: ${link}`);
+    if ((await sendLink(passwordEmail(user.email, link)).catch((e: Error) => (console.error(`[auth] password email failed: ${e.message}`), 'no-smtp' as const))) === 'no-smtp') console.warn(`[auth] password link for ${user.email}: ${link}`);
   }
   return redirect(accountUrl({ m: 'sent' }), 303);
 };

@@ -39,6 +39,13 @@ export interface Bindings {
   IMAGES?: ImagesBinding;
   /** Background jobs (src/lib/jobs.ts). */
   JOBS?: { send(body: unknown): Promise<void> };
+  /** Cloudflare Email Service (src/lib/forms/mail.ts). */
+  EMAIL?: EmailBinding;
+}
+
+type EmailParty = string | { email: string; name?: string };
+export interface EmailBinding {
+  send(message: { from: EmailParty; to: EmailParty[]; replyTo?: EmailParty; subject: string; html: string; text: string }): Promise<{ messageId: string }>;
 }
 
 let current: Bindings | null = null;

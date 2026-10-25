@@ -1,9 +1,12 @@
 // Outgoing mail (form notifications, accounts, tickets, confirmations), sent as HTML with a plain-text
-// version over SMTP, so any provider works (Mailgun, SES, Postmark, Resend, a mail server; locally the
-// Supabase stack's mail catcher, so nothing real is sent), through the Worker's TCP sockets
-// (worker-mailer; port 25 is closed to Workers, so 587 or 465). Settings come from the environment
-// (see transport()); without them mail is logged and skipped, and submissions are still stored.
+// version through Cloudflare Email Service when the Worker has its EMAIL binding (wrangler.jsonc
+// send_email), else over SMTP, so any provider works (Mailgun, SES, Postmark, Resend, a mail server;
+// locally a mail catcher, so nothing real is sent), through the Worker's TCP sockets (worker-mailer;
+// port 25 is closed to Workers, so 587 or 465; Cloudflare's own addresses, Email Service's SMTP
+// included, can't be reached that way). Settings come from the environment (see transport()); without
+// either, mail is logged and skipped, and submissions are still stored.
 import { site } from '../site';
+import { bindings } from '../platform';
 
 const env = (k: string) => process.env[k] ?? (import.meta.env?.[k] as string | undefined);
 
@@ -58,6 +61,11 @@ const party = (h: string) => {
 };
 
 export async function sendMail(mail: Mail): Promise<boolean> {
+  const email = bindings()?.EMAIL;
+  if (email) {
+    await email.send({ from: party(fromHeader(mail.fromName)), to: mail.to, replyTo: mail.replyTo ? party(mail.replyTo) : undefined, subject: mail.subject, html: mail.html, text: mail.text || textVersion(mail.html) });
+    return true;
+  }
   const t = transport();
   if (!t) {
     console.warn(`[forms] no SMTP configured; not sending "${mail.subject}" to ${mail.to.join(', ')}`);
