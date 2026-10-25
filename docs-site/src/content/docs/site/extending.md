@@ -98,4 +98,4 @@ Card fields available: `entry-title`, `entry-image`, `entry-excerpt`, `entry-dat
   integration. A site file wins.
 - **Content migrations**: `src/site/migrations/index.ts` exports `MIGRATIONS`, run by
   `scripts/migrate-content.ts` before the core's.
-- **Database migrations**: `supabase/migrations/YYYYMMDDHHMMSS_site_*.sql`, beside the core's.
+- **Database migrations**: `db/migrations/YYYYMMDDHHMMSS_site_*.sql` (D1), beside the core's.

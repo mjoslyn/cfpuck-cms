@@ -57,8 +57,12 @@ Update the docs in the same commit as the change, not afterwards:
 
 ## Local setup
 
-- `npx supabase start` (ports 5652x; each site uses its own) and
+- `npx supabase start` (files and the mail catcher; ports 5652x, each site uses its own),
+  `npx wrangler d1 migrations apply DB --local` (the database, in `.wrangler/state`) and
   `npx astro dev --background` (http://localhost:4321).
+- The dev server and scripts share the local D1 file. Two dev servers sharing `node_modules` (a
+  worktree with a symlink) share Vite's dependency cache too, and break each other's: give a second
+  checkout its own install, or `rm -rf node_modules/.vite` and restart.
 - `astro dev` runs the site in workerd, as a Worker (CORE.md, Hosting): code that only works in Node
   (native modules, `node:net`, `node:dns`) fails there as it would in production. Scripts run in Node.
 - After merges that change dependencies, restart the dev server: stale Vite dependency caches show as

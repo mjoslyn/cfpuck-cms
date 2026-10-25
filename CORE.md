@@ -1,6 +1,6 @@
-# supapuck-cms: the core (Astro + Puck + Supabase)
+# supapuck-cms: the core (Astro + Puck on Cloudflare)
 
-A CMS for small business and organisation sites: Astro SSR on a Cloudflare Worker, content in Postgres (a Supabase project) and files in R2, a Puck visual editor,
+A CMS for small business and organisation sites: Astro SSR on a Cloudflare Worker, content in D1 and files in R2, a Puck visual editor,
 and Compose (pages written with Claude from documents, images and links). The code is split into the
 core (everything outside `src/site/`) and a site (`src/site/`). This repository holds the core and an
 example site; a real site is a fork that replaces `src/site/` (see Upstream and sites).
@@ -12,8 +12,8 @@ remote. Its history starts from this one, with a commit that swaps the example `
 
 - Core changes are made here, committed and pushed, then merged into each site:
   `git fetch upstream && git merge upstream/main`. They merge cleanly as long as the site only changes
-  `src/site/`, its own migrations (`supabase/migrations/*_site_*.sql`: the Supabase CLI reads only that
-  folder), `AGENTS.md`, `README.md`, its env and its local ports (`supabase/config.toml`).
+  `src/site/`, its own migrations (`db/migrations/*_site_*.sql`: wrangler reads only that folder),
+  `AGENTS.md`, `README.md`, its env and its local ports (`supabase/config.toml`).
 - All of a site's code and files are in `src/site/`, laid out like the core so each maps onto its
   counterpart: `render/c/` (blocks, as `src/render/c/`), `lib/` (`lib/content/cards.ts` beside
   `src/lib/content/card-presets.ts`), `pages/api/` (endpoints, listed in `routes.json`), `styles/`
@@ -27,9 +27,10 @@ remote. Its history starts from this one, with a commit that swaps the example `
   (core files only), then `git cherry-pick` it here.
 - Never import from `src/site/` in core code except through `src/lib/site` (the CSS imports of the
   site's `styles/tokens.css` and `styles/theme.css` in `src/styles/site.css` aside). New core code must not hard-code a site's types, URLs or names.
-- Migrations (core and site) are named with the time they were written (`YYYYMMDDHHMMSS_name.sql`).
-  One written earlier than a migration a site already applied is out of order: apply it with
-  `npx supabase db push --include-all` (locally `migration up --include-all`).
+- Migrations (core and site, `db/migrations/`) are named with the time they were written
+  (`YYYYMMDDHHMMSS_name.sql`) and applied with `npx wrangler d1 migrations apply DB --local` (or
+  `--remote`), which applies every one not yet applied, in order. `supabase/migrations/` is the
+  Postgres history from before D1, kept for sites still moving (`scripts/pg-to-d1.ts`).
 - Content changes (renamed props, moved settings) ship as migrations: see Changing stored content.
 
 ## Site config
@@ -80,9 +81,9 @@ Entries have a `type` (from the site config) and terms a `taxonomy`; custom valu
 `entries.fields` under plain names (the type's `fields`). Events use `start`/`end` (wall-clock in
 `timezone`), `all_day`, `cost`, `website`, `venue` (entry id), `featured`, `recurrence`, `schedule`.
 Image fields hold media ids. `entries.body_text` is the entry's readable text, filled from its
-content by a database trigger (`entry_body_text`), for search and event descriptions. Site-wide values
-are in `settings` (`site`, `options`). Schema:
-`supabase/migrations/`.
+content by the query layer whenever `content` is written (`src/lib/content/body-text.ts`), for search
+and event descriptions. Site-wide values are in `settings` (`site`, `options`). Schema:
+`db/migrations/` (D1).
 
 ## Components
 
@@ -242,7 +243,8 @@ store with `SYNC_REMOTE_STORAGE_*` (as `STORAGE_*`; without them, its Supabase S
 the copy that has them set (production can't reach a local copy).
 
 - Rows match by id (entries, terms, media, forms: the copies share ids, and a sync keeps them; then
-  `sync_reset_ids()` moves the id counters past them), by kind and slug (templates), by key (settings)
+  `sync_reset_ids()`, kept for copies still on Postgres, moved the id counters past them; D1's next id
+  is already past the largest), by kind and slug (templates), by key (settings)
   and by old address (redirects). Derived columns (`updated_at`, `body_text`, a redirect's
   `wildcard`) are neither compared nor written.
 - Compare (`plan`) lists each group's new, changed and unchanged rows and its conflicts, which are
@@ -596,7 +598,8 @@ tickets (30-120 minutes), and the emails with the reminder's and follow-up's tim
   for paid orders, and what's left now (`GET /api/tickets/availability`).
 - Orders (`ticket_orders`, editors read, the site writes with the service key; `src/lib/tickets/orders.ts`):
   `POST /api/tickets/checkout` checks the order and holds its tickets in `ticket_order_create`, which takes
-  an advisory lock per event and date and counts paid orders and unexpired holds against the capacities.
+  counts paid orders and unexpired holds against the capacities in the same statement that inserts the
+  order (D1 runs one statement at a time, so two orders can't both take the last tickets).
   A free order is paid at once; a paid one goes to Stripe Checkout or a Square payment link (the shared
   payments code, see Forms > Payments). `/api/tickets/return` checks the payment with the provider and
   shows the order; the webhooks (`ticketsWebhook`) confirm payments, expiries and refunds. A refund
@@ -894,20 +897,36 @@ titled, returns the id).
 
 ## Database access
 
-The code reads and writes through the query layer (`src/lib/db`), on a direct connection to the
-database (`DATABASE_URL`; on a hosted project, its transaction pooler). Its calls are the ones the
-Supabase client had (`db.from('entries').select(...).eq(...)`, embedded relations, `or()` strings,
-`range`, `single`, `upsert`, `rpc`), so the code kept its shape: `query.ts` builds a query (safe in the
-browser), `sql.ts` compiles it to one Postgres statement that answers the JSON PostgREST did (checked
-against it by `scripts/checks/db-parity.ts`), with tables and columns checked against `schema.ts`
-(generated by `scripts/db-schema.ts`; run it after a migration that changes tables) and every value
-bound. The server's functions (`db.rpc`) are in `functions.ts`: counters, ticket holds (an advisory
-lock per event and date), mailing claims and audiences (a segment's rules as SQL), campaign numbers.
-This is the first step off Supabase (`docs/cloudflare-migration.md`); accounts are the site's own (see
-Accounts) and Storage is still Supabase's, carried by a Db as `storage`.
+The database is D1 (SQLite; the `DB` binding, schema in `db/migrations/`). The code reads and writes
+through the query layer (`src/lib/db`), whose calls are the ones the Supabase client had
+(`db.from('entries').select(...).eq(...)`, embedded relations, `or()` strings, `range`, `single`,
+`upsert`, `rpc`), so the code kept its shape: `query.ts` builds a query (safe in the browser),
+`sqlite.ts` compiles it to one SQLite statement whose rows are JSON built in SQL, typed as PostgREST
+answered them: booleans as `true`/`false`, JSON and arrays as values, embeds in jsonb's key order,
+times as ISO strings in UTC with milliseconds, text sorted without regard to case, nulls last going up
+(checked against PostgREST on the same data by `scripts/checks/d1-parity.ts` while a Postgres copy
+exists). Tables and columns are checked against `schema.ts` (generated from the local D1 by
+`scripts/db-schema.ts`; run it after a migration that changes tables). Every value is bound, lists and
+written rows as one JSON value each (`json_each`), so a statement stays inside D1's 100 bound values.
 
+- Column types are the declared types in the migrations (`BOOLEAN`, `JSON_TEXT`, `ARRAY_TEXT`,
+  `TIMESTAMPTZ`, `DATE`, `UUID`, `INTEGER`, `TEXT`, `REAL`); booleans are kept as 1 and 0, JSON as
+  text. `*_touch` triggers keep `updated_at` current when a write doesn't set it (the layer sets it);
+  generated columns (`contacts.name`, `redirects.wildcard`) are D1's. What Postgres computed in
+  triggers the layer fills on write: `entries.body_text` from `content`, `contacts.email_hash` (the
+  address as `mail_suppressions` keeps it) from `email`.
+- `src/lib/db/d1.ts` (`database()`): in the Worker the binding; in Node scripts the local D1 file
+  (`.wrangler/state`, through `node:sqlite`; `D1_LOCAL_FILE` when there are several) or, with
+  `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` and `D1_DATABASE_ID`, the deployed one through
+  Cloudflare's API.
+- D1 has no interactive transactions: a statement is atomic, and a role's write is checked before it
+  is made (the rows it may reach, read first; the rows it writes). The functions that needed a lock do
+  their check inside the one statement that writes (`ticket_order_create`, `insertIf`; claims are
+  conditional updates).
+- The server's functions (`db.rpc`) are in `functions.ts`: counters, ticket holds, mailing claims and
+  audiences (a segment's rules as SQL), campaign numbers.
 - A Db reads and writes as a role. The server's (`siteDb()`, `serviceClient()` in
-  `src/lib/supabase.ts`) isn't checked: public pages, feeds, search, ticket availability, member
+  `src/lib/db/site.ts`) isn't checked: public pages, feeds, search, ticket availability, member
   endpoints, the admin login page's theme. Its `Loader`s take a scope (`PUBLIC_SCOPE`, or
   `{ published, viewer }` from `renderRequest`) that limits entries to published ones and members-only
   ones to who may see them (`visibleTo`: `entry`, `entryById`, `entriesByIds`, `query`, `termCounts`,
@@ -918,29 +937,25 @@ Accounts) and Storage is still Supabase's, carried by a Db as `storage`.
   content, media, forms, templates, compose and segments; admins also write settings, lists, contacts
   and members; editors save campaigns only as drafts, change digests only while off and change their
   own profile but not its role; anyone else gets nothing. Reads a role may not make return no rows;
-  refused inserts, and writes whose rows fail a check, are errors (and rolled back).
-- The admin screens in the browser (`browserClient`, `src/lib/supabase-browser.ts`) send their queries
+  refused inserts, and writes whose rows fail a check, are errors and write nothing.
+- The admin screens in the browser (`browserClient`, `src/lib/db/browser.ts`) send their queries
   to `POST /api/admin/db`, which runs them as the signed-in editor; only its writes clear the page
   cache. Of the functions, editors may call `campaign_stats` and `ticket_sold`; the rest are the
   server's.
-- Supabase's database API is still there for Sync's other copy and still answers editors only
-  (migration `*_closed_api.sql`); the site no longer uses it for data. Accounts' tables are closed to
-  it entirely. New tables get a
-  line in `POLICIES` (none: the server's only).
+- New tables get a migration in `db/migrations/`, `scripts/db-schema.ts` run again, and a line in
+  `POLICIES` (none: the server's only).
 
 ## Hosting
 
 A Cloudflare Worker (`@astrojs/cloudflare`, `wrangler.jsonc`, entry `src/worker.ts`: Astro's `handle`
-for requests, `scheduled` for the Cron Triggers, `queue` for the jobs queue), with a hosted Supabase
-project for the database (`npx supabase link`). Migrations: `npx supabase db push --linked`; SQL:
-`npx supabase db query --linked`. `npm run deploy` builds and deploys (`wrangler deploy`).
+for requests, `scheduled` for the Cron Triggers, `queue` for the jobs queue), with D1 for the database
+(`npx wrangler d1 create`, its id in `wrangler.jsonc`). Migrations: `npx wrangler d1 migrations apply
+DB --remote`; SQL: `npx wrangler d1 execute DB --remote --command "..."`. `npm run deploy` builds and
+deploys (`wrangler deploy`).
 
-- The Worker reaches the database through Hyperdrive (the `HYPERDRIVE` binding, made from the
-  project's direct connection string). A Worker's connections can't outlive the request that opened
-  them, so each request, scheduled run and job runs in a scope of its own (`src/lib/platform.ts`,
-  `inScope`) with its own pool (`getPool`); Hyperdrive keeps the real connections. Scripts in Node
-  connect with `DATABASE_URL`.
-- Bindings: `HYPERDRIVE`, `IMAGES` (Cloudflare Images), `JOBS` (a queue: Compose turns, campaign
+- Each request, scheduled run and job runs in a scope of its own (`src/lib/platform.ts`, `inScope`),
+  which carries the work to finish after the answer (`afterAnswer`).
+- Bindings: `DB` (D1), `IMAGES` (Cloudflare Images), `JOBS` (a queue: Compose turns, campaign
   sending runs and restores, each run once with up to 15 minutes, `src/lib/jobs.ts`),
   `CF_VERSION_METADATA` (the page cache's validators). The Cron Triggers: mailing every 5 minutes and at
   06:20 UTC, snapshots at 07:00 UTC, ticket emails hourly (`SCHEDULES`).
@@ -948,22 +963,21 @@ project for the database (`npx supabase link`). Migrations: `npx supabase db pus
   `npx wrangler secret put`. Mail goes over SMTP through the Worker's sockets (`worker-mailer`; port 25
   is closed to Workers). Link fetching for Compose resolves names over DNS-over-HTTPS (`addressesOf`).
   The visitor's address and country come from `CF-Connecting-IP` and `CF-IPCountry`.
-- `astro dev` runs the Worker in workerd with local bindings: Hyperdrive to the local database
-  (`CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE`), a local queue, and Miniflare's Images,
+- `astro dev` runs the Worker in workerd with local bindings: D1 in `.wrangler/state` (the file scripts
+  use too), a local queue, and Miniflare's Images,
   which resizes but ignores crop rectangles and qualities (crops are centred locally; production cuts
   them exactly). Cron runs can be triggered at `/cdn-cgi/handler/scheduled?cron=<cron>`. Static files'
   headers are in `public/_headers`; the admin answers carry `X-Robots-Tag: noindex` (middleware).
 
-Hosted
-projects don't grant the API roles access to new tables (the local stack does): migration 0019 grants
-them and sets default privileges, and RLS does the rest for the database API (see Database access). Files need an R2 bucket and an API token for it (Media). Accounts need `AUTH_SECRET` (a long random value; changing it signs everyone out
+Files need an R2 bucket and an API token for it (Media). Accounts need `AUTH_SECRET` (a long random value; changing it signs everyone out
 and breaks links already sent) and links in emails use the request's address (`SITE_URL` for Better
 Auth's own). Env: `.env.example`.
 
 ## Commands
 
 ```
-npx supabase start                      # local stack (ports in supabase/config.toml)
+npx supabase start                      # local stack: files (S3) and the mail catcher (ports in supabase/config.toml)
+npx wrangler d1 migrations apply DB --local   # the local database's schema
 npx astro dev --background              # http://localhost:4321 (the Worker, in workerd)
 npm run deploy                          # build and deploy the Worker (wrangler deploy)
 npx tsx --env-file=.env scripts/create-editor.ts you@example.org 'password' [editor|admin]   # a user
@@ -971,8 +985,9 @@ npm run seed                            # starter templates, home page, sample e
 npx tsx --env-file=.env scripts/migrate-content.ts [--dry-run]   # site then core content migrations
 npx tsx scripts/checks/formatting.ts    # autop/texturize against scripts/checks/formatting-cases.json
 npx tsx scripts/checks/recurrence.ts    # recurrence rules, DST, event date sync
-npx tsx --env-file=.env scripts/db-schema.ts            # src/lib/db/schema.ts from the database, after a migration
-npx tsx --env-file=.env scripts/checks/db-parity.ts     # the query layer against PostgREST (local stack)
+npx tsx scripts/db-schema.ts            # src/lib/db/schema.ts from the local D1, after a migration
+npx tsx --env-file=.env scripts/pg-to-d1.ts [--replace | --out data.sql]   # a Postgres copy's data into D1 (moving a site)
+npx tsx --env-file=.env scripts/checks/d1-parity.ts     # the query layer on D1 against PostgREST on the Postgres it came from
 npx tsx scripts/checks/mailing.ts       # signed links, mailing emails, link tracking, click verdicts, digest times
 npx tsx --env-file=.env scripts/media-formats.ts   # backfill AVIF/WebP for existing media
 ```
@@ -1002,18 +1017,19 @@ on the example site some need that content first.
 ## Changing stored content
 
 Content changes the core or a site needs (renamed props, moved settings, switched block types) ship as
-a content migration or a SQL migration that edits the JSON. Content migrations are the core's
+a content migration or a SQL migration (`db/migrations/`) that edits the JSON. Content migrations are the core's
 (`migrateCollectionLayout` in `src/lib/content/collections.ts` is one) and the site's
 (`src/site/migrations/`); `scripts/migrate-content.ts` runs the site's first, then the core's.
 
-- Walk the JSON properly (PL/pgSQL or TypeScript): the key order of stored blocks varies, so text
-  patterns miss some.
-- Keep updated dates: disable the `*_touch` triggers around the update.
+- Walk the JSON properly (a content migration in TypeScript; SQLite's `json_tree` for small changes):
+  the key order of stored blocks varies, so text patterns miss some. A SQL migration that changes an
+  entry's `content` must leave `body_text` to a content migration (the layer fills it).
+- Keep updated dates: set `updated_at` to itself in the update (the `*_touch` triggers then leave it).
 - Name migrations with the time they are written (`YYYYMMDDHHMMSS_name.sql`; a site's
   `YYYYMMDDHHMMSS_site_name.sql`).
 - When a migration switches block types or settings, the new code and the database change must land
-  together: push the code, wait for the deploy, then `npx supabase db push --linked` at once (the
-  pages break in between).
+  together: push the code, wait for the deploy, then `npx wrangler d1 migrations apply DB --remote` at
+  once (the pages break in between).
 
 ## Checking changes
 

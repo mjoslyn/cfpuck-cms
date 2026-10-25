@@ -1,7 +1,7 @@
 // Cloudflare's bindings and the request being served (server only). The Worker entry (src/worker.ts)
 // hands over its bindings once and runs every request, scheduled run and queued job in a scope of its
-// own, since a Worker's connections (the database's, through Hyperdrive) can't outlive the request that
-// opened them. Scripts run in Node, with no bindings and no scope: they connect with DATABASE_URL.
+// own (work to finish after the answer). Scripts run in Node, with no bindings and no scope: they use
+// the local D1 file, or the deployed database through Cloudflare's API (src/lib/db/d1.ts).
 import { AsyncLocalStorage } from 'node:async_hooks';
 
 /** The Images binding, as the media code uses it. */
@@ -15,8 +15,8 @@ export interface ImageTransformer {
 }
 
 export interface Bindings {
-  /** The database, through Hyperdrive. */
-  HYPERDRIVE?: { connectionString: string };
+  /** The database (src/lib/db/d1.ts). */
+  DB?: import('./db/d1').D1Database;
   IMAGES?: ImagesBinding;
   /** Background jobs (src/lib/jobs.ts). */
   JOBS?: { send(body: unknown): Promise<void> };
@@ -32,8 +32,6 @@ export const setBindings = (env: Bindings) => {
 
 /** What belongs to one request, run or job. */
 export interface Scope {
-  /** Its database connections (src/lib/db/sql.ts). */
-  pool?: unknown;
   /** Work to finish after the answer has gone (ExecutionContext.waitUntil). */
   waitUntil?: (p: Promise<unknown>) => void;
 }

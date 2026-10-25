@@ -1,7 +1,7 @@
 # supapuck-cms
 
 A CMS for small business and organisation sites: Astro rendering on a
-Cloudflare Worker, content in Postgres (a Supabase project) and files in R2, the Puck visual editor, and Compose, which writes pages with Claude from
+Cloudflare Worker, content in D1 and files in R2, the Puck visual editor, and Compose, which writes pages with Claude from
 the documents, images and links an editor adds.
 
 The core is everything outside `src/site/`. `src/site/` is an example site called Example Town, with
@@ -31,9 +31,9 @@ What you get:
 ## Requirements
 
 - Node 22.12 or later
-- Docker (Docker Desktop or OrbStack), for the local Supabase stack
-- For hosting: a Cloudflare account (Workers paid plan: the jobs queue and CPU time), and a Supabase
-  project for the database
+- Docker (Docker Desktop or OrbStack), for the local Supabase stack, which serves files (S3) and
+  catches mail locally
+- For hosting: a Cloudflare account (Workers paid plan: the jobs queue and CPU time)
 - Optional: an Anthropic API key (Compose), an SMTP account (form notifications and ticket emails)
   and a Stripe or Square account (paid forms and tickets)
 
@@ -49,11 +49,13 @@ The Supabase CLI runs through `npx`, so you don't need to install it.
    npm install
    ```
 
-2. **Start the database.** This starts Supabase in Docker on ports 56520–56529 and applies the
-   migrations in `supabase/migrations/`.
+2. **Start the local services and the database.** The first starts Supabase in Docker on ports
+   56520–56529 (files and the mail catcher); the second makes the local D1 database from
+   `db/migrations/` (in `.wrangler/state`).
 
    ```
    npx supabase start
+   npx wrangler d1 migrations apply DB --local
    ```
 
    On a machine short of memory, skip the services the CMS doesn't use:
@@ -65,14 +67,10 @@ The Supabase CLI runs through `npx`, so you don't need to install it.
    cp .env.example .env
    ```
 
-   Then fill in the values that `npx supabase status` prints:
+   Then fill in these (the S3 keys are what `npx supabase status` prints):
 
-   | `.env` | from `supabase status` |
+   | `.env` | value |
    | --- | --- |
-   | `PUBLIC_SUPABASE_URL` | API URL (`http://127.0.0.1:56521`) |
-   | `PUBLIC_SUPABASE_ANON_KEY` | anon key |
-   | `SUPABASE_SERVICE_ROLE_KEY` | service_role key |
-   | `DATABASE_URL` | DB URL (`postgresql://postgres:postgres@127.0.0.1:56522/postgres`) |
    | `STORAGE_ACCESS_KEY_ID`, `STORAGE_SECRET_ACCESS_KEY` | S3 access key and secret (the rest of `STORAGE_*` is in `.env.example`) |
    | `AUTH_SECRET` | any long random value (`openssl rand -hex 32`) |
 
@@ -96,9 +94,8 @@ The Supabase CLI runs through `npx`, so you don't need to install it.
    ```
 
    The site is at http://localhost:4321 and the editor at http://localhost:4321/admin/. It runs as the
-   Worker does in production (workerd), with local bindings: `.env`'s
-   `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE` points the database binding at the local
-   stack.
+   Worker does in production (workerd), with local bindings: the database is the local D1, the same
+   file the scripts above use.
 
 ### Optional features
 
@@ -188,27 +185,26 @@ follow the config. `CORE.md` describes each option.
    token with Object Read & Write on it (R2 > Manage API tokens). `STORAGE_ENDPOINT` is
    `https://<account-id>.r2.cloudflarestorage.com`, `STORAGE_BUCKET` the bucket's name, and the token's
    access key and secret are `STORAGE_ACCESS_KEY_ID` and `STORAGE_SECRET_ACCESS_KEY`.
-2. **Supabase** (the database). Create a project at supabase.com.
-   - Link it and apply the migrations:
-     ```
-     npx supabase link --project-ref <project-ref>
-     npx supabase db push --linked
-     ```
-3. **Seed and create an admin.** Point a copy of `.env` at the hosted project: its URL, anon key and
-   service_role key, from Project Settings > API, and `DATABASE_URL`, its transaction pooler's
-   connection string (Connect > Transaction pooler). Then run the same two commands as locally:
+2. **D1** (the database). Give the Worker and its database names of the site's own in
+   `wrangler.jsonc` (`name`, `database_name`, and the queue's), then:
+   ```
+   npx wrangler login
+   npx wrangler d1 create <site>
+   npx wrangler d1 migrations apply DB --remote
+   npx wrangler queues create <site>-jobs
+   ```
+   Put the database's id in `wrangler.jsonc` (`database_id`). Images needs Cloudflare Images turned on
+   for the account.
+3. **Seed and create an admin.** Scripts reach the deployed database through Cloudflare's API: in a
+   copy of `.env`, set `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` (a token with D1 edit) and
+   `D1_DATABASE_ID`, then run the same two commands as locally:
    ```
    npx tsx --env-file=.env.production scripts/seed.ts
    npx tsx --env-file=.env.production scripts/create-editor.ts you@example.org 'a-password' admin
    ```
-   A site moving from Supabase Storage copies its files into the bucket with `scripts/copy-storage.ts`.
-4. **The Worker.** Give it a name of the site's own in `wrangler.jsonc` (`name`, and the queue's), then:
-   ```
-   npx wrangler login
-   npx wrangler hyperdrive create <site>-db --connection-string="<the project's direct connection string>"
-   npx wrangler queues create <site>-jobs
-   ```
-   Put the Hyperdrive id in `wrangler.jsonc`. Images needs Cloudflare Images turned on for the account.
+   A site moving from Netlify and Supabase copies its files with `scripts/copy-storage.ts` and its data
+   with `scripts/pg-to-d1.ts` instead (`docs/cloudflare-migration.md`, Moving an existing site).
+4. **The Worker.**
    Set the secrets (`npx wrangler secret put <NAME>`): `AUTH_SECRET` (a long random value of its own,
    e.g. `openssl rand -hex 32`), `STORAGE_SECRET_ACCESS_KEY`, `SMTP_PASS` (invitations, password links
    and confirmations are sent over SMTP; port 587 or 465), and the optional Compose, payment and Mailgun
@@ -252,12 +248,12 @@ To take core updates:
 ```
 git fetch upstream
 git merge upstream/main
-npx supabase db push --linked                      # if there are new migrations
+npx wrangler d1 migrations apply DB --remote       # if there are new migrations
 npx tsx --env-file=.env scripts/migrate-content.ts # if stored content needs migrating
 ```
 
 The merges stay clean as long as the site only changes `src/site/`, its own migrations
-(`supabase/migrations/*_site_*.sql`), `AGENTS.md`, `README.md` and its local settings. If you fix a core bug while working on a site,
+(`db/migrations/*_site_*.sql`), `AGENTS.md`, `README.md` and its local settings. If you fix a core bug while working on a site,
 commit the fix on its own and `git cherry-pick` it into the core repository.
 
 ## Checks

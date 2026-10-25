@@ -20,7 +20,7 @@ SYNC_REMOTE_SERVICE_KEY=<its service_role key>
 
 The sync talks to the other copy's database and storage directly, so it runs from the copy that has
 these set. A local copy can push to and pull from production; production can't reach a local copy.
-Apply the migrations on both copies (`sync_reset_ids()` comes with them).
+Apply the migrations on both copies.
 
 ## What can sync
 

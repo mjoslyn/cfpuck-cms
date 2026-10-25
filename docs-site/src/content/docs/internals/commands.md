@@ -19,15 +19,16 @@ npm run seed                            # starter templates, home page, sample e
 npx tsx --env-file=.env scripts/create-editor.ts you@example.org 'password' [editor|admin]
 npx tsx --env-file=.env scripts/migrate-content.ts [--dry-run]   # site then core content migrations
 npx tsx --env-file=.env scripts/media-formats.ts                 # backfill AVIF/WebP for existing media
-npx tsx --env-file=.env scripts/copy-storage.ts                  # local storage to a hosted project
+npx tsx --env-file=.env scripts/copy-storage.ts                  # Supabase Storage into the site's bucket (moving a site)
+npx tsx --env-file=.env scripts/pg-to-d1.ts                      # a Postgres copy's data into D1 (moving a site)
 ```
 
 ## Database
 
 ```sh
-npx supabase db push --linked           # apply migrations to the hosted project
-npx supabase db push --linked --include-all   # including out-of-order ones
-npx supabase db query --linked          # run SQL against it
+npx wrangler d1 migrations apply DB --local    # apply migrations locally (--remote: deployed)
+npx wrangler d1 execute DB --remote --command "select count(*) from entries"   # run SQL
+npx tsx scripts/db-schema.ts                   # src/lib/db/schema.ts from the local D1, after a migration
 ```
 
 ## Checks

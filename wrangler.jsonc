@@ -1,7 +1,7 @@
 // The Worker (https://developers.cloudflare.com/workers/wrangler/configuration/). Astro builds the site
 // into it; src/worker.ts adds the scheduled runs and the background jobs. Secrets (AUTH_SECRET,
 // STORAGE_SECRET_ACCESS_KEY, SMTP_PASS, ANTHROPIC_API_KEY, payment and Mailgun keys) are set with
-// `npx wrangler secret put <NAME>`, never here. Each site gives the Worker, Hyperdrive, queue and bucket
+// `npx wrangler secret put <NAME>`, never here. Each site gives the Worker, database, queue and bucket
 // names of its own.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
@@ -14,9 +14,9 @@
   "observability": { "enabled": true },
   // Background jobs run for minutes (a Compose turn, a restore, a campaign); their CPU is mostly waiting.
   "limits": { "cpu_ms": 300000 },
-  // The database, through Hyperdrive (its id from `npx wrangler hyperdrive create`). Locally,
-  // CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE in .env points it at the local database.
-  "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "00000000000000000000000000000000" }],
+  // The database: D1 (its id from `npx wrangler d1 create`), its schema in db/migrations
+  // (`npx wrangler d1 migrations apply DB --local` / `--remote`).
+  "d1_databases": [{ "binding": "DB", "database_name": "supapuck", "database_id": "00000000-0000-0000-0000-000000000000", "migrations_dir": "db/migrations" }],
   // Cloudflare Images: the media library's sizes and modern copies (src/lib/media/engine.ts).
   "images": { "binding": "IMAGES" },
   // The background jobs (src/lib/jobs.ts), each run once, one at a time.

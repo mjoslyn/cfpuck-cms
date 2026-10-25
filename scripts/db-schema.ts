@@ -1,51 +1,67 @@
-// Writes src/lib/db/schema.ts from the database: each table's columns and types, primary key and
-// foreign keys between our tables (the query layer embeds related rows through them). Run after a
-// migration that adds or changes tables: npx tsx --env-file=.env scripts/db-schema.ts
+// Writes src/lib/db/schema.ts from the local D1 database (after `npx wrangler d1 migrations apply DB
+// --local`): each table's columns and their types (from the declared types in db/migrations: BOOLEAN,
+// JSON_TEXT, ARRAY_TEXT, TIMESTAMPTZ...), primary key, generated columns, foreign keys (the query layer
+// embeds related rows through them), literal defaults and whether updated_at is kept current. Run after
+// a migration that adds or changes tables: npx tsx scripts/db-schema.ts
 import fs from 'node:fs';
-import pg from 'pg';
+import { database } from '../src/lib/db/d1';
 
-const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
-await client.connect();
+const TYPES: Record<string, string> = {
+  INTEGER: 'int8', TEXT: 'text', BOOLEAN: 'bool', JSON_TEXT: 'jsonb', ARRAY_TEXT: '_text',
+  TIMESTAMPTZ: 'timestamptz', DATE: 'date', UUID: 'uuid', REAL: 'numeric',
+};
 
-const { rows: columns } = await client.query(`
-  select c.table_name, c.column_name, c.udt_name, c.is_generated
-  from information_schema.columns c join information_schema.tables t using (table_schema, table_name)
-  where c.table_schema = 'public' and t.table_type = 'BASE TABLE'
-  order by c.table_name, c.ordinal_position`);
-const { rows: keys } = await client.query(`
-  select conrelid::regclass::text as table_name, contype, confrelid::regclass::text as ref_table,
-    (select array_agg(a.attname::text order by k.n) from unnest(conkey) with ordinality k(attnum, n) join pg_attribute a on a.attrelid = conrelid and a.attnum = k.attnum) as cols,
-    (select array_agg(a.attname::text order by k.n) from unnest(confkey) with ordinality k(attnum, n) join pg_attribute a on a.attrelid = confrelid and a.attnum = k.attnum) as ref_cols
-  from pg_constraint where connamespace = 'public'::regnamespace and contype in ('p', 'f')
-  order by conrelid::regclass::text, conname`);
-await client.end();
+const db = await database();
+const rows = async (sql: string) => (await db.prepare(sql).all()).results as Record<string, any>[];
+const names = (await rows(`select name from sqlite_master where type = 'table' and name not like 'sqlite_%' and name not like '\\_cf\\_%' escape '\\' and name <> 'd1_migrations' order by name`)).map((r) => r.name as string);
+const touched = new Set((await rows(`select tbl_name from sqlite_master where type = 'trigger' and name like '%\\_touch' escape '\\'`)).map((r) => r.tbl_name as string));
 
-const tables: Record<string, { pk: string[]; columns: Record<string, string>; generated: string[]; fks: [string[], string, string[]][] }> = {};
-for (const c of columns) {
-  const t = (tables[c.table_name] ??= { pk: [], columns: {}, generated: [], fks: [] });
-  t.columns[c.column_name] = c.udt_name;
-  if (c.is_generated === 'ALWAYS') t.generated.push(c.column_name);
+/** A default that is a plain value ('draft', 0, '{}'), as the value; expressions (now, ids) are left out. */
+function literal(d: string | null): unknown {
+  if (d === null) return undefined;
+  if (/^-?\d+(\.\d+)?$/.test(d)) return Number(d);
+  const m = d.match(/^'(.*)'$/s);
+  return m ? m[1].replace(/''/g, "'") : undefined;
 }
-for (const k of keys) {
-  const t = tables[k.table_name];
-  if (!t) continue;
-  if (k.contype === 'p') t.pk = k.cols;
-  else if (tables[k.ref_table]) t.fks.push([k.cols, k.ref_table, k.ref_cols]);
+
+const tables: Record<string, { pk: string[]; columns: Record<string, string>; generated: string[]; fks: [string[], string, string[]][]; defaults: Record<string, unknown>; touch: boolean }> = {};
+for (const name of names) {
+  const cols = await rows(`select * from pragma_table_xinfo('${name}')`);
+  const fks = await rows(`select * from pragma_foreign_key_list('${name}') order by id, seq`);
+  const t = (tables[name] = { pk: [] as string[], columns: {} as Record<string, string>, generated: [] as string[], fks: [] as [string[], string, string[]][], defaults: {} as Record<string, unknown>, touch: touched.has(name) });
+  for (const c of cols.sort((a, b) => a.cid - b.cid)) {
+    const declared = String(c.type).toUpperCase();
+    t.columns[c.name] = TYPES[declared] ?? (() => { throw new Error(`${name}.${c.name}: unknown type ${declared}`); })();
+    if (c.hidden === 2 || c.hidden === 3) t.generated.push(c.name);
+    const d = literal(c.dflt_value);
+    if (d !== undefined) t.defaults[c.name] = declared === 'BOOLEAN' ? d === 1 : declared === 'JSON_TEXT' || declared === 'ARRAY_TEXT' ? JSON.parse(String(d)) : d;
+  }
+  t.pk = cols.filter((c) => c.pk > 0).sort((a, b) => a.pk - b.pk).map((c) => c.name);
+  const byId = new Map<number, { from: string[]; table: string; to: string[] }>();
+  for (const f of fks) {
+    const k = byId.get(f.id) ?? { from: [] as string[], table: f.table as string, to: [] as string[] };
+    k.from.push(f.from);
+    k.to.push(f.to);
+    byId.set(f.id, k);
+  }
+  for (const k of [...byId.values()].sort((a, b) => a.from.join().localeCompare(b.from.join()))) if (names.includes(k.table)) t.fks.push([k.from, k.table, k.to]);
 }
 
 const out = `// Generated by scripts/db-schema.ts from the database: don't edit by hand.
-// Each table: primary key, columns with their Postgres types, generated columns, foreign keys to our
-// tables as [columns, table, its columns].
+// Each table: primary key, columns with their types, generated columns, foreign keys to our tables as
+// [columns, table, its columns], plain defaults, and whether updated_at is kept current (touch).
 
 export interface TableSchema {
   pk: string[];
   columns: Record<string, string>;
   generated: string[];
   fks: [string[], string, string[]][];
+  defaults: Record<string, unknown>;
+  touch: boolean;
 }
 
 export const SCHEMA: Record<string, TableSchema> = {
-${Object.entries(tables).map(([name, t]) => `  ${name}: {\n    pk: ${JSON.stringify(t.pk)},\n    columns: ${JSON.stringify(t.columns)},\n    generated: ${JSON.stringify(t.generated)},\n    fks: ${JSON.stringify(t.fks)},\n  },`).join('\n')}
+${Object.entries(tables).map(([name, t]) => `  ${name}: {\n    pk: ${JSON.stringify(t.pk)},\n    columns: ${JSON.stringify(t.columns)},\n    generated: ${JSON.stringify(t.generated)},\n    fks: ${JSON.stringify(t.fks)},\n    defaults: ${JSON.stringify(t.defaults)},\n    touch: ${t.touch},\n  },`).join('\n')}
 };
 `;
 fs.writeFileSync('src/lib/db/schema.ts', out);

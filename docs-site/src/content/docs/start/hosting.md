@@ -1,12 +1,12 @@
 ---
 title: Hosting
-description: Put a site on a Cloudflare Worker with a hosted Supabase project.
+description: Put a site on a Cloudflare Worker with D1 and R2.
 sidebar:
   order: 2
 ---
 
-A site runs as a Cloudflare Worker (Astro SSR) with a hosted Supabase project for the database and a
-Cloudflare R2 bucket for its files. Accounts are the site's own, in its database.
+A site runs as a Cloudflare Worker (Astro SSR) with D1 for the database and a Cloudflare R2 bucket
+for its files. Accounts are the site's own, in its database.
 
 ## 1. R2
 
@@ -16,59 +16,46 @@ on it (**R2 > Manage API tokens**). Set `STORAGE_ENDPOINT` to
 `STORAGE_REGION` to `auto`, and `STORAGE_ACCESS_KEY_ID` / `STORAGE_SECRET_ACCESS_KEY` to the token's
 access key and secret. The site serves the media library from it at `/media/`.
 
-## 2. Supabase
+## 2. D1
 
-Create a project at supabase.com, then link it and apply the migrations:
+Give the Worker and its database names of the site's own in `wrangler.jsonc` (`name`,
+`database_name`), then create the database and apply the migrations:
 
 ```sh
-npx supabase link --project-ref <project-ref>
-npx supabase db push --linked
+npx wrangler login
+npx wrangler d1 create <site>
+npx wrangler d1 migrations apply DB --remote
 ```
 
-Accounts are the site's own (in its database, not Supabase Auth), so nothing needs setting under
-Supabase's Authentication. Invitations (7 days), password links (an hour) and members' confirmation
-links (a day) are sent by the site over its SMTP settings; without SMTP, admins are shown invitation
-and password links to pass on themselves.
-
-:::note
-Hosted projects don't grant the API roles access to new tables the way the local stack does.
-Migration 0019 grants them and sets default privileges; row-level security does the rest.
-:::
-
-:::caution[The database API is for editors only]
-The anon key is public (the browser needs it to sign in), so the database's API is closed to everyone
-but editors (migration `*_closed_api.sql`); the site doesn't use it for data. The site reads and
-writes on the server over `DATABASE_URL` and shows visitors only published, permitted content; the
-admin screens' queries go through the site, which checks each person's role. Keep
-`SUPABASE_SERVICE_ROLE_KEY` and `DATABASE_URL` out of anything the browser loads (only `PUBLIC_`
-variables reach it).
-:::
+Put the database's id in `wrangler.jsonc` (`database_id`). The site reads and writes it only on the
+server; the admin screens' queries go through the site, which checks each person's role. Accounts are
+the site's own (in its database). Invitations (7 days), password links (an hour) and members'
+confirmation links (a day) are sent by the site over its SMTP settings; without SMTP, admins are shown
+invitation and password links to pass on themselves.
 
 ## 3. Seed and create an admin
 
-Point a copy of `.env` at the hosted project (its URL, anon key and service_role key, from
-**Project Settings > API**, and `DATABASE_URL`, its transaction pooler's connection string from
-**Connect > Transaction pooler**) and run the same commands as locally:
+Scripts reach the deployed database through Cloudflare's API. In a copy of `.env`, set
+`CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` (a token with D1 edit) and `D1_DATABASE_ID`, then run
+the same commands as locally:
 
 ```sh
 npx tsx --env-file=.env.production scripts/seed.ts
 npx tsx --env-file=.env.production scripts/create-editor.ts you@example.org 'a-password' admin
 ```
 
-A site moving from Supabase Storage copies its files into the bucket with `scripts/copy-storage.ts`
-(resumable).
+A site moving from Netlify and Supabase copies its files with `scripts/copy-storage.ts` (resumable) and
+its data with `scripts/pg-to-d1.ts` instead (`docs/cloudflare-migration.md` in the repository).
 
 ## 4. The Worker
 
-Give the Worker and its queue names of the site's own in `wrangler.jsonc`, then:
+Give the queue a name of the site's own in `wrangler.jsonc`, then:
 
 ```sh
-npx wrangler login
-npx wrangler hyperdrive create <site>-db --connection-string="<the project's direct connection string>"
 npx wrangler queues create <site>-jobs
 ```
 
-Put the Hyperdrive id in `wrangler.jsonc`, and turn on Cloudflare Images for the account. Set the
+Turn on Cloudflare Images for the account. Set the
 secrets with `npx wrangler secret put <NAME>` (`AUTH_SECRET`, `STORAGE_SECRET_ACCESS_KEY`, `SMTP_PASS`,
 and the optional Compose, payment and Mailgun keys) and the other settings as `vars` in
 `wrangler.jsonc`. Deploy with `npm run deploy`, then add your domain under the Worker's **Domains &
@@ -130,13 +117,12 @@ Admins invite editors from `/admin/users/`. See [Editor and roles](../../feature
 
 | Variable | Purpose |
 | --- | --- |
-| `PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_ANON_KEY` | The Supabase project |
-| `SUPABASE_SERVICE_ROLE_KEY` | Sync with another copy over its database API |
+| `PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | Sync with another copy still on Supabase, over its database API |
+| `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, `D1_DATABASE_ID` | Scripts only: the deployed database through Cloudflare's API |
 | `STORAGE_ENDPOINT`, `STORAGE_BUCKET`, `STORAGE_REGION`, `STORAGE_ACCESS_KEY_ID`, `STORAGE_SECRET_ACCESS_KEY` | The site's files (R2) |
 | `AUTH_SECRET` | Signs sessions and the site's links: a long random value (`openssl rand -hex 32`) |
 | `AUTH_CONFIRM_EMAIL` | `false` lets member sign-ups in without confirming their address |
-| `DATABASE_URL` | The database, through the project's transaction pooler (port 6543) |
-| `DATABASE_POOL_MAX` | Database connections per server instance (default 5) |
+| `DATABASE_URL` | Moving a site only: the Postgres database `scripts/pg-to-d1.ts` copies from |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE` or `SMTP_URL` | Outgoing mail |
 | `MAIL_FROM` | Sender, overriding the config's `mailFrom` |
 | `FORMS_ADMIN_EMAIL` | Where form notifications go when a form doesn't say |

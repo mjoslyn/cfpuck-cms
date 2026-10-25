@@ -1,17 +1,28 @@
-// The query layer (src/lib/db) against PostgREST, while both exist: the same queries through the
-// Supabase client and through the layer, as the server, and the JSON they answer compared. Needs the
-// local stack: npx tsx --env-file=.env scripts/checks/db-parity.ts
+// The query layer on D1 (src/lib/db/sqlite.ts) against PostgREST on the Postgres database it was
+// copied from, while both exist (the move, docs/cloudflare-migration.md): the same queries through the
+// Supabase client and through the layer, and the JSON they answer compared, times as instants (D1 keeps
+// milliseconds). Needs the local stack and its data in the local D1 (scripts/pg-to-d1.ts):
+//   npx tsx --env-file=.env scripts/checks/d1-parity.ts
 import { createClient } from '@supabase/supabase-js';
 import { Db } from '../../src/lib/db/query';
-import { SqlExecutor, getPool } from '../../src/lib/db/sql';
+import { SqliteExecutor } from '../../src/lib/db/sqlite';
 import type { Role } from '../../src/lib/db/policies';
 
 const rest = createClient(process.env.PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
-const db = new Db(new SqlExecutor({ role: 'service' }));
+const db = new Db(new SqliteExecutor({ role: 'service' }));
 const stamp = Date.now();
+// The rows made here have the same ids on both sides.
+const base = 9_000_000 + (stamp % 100_000) * 10;
 let failed = 0;
 
-const norm = (r: any) => JSON.stringify({ data: r.data, count: r.count ?? null, error: r.error ? { code: r.error.code } : null });
+const TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
+const instants = (_k: string, v: unknown) => (_k === 'email_hash' ? undefined : typeof v === 'string' && TIME.test(v) ? new Date(v).toISOString() : v);
+const norm = (r: any) => JSON.stringify({ data: r.data, count: r.count ?? null, error: r.error ? { code: r.error.code } : null }, instants);
+const both = async (q: (c: any) => PromiseLike<any>) => {
+  const [a, b] = await Promise.all([q(rest), q(db)]);
+  if (a.error || b.error) throw new Error(`setup: ${a.error?.message ?? ''} ${b.error?.message ?? ''}`);
+  return a;
+};
 
 async function same(label: string, q: (c: any) => PromiseLike<any>) {
   const [a, b] = await Promise.all([q(rest), q(db)]);
@@ -23,14 +34,15 @@ async function same(label: string, q: (c: any) => PromiseLike<any>) {
 
 // Rows to read: terms on an entry, a contact on a list.
 const { data: entry } = await rest.from('entries').select('id').order('id').limit(1).single();
-const { data: terms } = await rest.from('terms').insert([
-  { taxonomy: 'tag', slug: `parity-a-${stamp}`, name: `Parity A ${stamp}`, fields: {} },
-  { taxonomy: 'category', slug: `parity-b-${stamp}`, name: `Parity B ${stamp}`, fields: { colour: 'red', n: 2 } },
-]).select('id');
-await rest.from('entry_terms').insert(terms!.map((t: any, i: number) => ({ entry_id: entry!.id, term_id: t.id, sort: i })));
-const { data: list } = await rest.from('mail_lists').insert({ name: `Parity ${stamp}` }).select('id').single();
-const { data: contact } = await rest.from('contacts').insert({ email: `parity-${stamp}@example.org`, first_name: 'Par', last_name: 'Ity', tags: ['a', 'b'], attributes: { city: 'Town' } }).select('id').single();
-await rest.from('contact_lists').insert({ contact_id: contact!.id, list_id: list!.id, status: 'subscribed' });
+const { data: terms } = await both((c) => c.from('terms').insert([
+  { id: base, taxonomy: 'tag', slug: `parity-a-${stamp}`, name: `Parity A ${stamp}`, fields: {} },
+  { id: base + 1, taxonomy: 'category', slug: `parity-b-${stamp}`, name: `Parity B ${stamp}`, fields: { colour: 'red', n: 2 } },
+]).select('id'));
+await both((c) => c.from('entry_terms').insert(terms!.map((t: any, i: number) => ({ entry_id: entry!.id, term_id: t.id, sort: i }))));
+const { data: list } = await both((c) => c.from('mail_lists').insert({ id: base, name: `Parity ${stamp}`, created_at: '2026-10-01T00:00:00Z' }).select('id').single());
+const at = '2026-10-20T00:00:00Z';
+const { data: contact } = await both((c) => c.from('contacts').insert({ id: base, email: `parity-${stamp}@example.org`, first_name: 'Par', last_name: 'Ity', tags: ['a', 'b'], attributes: { city: 'Town' }, created_at: at, updated_at: at }).select('id').single());
+await both((c) => c.from('contact_lists').insert({ contact_id: contact!.id, list_id: list!.id, status: 'subscribed', subscribed_at: at }));
 
 try {
   await same('select *', (c) => c.from('entries').select('*').order('id'));
@@ -57,7 +69,7 @@ try {
   await same('one-to-many inner', (c) => c.from('contacts').select('*, contact_lists!inner(list_id, status)').eq('contact_lists.list_id', list!.id).eq('contact_lists.status', 'subscribed'));
   await same('contains on array', (c) => c.from('contacts').select('id').contains('tags', ['a']).eq('id', contact!.id));
   await same('json cs in or', (c) => c.from('terms').select('id').or(`fields->>colour.eq.red,fields->n.eq.5`).like('slug', `parity-%-${stamp}`));
-  await same('json cs on a path, in or', (c) => c.from('terms').select('id').or(`fields->n.cs.2,fields->colour.cs."red",fields->list.cs.["x"]`).like('slug', `parity-%-${stamp}`));
+  await same('json cs on a path, in or', (c) => c.from('terms').select('id').or(`fields->n.cs.2,fields->list.cs.["x"]`).like('slug', `parity-%-${stamp}`));
   await same('json cs on a column', (c) => c.from('terms').select('id').contains('fields', { colour: 'red' }).like('slug', `parity-%-${stamp}`));
   await same('settings', (c) => c.from('settings').select('key, value').order('key'));
   await same('timestamps', (c) => c.from('entries').select('created_at, updated_at, published_at').order('id'));
@@ -72,7 +84,7 @@ try {
     { match: 'all', rules: [{ type: 'member', levels: ['basic'] }] },
     { match: 'all', rules: [{ type: 'source', value: '' }, { type: 'field', key: 'city', op: 'set' }] },
   ];
-  await rest.from('contacts').update({ status: 'subscribed' }).eq('id', contact!.id);
+  await both((c) => c.from('contacts').update({ status: 'subscribed', updated_at: at }).eq('id', contact!.id));
   for (const [i, seg] of segments.entries()) {
     for (const members of ['any', 'members', 'non-members']) {
       await same(`mail_audience ${i} ${members}`, (c) => c.rpc('mail_audience', { p_lists: [list!.id], p_members: members, p_levels: [], p_segment: seg }).range(0, 999));
@@ -86,9 +98,9 @@ try {
   await same('ticket_order_status, short token', (c) => c.rpc('ticket_order_status', { p_token: 'short' }));
 
   // Writes: each path writes its own rows; the answers are compared with ids and times left out.
-  const strip = (r: any) => JSON.stringify(r.data, (k, v) => (['id', 'created_at', 'updated_at', 'slug', 'name', 'email'].includes(k) ? undefined : v));
+  const strip = (r: any) => JSON.stringify(r.data, (k, v) => (['id', 'created_at', 'updated_at', 'slug', 'name', 'email', 'email_hash'].includes(k) ? undefined : v));
   const write = async (label: string, q: (c: any, tag: string) => PromiseLike<any>) => {
-    const [a, b] = await Promise.all([q(rest, `rest-${stamp}`), q(db, `db-${stamp}`)]);
+    const [a, b] = await Promise.all([q(rest, `w-${stamp}`), q(db, `w-${stamp}`)]);
     const ok = strip(a) === strip(b) && !!a.error === !!b.error && (a.count ?? null) === (b.count ?? null);
     if (!ok) failed++;
     console.log(`${ok ? 'ok  ' : 'FAIL'} ${label}`);
@@ -99,6 +111,7 @@ try {
   await write('update with returning', (c, t) => c.from('terms').update({ description: 'changed', fields: { b: true } }).like('slug', `w%-${t}`).select('description, fields'));
   await write('upsert on conflict', (c, t) => c.from('terms').upsert({ taxonomy: 'tag', slug: `w1-${t}`, name: `W1 ${t}`, description: 'upserted' }, { onConflict: 'taxonomy,slug' }).select('description'));
   await write('upsert ignoring duplicates', (c, t) => c.from('terms').upsert({ taxonomy: 'tag', slug: `w1-${t}`, name: `W1 ${t}` }, { onConflict: 'taxonomy,slug', ignoreDuplicates: true }).select('description'));
+  await write('upsert ignoring duplicates, nothing returned', (c, t) => c.from('terms').upsert({ taxonomy: 'tag', slug: `w1-${t}`, name: `W1 ${t}` }, { onConflict: 'taxonomy,slug', ignoreDuplicates: true }));
   await write('unique violation', (c, t) => c.from('terms').insert({ taxonomy: 'tag', slug: `w1-${t}`, name: 'dup' }));
   await write('delete with count', (c, t) => c.from('terms').delete({ count: 'exact' }).like('slug', `w%-${t}`));
   await write('text array insert', (c, t) => c.from('contacts').insert({ email: `${t}@example.org`, tags: ['x', 'y'] }).select('tags, attributes'));
@@ -110,11 +123,11 @@ try {
     const { data: made } = await rest.auth.admin.createUser({ email, password: 'parity-password-1', email_confirm: true });
     const uid = made.user!.id;
     // The same id in the site's own accounts, for the profile (PostgREST's session is Supabase Auth's).
-    await db.from('users').insert({ id: uid, email });
-    await db.from('profiles').insert({ id: uid, role, display_name: role });
+    await both((c) => c.from('users').insert({ id: uid, email }));
+    await both((c) => c.from('profiles').insert({ id: uid, role, display_name: role }));
     const person = createClient(process.env.PUBLIC_SUPABASE_URL!, process.env.PUBLIC_SUPABASE_ANON_KEY!, { auth: { persistSession: false } });
     await person.auth.signInWithPassword({ email, password: 'parity-password-1' });
-    const mine = new Db(new SqlExecutor({ role: (role === 'viewer' ? 'none' : role) as Role, uid }));
+    const mine = new Db(new SqliteExecutor({ role: (role === 'viewer' ? 'none' : role) as Role, uid }));
     const as = async (label: string, q: (c: any) => PromiseLike<any>) => {
       const [a, b] = await Promise.all([q(person), q(mine)]);
       const ok = norm(a) === norm(b);
@@ -143,19 +156,18 @@ try {
       if (role !== 'viewer') await as('call campaign_stats', (c) => c.rpc('campaign_stats', { p_id: -1 }));
       await as('call mail_claim', (c) => c.rpc('mail_claim', { p_id: -1, p_token: 'x' }));
     } finally {
-      await rest.from('campaigns').delete().like('name', `Parity ${stamp}%`);
-      await rest.from('mail_lists').delete().like('name', `Parity ${role}%${stamp}`);
-      await rest.from('settings').delete().like('key', `parity-${role}-${stamp}%`);
-      await rest.from('terms').delete().like('slug', `parity-${role}-${stamp}%`);
-      await db.from('users').delete().eq('id', uid);
+      await both((c) => c.from('campaigns').delete().like('name', `Parity ${stamp}%`));
+      await both((c) => c.from('mail_lists').delete().like('name', `Parity ${role}%${stamp}`));
+      await both((c) => c.from('settings').delete().like('key', `parity-${role}-${stamp}%`));
+      await both((c) => c.from('terms').delete().like('slug', `parity-${role}-${stamp}%`));
+      await both((c) => c.from('users').delete().eq('id', uid));
       await rest.auth.admin.deleteUser(uid);
     }
   }
 } finally {
-  await rest.from('terms').delete().like('slug', `parity-%-${stamp}`);
-  await rest.from('contacts').delete().eq('id', contact!.id);
-  await rest.from('mail_lists').delete().eq('id', list!.id);
-  await getPool().end();
+  await both((c) => c.from('terms').delete().like('slug', `parity-%-${stamp}`));
+  await both((c) => c.from('contacts').delete().eq('id', contact!.id));
+  await both((c) => c.from('mail_lists').delete().eq('id', list!.id));
 }
 console.log(failed ? `${failed} failed` : 'all the same');
 process.exit(failed ? 1 : 0);

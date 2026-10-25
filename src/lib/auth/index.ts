@@ -9,7 +9,7 @@ import { APIError, createEmailVerificationToken } from 'better-auth/api';
 import { hashPassword, verifyPassword } from 'better-auth/crypto';
 import bcrypt from 'bcryptjs';
 import { randomBytes } from 'node:crypto';
-import { getPool } from '../db/sql';
+import { lazyD1 } from '../db/d1';
 import { siteDb } from '../db/site';
 
 const env = (k: string) => (import.meta.env?.[k] as string | undefined) ?? process.env[k];
@@ -31,8 +31,8 @@ function makeAuth() {
   return betterAuth({
     secret,
     baseURL: env('SITE_URL') || 'http://localhost:4321',
-    // The connections of whatever request is running (getPool), so one instance serves them all.
-    database: { connect: () => getPool().connect(), end: async () => {} } as unknown as ReturnType<typeof getPool>,
+    // D1 (Better Auth's D1 dialect: it sees prepare, batch and exec).
+    database: lazyD1() as never,
     telemetry: { enabled: false },
     emailAndPassword: {
       enabled: true,

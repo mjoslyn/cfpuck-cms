@@ -52,7 +52,7 @@ const sitePublic = {
 export default defineConfig({
   output: 'server',
   // A Cloudflare Worker (wrangler.jsonc; its entry is src/worker.ts). astro dev runs it in workerd too,
-  // with local bindings (Hyperdrive to the local database, the jobs queue, Images).
+  // with local bindings (D1 in .wrangler/state, the jobs queue, Images).
   adapter: cloudflare({ imageService: 'passthrough' }),
   integrations: [react(), siteRoutes, sitePublic],
   // Cloudflare's Workers cache keeps the pages (tagged) and purges them after edits (src/lib/cache.ts).

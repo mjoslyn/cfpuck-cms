@@ -5,7 +5,7 @@ sidebar:
   order: 1
 ---
 
-The schema is in `supabase/migrations/`.
+The schema is in `db/migrations/` (D1).
 
 ## Entries
 
@@ -15,7 +15,7 @@ Every piece of content is a row in `entries` with a `type` from the site config 
 
 - **Content** is Puck data in `entries.content` (see [Blocks](../blocks/)).
 - **Body text**: `entries.body_text` is the entry's readable text, filled from its content by the
-  `entry_body_text` trigger. Search and event descriptions use it.
+  query layer whenever the content is written. Search and event descriptions use it.
 - **Unpublished changes** to a published entry are kept aside in `entry_drafts` (editors only: the
   published rows of `entries` are public).
 - **Image fields** hold media ids.
@@ -44,7 +44,7 @@ Site-wide values are in `settings`:
   profiles, share image, taxonomy templates.
 - `options`: the menu (`menu_items`) and the site's own `settingsFields`.
 
-Settings writes are admin-only in row-level security (`is_admin()`).
+Settings writes are admin-only in the query layer's policies (`src/lib/db/policies.ts`).
 
 ## Other tables
 

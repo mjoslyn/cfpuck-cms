@@ -1,7 +1,7 @@
 # Moving to Cloudflare
 
 Plan for moving the core off Netlify and Supabase onto Cloudflare Workers, D1, R2, Cloudflare Images
-and Better Auth. Nothing here is built yet. Each phase leaves the site working and can ship by itself;
+and Better Auth. Phases 1 to 5 are done (each with what was built); phase 6 is next. Each phase leaves the site working and can ship by itself;
 CORE.md, README.md and docs-site change in the same commits as the code.
 
 ## Decisions
@@ -122,23 +122,39 @@ local Images ignores `trim` (the same geometry through sharp gives the old resul
 To check on the first real deploy: Images' `trim` (production only), `cache.purge` by tag, SMTP over
 the Worker's sockets with the site's provider, and Hyperdrive to the Supabase project.
 
-### 5. Database to D1
+### 5. Database to D1: done
 
-- One fresh SQLite schema, `db/migrations/0001_init.sql`, from the current Postgres schema (also
-  closes the open work item about a fresh starting migration). Site migrations move to
-  `db/migrations/*_site_*.sql`; `wrangler d1 migrations apply`.
-- A SQLite compiler beside `src/lib/db/sql.ts` (the same QuerySpecs; JSON from `json_group_array` or
-  parsed by column type from `schema.ts`), the functions' SQL for SQLite, ticket and mail claims as
-  batches, FTS5 search.
-- `scripts/pg-to-d1.ts`: exports every table from a Postgres copy, converts types and imports into D1
-  in batches; reports row counts per table on both sides.
-- Hyperdrive and the Postgres compiler are removed.
+- One SQLite schema, `db/migrations/20261025180000_init.sql`, written from the Postgres schema by
+  `scripts/pg-to-d1-schema.ts` (37 tables, keys, checks, defaults, indexes, `*_touch` triggers,
+  generated columns; declared types `BOOLEAN`, `JSON_TEXT`, `ARRAY_TEXT`, `TIMESTAMPTZ`, `DATE`, `UUID`
+  carry what the layer needs). `*_contacts_email_hash.sql` adds the address hash the audience query
+  needs (SQLite has no digest function). Site migrations go in `db/migrations/*_site_*.sql`;
+  `wrangler d1 migrations apply`. `scripts/db-schema.ts` now reads the local D1.
+- `src/lib/db/sqlite.ts`: the compiler and executor (rows as `json_object`, embeds as
+  `json_group_array`, booleans and JSON typed in SQL; `GLOB` for case-sensitive `like`; `NULLS
+  FIRST/LAST` and `COLLATE NOCASE` to sort as Postgres did; lists and rows as one JSON parameter).
+  Policies are checked before writes (no transactions to roll back). `body_text` is computed in
+  TypeScript on write (`src/lib/content/body-text.ts`, identical to the trigger's output on every entry).
+- Functions in SQLite: `ticket_order_create` is one `INSERT ... SELECT ... WHERE <capacity>`
+  (`insertIf`); claims stay conditional updates; `mail_audience` reads `contacts.email_hash`;
+  `sync_reset_ids` does nothing.
+- Better Auth uses its D1 dialect (`lazyD1()`, a handle that finds the binding when a statement runs).
+- `scripts/pg-to-d1.ts` copies a Postgres copy's data into D1 (local, remote through the API, or a SQL
+  file for `wrangler d1 execute`; long values split under D1's statement limit).
+- Hyperdrive, `src/lib/db/sql.ts` and `pg` at runtime are gone (`pg` stays for the two scripts).
+- Not done: FTS5. Search keeps `Loader.queryRanked`'s word matching, which renders the same results.
+- Checked: `scripts/checks/d1-parity.ts` (PostgREST on Postgres against the layer on D1, same data:
+  reads, writes, functions, editor, admin and viewer; one difference: Postgres refuses invalid JSON in
+  a `cs` filter, D1 doesn't), HTML of every page type identical before and after, auth (30), safety
+  (28) and mailing (64) e2e, roles, publishing, revisions, forms, events, venue and media e2e as before,
+  and the built Worker under `wrangler dev`.
 
 ### 6. Sync, backups, tooling, docs
 
 - Sync: the other copy is reached through a signed endpoint on it (`/api/sync/remote`, HMAC with a
   shared `SYNC_SECRET`) instead of its service key; rows are matched as today. Snapshots and backups
-  write to R2. `sync_reset_ids` goes.
+  write to R2. `sync_reset_ids` goes. Until then Sync reaches the other copy through Supabase's API, so
+  it works only between copies still on Postgres.
 - e2e scripts and `scripts/checks/*` run against `wrangler dev`; `create-editor.ts` and `seed.ts` use
   the new layer.
 - Docs: CORE.md (Hosting, Database access, Media, Sync, Commands, every RLS reference), README.md
@@ -150,7 +166,10 @@ the Worker's sockets with the site's provider, and Hyperdrive to the Supabase pr
    `MAIL_LINK_SECRET` sets it to `mail-links:<its old Supabase service_role key>`, so mailing links
    already sent keep working.
 2. `scripts/copy-storage.ts` (Supabase Storage to R2), `scripts/pg-to-d1.ts` (the data, accounts
-   included: migration `*_auth_tables.sql` already moved them out of Supabase Auth).
+   included: migration `*_auth_tables.sql` already moved them out of Supabase Auth). A site with tables
+   of its own (`*_site_*.sql` in `supabase/migrations/`) writes their D1 migration first
+   (`scripts/pg-to-d1-schema.ts` prints every table). Check the largest rows (entries' content,
+   compose sessions) against D1's 2 MB.
 3. Deploy to a `workers.dev` address, compare pages against the live site, sign in, run the e2e
    scripts.
 4. Freeze edits, run the two copies again for the latest changes, point DNS at the Worker, move the

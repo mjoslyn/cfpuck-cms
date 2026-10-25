@@ -8,8 +8,9 @@ sidebar:
 ## Requirements
 
 - Node 22.12 or later
-- Docker (Docker Desktop or OrbStack), for the local Supabase stack
-- For hosting: a Cloudflare account (Workers paid plan) and a Supabase project for the database
+- Docker (Docker Desktop or OrbStack), for the local Supabase stack, which serves files (S3) and
+  catches mail locally
+- For hosting: a Cloudflare account (Workers paid plan)
 - Optional: an Anthropic API key (Compose), an SMTP account (form notifications and ticket emails)
   and a Stripe or Square account (paid forms and tickets)
 
@@ -25,11 +26,13 @@ The Supabase CLI runs through `npx`, so you don't need to install it.
    npm install
    ```
 
-2. **Start the database.** This starts Supabase in Docker on ports 56520–56529 and applies the
-   migrations in `supabase/migrations/`.
+2. **Start the local services and the database.** The first starts Supabase in Docker on ports
+   56520–56529 (files and the mail catcher); the second makes the local D1 database from
+   `db/migrations/` (in `.wrangler/state`, shared by the dev server and the scripts).
 
    ```sh
    npx supabase start
+   npx wrangler d1 migrations apply DB --local
    ```
 
    On a machine short of memory, skip the services the CMS doesn't use:
@@ -38,20 +41,17 @@ The Supabase CLI runs through `npx`, so you don't need to install it.
    npx supabase start -x logflare,vector,studio,imgproxy,edge-runtime,realtime,supavisor,postgres-meta
    ```
 
-3. **Configure.** Copy the example env file and fill in the values `npx supabase status` prints:
+3. **Configure.** Copy the example env file and fill in these (the S3 keys are what
+   `npx supabase status` prints):
 
    ```sh
    cp .env.example .env
    ```
 
-   | `.env` | from `supabase status` |
+   | `.env` | value |
    | --- | --- |
-   | `PUBLIC_SUPABASE_URL` | API URL (`http://127.0.0.1:56521`) |
-   | `PUBLIC_SUPABASE_ANON_KEY` | anon key |
    | `STORAGE_ACCESS_KEY_ID`, `STORAGE_SECRET_ACCESS_KEY` | S3 access key and secret (files, in the stack's `site` bucket) |
    | `AUTH_SECRET` | any long random value (`openssl rand -hex 32`) |
-   | `SUPABASE_SERVICE_ROLE_KEY` | service_role key |
-   | `DATABASE_URL` | DB URL (`postgresql://postgres:postgres@127.0.0.1:56522/postgres`) |
 
 4. **Add starter content**: the header, footer, base templates, a home page, an About page and a
    sample event. It skips anything that already exists, so it is safe to run again.

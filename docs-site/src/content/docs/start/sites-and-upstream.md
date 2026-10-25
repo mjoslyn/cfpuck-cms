@@ -30,8 +30,7 @@ Then make it your site:
 Merges stay clean as long as the site only changes:
 
 - `src/site/`
-- its own database migrations, `supabase/migrations/*_site_*.sql` (the Supabase CLI reads only that
-  folder)
+- its own database migrations, `db/migrations/*_site_*.sql` (wrangler reads only that folder)
 - `AGENTS.md`, `README.md`
 - its env and its local ports in `supabase/config.toml`
 
@@ -40,22 +39,22 @@ Merges stay clean as long as the site only changes:
 ```sh
 git fetch upstream
 git merge upstream/main
-npx supabase db push --linked                      # if there are new migrations
+npx wrangler d1 migrations apply DB --remote       # if there are new migrations
 npx tsx --env-file=.env scripts/migrate-content.ts # if stored content needs migrating
 ```
 
 On a conflict, a site keeps its own `AGENTS.md`, `README.md`, `.env.example` and
 `supabase/config.toml`.
 
-### Out-of-order migrations
+### Migrations
 
-Migrations (core and site) are named with the time they were written:
-`YYYYMMDDHHMMSS_name.sql`. A core migration written earlier than one a site already applied is out of
-order. Apply it with:
+Migrations (core and site) are named with the time they were written: `YYYYMMDDHHMMSS_name.sql`.
+`wrangler d1 migrations apply` applies every one not yet applied, in order, so a core migration written
+earlier than one a site already applied still goes in:
 
 ```sh
-npx supabase db push --linked --include-all   # hosted
-npx supabase migration up --include-all       # local
+npx wrangler d1 migrations apply DB --remote   # deployed
+npx wrangler d1 migrations apply DB --local    # local
 ```
 
 ## Sending a fix upstream

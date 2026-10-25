@@ -39,15 +39,16 @@ Update the docs in the same commit as the change:
 
 Content changes the core needs (renamed props, moved settings) ship as a core content migration
 (`scripts/migrate-content.ts`; `migrateCollectionLayout` in `src/lib/content/collections.ts` is one)
-or a SQL migration that edits the JSON.
+or a SQL migration (`db/migrations/`) that edits the JSON.
 
-- Walk the JSON properly (PL/pgSQL or TypeScript). The key order of stored blocks varies, so text
-  patterns miss some.
-- Keep updated dates: disable the `*_touch` triggers around the update.
+- Walk the JSON properly (a content migration in TypeScript). The key order of stored blocks varies,
+  so text patterns miss some. The query layer fills `body_text` when content is written, so changes to
+  entries' content belong in content migrations.
+- Keep updated dates: set `updated_at` to itself in the update (the `*_touch` triggers then leave it).
 - Name migrations with the time they are written (`YYYYMMDDHHMMSS_name.sql`).
 
 When a site migration switches block types or settings, the site's code and its database change must
-land together: push the code, wait for the deploy, then `npx supabase db push --linked` at once.
+land together: push the code, wait for the deploy, then `npx wrangler d1 migrations apply DB --remote` at once.
 
 ## Workflow
 

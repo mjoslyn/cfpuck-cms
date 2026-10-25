@@ -1,6 +1,7 @@
 // Content migrations: rewrite stored Puck documents (entries, unpublished drafts, templates, revisions)
 // with the site's migrations (src/site/migrations). Idempotent; --dry-run only counts. Runs against the
-// database in .env (DATABASE_URL), or another with TARGET_DATABASE_URL.
+// local D1, or the deployed one with CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN and D1_DATABASE_ID set
+// (src/lib/db/d1.ts).
 //   npx tsx --env-file=.env scripts/migrate-content.ts [--dry-run]
 import { siteDb } from '../src/lib/db/site';
 import type { PuckItem } from '../src/lib/puck/types';
@@ -11,9 +12,8 @@ import { migrateCollectionLayout } from '../src/lib/content/collections';
 const MIGRATIONS: ((items: PuckItem[]) => PuckItem[])[] = [...SITE_MIGRATIONS, migrateCollectionLayout];
 
 const dry = process.argv.includes('--dry-run');
-if (process.env.TARGET_DATABASE_URL) process.env.DATABASE_URL = process.env.TARGET_DATABASE_URL;
 const db = siteDb();
-console.log(`${dry ? 'Dry run on' : 'Migrating'} ${new URL(process.env.DATABASE_URL!).host}`);
+console.log(`${dry ? 'Dry run on' : 'Migrating'} ${process.env.D1_DATABASE_ID && process.env.CLOUDFLARE_API_TOKEN ? `D1 ${process.env.D1_DATABASE_ID}` : 'the local D1'}`);
 
 /** A document with the migrations applied, or null when nothing changed. */
 function migrate(doc: { content?: PuckItem[] } | null | undefined): typeof doc | null {

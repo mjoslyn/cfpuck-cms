@@ -1,8 +1,8 @@
 // The site's connections (server only): as the server, or as a signed-in person's role. They read and
-// write through the query layer (src/lib/db) on a direct database connection and carry the site's files
+// write through the query layer (src/lib/db) on D1 and carry the site's files
 // (src/lib/storage.ts).
 import { Db } from './query';
-import { SqlExecutor } from './sql';
+import { SqliteExecutor } from './sqlite';
 import type { Ctx } from './policies';
 import { siteStorage } from '../storage';
 
@@ -14,7 +14,7 @@ let site: Db | null = null;
  * filters elsewhere. Never reaches the browser.
  */
 export function siteDb(): Db {
-  site ??= new Db(new SqlExecutor({ role: 'service' }), siteStorage);
+  site ??= new Db(new SqliteExecutor({ role: 'service' }), siteStorage);
   return site;
 }
 
@@ -23,5 +23,5 @@ export const serviceClient = siteDb;
 
 /** A signed-in person's connection (admin and preview): reads and writes as the policies allow their role. */
 export function sessionDb(ctx: Ctx): Db {
-  return new Db(new SqlExecutor(ctx), siteStorage);
+  return new Db(new SqliteExecutor(ctx), siteStorage);
 }
