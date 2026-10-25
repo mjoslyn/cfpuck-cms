@@ -44,7 +44,9 @@ or a SQL migration (`db/migrations/`) that edits the JSON.
 - Walk the JSON properly (a content migration in TypeScript). The key order of stored blocks varies,
   so text patterns miss some. The query layer fills `body_text` when content is written, so changes to
   entries' content belong in content migrations.
-- Keep updated dates: set `updated_at` to itself in the update (the `*_touch` triggers then leave it).
+- Keep updated dates: drop the table's `*_touch` trigger before the update and create it again after
+  (as `*_init.sql` has it). It fires whenever a write leaves `updated_at` as it was, setting it to
+  itself included.
 - Name migrations with the time they are written (`YYYYMMDDHHMMSS_name.sql`).
 
 When a site migration switches block types or settings, the site's code and its database change must

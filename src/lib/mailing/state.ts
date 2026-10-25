@@ -7,8 +7,7 @@ import { site as config } from '../site';
 import { sendMail } from '../forms/mail';
 import { HEALTH, mailingSettings, type CampaignStats } from './config';
 import { mailOrigin } from './contacts';
-
-const env = (k: string) => (import.meta.env?.[k] as string | undefined) ?? process.env[k];
+import { env } from '../env';
 
 export interface MailingState {
   paused?: { reason: string; at: string; campaign?: number };

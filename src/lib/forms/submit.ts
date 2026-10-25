@@ -14,8 +14,8 @@ import { Loader, PUBLIC_SCOPE } from '../data';
 import { permalink } from '../permalink';
 import { serviceClient } from '../db/site';
 import { SITE_TZ, site } from '../site';
+import { env } from '../env';
 
-const env = (k: string) => (import.meta.env?.[k] as string | undefined) ?? process.env[k];
 const REQUIRED = 'This field is required.';
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // Limits no real answer reaches: an answer's length, and one form's submissions in a minute (all

@@ -13,6 +13,7 @@ import { remoteDb, syncSecret } from './sync-remote';
 import { allRows } from './rows';
 import { site as config, fieldsFor, taxonomyLabel } from './site';
 import { serviceClient } from './db/site';
+import { env } from './env';
 
 export type Direction = 'push' | 'pull';
 
@@ -41,7 +42,6 @@ export interface SyncPlan {
 
 /** The other copy, from the environment, or null when none is set. */
 export function remoteConfig(): { name: string; url: string; key: string } | null {
-  const env = (k: string) => (import.meta.env?.[k] ?? process.env[k]) as string | undefined;
   const url = env('SYNC_REMOTE_URL');
   const key = syncSecret();
   if (!url || !key) return null;
@@ -56,7 +56,7 @@ export function remoteConfig(): { name: string; url: string; key: string } | nul
 export function endpoints(direction: Direction): { source: Db; target: Db; sourceName: string; targetName: string } {
   const remote = remoteConfig();
   if (!remote) throw new Error('No other copy is set up (SYNC_REMOTE_URL, and SYNC_SECRET of at least 32 characters).');
-  const here = (import.meta.env?.SITE_URL ?? process.env.SITE_URL ?? '').replace(/\/$/, '');
+  const here = (env('SITE_URL') ?? '').replace(/\/$/, '');
   if (remote.url === here) throw new Error('SYNC_REMOTE_URL is this site’s own address.');
   const local = serviceClient();
   const other = remoteDb(remote.url, remote.key);

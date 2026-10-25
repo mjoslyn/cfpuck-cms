@@ -7,8 +7,7 @@
 // either, mail is logged and skipped, and submissions are still stored.
 import { site } from '../site';
 import { bindings } from '../platform';
-
-const env = (k: string) => process.env[k] ?? (import.meta.env?.[k] as string | undefined);
+import { env } from '../env';
 
 interface Smtp {
   host: string;

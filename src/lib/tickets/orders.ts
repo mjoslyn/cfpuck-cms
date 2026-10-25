@@ -20,8 +20,8 @@ import { ticketEmail, type EventView, type OrderView } from './email';
 import type { EmailPayment } from '../forms/email';
 import { formatMoney } from '../payments/money';
 import { defaultTemplate } from '../email-templates';
+import { env } from '../env';
 
-const env = (k: string) => (import.meta.env?.[k] as string | undefined) ?? process.env[k];
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 /** Orders one event takes in a minute (all buyers together), against floods. */
 const MAX_PER_MINUTE = 30;

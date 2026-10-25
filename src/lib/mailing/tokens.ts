@@ -5,8 +5,7 @@
 // that moved off Supabase without one set it to `mail-links:<its old service_role key>`).
 // Server only.
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
-
-const env = (k: string) => (import.meta.env?.[k] as string | undefined) ?? process.env[k];
+import { env } from '../env';
 
 let key: Buffer | null = null;
 function secret(): Buffer {

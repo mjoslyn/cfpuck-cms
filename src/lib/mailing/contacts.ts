@@ -9,8 +9,8 @@ import { CONSENT_TEXT, EMAIL_RE, PREFERENCES_PATH, mailingSettings, nameParts, n
 import { emailHash, sign } from './tokens';
 import { cleanTags } from './segments';
 import { addUnsubscribe, removeUnsubscribe } from './mailgun';
+import { env } from '../env';
 
-const env = (k: string) => (import.meta.env?.[k] as string | undefined) ?? process.env[k];
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
 /** The site's address for links in emails: SITE_URL, else the request's. */

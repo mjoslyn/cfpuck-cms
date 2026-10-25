@@ -12,8 +12,7 @@ import type { Digest } from './config';
 import { mailOrigin } from './contacts';
 import { emailEntries } from './entries';
 import { startSending } from './send';
-
-const env = (k: string) => (import.meta.env?.[k] as string | undefined) ?? process.env[k];
+import { env } from '../env';
 
 /** Wall-clock parts of a moment in the site's time zone. */
 function local(now: Date, tz = SITE_TZ) {

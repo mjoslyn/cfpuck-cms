@@ -5,8 +5,7 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { Db, type CallSpec, type Executor, type QuerySpec, type Result } from './db/query';
 import type { FolderCalls, Files, ListedFile, Res } from './storage';
-
-const env = (k: string) => (import.meta.env?.[k] ?? process.env[k]) as string | undefined;
+import { env } from './env';
 
 /** The tables a sync reads and writes, and the one function it calls. */
 export const SYNC_TABLES = ['entries', 'entry_drafts', 'entry_terms', 'form_submissions', 'forms', 'media', 'redirects', 'settings', 'templates', 'terms'];

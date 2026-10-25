@@ -5,8 +5,7 @@
 // accepts and delivers nothing). Without keys nothing goes to Mailgun: a batch is sent one by one to a
 // local mail catcher (an SMTP host on this machine), else logged. Server only.
 import { createHmac, timingSafeEqual } from 'node:crypto';
-
-const env = (k: string) => (import.meta.env?.[k] as string | undefined) ?? process.env[k];
+import { env } from '../env';
 
 export interface MailgunStatus {
   configured: boolean;

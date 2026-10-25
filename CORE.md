@@ -977,7 +977,9 @@ deploys (`wrangler deploy`).
   `CF_VERSION_METADATA` (the page cache's validators). The Cron Triggers: mailing every 5 minutes and at
   06:20 UTC, snapshots at 07:00 UTC, ticket emails hourly (`SCHEDULES`).
 - Variables and secrets reach the code as `process.env` (`nodejs_compat`); secrets are set with
-  `npx wrangler secret put`. Mail goes through the `EMAIL` binding (Email Service) when there is one, else
+  `npx wrangler secret put`. Code reads them with `env()` (`src/lib/env.ts`), which reads `.env` through
+  `import.meta.env` under `astro dev` only: a build would write the build machine's `.env` values into
+  the bundle, in place of the Worker's. Mail goes through the `EMAIL` binding (Email Service) when there is one, else
   over SMTP through the Worker's sockets (`worker-mailer`; port 25 is closed to Workers, and so are
   Cloudflare's own addresses, Email Service's SMTP endpoint among them). Link fetching for Compose resolves names over DNS-over-HTTPS (`addressesOf`).
   The visitor's address and country come from `CF-Connecting-IP` and `CF-IPCountry`.
@@ -1044,7 +1046,9 @@ a content migration or a SQL migration (`db/migrations/`) that edits the JSON. C
 - Walk the JSON properly (a content migration in TypeScript; SQLite's `json_tree` for small changes):
   the key order of stored blocks varies, so text patterns miss some. A SQL migration that changes an
   entry's `content` must leave `body_text` to a content migration (the layer fills it).
-- Keep updated dates: set `updated_at` to itself in the update (the `*_touch` triggers then leave it).
+- Keep updated dates: drop the table's `*_touch` trigger before the update and create it again after
+  (as `*_init.sql` has it). It fires whenever a write leaves `updated_at` as it was, setting it to
+  itself included.
 - Name migrations with the time they are written (`YYYYMMDDHHMMSS_name.sql`; a site's
   `YYYYMMDDHHMMSS_site_name.sql`).
 - When a migration switches block types or settings, the new code and the database change must land

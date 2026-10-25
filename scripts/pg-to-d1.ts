@@ -64,6 +64,8 @@ const CHUNK = 40_000;
 const lit = (v: unknown): string => (v === null ? 'NULL' : typeof v === 'number' ? String(v) : `'${String(v).replace(/'/g, "''")}'`);
 
 const statements: string[] = [];
+// Long values are appended by UPDATE, which the *_touch triggers answer with a new updated_at: put it back.
+const restore: string[] = [];
 const counts: Record<string, number> = {};
 for (const table of ordered()) {
   const schema = SCHEMA[table];
@@ -93,10 +95,12 @@ for (const table of ordered()) {
       if (!schema.pk.length) throw new Error(`${table}: a long value in a table without a key`);
       const where = schema.pk.map((k) => `"${k}" = ${lit(convert(schema.columns[k], row[k]))}`).join(' AND ');
       for (const [col, rest] of long) for (let i = 0; i < rest.length; i += CHUNK) statements.push(`UPDATE "${table}" SET "${col}" = "${col}" || ${lit(rest.slice(i, i + CHUNK))} WHERE ${where};`);
+      if (cols.includes('updated_at')) restore.push(`UPDATE "${table}" SET "updated_at" = ${lit(convert(schema.columns.updated_at, row.updated_at))} WHERE ${where};`);
     }
   }
 }
 await client.end();
+statements.push(...restore);
 
 if (outFile) {
   // Foreign keys are checked when the file's work is done, so rows can come in any order.

@@ -12,8 +12,8 @@ import { site } from '../../../lib/site';
 import { mailingSettings, CONSENT_TEXT } from '../../../lib/mailing/config';
 import { signUp } from '../../../lib/mailing/contacts';
 import { clientIp } from '../../../lib/mailing/request';
+import { env } from '../../../lib/env';
 
-const env = (k: string) => (import.meta.env?.[k] as string | undefined) ?? process.env[k];
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
 export const POST: APIRoute = async ({ request, redirect, url }) => {

@@ -1,9 +1,10 @@
 // The Anthropic client Compose and the quick suggestions (SEO, excerpt) share: the site's key, straight
 // to Anthropic's API.
 import Anthropic from '@anthropic-ai/sdk';
+import { env as readEnv } from '../env';
 
-/** Server env: the Worker's variables and secrets (process.env), else Astro's .env (import.meta.env). */
-export const env = (k: string) => (process.env[k] || (import.meta.env?.[k] as string | undefined) || '').trim();
+/** A setting from the environment (../env), trimmed, '' when unset. */
+export const env = (k: string) => (readEnv(k) || '').trim();
 
 /** The message when no key is set. */
 export const NO_KEY = 'ANTHROPIC_API_KEY is not set on the server.';

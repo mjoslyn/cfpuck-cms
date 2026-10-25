@@ -9,6 +9,7 @@
 import { AwsClient } from 'aws4fetch';
 import { bindings, type R2BucketLike } from './platform';
 import { localBindings } from './local-bindings';
+import { env } from './env';
 
 export interface StorageConfig {
   endpoint: string;
@@ -29,8 +30,6 @@ export interface ListedFile {
   updated_at: string | null;
   metadata: { size: number; mimetype?: string } | null;
 }
-
-const env = (k: string) => (import.meta.env?.[k] as string | undefined) ?? process.env[k];
 
 /** This site's store, from the environment. */
 export function storageConfig(prefix = 'STORAGE'): StorageConfig | null {

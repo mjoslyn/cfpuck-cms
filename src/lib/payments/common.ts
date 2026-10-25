@@ -1,5 +1,7 @@
 // Shared by the payment providers (./index.ts).
-export const env = (k: string) => ((import.meta.env?.[k] as string | undefined) ?? process.env[k])?.trim() || undefined;
+import { env as readEnv } from '../env';
+
+export const env = (k: string) => readEnv(k)?.trim() || undefined;
 
 /** A provider refused or failed a request; its message is fit to show an editor. */
 export class ProviderError extends Error {}

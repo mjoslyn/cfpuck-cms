@@ -10,6 +10,7 @@ import { site } from '../site';
 import { accountUrl } from '../members/account';
 import { createUser, updateUser, userById, awaitingPassword, type AuthUser } from '../auth';
 import { sendLink } from '../auth/mail';
+import { env } from '../env';
 
 export { awaitingPassword };
 
@@ -21,7 +22,6 @@ export type InviteTo = 'admin' | 'member';
 export const passwordPage = (to: InviteTo, token?: string) =>
   to === 'admin' ? `/admin/set-password/${token ? `?token=${token}` : ''}` : accountUrl({ view: 'password', ...(token ? { token } : {}) });
 
-const env = (k: string) => (import.meta.env?.[k] as string | undefined) ?? process.env[k];
 const key = () => createHash('sha256').update(`invites:${env('AUTH_SECRET') ?? ''}`).digest();
 const sig = (to: string, id: string, exp: string, nonce: string) => createHmac('sha256', key()).update(`${to}:${id}:${exp}:${nonce}`).digest('base64url').slice(0, 32);
 

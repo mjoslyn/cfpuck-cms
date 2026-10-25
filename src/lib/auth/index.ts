@@ -11,8 +11,7 @@ import bcrypt from 'bcryptjs';
 import { randomBytes } from 'node:crypto';
 import { lazyD1 } from '../db/d1';
 import { siteDb } from '../db/site';
-
-const env = (k: string) => (import.meta.env?.[k] as string | undefined) ?? process.env[k];
+import { env } from '../env';
 
 /** The signed-in person, as the site reads them. */
 export interface AuthUser {
