@@ -55,7 +55,7 @@ A sync adds and overwrites; it never deletes.
 :::caution[Images aren't backed up]
 Backups and snapshots hold the site's content as database rows. Stored images, the files of the media
 library, are not backed up: a restore brings back a file's library row, not its image. Keep a copy of
-the storage bucket some other way if you need one.
+the store's `media/` folder (the R2 bucket) some other way if you need one.
 :::
 
 What protects images instead: the CMS never deletes or overwrites a stored image. The media library has

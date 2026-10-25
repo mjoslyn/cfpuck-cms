@@ -3,7 +3,7 @@
 //   npx tsx --env-file=.env scripts/media-e2e.ts
 import { chromium } from 'playwright';
 import sharp from 'sharp';
-import { siteDb } from '../src/lib/supabase';
+import { siteDb } from '../src/lib/db/site';
 
 const origin = process.env.ASTRO_ORIGIN ?? 'http://localhost:4321';
 const sb = siteDb();

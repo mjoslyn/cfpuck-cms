@@ -1,6 +1,6 @@
 // Form selector for the Form block: lists the forms built in /admin/forms/.
 import { useEffect, useState } from 'react';
-import { browserClient } from '../lib/supabase-browser';
+import { browserClient } from '../lib/db/browser';
 import { Row, inputClass } from './fields';
 
 export function FormPicker({ value, onChange }: { value: number | undefined; onChange: (id: number | undefined) => void }) {

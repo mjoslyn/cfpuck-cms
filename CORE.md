@@ -237,7 +237,8 @@ between this site and another copy of it (production and a local copy), either w
 types (with their terms and unpublished changes), terms of chosen taxonomies, files (media rows and
 every storage object: sizes, the kept original, AVIF/WebP copies), templates, parts and patterns,
 forms, settings (`site`, `options`; the site icon's files too) and redirects. The other copy is reached
-directly with `SYNC_REMOTE_URL`, `SYNC_REMOTE_SERVICE_KEY` and `SYNC_REMOTE_NAME`, so a sync runs from
+directly with `SYNC_REMOTE_URL`, `SYNC_REMOTE_SERVICE_KEY` and `SYNC_REMOTE_NAME`, and its files in its
+store with `SYNC_REMOTE_STORAGE_*` (as `STORAGE_*`; without them, its Supabase Storage), so a sync runs from
 the copy that has them set (production can't reach a local copy).
 
 - Rows match by id (entries, terms, media, forms: the copies share ids, and a sync keeps them; then
@@ -253,13 +254,13 @@ the copy that has them set (production can't reach a local copy).
 - Before the first batch, `backup` checks the target can take the sync (not protected, and
   `sync_reset_ids()` there: a copy without the migrations is refused before anything is written) and,
   unless **Save a backup first** (on by default) is unticked, saves a backup in the target's private
-  `sync-backups` bucket: the rows the sync overwrites, whole and as they are, and the keys of the rows
+  `sync-backups/` folder of its store: the rows the sync overwrites, whole and as they are, and the keys of the rows
   it adds. If that fails, nothing is synced. A key the sync means to add that now exists on the target
   (a row made there since Compare) stops it: compare again. Each batch then records the rows it really
   added beside the backup (`written/<backup name>`).
 - **Snapshots**: everything a sync covers on one copy (entries with their terms and unpublished
   changes, terms, media rows, templates, forms, settings `site` and `options`, redirects), in the same
-  bucket as `<time>-snapshot-<trigger>.json`. Taken by **Back up now** (`snapshotNow`), before a
+  folder as `<time>-snapshot-<trigger>.json`. Taken by **Back up now** (`snapshotNow`), before a
   snapshot restore, and on a schedule: `netlify/functions/scheduled-snapshot.mts` runs daily at 07:00
   UTC on the deployed site (not under `astro dev`) and calls `scheduledSnapshot`, which takes one if
   they are on and the last is due (daily or weekly).
@@ -281,7 +282,7 @@ the copy that has them set (production can't reach a local copy).
   terms and unpublished changes in bulk. Deleting a file deletes its media row only: its stored images
   stay. A form with submissions is never deleted (they would be cut loose from it); the report names
   it. A restore runs as a job, since it outlasts a request and must not be cut off halfway:
-  `restoreBackup` queues it (`queueRestore`, a file under `jobs/` in the bucket) and the background
+  `restoreBackup` queues it (`queueRestore`, a file under `jobs/` in that folder) and the background
   function `netlify/functions/restore-background.mts` runs it once (`runRestore`; under `astro dev` the
   request does) and clears the page cache; the screen polls `GET /api/admin/sync?restoreJob=<id>`.
 - Mailing's contacts, campaigns, sends and clicks aren't synced or backed up, and a restore leaves
@@ -335,7 +336,7 @@ fills its fields (those with a `compose` hint in the site config) from the mater
 `fields` (`src/lib/compose/entry-fields.ts`) when the entry is created, and later with `update_fields`
 (just the changed fields). The editor applies updates to its sidebar form (`LivePage.setFields`),
 saved with the page. `src/lib/compose/`: `materials.ts` keeps a registry with stable ids (image-1,
-doc-1...; PDFs in the private `compose` bucket, link text fetched once with private addresses refused (`private-address.ts`, a subnet list that also
+doc-1...; PDFs in the store's `compose/` folder, link text fetched once with private addresses refused (`private-address.ts`, a subnet list that also
 reads IPv4 addresses written as IPv6; `scripts/checks/private-address.ts`),
 images re-encoded to JPEG for Claude); `claude.ts` sends the whole conversation (prompt-cached for an hour: the system prompt and the conversation up to the latest message; the page's current sections and fields follow the cache breakpoint) and
 Claude either replies or calls `build_page` with the complete page plan (`spec.ts`); `build.ts` turns
@@ -387,11 +388,20 @@ Text materials count toward the budget of what is sent in full (`MATERIAL_BUDGET
 
 ## Media
 
+Files are kept in the site's store (`src/lib/storage.ts`): one private bucket on an S3-compatible
+service, Cloudflare R2 in production (`STORAGE_ENDPOINT`, `STORAGE_BUCKET`, `STORAGE_ACCESS_KEY_ID`,
+`STORAGE_SECRET_ACCESS_KEY`; locally the Supabase stack's S3 endpoint and its `site` bucket), with the
+folders `media/`, `compose/` and `sync-backups/`; a Db carries it as `storage`, answering the calls the
+code made of Supabase Storage. The site serves the media folder at `/media/<path>`
+(`src/pages/media/[...path].ts`: ranges for video, cached a year at the CDN), refusing paths that try to
+leave it (`unsafeMediaPath`). `scripts/copy-storage.ts` copies a site's Supabase Storage buckets into
+the store's folders (resumable).
+
 Uploads (`/api/admin/media`) are processed by `src/lib/media/process.ts` (sharp): images over 2560px get
 a `-scaled` copy as the full size, the standard sizes are generated (hard crops centred on the focal
 point), and every file gets AVIF and WebP copies next to it. An SVG is stored as uploaded. It can carry script and
 `/media/` is the site's own address, so every `/media/` answer carries `Content-Security-Policy:
-sandbox` and `X-Content-Type-Options: nosniff` (`MEDIA_HEADERS`; the edge function in production): a
+sandbox` and `X-Content-Type-Options: nosniff` (`MEDIA_HEADERS`): a
 file opened on its own can't run script, and images in pages are unaffected. `media.focal_point` ({x, y} in 0..1) is set
 in the media library, with optional overrides per crop shape (`media.crop_focals`: square, 16:9, 4:3,
 3:4; `src/lib/media/focal.ts`). Changes re-crop the cropped sizes; the point for the nearest shape
@@ -923,8 +933,7 @@ Netlify, with a hosted Supabase project (`npx supabase link`). Migrations: `npx 
 `DATABASE_URL`: on Netlify, the project's transaction pooler (Connect > Transaction pooler, port 6543),
 since each function instance opens its own connections (`DATABASE_POOL_MAX`, default 5). Hosted
 projects don't grant the API roles access to new tables (the local stack does): migration 0019 grants
-them and sets default privileges, and RLS does the rest for the database API (see Database access). `scripts/copy-storage.ts` copies storage objects from the local stack to a hosted
-project (resumable). Accounts need `AUTH_SECRET` (a long random value; changing it signs everyone out
+them and sets default privileges, and RLS does the rest for the database API (see Database access). Files need an R2 bucket and an API token for it (Media). Accounts need `AUTH_SECRET` (a long random value; changing it signs everyone out
 and breaks links already sent) and links in emails use the request's address (`SITE_URL` for Better
 Auth's own). Env: `.env.example`.
 

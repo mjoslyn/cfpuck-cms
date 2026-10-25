@@ -4,7 +4,7 @@
 // (a second `supabase start` on other ports).
 //   npx tsx --env-file=.env scripts/sync-e2e.ts
 import { createClient } from '@supabase/supabase-js';
-import { siteDb } from '../src/lib/supabase';
+import { siteDb } from '../src/lib/db/site';
 const base = process.env.ASTRO_ORIGIN ?? 'http://localhost:4321';
 if (!/^https?:\/\/(127\.0\.0\.1|localhost)[:/]/.test(process.env.SYNC_REMOTE_URL ?? '')) throw new Error('SYNC_REMOTE_URL must be a local stack: this test writes to it.');
 const remote = createClient(process.env.SYNC_REMOTE_URL!, process.env.SYNC_REMOTE_SERVICE_KEY!);

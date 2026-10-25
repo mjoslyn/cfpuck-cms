@@ -12,7 +12,7 @@ import { PROVIDERS, pickProvider, type PaymentEvent, type PaymentProvider } from
 import { env, sameString } from '../payments/common';
 import { confirmationResult, mergeTags, notify } from './submit';
 import { site } from '../site';
-import { serviceClient } from '../supabase';
+import { serviceClient } from '../db/site';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 /** The query parameter a visitor comes back from checkout with. */

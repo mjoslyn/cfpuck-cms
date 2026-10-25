@@ -6,7 +6,7 @@ import { Row, Select, Text, Toggle, inputClass, type Attrs } from './fields';
 import { EntriesField } from './entry-fields';
 import { useEventsOn } from './member-settings';
 import { Group, Space, StyleControls } from './panels';
-import { browserClient } from '../lib/supabase-browser';
+import { browserClient } from '../lib/db/browser';
 import { CARD_PRESETS } from '../lib/content/card-presets';
 import { LISTABLE_TYPES, taxonomiesOf, taxonomyLabel, typeDef } from '../lib/site';
 

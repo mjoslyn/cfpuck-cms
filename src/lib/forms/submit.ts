@@ -12,7 +12,7 @@ import { emailPayment, paymentTable, renderEmail, type EmailEvent } from './emai
 import { emailEvents } from '../events/email';
 import { Loader, PUBLIC_SCOPE } from '../data';
 import { permalink } from '../permalink';
-import { serviceClient } from '../supabase';
+import { serviceClient } from '../db/site';
 import { SITE_TZ, site } from '../site';
 
 const env = (k: string) => (import.meta.env?.[k] as string | undefined) ?? process.env[k];

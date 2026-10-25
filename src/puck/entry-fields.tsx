@@ -1,7 +1,7 @@
 // Sidebar form for an entry's own data: core columns plus the fields of each content type.
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { Code, MediaPicker, Num, Row, Select, Text, Toggle, inputClass, FieldGroup } from './fields';
-import { browserClient } from '../lib/supabase-browser';
+import { browserClient } from '../lib/db/browser';
 import { mediaUrl } from '../lib/media/image';
 import { RECURRENCE_KEY, occurrenceDates, type Recurrence } from '../lib/recurrence';
 import { fieldsFor as siteFields, PAGELESS_TYPES, SITE_TZ, type FieldDef, taxonomiesOf, taxonomyLabel } from '../lib/site';

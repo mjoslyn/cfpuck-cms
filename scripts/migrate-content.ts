@@ -2,7 +2,7 @@
 // with the site's migrations (src/site/migrations). Idempotent; --dry-run only counts. Runs against the
 // database in .env (DATABASE_URL), or another with TARGET_DATABASE_URL.
 //   npx tsx --env-file=.env scripts/migrate-content.ts [--dry-run]
-import { siteDb } from '../src/lib/supabase';
+import { siteDb } from '../src/lib/db/site';
 import type { PuckItem } from '../src/lib/puck/types';
 import { MIGRATIONS as SITE_MIGRATIONS } from '../src/site/migrations';
 import { migrateCollectionLayout } from '../src/lib/content/collections';

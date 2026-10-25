@@ -3,7 +3,7 @@
 // session cookie, so most requests never look a session up (src/lib/auth). The profile and membership
 // are read as the server.
 import type { AstroCookies } from 'astro';
-import { siteDb } from '../supabase';
+import { siteDb } from '../db/site';
 import { hasSession, sessionUser } from '../auth';
 import type { MemberRow, Viewer } from './config';
 

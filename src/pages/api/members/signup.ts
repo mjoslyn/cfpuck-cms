@@ -3,7 +3,7 @@
 // confirmed by email first (AUTH_CONFIRM_EMAIL, on by default: the link signs them in on the account
 // page); otherwise they are signed in at once. The site's admin address is told of each sign-up.
 import type { APIRoute } from 'astro';
-import { serviceClient, siteDb } from '../../../lib/supabase';
+import { serviceClient, siteDb } from '../../../lib/db/site';
 import { confirmEmail, createUser, redirectWith, signIn, userByEmail } from '../../../lib/auth';
 import { EMAIL, accountUrl, loadMemberSettings, safeNext } from '../../../lib/members/account';
 import { sendConfirmation } from '../../../lib/members/confirm';

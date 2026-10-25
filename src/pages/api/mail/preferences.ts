@@ -2,7 +2,7 @@
 // for (t), or the signed-in visitor (their account page). A visitor without a subscription who ticks
 // lists signs up, confirmed by email like anyone.
 import type { APIRoute } from 'astro';
-import { serviceClient } from '../../../lib/supabase';
+import { serviceClient } from '../../../lib/db/site';
 import { PREFERENCES_PATH } from '../../../lib/mailing/config';
 import { contactByEmail, loadLists, loadMailing, setLists, signUp } from '../../../lib/mailing/contacts';
 import { verify } from '../../../lib/mailing/tokens';

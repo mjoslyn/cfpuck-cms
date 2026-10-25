@@ -5,7 +5,7 @@
 // list, source: who agreed and how); members (list, levels[], vouch: active members join a list).
 // GET ?export=csv: every contact as CSV.
 import type { APIRoute } from 'astro';
-import { serviceClient } from '../../../../lib/supabase';
+import { serviceClient } from '../../../../lib/db/site';
 import { contactsCsv, erase, importContacts, loadMailing, parseCsv, resendConfirmation, unsubscribe } from '../../../../lib/mailing/contacts';
 import type { Contact } from '../../../../lib/mailing/config';
 import { EMAIL_RE, fieldValue, normalEmail, type ContactField } from '../../../../lib/mailing/config';

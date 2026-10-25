@@ -48,6 +48,8 @@ The Supabase CLI runs through `npx`, so you don't need to install it.
    | --- | --- |
    | `PUBLIC_SUPABASE_URL` | API URL (`http://127.0.0.1:56521`) |
    | `PUBLIC_SUPABASE_ANON_KEY` | anon key |
+   | `STORAGE_ACCESS_KEY_ID`, `STORAGE_SECRET_ACCESS_KEY` | S3 access key and secret (files, in the stack's `site` bucket) |
+   | `AUTH_SECRET` | any long random value (`openssl rand -hex 32`) |
    | `SUPABASE_SERVICE_ROLE_KEY` | service_role key |
    | `DATABASE_URL` | DB URL (`postgresql://postgres:postgres@127.0.0.1:56522/postgres`) |
 

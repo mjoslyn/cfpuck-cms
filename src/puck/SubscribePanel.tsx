@@ -3,7 +3,7 @@
 // asks for (Settings > Mailing Lists), and its layout.
 import { useEffect, useState } from 'react';
 import { Segmented, Select, Text, Toggle, type Attrs } from './fields';
-import { browserClient } from '../lib/supabase-browser';
+import { browserClient } from '../lib/db/browser';
 import { useMailingOn, useSite } from './member-settings';
 import { FormStylePanel } from './FormStyle';
 import { mailingSettings, type MailList } from '../lib/mailing/config';

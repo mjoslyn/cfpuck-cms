@@ -5,7 +5,7 @@
 // resend (id): an invitation not yet taken up, sent again;
 // remove (id): the membership, and the account too unless it edits the site.
 import type { APIRoute } from 'astro';
-import { serviceClient } from '../../../lib/supabase';
+import { serviceClient } from '../../../lib/db/site';
 import { EMAIL } from '../../../lib/members/account';
 import { memberSettings } from '../../../lib/members/config';
 import { invite, passwordPage, resendInvite } from '../../../lib/admin/invite';

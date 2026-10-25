@@ -2,7 +2,7 @@
 // the email from, with the kind of email each is the default for; saving the email as a new template or
 // over one; deleting. Read and written with the editor's own session (editors only, by RLS).
 import { useEffect, useState } from 'react';
-import { browserClient } from '../lib/supabase-browser';
+import { browserClient } from '../lib/db/browser';
 import { TEMPLATE_DEFAULTS, type EmailTemplate, type TemplateKit } from '../lib/email-templates';
 import type { EmailDoc } from '../lib/forms/email';
 

@@ -1,7 +1,7 @@
 // The waitlist form of a sold-out event (src/render/c/tickets.ts; src/lib/tickets/orders.ts joinWaitlist).
 import type { APIRoute } from 'astro';
 import { eventsOnIn } from '../../../lib/events/on';
-import { siteDb } from '../../../lib/supabase';
+import { siteDb } from '../../../lib/db/site';
 import { joinWaitlist } from '../../../lib/tickets/orders';
 
 const FORM = /multipart\/form-data|application\/x-www-form-urlencoded/i;

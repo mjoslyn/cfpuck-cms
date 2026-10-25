@@ -2,7 +2,7 @@
 // in an iframe with the site stylesheet: click a field to edit it, drag fields to reorder, drag or
 // click palette items to add. Fields, settings, confirmation, payment and notifications save together.
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { browserClient } from '../lib/supabase-browser';
+import { browserClient } from '../lib/db/browser';
 import { defaultTemplate } from '../lib/email-templates';
 import { renderForm } from '../render/forms/form';
 import { INPUT_TYPES, NAME_LABELS, NAME_PARTS, logicOf } from '../lib/forms/logic';

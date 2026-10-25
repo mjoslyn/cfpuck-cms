@@ -1,7 +1,7 @@
 ---
 import Admin from '../../../layouts/Admin.astro';
 import { SITE_TZ } from '../../../lib/site';
-import { serviceClient } from '../../../lib/supabase';
+import { serviceClient } from '../../../lib/db/site';
 import { awaitingPassword, listUsers } from '../../../lib/auth';
 
 // Accounts (src/lib/auth; this page is admins only) with their roles from profiles.

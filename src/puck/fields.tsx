@@ -2,7 +2,7 @@
 // Advanced tab edits the raw JSON so no attribute is out of reach.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { PRESETS as themeJson } from '../lib/site';
-import { browserClient } from '../lib/supabase-browser';
+import { browserClient } from '../lib/db/browser';
 import { mediaUrl } from '../lib/media/image';
 import type { Media } from '../lib/types';
 

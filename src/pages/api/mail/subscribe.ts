@@ -2,7 +2,7 @@
 // (src/lib/mailing/contacts.ts signUp). Back to the page the form is on, with the outcome. The answer is
 // the same whether the address was known or not.
 import type { APIRoute } from 'astro';
-import { serviceClient } from '../../../lib/supabase';
+import { serviceClient } from '../../../lib/db/site';
 import { SUBSCRIBE_PATH, fieldValue } from '../../../lib/mailing/config';
 import { loadLists, loadMailing, signUp } from '../../../lib/mailing/contacts';
 import { safeNext } from '../../../lib/members/account';

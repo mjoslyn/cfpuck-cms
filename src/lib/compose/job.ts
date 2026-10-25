@@ -4,7 +4,7 @@
 // in-process. The runner writes progress to the job row and the panel polls it.
 import type { Db } from '../db/query';
 import { refreshSiteTimezone } from '../site/timezone';
-import { serviceClient } from '../supabase';
+import { serviceClient } from '../db/site';
 import { MediaStore } from '../media/process';
 import { permalink } from '../permalink';
 import { renderedTitle } from '../admin/save';

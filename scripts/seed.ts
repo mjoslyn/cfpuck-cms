@@ -4,7 +4,7 @@
 // Anything that already exists is left alone, so it is safe to run again (after turning Events on, it
 // adds the event templates and the sample event) and on a hosted project.
 //   npx tsx --env-file=.env scripts/seed.ts
-import { siteDb } from '../src/lib/supabase';
+import { siteDb } from '../src/lib/db/site';
 import { buildPage } from '../src/lib/compose/build';
 import { site } from '../src/lib/site';
 import type { PuckItem } from '../src/lib/puck/types';

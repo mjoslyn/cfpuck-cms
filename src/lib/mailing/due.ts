@@ -4,7 +4,7 @@
 // their time (cancelled), and digests due this week. Nightly: Mailgun's bounces, complaints and
 // unsubscribes for the domain reconciled with the contacts, and old events, clicks, tokens and
 // unconfirmed sign-ups pruned. Server only.
-import { serviceClient } from '../supabase';
+import { serviceClient } from '../db/site';
 import { refreshSiteTimezone } from '../site/timezone';
 import { mailingOn, type Digest } from './config';
 import { mailOrigin } from './contacts';

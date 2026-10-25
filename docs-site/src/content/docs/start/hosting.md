@@ -5,9 +5,18 @@ sidebar:
   order: 2
 ---
 
-A site runs on Netlify (Astro SSR) with a hosted Supabase project for the database, auth and storage.
+A site runs on Netlify (Astro SSR) with a hosted Supabase project for the database and a Cloudflare R2
+bucket for its files. Accounts are the site's own, in its database.
 
-## 1. Supabase
+## 1. R2
+
+Create a private bucket for the site (**R2 > Create bucket**) and an API token with Object Read & Write
+on it (**R2 > Manage API tokens**). Set `STORAGE_ENDPOINT` to
+`https://<account-id>.r2.cloudflarestorage.com`, `STORAGE_BUCKET` to the bucket's name,
+`STORAGE_REGION` to `auto`, and `STORAGE_ACCESS_KEY_ID` / `STORAGE_SECRET_ACCESS_KEY` to the token's
+access key and secret. The site serves the media library from it at `/media/`.
+
+## 2. Supabase
 
 Create a project at supabase.com, then link it and apply the migrations:
 
@@ -35,7 +44,7 @@ admin screens' queries go through the site, which checks each person's role. Kee
 variables reach it).
 :::
 
-## 2. Seed and create an admin
+## 3. Seed and create an admin
 
 Point a copy of `.env` at the hosted project (its URL, anon key and service_role key, from
 **Project Settings > API**, and `DATABASE_URL`, its transaction pooler's connection string from
@@ -46,9 +55,10 @@ npx tsx --env-file=.env.production scripts/seed.ts
 npx tsx --env-file=.env.production scripts/create-editor.ts you@example.org 'a-password' admin
 ```
 
-To move local media to the hosted storage bucket, use `scripts/copy-storage.ts` (resumable).
+A site moving from Supabase Storage copies its files into the bucket with `scripts/copy-storage.ts`
+(resumable).
 
-## 3. Netlify
+## 4. Netlify
 
 - Create a site from your repository. The build settings are in `netlify.toml`.
 - Set the same environment variables as `.env`: the Supabase URL and keys, plus the optional Compose,
@@ -105,7 +115,7 @@ To send [Mailing](../../features/mailing/) campaigns and digests, set up Mailgun
 A shared IP is enough to start; a dedicated one is worth it only past roughly 50,000 emails a month,
 with a warmup plan.
 
-## 4. Invite editors
+## 5. Invite editors
 
 Admins invite editors from `/admin/users/`. See [Editor and roles](../../features/editor/).
 
@@ -114,7 +124,8 @@ Admins invite editors from `/admin/users/`. See [Editor and roles](../../feature
 | Variable | Purpose |
 | --- | --- |
 | `PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_ANON_KEY` | The Supabase project |
-| `SUPABASE_SERVICE_ROLE_KEY` | Server-side access to Supabase Storage |
+| `SUPABASE_SERVICE_ROLE_KEY` | Sync with another copy over its database API |
+| `STORAGE_ENDPOINT`, `STORAGE_BUCKET`, `STORAGE_REGION`, `STORAGE_ACCESS_KEY_ID`, `STORAGE_SECRET_ACCESS_KEY` | The site's files (R2) |
 | `AUTH_SECRET` | Signs sessions and the site's links: a long random value (`openssl rand -hex 32`) |
 | `AUTH_CONFIRM_EMAIL` | `false` lets member sign-ups in without confirming their address |
 | `DATABASE_URL` | The database, through the project's transaction pooler (port 6543) |

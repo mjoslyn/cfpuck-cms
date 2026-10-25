@@ -52,8 +52,7 @@ const sitePublic = {
 export default defineConfig({
   output: 'server',
   // No edge-function emulation under astro dev: its Deno runtime ran out of memory on the editor's
-  // image requests and took the dev server down. The one edge function (media-guard) only guards
-  // Netlify's /media/ rewrite; locally /media/ is the app's route with the same check (path-guard.ts).
+  // image requests and took the dev server down (the site has no edge functions now).
   adapter: netlify({ devFeatures: { images: true, environmentVariables: false, edgeFunctions: false } }),
   integrations: [react(), siteRoutes, sitePublic],
   // Netlify's CDN caches the pages (durable, cache tags) and purges them after edits (src/lib/cache.ts).

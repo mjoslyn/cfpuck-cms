@@ -1,7 +1,7 @@
 // Admin routes require a session (src/lib/auth) whose profile role is editor or admin. Site settings and
 // users are for admins only. locals.db reads and writes as that role (src/lib/db/policies.ts).
 import { defineMiddleware } from 'astro:middleware';
-import { sessionDb, siteDb } from './lib/supabase';
+import { sessionDb, siteDb } from './lib/db/site';
 import { sessionUser } from './lib/auth';
 import { refreshSiteTimezone } from './lib/site/timezone';
 import { changesPages, PAGE_CACHE_TAG } from './lib/cache';

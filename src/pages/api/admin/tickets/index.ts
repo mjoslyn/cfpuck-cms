@@ -10,7 +10,7 @@
 //                            (an empty one, not off, goes back to the site's)
 // Freed tickets go to the waitlist at once when the event emails it on its own.
 import type { APIRoute } from 'astro';
-import { serviceClient } from '../../../../lib/supabase';
+import { serviceClient } from '../../../../lib/db/site';
 import { EMAIL_KINDS, ticketEmailFrom } from '../../../../lib/tickets/config';
 import { cancelOrder, loadEvent, notifyWaitlist, refundOrder, resendConfirmation, siteOrigin, waitlistAfterRelease } from '../../../../lib/tickets/orders';
 

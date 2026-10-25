@@ -5,7 +5,7 @@
 // mail catcher (LOCAL_MAIL_URL). Removes what it makes.
 //   npx tsx --env-file=.env scripts/auth-e2e.ts
 import bcrypt from 'bcryptjs';
-import { siteDb } from '../src/lib/supabase';
+import { siteDb } from '../src/lib/db/site';
 import { confirmToken, createUser, deleteUser, userByEmail } from '../src/lib/auth';
 
 const base = process.env.ASTRO_ORIGIN ?? 'http://localhost:4321';

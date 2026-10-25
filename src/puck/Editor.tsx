@@ -7,7 +7,7 @@ import { isComposed } from '../lib/compose/outline';
 import { findBlock, replaceBlock } from '../lib/puck/tree';
 import '@puckeditor/core/no-external.css'; // without its Inter webfont: the admin uses the system font
 import { SITE_TZ, taxonomiesOf } from '../lib/site';
-import { browserClient } from '../lib/supabase-browser';
+import { browserClient } from '../lib/db/browser';
 import { Loader } from '../lib/data';
 import { permalink } from '../lib/permalink';
 import { mediaUrl } from '../lib/media/image';

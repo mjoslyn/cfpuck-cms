@@ -8,7 +8,7 @@ import { ACCOUNT_PATH, type Viewer } from '../lib/members/config';
 import { eventsOnIn } from '../lib/events/on';
 import { handleFormPost } from '../lib/forms/submit';
 import { RETURN_PARAM, paymentReturn } from '../lib/forms/checkout';
-import { serviceClient, siteDb } from '../lib/supabase';
+import { serviceClient, siteDb } from '../lib/db/site';
 import { eventsFeed, eventFile } from '../lib/events/ical';
 import { SITE_RENDER } from '../lib/site/render';
 import { Loader, PUBLIC_SCOPE } from '../lib/data';

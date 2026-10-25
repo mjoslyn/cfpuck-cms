@@ -10,9 +10,10 @@
 // `plan` compares and lists what would change; `apply` writes one batch of it, checking again.
 import { createClient } from '@supabase/supabase-js';
 import type { Db } from './db/query';
+import { Storage, storageConfig } from './storage';
 import { allRows } from './rows';
 import { site as config, fieldsFor, taxonomyLabel } from './site';
-import { serviceClient } from './supabase';
+import { serviceClient } from './db/site';
 
 export type Direction = 'push' | 'pull';
 
@@ -59,8 +60,12 @@ export function endpoints(direction: Direction): { source: Db; target: Db; sourc
   const here = (import.meta.env?.PUBLIC_SUPABASE_URL ?? process.env.PUBLIC_SUPABASE_URL ?? '').replace(/\/$/, '');
   if (remote.url === here) throw new Error('SYNC_REMOTE_URL is this site’s own database.');
   const local = serviceClient();
-  // The other copy is reached over its database API, which answers the same calls as the query layer.
-  const other = createClient(remote.url, remote.key, { auth: { persistSession: false } }) as unknown as Db;
+  // The other copy is reached over its database API, which answers the same calls as the query layer,
+  // and its files in its own store (SYNC_REMOTE_STORAGE_*), else its Supabase Storage (a copy that
+  // hasn't moved its files yet).
+  const rest = createClient(remote.url, remote.key, { auth: { persistSession: false } });
+  const store = storageConfig('SYNC_REMOTE_STORAGE');
+  const other = { from: (t: string) => rest.from(t), rpc: (f: string, a?: object) => rest.rpc(f, a), storage: store ? new Storage(store) : rest.storage } as unknown as Db;
   return direction === 'push'
     ? { source: local, target: other, sourceName: 'this site', targetName: remote.name }
     : { source: other, target: local, sourceName: remote.name, targetName: 'this site' };

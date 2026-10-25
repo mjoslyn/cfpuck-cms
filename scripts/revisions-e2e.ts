@@ -2,7 +2,7 @@
 // revision previews as it was and restores into the editor as undoable, unsaved changes.
 //   npx tsx --env-file=.env scripts/revisions-e2e.ts
 import { chromium, type Page } from 'playwright';
-import { siteDb } from '../src/lib/supabase';
+import { siteDb } from '../src/lib/db/site';
 
 const origin = process.env.ASTRO_ORIGIN ?? 'http://localhost:4321';
 const sb = siteDb();

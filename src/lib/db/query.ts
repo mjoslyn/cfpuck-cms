@@ -3,7 +3,7 @@
 // query (a QuerySpec); an Executor runs it: on the server, compiled to SQL (src/lib/db/sql.ts); in the
 // admin's browser, posted to /api/admin/db, which runs it as the signed-in editor. Safe in the browser.
 
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Storage } from '../storage';
 
 export type Op = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'like' | 'ilike' | 'is' | 'in' | 'cs' | 'cd';
 
@@ -314,14 +314,19 @@ export class CallBuilder implements PromiseLike<Result> {
 
 /**
  * A connection to the site's data, as some role: the server's (`service`, everything), an editor's or
- * admin's (what the policies in src/lib/db/policies.ts allow), or anyone else's (nothing).
- * `storage` is Supabase Storage until it moves (docs/cloudflare-migration.md).
+ * admin's (what the policies in src/lib/db/policies.ts allow), or anyone else's (nothing). On the
+ * server it carries the site's files too (`storage`, src/lib/storage.ts).
  */
 export class Db {
   constructor(
     private exec: Executor,
-    readonly storage: SupabaseClient['storage'] = undefined as never,
+    private storageOf?: () => Storage,
   ) {}
+
+  get storage(): Storage {
+    if (!this.storageOf) throw new Error('No storage here');
+    return this.storageOf();
+  }
 
   from(table: string): QueryBuilder {
     return new QueryBuilder(this.exec, table);

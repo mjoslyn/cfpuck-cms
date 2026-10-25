@@ -5,7 +5,7 @@ import { eventsOnIn } from '../../../lib/events/on';
 import { startCheckout } from '../../../lib/tickets/orders';
 import { viewerOf } from '../../../lib/members/viewer';
 import { loadMemberSettings } from '../../../lib/members/account';
-import { siteDb } from '../../../lib/supabase';
+import { siteDb } from '../../../lib/db/site';
 
 const FORM = /multipart\/form-data|application\/x-www-form-urlencoded/i;
 

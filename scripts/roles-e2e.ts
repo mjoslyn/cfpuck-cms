@@ -2,7 +2,7 @@
 // manages roles and invites on /admin/users/. Uses temporary accounts, removed afterwards.
 //   npx tsx --env-file=.env scripts/roles-e2e.ts
 import { chromium, type Page } from 'playwright';
-import { siteDb } from '../src/lib/supabase';
+import { siteDb } from '../src/lib/db/site';
 import { createUser, deleteUser, userByEmail } from '../src/lib/auth';
 
 const origin = process.env.ASTRO_ORIGIN ?? 'http://localhost:4321';

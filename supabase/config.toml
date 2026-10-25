@@ -116,6 +116,10 @@ enabled = true
 # The maximum file size allowed (e.g. "5MB", "500KB").
 file_size_limit = "50MiB"
 
+# The site's store locally (STORAGE_* in .env, through the S3 protocol below): one private bucket.
+[storage.buckets.site]
+public = false
+
 # Uncomment to configure local storage buckets
 # [storage.buckets.images]
 # public = false

@@ -72,6 +72,8 @@ The Supabase CLI runs through `npx`, so you don't need to install it.
    | `PUBLIC_SUPABASE_ANON_KEY` | anon key |
    | `SUPABASE_SERVICE_ROLE_KEY` | service_role key |
    | `DATABASE_URL` | DB URL (`postgresql://postgres:postgres@127.0.0.1:56522/postgres`) |
+   | `STORAGE_ACCESS_KEY_ID`, `STORAGE_SECRET_ACCESS_KEY` | S3 access key and secret (the rest of `STORAGE_*` is in `.env.example`) |
+   | `AUTH_SECRET` | any long random value (`openssl rand -hex 32`) |
 
 4. **Add starter content.** This adds the header, footer, base templates, a home page, an About page
    and a sample event. It skips anything that already exists, so it is safe to run again.
@@ -178,24 +180,28 @@ follow the config. `CORE.md` describes each option.
 
 ## Hosting
 
-1. **Supabase.** Create a project at supabase.com.
+1. **Cloudflare R2** (files). Create a bucket for the site (R2 > Create bucket; private) and an API
+   token with Object Read & Write on it (R2 > Manage API tokens). `STORAGE_ENDPOINT` is
+   `https://<account-id>.r2.cloudflarestorage.com`, `STORAGE_BUCKET` the bucket's name, and the token's
+   access key and secret are `STORAGE_ACCESS_KEY_ID` and `STORAGE_SECRET_ACCESS_KEY`.
+2. **Supabase** (the database). Create a project at supabase.com.
    - Link it and apply the migrations:
      ```
      npx supabase link --project-ref <project-ref>
      npx supabase db push --linked
      ```
-2. **Seed and create an admin.** Point a copy of `.env` at the hosted project: its URL, anon key and
+3. **Seed and create an admin.** Point a copy of `.env` at the hosted project: its URL, anon key and
    service_role key, from Project Settings > API, and `DATABASE_URL`, its transaction pooler's
    connection string (Connect > Transaction pooler). Then run the same two commands as locally:
    ```
    npx tsx --env-file=.env.production scripts/seed.ts
    npx tsx --env-file=.env.production scripts/create-editor.ts you@example.org 'a-password' admin
    ```
-   To move local media to the hosted storage bucket, use `scripts/copy-storage.ts`.
-3. **Netlify.**
+   A site moving from Supabase Storage copies its files into the bucket with `scripts/copy-storage.ts`.
+4. **Netlify.**
    - Create a site from your repository. The build settings are in `netlify.toml`.
    - Set the same environment variables as `.env`: the Supabase URL and keys, `DATABASE_URL` (the
-     transaction pooler), `AUTH_SECRET` (a long random value of its own, e.g. `openssl rand -hex 32`),
+     transaction pooler), `STORAGE_*`, `AUTH_SECRET` (a long random value of its own, e.g. `openssl rand -hex 32`),
      `SITE_URL`, SMTP (invitations, password links and confirmations are sent over it), plus the
      optional Compose and ticket payment (Stripe or Square) ones.
    - Add your domain.

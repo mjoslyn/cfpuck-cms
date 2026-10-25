@@ -5,7 +5,7 @@ import { moveEventsToTimezone, refreshSiteTimezone } from '../../../lib/site/tim
 import { socialLinks } from '../../../lib/social/links';
 import { makeSiteIcons } from '../../../lib/media/site-icon';
 import { MediaStore } from '../../../lib/media/process';
-import { serviceClient } from '../../../lib/supabase';
+import { serviceClient } from '../../../lib/db/site';
 import { adminThemeFrom, loadAdminTheme, type AdminTheme } from '../../../lib/admin-theme';
 import { downsize, mediaUrl, versioned } from '../../../lib/media/image';
 import type { Media } from '../../../lib/types';

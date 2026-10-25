@@ -7,7 +7,7 @@ import { CAMPAIGN_STATUS, CONTACT_STATUS, WEEKDAYS, mailingSettings, type Campai
 import { mailingState } from '../../../lib/mailing/state';
 import { mailgunStatus } from '../../../lib/mailing/mailgun';
 import { memberSettings } from '../../../lib/members/config';
-import { serviceClient } from '../../../lib/supabase';
+import { serviceClient } from '../../../lib/db/site';
 import { cleanRules, describeSegment, type Segment } from '../../../lib/mailing/segments';
 import { audienceOfRules } from '../../../lib/mailing/send';
 

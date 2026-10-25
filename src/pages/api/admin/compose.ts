@@ -12,7 +12,7 @@
 import type { APIRoute } from 'astro';
 import { COMPOSABLE_TYPES } from '../../../lib/site';
 import type { EditorFields } from '../../../lib/compose/entry-fields';
-import { serviceClient } from '../../../lib/supabase';
+import { serviceClient } from '../../../lib/db/site';
 import { emptyRegistry, ingest, type Registry } from '../../../lib/compose/materials';
 import type { Turn } from '../../../lib/compose/claude';
 import { queueJob, runJob, SILENT_MS, STALE_MS, type JobInput } from '../../../lib/compose/job';

@@ -1,7 +1,7 @@
 // Upload an image (stored at YYYY/MM/name.ext with responsive sizes and AVIF/WebP copies) or a video
 // (MP4/WebM/MOV, stored as is, up to 200 MB).
 import type { APIRoute } from 'astro';
-import { serviceClient } from '../../../../lib/supabase';
+import { serviceClient } from '../../../../lib/db/site';
 import { MediaStore, processUpload } from '../../../../lib/media/process';
 
 export const POST: APIRoute = async ({ request, locals }) => {

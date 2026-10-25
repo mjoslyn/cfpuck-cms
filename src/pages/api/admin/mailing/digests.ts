@@ -4,7 +4,7 @@
 // (admins: make this week's issue now, outside its schedule), delete (admins). Writes here don't change
 // the site's pages.
 import type { APIRoute } from 'astro';
-import { serviceClient } from '../../../../lib/supabase';
+import { serviceClient } from '../../../../lib/db/site';
 import { EMAIL_RE, audienceOf, mailingSettings, splitName, type Campaign, type Digest } from '../../../../lib/mailing/config';
 import { runDigest } from '../../../../lib/mailing/digest';
 import { sendTest } from '../../../../lib/mailing/send';

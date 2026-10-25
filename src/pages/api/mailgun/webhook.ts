@@ -3,7 +3,7 @@
 // checked with MAILGUN_WEBHOOK_SIGNING_KEY; the work is src/lib/mailing/webhook.ts. A failure answers
 // 500, so Mailgun tries again; a bad signature answers 406, so it doesn't.
 import type { APIRoute } from 'astro';
-import { serviceClient } from '../../../lib/supabase';
+import { serviceClient } from '../../../lib/db/site';
 import { handleWebhook } from '../../../lib/mailing/webhook';
 
 export const POST: APIRoute = async ({ request }) => {

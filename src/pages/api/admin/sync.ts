@@ -18,7 +18,7 @@
 // Backups and snapshots hold rows, not stored images.
 import type { APIRoute } from 'astro';
 import { apply, backup, backupFile, backups, deleteBackup, diff, endpoints, isProtected, plan, queueRestore, remoteConfig, restoreJob, runRestore, setRetention, snapshotNow, snapshotPreview, syncGroups, type Direction, type Site } from '../../../lib/sync';
-import { serviceClient } from '../../../lib/supabase';
+import { serviceClient } from '../../../lib/db/site';
 
 const direction = (v: unknown): Direction => (v === 'pull' ? 'pull' : 'push');
 const site = (v: unknown): Site => (v === 'remote' ? 'remote' : 'here');

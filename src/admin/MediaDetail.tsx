@@ -4,7 +4,7 @@
 // focal point for that use (kept with this image; the other image's own are untouched). Opens on
 // `cms:media-open` events.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { browserClient } from '../lib/supabase-browser';
+import { browserClient } from '../lib/db/browser';
 import { mediaUrl } from '../lib/media/image';
 import type { Media } from '../lib/types';
 import { SHAPES, position, type Point } from '../lib/media/focal';

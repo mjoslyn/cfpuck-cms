@@ -2,7 +2,7 @@
 // settings' access, member ticket prices, the Members only block) and whether events are on (event and
 // ticket blocks, the event type in pickers) and whether mailing is on (the Subscribe and Email preferences blocks).
 import { useEffect, useState } from 'react';
-import { browserClient } from '../lib/supabase-browser';
+import { browserClient } from '../lib/db/browser';
 import { memberSettings, type MemberSettings } from '../lib/members/config';
 import { eventsOn } from '../lib/events/on';
 import { mailingOn } from '../lib/mailing/config';

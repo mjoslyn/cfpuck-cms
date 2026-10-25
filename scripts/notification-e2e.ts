@@ -4,7 +4,7 @@
 // temporary form and page.
 //   npx tsx --env-file=.env scripts/notification-e2e.ts
 import { chromium } from 'playwright';
-import { siteDb } from '../src/lib/supabase';
+import { siteDb } from '../src/lib/db/site';
 
 const MAIL = process.env.LOCAL_MAIL_URL ?? 'http://127.0.0.1:56524';
 const origin = 'http://localhost:4321';

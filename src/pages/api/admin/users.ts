@@ -3,7 +3,7 @@
 // invitation not yet taken up, sent again), action=delete (id: the account, with its profile and any
 // membership; what it made stays, its author left empty).
 import type { APIRoute } from 'astro';
-import { serviceClient } from '../../../lib/supabase';
+import { serviceClient } from '../../../lib/db/site';
 import { invite, resendInvite } from '../../../lib/admin/invite';
 import { deleteUser, userById } from '../../../lib/auth';
 

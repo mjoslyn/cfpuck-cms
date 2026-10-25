@@ -2,7 +2,7 @@
 // then the visitor goes on to the link's address, which comes from its stored row. HEAD answers the same
 // redirect and counts as a machine's. Never cached.
 import type { APIRoute } from 'astro';
-import { serviceClient } from '../../../../lib/supabase';
+import { serviceClient } from '../../../../lib/db/site';
 import { recordClick } from '../../../../lib/mailing/tracking';
 import { clientCountry, clientIp } from '../../../../lib/mailing/request';
 

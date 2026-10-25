@@ -1,7 +1,7 @@
 // A tracked link's visitor interacted with the page it led to (public/assets/js/mail-seen.js): that
 // click was a person's. The body is the click's signed id.
 import type { APIRoute } from 'astro';
-import { serviceClient } from '../../../lib/supabase';
+import { serviceClient } from '../../../lib/db/site';
 import { confirmSeen } from '../../../lib/mailing/tracking';
 
 export const POST: APIRoute = async ({ request }) => {

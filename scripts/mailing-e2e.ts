@@ -8,7 +8,7 @@
 // makes is removed afterwards and the settings put back.
 //   npx tsx --env-file=.env scripts/mailing-e2e.ts
 import { createHmac } from 'node:crypto';
-import { siteDb } from '../src/lib/supabase';
+import { siteDb } from '../src/lib/db/site';
 import { deleteUser } from '../src/lib/auth';
 
 const base = process.env.ASTRO_ORIGIN ?? 'http://localhost:4321';

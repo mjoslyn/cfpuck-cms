@@ -4,7 +4,7 @@
 // (rules, lists?: who matches now, subscribed, with a count and the first 100). Editors and admins.
 // Writes here don't change the site's pages.
 import type { APIRoute } from 'astro';
-import { serviceClient } from '../../../../lib/supabase';
+import { serviceClient } from '../../../../lib/db/site';
 import { cleanRules } from '../../../../lib/mailing/segments';
 import { audienceOfRules } from '../../../../lib/mailing/send';
 

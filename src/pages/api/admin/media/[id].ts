@@ -2,7 +2,7 @@
 // images (crop_images: another image shown wherever this one is cropped to that shape). A changed focal
 // point regenerates the hard-cropped sizes (and their AVIF/WebP copies) around it.
 import type { APIRoute } from 'astro';
-import { serviceClient } from '../../../../lib/supabase';
+import { serviceClient } from '../../../../lib/db/site';
 import { MediaStore, addFormats } from '../../../../lib/media/process';
 import { SHAPES } from '../../../../lib/media/focal';
 

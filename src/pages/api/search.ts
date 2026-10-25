@@ -6,7 +6,7 @@
 // (those in use), so a filter can offer them.
 import { BROWSER_CACHE_CONTROL, PAGE_CACHE_TAG } from '../../lib/cache';
 import type { APIRoute } from 'astro';
-import { siteDb } from '../../lib/supabase';
+import { siteDb } from '../../lib/db/site';
 import { eventsOn } from '../../lib/events/on';
 import { Loader, PUBLIC_SCOPE } from '../../lib/data';
 import { permalink, termLink } from '../../lib/permalink';

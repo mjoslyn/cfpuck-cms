@@ -3,7 +3,7 @@
 // lets this route through), and the button on the unsubscribe page. t: the signed manage token; c: the
 // campaign the email was; l: one list only. Takes effect at once.
 import type { APIRoute } from 'astro';
-import { serviceClient } from '../../../lib/supabase';
+import { serviceClient } from '../../../lib/db/site';
 import { PREFERENCES_PATH, UNSUBSCRIBE_PATH } from '../../../lib/mailing/config';
 import { unsubscribe } from '../../../lib/mailing/contacts';
 import { verify } from '../../../lib/mailing/tokens';

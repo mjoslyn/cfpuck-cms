@@ -86,7 +86,12 @@ confirmation and carried-over bcrypt passwords. CORE.md, Accounts.
 - Done when: admin login, invitations, password links, member sign-up and account page work; Users and
   Members screens list everyone.
 
-### 3. Storage to R2 (still Netlify)
+### 3. Storage to R2 (still Netlify): done
+
+One private bucket per site with `media/`, `compose/` and `sync-backups/` folders, over the S3 API
+(aws4fetch: fetch and WebCrypto, so the same code runs on Workers), behind the calls the code made of
+Supabase Storage. `/media/` is the site's route (ranges, a year's caching), which also replaced the
+edge function. Sync reaches the other copy's store with `SYNC_REMOTE_STORAGE_*`. CORE.md, Media.
 
 - R2 buckets `media`, `compose`, `sync-backups`; `src/lib/storage.ts` with `put`, `get`, `list`,
   `remove` over R2 (S3 API from Node now, the binding in phase 4).
@@ -144,9 +149,11 @@ confirmation and carried-over bcrypt passwords. CORE.md, Accounts.
 
 ## Moving an existing site
 
-1. Merge the core, create D1, R2 buckets, Images, Workflows; set secrets.
-2. `scripts/copy-storage.ts` (Supabase Storage to R2), `scripts/pg-to-d1.ts` (data and auth users
-   with their bcrypt hashes).
+1. Merge the core, create D1, an R2 bucket, Images, Workflows; set secrets. A site that never set
+   `MAIL_LINK_SECRET` sets it to `mail-links:<its old Supabase service_role key>`, so mailing links
+   already sent keep working.
+2. `scripts/copy-storage.ts` (Supabase Storage to R2), `scripts/pg-to-d1.ts` (the data, accounts
+   included: migration `*_auth_tables.sql` already moved them out of Supabase Auth).
 3. Deploy to a `workers.dev` address, compare pages against the live site, sign in, run the e2e
    scripts.
 4. Freeze edits, run the two copies again for the latest changes, point DNS at the Worker, move the

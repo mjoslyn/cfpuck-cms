@@ -42,7 +42,7 @@ Hand edits are shown to Claude. With a block selected in the editor, the panel t
 ## Materials
 
 `src/lib/compose/materials.ts` keeps a registry with stable ids (`image-1`, `doc-1`...). PDFs go in
-the private `compose` bucket, link text is fetched once (private addresses refused), and images are
+the store's private `compose/` folder, link text is fetched once (private addresses refused), and images are
 re-encoded to JPEG for Claude. The whole conversation is sent with prompt caching
 (`src/lib/compose/claude.ts`).
 

@@ -1,4 +1,4 @@
-import { Db, type CallSpec, type Executor, type QuerySpec, type Result } from './db/query';
+import { Db, type CallSpec, type Executor, type QuerySpec, type Result } from './query';
 
 /** Runs the admin's queries on the server (/api/admin/db), as the signed-in editor. */
 const remote: Executor = {

@@ -3,7 +3,7 @@
 // skipped by validation), then delete the page, form and submissions.
 //   npx tsx --env-file=.env scripts/forms-e2e.ts
 import { chromium } from 'playwright';
-import { siteDb } from '../src/lib/supabase';
+import { siteDb } from '../src/lib/db/site';
 
 const origin = process.env.ASTRO_ORIGIN ?? 'http://localhost:4321';
 const sb = siteDb();

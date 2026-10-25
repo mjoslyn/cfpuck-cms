@@ -5,7 +5,7 @@
 //   npx tsx --env-file=.env scripts/payments-e2e.ts [stripe|square]
 // PW_CHROMIUM=/opt/pw-browsers/chromium uses an installed Chromium in place of Playwright's.
 import { chromium } from 'playwright';
-import { siteDb } from '../src/lib/supabase';
+import { siteDb } from '../src/lib/db/site';
 
 const origin = process.env.ASTRO_ORIGIN ?? 'http://localhost:4321';
 const provider = process.argv[2] ?? 'stripe';

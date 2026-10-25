@@ -2,7 +2,7 @@
 // Read at most once a minute per server instance, before a request is handled (src/middleware.ts) and
 // before a compose job runs.
 import type { Db } from '../db/query';
-import { siteDb } from '../supabase';
+import { siteDb } from '../db/site';
 import { localToUtc } from '../recurrence';
 import { allRows } from '../rows';
 import { SITE_TZ, setSiteTimezone } from './index';

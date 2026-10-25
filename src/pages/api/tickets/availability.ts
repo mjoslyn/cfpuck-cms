@@ -2,7 +2,7 @@
 // the page itself can be a minute old: GET /api/tickets/availability?event=<id>[&date=<Y-m-d>]
 //   -> { left: n | null, types: { <type id>: n | null } } (null: no limit)
 import type { APIRoute } from 'astro';
-import { siteDb } from '../../../lib/supabase';
+import { siteDb } from '../../../lib/db/site';
 import { PUBLIC_SCOPE, visibleTo } from '../../../lib/data';
 import { eventsOnIn } from '../../../lib/events/on';
 import { remaining, ticketsOf } from '../../../lib/tickets/config';

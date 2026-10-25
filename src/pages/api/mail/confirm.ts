@@ -1,7 +1,7 @@
 // A sign-up's confirmation: the button on the page its emailed link opens (a GET never confirms: mail
 // scanners follow links). On to the preferences page, signed for the person.
 import type { APIRoute } from 'astro';
-import { serviceClient } from '../../../lib/supabase';
+import { serviceClient } from '../../../lib/db/site';
 import { PREFERENCES_PATH } from '../../../lib/mailing/config';
 import { confirm } from '../../../lib/mailing/contacts';
 import { sign, verify } from '../../../lib/mailing/tokens';

@@ -7,7 +7,7 @@ import { Text } from '../puck/fields';
 import type { EmailDoc } from '../lib/forms/email';
 import { DEFAULT_EMAILS, type EmailKind, type TicketEmail } from '../lib/tickets/config';
 import { ticketEmailKit } from './ticket-email';
-import { browserClient } from '../lib/supabase-browser';
+import { browserClient } from '../lib/db/browser';
 import { defaultTemplate } from '../lib/email-templates';
 
 const btn = 'rounded-sm border border-admin-ink/20 px-3 py-1.5 text-xs font-semibold hover:border-admin-ink/50';

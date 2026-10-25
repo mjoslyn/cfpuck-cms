@@ -1,7 +1,7 @@
 // A member signs in (the Member account block): back to the page they came from, or the account page.
 // An address not yet confirmed gets a new confirmation link.
 import type { APIRoute } from 'astro';
-import { siteDb } from '../../../lib/supabase';
+import { siteDb } from '../../../lib/db/site';
 import { redirectWith, signIn } from '../../../lib/auth';
 import { accountUrl, loadMemberSettings, safeNext } from '../../../lib/members/account';
 import { sendConfirmation } from '../../../lib/members/confirm';

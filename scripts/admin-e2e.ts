@@ -1,7 +1,7 @@
 // End-to-end editor check: edit a heading on /about/, publish, verify the public page, then restore.
 //   npx tsx --env-file=.env scripts/admin-e2e.ts
 import { chromium } from 'playwright';
-import { siteDb } from '../src/lib/supabase';
+import { siteDb } from '../src/lib/db/site';
 
 const origin = process.env.ASTRO_ORIGIN ?? 'http://localhost:4321';
 const sb = siteDb();

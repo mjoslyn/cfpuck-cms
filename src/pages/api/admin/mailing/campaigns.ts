@@ -5,7 +5,7 @@
 // approve (a digest's issue waiting for review), reconcile (Mailgun's totals), unpause (sending site-wide).
 // Writes here don't change the site's pages (src/lib/cache.ts).
 import type { APIRoute } from 'astro';
-import { serviceClient } from '../../../../lib/supabase';
+import { serviceClient } from '../../../../lib/db/site';
 import { SITE_TZ } from '../../../../lib/site';
 import { localToUtc } from '../../../../lib/recurrence';
 import { EMAIL_RE, audienceOf, mailingSettings, splitName, type Campaign } from '../../../../lib/mailing/config';

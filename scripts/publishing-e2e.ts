@@ -3,7 +3,7 @@
 // live version; unpublish takes the page off the site and publish brings it back.
 //   npx tsx --env-file=.env scripts/publishing-e2e.ts
 import { chromium, type Page } from 'playwright';
-import { siteDb } from '../src/lib/supabase';
+import { siteDb } from '../src/lib/db/site';
 
 const origin = process.env.ASTRO_ORIGIN ?? 'http://localhost:4321';
 const sb = siteDb();

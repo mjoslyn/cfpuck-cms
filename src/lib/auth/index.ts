@@ -10,7 +10,7 @@ import { hashPassword, verifyPassword } from 'better-auth/crypto';
 import bcrypt from 'bcryptjs';
 import { randomBytes } from 'node:crypto';
 import { getPool } from '../db/sql';
-import { siteDb } from '../supabase';
+import { siteDb } from '../db/site';
 
 const env = (k: string) => (import.meta.env?.[k] as string | undefined) ?? process.env[k];
 

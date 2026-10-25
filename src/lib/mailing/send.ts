@@ -8,7 +8,7 @@
 // A run that runs out of time lets go of the campaign, and the scheduler's next run carries on. Server only.
 import { randomUUID } from 'node:crypto';
 import type { Db } from '../db/query';
-import { serviceClient } from '../supabase';
+import { serviceClient } from '../db/site';
 import { emailEvents } from '../events/email';
 import { refreshSiteTimezone } from '../site/timezone';
 import { audienceOf, type Campaign } from './config';

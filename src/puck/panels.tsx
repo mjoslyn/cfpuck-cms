@@ -7,7 +7,7 @@ import { PRESETS as themeJson } from '../lib/site';
 import { site } from '../lib/site';
 import { LIST_ICONS, iconSvg } from '../render/c/icons';
 import { useEffect, useState } from 'react';
-import { browserClient } from '../lib/supabase-browser';
+import { browserClient } from '../lib/db/browser';
 
 type SetFn = (patch: Attrs) => void;
 export type Panel = (a: Attrs, set: SetFn) => ReactNode;

@@ -1,6 +1,5 @@
-// Whether a /media/ path tries to leave the media bucket: ".." segments or backslashes, plain or
-// %-escaped (once or twice). Used by the Netlify edge function in front of the Storage rewrite and by
-// the local /media/ route.
+// Whether a /media/ path tries to leave the media folder: ".." segments or backslashes, plain or
+// %-escaped (once or twice). Used by the /media/ route.
 export function unsafeMediaPath(pathname: string): boolean {
   let p = pathname;
   for (let i = 0; i < 3; i++) {

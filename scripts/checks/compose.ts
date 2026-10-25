@@ -3,7 +3,7 @@
 // materials step reads text documents and video links and refuses private addresses.
 //   npx tsx --env-file=.env scripts/checks/compose.ts
 import { chromium } from 'playwright';
-import { siteDb } from '../../src/lib/supabase';
+import { siteDb } from '../../src/lib/db/site';
 import { blocksFor, buildMaterials, emptyRegistry, ingest } from '../../src/lib/compose/materials';
 import { buildPage } from '../../src/lib/compose/build';
 import { MediaStore } from '../../src/lib/media/process';

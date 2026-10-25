@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { SITE_TZ } from '../lib/site';
 import { FieldsForm, fieldsFor } from './entry-fields';
 import { Select, Text } from './fields';
-import { browserClient } from '../lib/supabase-browser';
+import { browserClient } from '../lib/db/browser';
 import { isPlaceholderSlug, slugify } from '../lib/slug';
 
 interface Record_ { id: number; type: string; title: string; slug: string; status: string; fields: Record<string, any> }

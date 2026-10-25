@@ -1,6 +1,6 @@
 // Backfill AVIF/WebP copies for media that don't have them yet (imported or older uploads).
 //   npx tsx --env-file=.env scripts/media-formats.ts [--limit N] [--concurrency 4] [--all]
-import { siteDb } from '../src/lib/supabase';
+import { siteDb } from '../src/lib/db/site';
 import { MediaStore, addFormats } from '../src/lib/media/process';
 import type { Media } from '../src/lib/types';
 

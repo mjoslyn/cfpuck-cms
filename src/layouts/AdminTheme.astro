@@ -1,7 +1,7 @@
 ---
 // The admin colors chosen under Settings > Admin (src/lib/admin-theme.ts).
 import { adminThemeCss, loadAdminTheme, type AdminTheme } from '../lib/admin-theme';
-import { siteDb } from '../lib/supabase';
+import { siteDb } from '../lib/db/site';
 
 interface Props {
   /** The saved theme, when the page has loaded it already. */

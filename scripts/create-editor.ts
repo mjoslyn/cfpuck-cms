@@ -1,6 +1,6 @@
 // Create (or promote) an editor account.
 //   npx tsx --env-file=.env scripts/create-editor.ts you@example.com 'password' [editor|admin]
-import { siteDb } from '../src/lib/supabase';
+import { siteDb } from '../src/lib/db/site';
 import { createUser, setPassword, userByEmail } from '../src/lib/auth';
 
 const [email, password, role = 'admin'] = process.argv.slice(2);

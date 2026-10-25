@@ -4,7 +4,7 @@
 // its layout and style stay the pattern's.
 import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useGetPuck, type Data } from '@puckeditor/core';
-import { browserClient } from '../lib/supabase-browser';
+import { browserClient } from '../lib/db/browser';
 import { findBlock, replaceBlock } from '../lib/puck/tree';
 import type { PuckItem } from '../lib/puck/types';
 import { EnvContext } from './BlockView';

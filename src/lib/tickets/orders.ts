@@ -4,7 +4,7 @@
 // netlify/functions/ticket-emails.mts). Everything here runs on the server with the service key.
 import { randomBytes, randomInt } from 'node:crypto';
 import type { Db } from '../db/query';
-import { serviceClient } from '../supabase';
+import { serviceClient } from '../db/site';
 import { ENTRY_COLUMNS, type Entry } from '../types';
 import { defaultHorizon, expandEntry, localToUtc, recurrenceOf } from '../recurrence';
 import { permalink } from '../permalink';

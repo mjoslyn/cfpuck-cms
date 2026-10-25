@@ -3,7 +3,7 @@
 // and a snapshot restore run as a job (rows made since deleted, a form with submissions kept).
 // Everything it makes is removed afterwards.
 //   npx tsx --env-file=.env scripts/safety-e2e.ts
-import { siteDb } from '../src/lib/supabase';
+import { siteDb } from '../src/lib/db/site';
 import { createUser, deleteUser } from '../src/lib/auth';
 const base = process.env.ASTRO_ORIGIN ?? 'http://localhost:4321';
 const db = siteDb();
