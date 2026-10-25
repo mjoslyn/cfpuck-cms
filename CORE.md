@@ -480,9 +480,11 @@ to save the email as, save over, start from (Use) or delete. A template can be t
 of email (`default_for`, unique; `TEMPLATE_DEFAULTS`): new campaigns, digests, forms and form
 notifications start from theirs (`defaultTemplate`), and a ticket email nobody designed is sent from
 its kind's (`ticket:<kind>`). Not synced or backed up.
-Notifications from before the builder send their message as before until opened there. Mail goes out over SMTP
-(`SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_PASS`/`SMTP_SECURE`, or one `SMTP_URL`; sender `MAIL_FROM`,
-default `mailFrom` in the site config).
+Notifications from before the builder send their message as before until opened there. Mail goes out through
+Cloudflare Email Service when the Worker has its `EMAIL` binding (`"send_email": [{ "name": "EMAIL" }]` in
+`wrangler.jsonc`; the sender's domain onboarded under Email Sending), else over SMTP
+(`SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_PASS`/`SMTP_SECURE`, or one `SMTP_URL`); sender `MAIL_FROM`,
+default `mailFrom` in the site config (`src/lib/forms/mail.ts`).
 
 Payments: a form's Payment tab (`FormDef.payment`: Stripe or Square, currency, a description with merge
 tags, the email field for the receipt; shown, with the Pricing fields, only when a provider has its keys
@@ -975,8 +977,9 @@ deploys (`wrangler deploy`).
   `CF_VERSION_METADATA` (the page cache's validators). The Cron Triggers: mailing every 5 minutes and at
   06:20 UTC, snapshots at 07:00 UTC, ticket emails hourly (`SCHEDULES`).
 - Variables and secrets reach the code as `process.env` (`nodejs_compat`); secrets are set with
-  `npx wrangler secret put`. Mail goes over SMTP through the Worker's sockets (`worker-mailer`; port 25
-  is closed to Workers). Link fetching for Compose resolves names over DNS-over-HTTPS (`addressesOf`).
+  `npx wrangler secret put`. Mail goes through the `EMAIL` binding (Email Service) when there is one, else
+  over SMTP through the Worker's sockets (`worker-mailer`; port 25 is closed to Workers, and so are
+  Cloudflare's own addresses, Email Service's SMTP endpoint among them). Link fetching for Compose resolves names over DNS-over-HTTPS (`addressesOf`).
   The visitor's address and country come from `CF-Connecting-IP` and `CF-IPCountry`.
 - `astro dev` runs the Worker in workerd with local bindings: D1 and R2 in `.wrangler/state` (which
   scripts use too), a local queue, and Miniflare's Images,
