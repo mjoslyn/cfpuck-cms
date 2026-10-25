@@ -142,7 +142,7 @@ the Worker's sockets with the site's provider.
 - `scripts/pg-to-d1.ts` copies a Postgres copy's data into D1 (local, remote through the API, or a SQL
   file for `wrangler d1 execute`; long values split under D1's statement limit).
 - Hyperdrive, `src/lib/db/sql.ts` and `pg` at runtime are gone (`pg` stays for the two scripts).
-- Not done: FTS5. Search keeps `Loader.queryRanked`'s word matching, which renders the same results.
+- FTS5 came after: `*_entries_fts.sql` and `textSearch` (CORE.md, Search).
 - Checked: `scripts/checks/d1-parity.ts` (removed in phase 6 with Supabase; in commit `68b7327`; PostgREST on Postgres against the layer on D1, same data:
   reads, writes, functions, editor, admin and viewer; one difference: Postgres refuses invalid JSON in
   a `cs` filter, D1 doesn't), HTML of every page type identical before and after, auth (30), safety

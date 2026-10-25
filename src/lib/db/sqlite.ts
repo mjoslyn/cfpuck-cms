@@ -280,7 +280,13 @@ function conditionSql(f: Filter, alias: string, table: string, params: Params): 
   let sql: string;
   if ('any' in f) sql = f.any.length ? `(${f.any.map((x) => conditionSql(x, alias, table, params)).join(' OR ')})` : 'false';
   else if ('all' in f) sql = f.all.length ? `(${f.all.map((x) => conditionSql(x, alias, table, params)).join(' AND ')})` : 'true';
-  else {
+  else if (f.op === 'fts') {
+    // The table's FTS5 index, keyed by its rows' id; one column of it with FTS5's column filter.
+    const fts = tableOf(table).fts ?? fail(`'${table}' has no full-text index`, '42883');
+    if (f.col !== 'fts' && !fts.columns.includes(f.col)) fail(`'${f.col}' is not in the full-text index of '${table}'`, '42703');
+    const query = f.col === 'fts' ? String(f.value) : `{${f.col}} : (${String(f.value)})`;
+    sql = `${alias}.${ident(fts.key)} IN (SELECT rowid FROM ${ident(fts.table)} WHERE ${ident(fts.table)} MATCH ${params.add(query)})`;
+  } else {
     const { sql: col, type } = refSql(alias, table, parseRef(f.col));
     const v = f.value;
     const json = isJson(type);

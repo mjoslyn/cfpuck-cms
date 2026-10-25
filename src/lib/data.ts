@@ -41,6 +41,9 @@ export interface QueryResult {
  *  so "(annual)" finds "Annual Report". */
 const searchWords = (search?: string) => (search ?? '').replace(/[%_,()]/g, ' ').split(/\s+/).filter(Boolean);
 
+/** A search as a full-text query: every word, each matching the start of a word ("tow" finds "town"). */
+const ftsQuery = (search?: string) => searchWords(search).map((w) => `"${w.replace(/"/g, '""')}"*`).join(' ');
+
 /**
  * What a Loader may read for whom. `published`: the site's view, for the server's key (which the
  * database doesn't filter): published entries only, and members-only ones (fields.access) only for an
@@ -259,15 +262,13 @@ export class Loader {
       matchIds = matchIds ? matchIds.filter((id) => set.has(id)) : [...set];
     }
     if (matchIds && !matchIds.length) return { ids: [], total: 0, pages: 0 };
-    const select = `${ENTRY_COLUMNS}, entry_terms(term_id, sort)${args.orderBy === 'relevance' ? ', body_text' : ''}`;
+    const select = `${ENTRY_COLUMNS}, entry_terms(term_id, sort)`;
 
     let q = this.visible(this.db.from('entries').select(select, { count: 'exact' }).eq('status', 'publish').in('type', types));
     if (matchIds) q = q.in('id', matchIds);
-    // Search: every word must appear in the title, excerpt or text.
-    for (const word of searchWords(args.search)) {
-      const like = `%${word}%`;
-      q = q.or(`title.ilike.${like},excerpt.ilike.${like},body_text.ilike.${like}`);
-    }
+    // Search: every word must start a word of the title, excerpt or text (the full-text index).
+    const fts = ftsQuery(args.search);
+    if (fts) q = q.textSearch('fts', fts);
     if (args.featuredOnly) q = q.eq('fields->>featured', 'true');
     if (args.exclude?.length) q = q.not('id', 'in', `(${args.exclude.join(',')})`);
     if (args.include?.length) q = q.in('id', args.include);
@@ -312,29 +313,21 @@ export class Loader {
   }
 
   /**
-   * query() ordered by relevance to args.search: every match is fetched (up to 500) and scored: the
-   * whole phrase in the title first, then each word in the title, excerpt and text; newest first on ties.
+   * query() ordered by relevance to args.search: the full-text index ranks the matches (BM25, the title
+   * weighing most, then the excerpt, then the text; the best 1000), the query keeps those this listing
+   * shows, newest first on ties.
    */
   private async queryRanked(q: any, args: QueryArgs, perPage: number, offset: number): Promise<QueryResult> {
-    // shortcut: past 500 matches only the newest 500 are ranked; rank in SQL if a site's searches get there.
-    const { data, error } = await q.order('published_at', { ascending: false }).order('id').limit(500);
+    const fts = ftsQuery(args.search);
+    if (!fts) return { ids: [], total: 0, pages: 0 };
+    const { data: ranked, error: rankError } = await this.db.rpc('entry_search', { p_query: fts, p_limit: 1000 });
+    if (rankError) throw rankError;
+    const rank = new Map<number, number>(((ranked ?? []) as { id: number; rank: number }[]).map((r) => [r.id, r.rank]));
+    if (!rank.size) return { ids: [], total: 0, pages: 0 };
+    const { data, error } = await allRows(q.in('id', [...rank.keys()]).order('id'));
     if (error) throw error;
-    const words = searchWords(args.search).map((w) => w.toLowerCase());
-    const phrase = words.join(' ');
-    const score = (r: any) => {
-      const title = String(r.title ?? '').toLowerCase();
-      const excerpt = String(r.excerpt ?? '').toLowerCase();
-      const text = String(r.body_text ?? '').toLowerCase();
-      let s = title === phrase ? 20 : title.includes(phrase) ? 10 : 0;
-      for (const w of words) s += (title.includes(w) ? 4 : 0) + (excerpt.includes(w) ? 2 : 0) + (text.includes(w) ? 1 : 0);
-      return s;
-    };
-    const rows = (data ?? [])
-      .map((r: any) => ({ r, s: score(r) }))
-      .sort((a: any, b: any) => b.s - a.s || Date.parse(b.r.published_at) - Date.parse(a.r.published_at) || a.r.id - b.r.id)
-      .map((x: any) => x.r);
+    const rows = (data ?? []).sort((a: any, b: any) => rank.get(a.id)! - rank.get(b.id)! || Date.parse(b.published_at) - Date.parse(a.published_at) || a.id - b.id);
     const page = rows.slice(offset, offset + perPage);
-    for (const r of page) delete r.body_text;
     this.remember(page);
     const total = Math.max(0, rows.length - (args.offset ?? 0));
     return { ids: page.map((r: any) => r.id), total, pages: Math.ceil(total / perPage) };

@@ -7,12 +7,11 @@ sidebar:
 
 ## The search page
 
-`/search/?q=` lists the entries whose title, excerpt or body text (`entries.body_text`) contain
-every word, ranked by relevance (`Loader.queryRanked`):
-
-1. the phrase in the title,
-2. then words in the title, excerpt and text,
-3. newest first on ties.
+`/search/?q=` lists the entries whose title, excerpt or body text (`entries.body_text`) have every
+word of the search at the start of a word ("tow" finds "town"; case and accents don't matter), from
+the full-text index (`entries_fts`, FTS5 in D1, kept in step by triggers). Results are ranked by
+relevance (`Loader.queryRanked`, the `entry_search` function): BM25 with words in the title weighing
+most, then the excerpt, then the text; newest first on ties. The best 1,000 matches are ranked.
 
 It searches the types chosen under Settings > Search (`settings.site.search_types`, `searchTypes`);
 by default all types with a page. It renders the `search` template (`src/lib/content/search-template.ts`),

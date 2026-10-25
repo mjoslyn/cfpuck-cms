@@ -101,6 +101,20 @@ function segmentSql(segment: any, add: (v: unknown) => string): string {
 }
 
 export const FUNCTIONS: Record<string, Fn> = {
+  /**
+   * Entries the full-text index matches for `p_query` (FTS5's syntax), best first: BM25 with the title
+   * weighing most, then the excerpt, then the text. At most `p_limit` (default 1000), as [{ id, rank }].
+   */
+  entry_search: {
+    async run(exec, a) {
+      const limit = Math.min(Math.max(Math.trunc(Number(a.p_limit) || 1000), 1), 5000);
+      return exec.rows<{ id: number; rank: number }>(
+        `SELECT rowid AS id, bm25(entries_fts, 10.0, 4.0, 1.0) AS rank FROM entries_fts WHERE entries_fts MATCH ?1 ORDER BY rank LIMIT ${limit}`,
+        [String(a.p_query ?? '')],
+      );
+    },
+  },
+
   redirect_hit: {
     async run(exec, a) {
       await exec.changes('UPDATE redirects SET hits = hits + 1, last_hit_at = ?2 WHERE id = ?1', [a.redirect_id, now()]);

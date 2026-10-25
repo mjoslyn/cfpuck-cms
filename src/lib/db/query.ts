@@ -1,11 +1,12 @@
 // The query builder the code reads and writes with: the same chained calls the Supabase client had
 // (from, select, eq, or, order, range, single...), so call sites keep their shape. It only describes a
-// query (a QuerySpec); an Executor runs it: on the server, compiled to SQL (src/lib/db/sql.ts); in the
+// query (a QuerySpec); an Executor runs it: on the server, compiled to SQL (src/lib/db/sqlite.ts); in the
 // admin's browser, posted to /api/admin/db, which runs it as the signed-in editor. Safe in the browser.
 
 import type { Files } from '../storage';
 
-export type Op = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'like' | 'ilike' | 'is' | 'in' | 'cs' | 'cd';
+// fts: a full-text query (FTS5's syntax) on the table's index (`fts`, every indexed column) or one of its columns.
+export type Op = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'like' | 'ilike' | 'is' | 'in' | 'cs' | 'cd' | 'fts';
 
 /** A condition: a column (or JSON path, `fields->a->>b`) compared to a value, or a group of them. */
 export type Filter =
@@ -98,7 +99,7 @@ function splitTop(text: string): string[] {
   return out;
 }
 
-const OPS = new Set<string>(['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'like', 'ilike', 'is', 'in', 'cs', 'cd']);
+const OPS = new Set<string>(['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'like', 'ilike', 'is', 'in', 'cs', 'cd', 'fts']);
 
 /** One condition in PostgREST's text form (`col.op.value`, `not.and(...)`), as used in or(). */
 function parseCondition(text: string): Filter {
@@ -208,6 +209,8 @@ export class QueryBuilder<T = any[]> implements PromiseLike<Result<T>> {
   in(col: string, values: readonly unknown[]) { return this.where(col, 'in', [...values]); }
   contains(col: string, value: unknown) { return this.where(col, 'cs', value); }
   containedBy(col: string, value: unknown) { return this.where(col, 'cd', value); }
+  /** Rows the table's full-text index matches (`fts`: any indexed column; or one of them), in FTS5's query syntax. */
+  textSearch(col: string, query: string) { return this.where(col, 'fts', query); }
 
   match(values: Record<string, unknown>): this {
     for (const [col, value] of Object.entries(values)) this.where(col, 'eq', value);

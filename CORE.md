@@ -297,9 +297,13 @@ secret those routes answer Not found. Its writes clear its page cache.
 
 ## Search
 
-`/search/?q=` lists the entries whose title, excerpt or body text (`entries.body_text`) contain every
-word, ranked by relevance (`Loader.queryRanked`: the phrase in the title, then words in title, excerpt,
-text; newest first on ties; punctuation separates words; past 500 matches the newest 500 are ranked), in the types chosen under Settings > Search (`searchTypes`,
+`/search/?q=` lists the entries whose title, excerpt or body text (`entries.body_text`) have every
+word at the start of a word (`ftsQuery`: each word as an FTS5 prefix, `"tow"*`; punctuation separates
+words; case and accents don't matter), from the full-text index (`entries_fts`, an FTS5 table over
+title, excerpt and body text kept in step by triggers, migration `*_entries_fts.sql`; listings with a
+search, such as the event calendar's `?q=`, use it too). It is ranked by relevance (`Loader.queryRanked`:
+`entry_search` gives the best 1,000 matches by BM25, title weighing 10, excerpt 4, text 1; newest
+first on ties), in the types chosen under Settings > Search (`searchTypes`,
 `settings.site.search_types`; all types with a page by default). It renders the `search` template
 (migration 0021, `src/lib/content/search-template.ts`), else `index`; the page is noindex. The
 `search-form` block is a GET form to `/search/`. On any page with a `.c-search-form`, the page shell
@@ -931,7 +935,11 @@ written rows as one JSON value each (`json_each`), so a statement stays inside D
   their check inside the one statement that writes (`ticket_order_create`, `insertIf`; claims are
   conditional updates).
 - The server's functions (`db.rpc`) are in `functions.ts`: counters, ticket holds, mailing claims and
-  audiences (a segment's rules as SQL), campaign numbers.
+  audiences (a segment's rules as SQL), campaign numbers, search ranking (`entry_search`).
+- Full-text search: `textSearch(col, query)` (op `fts`, FTS5's query syntax) matches rows through the
+  table's FTS5 index (`schema.ts` `fts`, found by `scripts/db-schema.ts` from a virtual table with
+  `content='<table>'`); `col` is `fts` for every indexed column, or one of them. `wrangler d1 export`
+  can't export a database with virtual tables: drop `entries_fts` first, or copy with the API.
 - A Db reads and writes as a role. The server's (`siteDb()`, `serviceClient()` in
   `src/lib/db/site.ts`) isn't checked: public pages, feeds, search, ticket availability, member
   endpoints, the admin login page's theme. Its `Loader`s take a scope (`PUBLIC_SCOPE`, or

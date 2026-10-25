@@ -78,5 +78,4 @@ Concise and factual: what changed, why, and any measurements; no editorial frami
 - The move to Cloudflare is built (`docs/cloudflare-migration.md`); still to check on the first real
   deploy: Images' trim, the cache purge, SMTP over sockets, and a real site's move (its own tables,
   row sizes against D1's 2 MB).
-- Search on FTS5 (today: word matching in `Loader.queryRanked`).
 - Core tests that run on the example site's content (several e2e scripts assume a site's content).
