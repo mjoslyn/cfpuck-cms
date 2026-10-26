@@ -104,7 +104,7 @@ export function renderCampaign(input: RenderInput): Rendered {
 export function urlVariables(html: string): string {
   return html.replace(/\s(href|src)="([^"]*)"/g, (whole, attr: string, url: string) => {
     if (!/%recipient\.v\d+/.test(url)) return whole;
-    if (/^%recipient\./.test(url)) return '';
+    if (/^\s*%recipient\./.test(url)) return '';
     return ` ${attr}="${url.replace(/%recipient\.(v\d+)(?:_h)?%/g, '%recipient.$1_u%')}"`;
   });
 }
