@@ -1,6 +1,8 @@
 // Mailing segments (the Mailing Lists screen's Segments tab and the segment editor). JSON posts { action, ... }:
-// create (a form post from the list goes to its editor), save (id, segment: name, description, rules),
-// delete (id; refused while a campaign or digest uses it, so no audience widens on its own), people
+// create (a form post from the list goes to its editor), save (id, segment: name, description, rules;
+// editors can't change the rules while a campaign that is scheduled, waiting for review, sending or
+// paused, or a digest that is on, uses it: admins can), delete (id; refused while a campaign or digest
+// uses it, so no audience widens on its own), people
 // (rules, lists?: who matches now, subscribed, with a count and the first 100). Editors and admins.
 // Writes here don't change the site's pages.
 import type { APIRoute } from 'astro';
@@ -9,6 +11,8 @@ import { cleanRules } from '../../../../lib/mailing/segments';
 import { audienceOfRules } from '../../../../lib/mailing/send';
 
 const text = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+/** Campaigns past their draft whose audience is still to be made (or made again). */
+const LIVE = ['scheduled', 'review', 'sending', 'paused'];
 
 export const POST: APIRoute = async ({ request, locals, redirect }) => {
   const isForm = /form/.test(request.headers.get('content-type') ?? '');
@@ -23,7 +27,21 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
     }
     case 'save': {
       const s = body.segment ?? {};
-      const { data, error } = await db.from('mail_segments').update({ name: text(s.name, 100) || 'Untitled segment', description: text(s.description, 500), rules: cleanRules(s.rules) }).eq('id', Number(body.id)).select('updated_at').single();
+      const id = Number(body.id);
+      const rules = cleanRules(s.rules);
+      if (locals.user?.role !== 'admin') {
+        // An approved audience isn't widened by an editor: the rules stay while something waiting to go out uses them.
+        const { data: old } = await db.from('mail_segments').select('rules').eq('id', id).maybeSingle();
+        if (old && JSON.stringify(cleanRules(old.rules)) !== JSON.stringify(rules)) {
+          const [{ data: campaigns }, { data: digests }] = await Promise.all([
+            db.from('campaigns').select('name').eq('segment_id', id).in('status', LIVE).limit(3),
+            db.from('digests').select('name').eq('segment_id', id).eq('enabled', true).limit(3),
+          ]);
+          const users = [...(campaigns ?? []), ...(digests ?? [])].map((x) => `“${x.name}”`);
+          if (users.length) return fail(`${users.join(', ')}${users.length >= 3 ? ' and more' : ''} will go out to this segment: only admins change its rules now.`, 403);
+        }
+      }
+      const { data, error } = await db.from('mail_segments').update({ name: text(s.name, 100) || 'Untitled segment', description: text(s.description, 500), rules }).eq('id', id).select('updated_at').single();
       return error ? fail(error.message) : Response.json({ ok: true, updated_at: data.updated_at });
     }
     case 'delete': {

@@ -142,14 +142,22 @@ export async function suppressions(list: 'bounces' | 'complaints' | 'unsubscribe
   return out;
 }
 
-/** Take an address off the domain's unsubscribes (someone signed up again). */
-export async function removeUnsubscribe(address: string): Promise<void> {
+/** Take an address off one of the domain's suppression lists (not on it: nothing to do). */
+async function removeFrom(list: 'bounces' | 'complaints' | 'unsubscribes', address: string): Promise<void> {
   if (!mailgunStatus().configured) return;
   try {
-    await call(`${domainPath()}/unsubscribes/${encodeURIComponent(address)}`, { method: 'DELETE' });
+    await call(`${domainPath()}/${list}/${encodeURIComponent(address)}`, { method: 'DELETE' });
   } catch (e) {
     if ((e as MailgunError).status !== 404) throw e;
   }
+}
+
+/** Take an address off the domain's unsubscribes (someone signed up again). */
+export const removeUnsubscribe = (address: string) => removeFrom('unsubscribes', address);
+
+/** Take an address off the domain's bounces, complaints and unsubscribes (a confirmed sign-up), so the nightly reconcile doesn't suppress it again. */
+export async function removeSuppressions(address: string): Promise<void> {
+  for (const list of ['bounces', 'complaints', 'unsubscribes'] as const) await removeFrom(list, address);
 }
 
 /** Put an address on the domain's unsubscribes (an erased contact). */

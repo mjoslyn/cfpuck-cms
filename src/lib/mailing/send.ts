@@ -183,8 +183,11 @@ export async function runCampaign(id: number, token: string): Promise<void> {
       if (outcome === 'stop') return release(db, id);
       if (outcome.startsWith('failed:')) return release(db, id, { status: 'failed', error: outcome.slice(7) });
     }
-    const { data: open } = await db.from('campaign_batches').select('id').eq('campaign_id', id).in('status', ['pending', 'attempting', 'unknown']);
+    const { data: open } = await db.from('campaign_batches').select('n, status').eq('campaign_id', id).in('status', ['pending', 'attempting', 'unknown', 'failed']).order('n');
+    // A failed batch (resumed past) still went to nobody: the campaign isn't sent until Resume sends it again.
+    const failed = (open ?? []).filter((b) => b.status === 'failed');
     if (!open?.length) await release(db, id, { status: 'sent', sent_at: new Date().toISOString(), error: '' });
+    else if (failed.length === open.length) await release(db, id, { status: 'failed', error: failed.length > 1 ? `Batches ${failed.map((b) => b.n + 1).join(', ')} weren’t sent. Resume sends them again.` : `Batch ${failed[0].n + 1} wasn’t sent. Resume sends it again.` });
     else await release(db, id);
   } catch (e) {
     console.error(`[mailing] campaign ${id}: ${(e as Error).message}`);
