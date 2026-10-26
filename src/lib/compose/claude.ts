@@ -154,7 +154,7 @@ export async function converse(r: ConverseRequest, on: ConverseHooks): Promise<C
   for (let round = 0; round < 6; round++) {
     const stream = client.messages.stream({
       model: COMPOSE_MODEL,
-      max_tokens: 16000,
+      max_tokens: 64000, // thinking counts toward it; streamed, so no request timeout
       system: [{ type: 'text', text: system(r), cache_control: { type: 'ephemeral', ttl: '1h' } }],
       tools,
       tool_choice: { type: 'auto', disable_parallel_tool_use: true },
