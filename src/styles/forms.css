@@ -5,7 +5,6 @@
    button's --button-bg and --button-color. */
 .c-form {
   --form-error: #b42318;
-  max-width: 100%;
 }
 /* A form style's background or border: the form sits in a box with room round it. */
 .has-form-box {
