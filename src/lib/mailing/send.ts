@@ -25,6 +25,8 @@ import { cleanRules, type SegmentRules } from './segments';
 const RUN_MS = 12 * 60 * 1000;
 /** An unknown batch is resent (once) only after Mailgun has had this long to show events for it. */
 const UNKNOWN_WAIT_MS = 10 * 60 * 1000;
+/** How long a batch can stay unclear because Mailgun's events can't be read before the campaign pauses. */
+const UNCLEAR_MS = 60 * 60 * 1000;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'campaign';
 
@@ -167,12 +169,18 @@ export async function runCampaign(id: number, token: string): Promise<void> {
       if (now.status !== 'sending') return release(db, id);
       if (Date.now() - started > RUN_MS) return release(db, id);
       if (b.status === 'unknown' || b.status === 'attempting') {
-        // Did Mailgun take it? Its events for the batch's tag say.
-        if (await tagSeen(`batch-${b.id}`).catch(() => false)) {
+        // Did Mailgun take it? Its events for the batch's tag say. If they can't be read, it isn't sent
+        // again: the next run asks again.
+        const seen = await tagSeen(`batch-${b.id}`).catch((e: Error) => (console.warn(`[mailing] campaign ${id}: Mailgun's events for batch ${b.n + 1} couldn't be read (${e.message})`), null));
+        if (seen) {
           await markAccepted(db, b.id, b.mailgun_id ?? '');
           continue;
         }
         const waited = Date.now() - Date.parse(b.attempted_at ?? new Date(0).toISOString());
+        if (seen === null) {
+          if (waited < UNCLEAR_MS) return release(db, id);
+          return release(db, id, { status: 'paused', error: `Batch ${b.n + 1}: Mailgun’s events couldn’t be read to see whether it took it, so it wasn’t sent again. Check Mailgun’s logs before resuming.` });
+        }
         if (waited < UNKNOWN_WAIT_MS) return release(db, id);
         if (b.attempts >= 2) {
           await db.from('campaign_batches').update({ status: 'failed', error: 'Mailgun’s answer wasn’t seen twice; not sent again.' }).eq('id', b.id);

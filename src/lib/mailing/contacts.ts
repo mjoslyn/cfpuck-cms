@@ -54,7 +54,7 @@ export interface SignUp {
   last_name?: string;
   /** A whole name, split when first and last aren't given. */
   name?: string;
-  /** Values for the site's contact fields (cleaned by the caller), set on a new or unconfirmed contact. */
+  /** Values for the site's contact fields (cleaned by the caller), set on a new contact, or on one not subscribed once it confirms. */
   attributes?: Record<string, string>;
   /** Lists asked for (ids); others are ignored. */
   lists: number[];
@@ -64,16 +64,39 @@ export interface SignUp {
   ip?: string;
   /** The site's address, for the confirmation link. */
   origin: string;
-  /** Tags for the sign-up (a Subscribe block's), added to a new or unconfirmed contact. */
+  /** Tags for the sign-up (a Subscribe block's), added to a new contact, or to one not subscribed once it confirms. */
   tags?: string[];
 }
 
 export type SignUpResult = { ok: true; sent: boolean } | { ok: false; error: string };
 
+/** What a sign-up for an address already on file says, kept until the address is confirmed (contacts.pending_signup). */
+interface PendingSignUp {
+  consent_source: string;
+  consent_text: string;
+  consent_at: string;
+  consent_ip: string;
+  tags: string[];
+  attributes: Record<string, string>;
+}
+
+/**
+ * How many confirmation emails a day an address may have: none once it bounced or complained (here, or
+ * in mail_suppressions), one once it was erased (a confirmed sign-up is its only way back), else 3.
+ */
+async function confirmationsAllowed(db: Db, email: string, contact: Contact | null): Promise<number> {
+  if (contact && (contact.status === 'bounced' || contact.status === 'complained')) return 0;
+  const { data } = await db.from('mail_suppressions').select('reason').eq('email_hash', emailHash(email)).maybeSingle();
+  if (!data) return 3;
+  return data.reason === 'bounced' || data.reason === 'complained' ? 0 : 1;
+}
+
 /**
  * Someone asks to join some lists. A new address (or one that isn't subscribed) waits for confirmation;
  * a subscribed one's new lists wait too, and the confirmation email covers them. Nothing tells the
- * visitor whether the address was known: the answer is the same either way.
+ * visitor whether the address was known: the answer is the same either way, also for an address that
+ * bounced or complained, which is sent nothing. Anyone can type an address, so a sign-up for one already
+ * on file changes nothing on it until it is confirmed (its consent, tags and fields wait in pending_signup).
  */
 export async function signUp(db: Db, s: SignUp): Promise<SignUpResult> {
   const email = normalEmail(s.email);
@@ -85,6 +108,8 @@ export async function signUp(db: Db, s: SignUp): Promise<SignUpResult> {
   const fields = Object.fromEntries(Object.entries(s.attributes ?? {}).filter(([, v]) => v));
   const consent = { consent_source: s.source.slice(0, 200), consent_text: (s.consentText || CONSENT_TEXT).slice(0, 1000), consent_at: new Date().toISOString(), consent_ip: (s.ip ?? '').slice(0, 64) };
   let contact = await contactByEmail(db, email);
+  const allowed = await confirmationsAllowed(db, email, contact);
+  if (!allowed) return { ok: true, sent: false };
   if (!contact) {
     const { data, error } = await db.from('contacts').insert({ email, ...names, status: 'pending', tags: cleanTags(s.tags ?? []), attributes: fields, ...consent }).select('*').single();
     // Two sign-ups at once: the other one made the row.
@@ -92,10 +117,11 @@ export async function signUp(db: Db, s: SignUp): Promise<SignUpResult> {
     else if (error) return { ok: false, error: error.message };
     else contact = data as Contact;
   } else if (contact.status !== 'subscribed') {
-    // Tags and fields only for an address not yet confirmed: a form can't change someone already subscribed.
+    // Consent, tags and fields wait for the confirmation (confirm writes them): a form can't change someone on file.
+    const pending: PendingSignUp = { ...consent, tags: cleanTags(s.tags ?? []), attributes: fields };
     await db
       .from('contacts')
-      .update({ ...consent, ...(!contact.name && (names.first_name || names.last_name) ? names : {}), ...(s.tags?.length ? { tags: cleanTags([...(contact.tags ?? []), ...s.tags]) } : {}), ...(Object.keys(fields).length ? { attributes: mergeFields(contact.attributes, fields) } : {}) })
+      .update({ pending_signup: pending, ...(!contact.name && (names.first_name || names.last_name) ? names : {}) })
       .eq('id', contact.id);
   } else if (!contact.name && (names.first_name || names.last_name)) {
     await db.from('contacts').update(names).eq('id', contact.id);
@@ -111,16 +137,17 @@ export async function signUp(db: Db, s: SignUp): Promise<SignUpResult> {
     { onConflict: 'contact_id,list_id' },
   );
   if (error) return { ok: false, error: error.message };
-  return { ok: true, sent: await sendConfirmation(db, contact, offered.filter((l) => wanted.includes(l.id)), s.origin) };
+  return { ok: true, sent: await sendConfirmation(db, contact, offered.filter((l) => wanted.includes(l.id)), s.origin, allowed) };
 }
 
-/** The confirmation email, at most 3 a day to one address. Sent over SMTP like the site's other transactional mail. */
-async function sendConfirmation(db: Db, contact: Contact, lists: MailList[], origin: string): Promise<boolean> {
+/** The confirmation email, at most `perDay` a day to one address (confirmationsAllowed). Sent over SMTP like the site's other transactional mail. */
+async function sendConfirmation(db: Db, contact: Contact, lists: MailList[], origin: string, perDay: number): Promise<boolean> {
   const today = new Date().toISOString().slice(0, 10);
   const { data: row } = await db.from('contacts').select('confirm_day, confirm_count').eq('id', contact.id).single();
   const count = row?.confirm_day === today ? Number(row.confirm_count) : 0;
-  if (count >= 3) return false;
-  await db.from('contacts').update({ confirm_day: today, confirm_count: count + 1 }).eq('id', contact.id);
+  if (count >= perDay) return false;
+  // confirm_sent_at: the sign-up form's limit a minute counts the emails sent.
+  await db.from('contacts').update({ confirm_day: today, confirm_count: count + 1, confirm_sent_at: new Date().toISOString() }).eq('id', contact.id);
   const { name } = await loadMailing(db);
   const link = `${origin}${PREFERENCES_PATH}?confirm=${sign('confirm', contact.id)}`;
   const which = lists.map((l) => l.name).join(', ');
@@ -143,25 +170,32 @@ export async function resendConfirmation(db: Db, id: number, origin: string): Pr
   if (!found) return { ok: false, error: 'No such contact.' };
   const { contact } = found;
   if (contact.status === 'bounced' || contact.status === 'complained') return { ok: false, error: `${contact.email} ${contact.status === 'bounced' ? 'bounced' : 'marked an email as spam'}, so nothing more is sent to them.` };
+  const allowed = await confirmationsAllowed(db, contact.email, contact);
+  if (!allowed) return { ok: false, error: `${contact.email} bounced or marked an email as spam, so nothing more is sent to them.` };
   const { data: rows } = await db.from('contact_lists').select('list_id').eq('contact_id', id).eq('status', 'pending');
   const waiting = new Set((rows ?? []).map((r) => Number(r.list_id)));
   const lists = (await loadLists(db)).filter((l) => waiting.has(l.id));
   if (!lists.length) return { ok: false, error: 'Nothing is waiting for their confirmation.' };
-  return (await sendConfirmation(db, contact, lists, origin)) ? { ok: true } : { ok: false, error: 'Not sent: they already had 3 confirmation emails today, or the email failed.' };
+  return (await sendConfirmation(db, contact, lists, origin, allowed)) ? { ok: true } : { ok: false, error: `Not sent: they already had ${allowed === 1 ? 'a confirmation email (their address was erased, so one a day)' : `${allowed} confirmation emails`} today, or the email failed.` };
 }
 
-/** A confirmation link was followed (and its button pressed): the contact and their waiting lists are subscribed. */
+/** A confirmation link was followed (and its button pressed): the contact and their waiting lists are
+ * subscribed, and what the latest sign-up said (consent, tags, fields) is written. */
 export async function confirm(db: Db, id: number): Promise<Contact | null> {
   const found = await loadContact(db, id);
   if (!found) return null;
   const now = new Date().toISOString();
   const { contact } = found;
-  await db.from('contacts').update({ status: 'subscribed', confirmed_at: now, unsubscribed_at: null }).eq('id', id);
+  const p = (contact as Contact & { pending_signup?: PendingSignUp | null }).pending_signup;
+  const signed = p
+    ? { consent_source: p.consent_source, consent_text: p.consent_text, consent_at: p.consent_at, consent_ip: p.consent_ip, tags: cleanTags([...(contact.tags ?? []), ...(p.tags ?? [])]), attributes: mergeFields(contact.attributes, p.attributes) }
+    : {};
+  await db.from('contacts').update({ status: 'subscribed', confirmed_at: now, unsubscribed_at: null, pending_signup: null, ...signed }).eq('id', id);
   await db.from('contact_lists').update({ status: 'subscribed', subscribed_at: now, unsubscribed_at: null }).eq('contact_id', id).eq('status', 'pending');
   // A confirmed sign-up lifts an earlier suppression, here and at Mailgun.
   await db.from('mail_suppressions').delete().eq('email_hash', emailHash(contact.email));
   if (contact.status !== 'subscribed') await removeSuppressions(contact.email).catch((e) => console.error(`mailing: Mailgun suppression removal failed: ${e.message}`));
-  return { ...contact, status: 'subscribed', confirmed_at: now };
+  return { ...contact, ...signed, status: 'subscribed', confirmed_at: now };
 }
 
 /**
@@ -220,13 +254,18 @@ export async function unsubscribe(db: Db, id: number, opts: { list?: number; cam
   return true;
 }
 
-/** Erase a contact (admins): their row, sends and clicks go; a hash of the address stays, so they're never mailed again without signing up anew. */
+/** Erase a contact (admins): their row, sends, clicks and Mailgun's events for the address go; a hash of the
+ * address stays, so they're never mailed again without signing up anew (an earlier bounce or complaint is
+ * kept as the reason, so they're never sent a confirmation either). */
 export async function erase(db: Db, id: number): Promise<{ ok: boolean; error?: string }> {
   const { data } = await db.from('contacts').select('email').eq('id', id).maybeSingle();
   if (!data) return { ok: false, error: 'No such contact.' };
-  const { error: e1 } = await db.from('mail_suppressions').upsert({ email_hash: emailHash(data.email), reason: 'erased' }, { onConflict: 'email_hash' });
+  const { error: e1 } = await db.from('mail_suppressions').upsert({ email_hash: emailHash(data.email), reason: 'erased' }, { onConflict: 'email_hash', ignoreDuplicates: true });
   if (e1) return { ok: false, error: e1.message };
   await db.from('link_clicks').delete().eq('contact_id', id);
+  // The webhook keeps the recipient lowercased, as contacts' addresses are.
+  const { error: e2 } = await db.from('mail_events').delete().eq('recipient', normalEmail(data.email));
+  if (e2) return { ok: false, error: e2.message };
   const { error } = await db.from('contacts').delete().eq('id', id);
   if (error) return { ok: false, error: error.message };
   await addUnsubscribe(data.email).catch((e) => console.error(`mailing: Mailgun unsubscribe failed: ${e.message}`));

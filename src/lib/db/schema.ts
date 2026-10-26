@@ -80,7 +80,7 @@ export const SCHEMA: Record<string, TableSchema> = {
   },
   contacts: {
     pk: ["id"],
-    columns: {"id":"int8","email":"text","attributes":"jsonb","status":"text","consent_source":"text","consent_text":"text","consent_at":"timestamptz","consent_ip":"text","confirmed_at":"timestamptz","unsubscribed_at":"timestamptz","confirm_day":"date","confirm_count":"int8","notes":"text","created_at":"timestamptz","updated_at":"timestamptz","tags":"_text","first_name":"text","last_name":"text","name":"text","email_hash":"text"},
+    columns: {"id":"int8","email":"text","attributes":"jsonb","status":"text","consent_source":"text","consent_text":"text","consent_at":"timestamptz","consent_ip":"text","confirmed_at":"timestamptz","unsubscribed_at":"timestamptz","confirm_day":"date","confirm_count":"int8","notes":"text","created_at":"timestamptz","updated_at":"timestamptz","tags":"_text","first_name":"text","last_name":"text","name":"text","email_hash":"text","pending_signup":"jsonb","confirm_sent_at":"timestamptz"},
     generated: ["name"],
     fks: [],
     defaults: {"attributes":{},"status":"pending","consent_source":"","consent_text":"","consent_ip":"","confirm_count":0,"notes":"","tags":[],"first_name":"","last_name":"","email_hash":""},
