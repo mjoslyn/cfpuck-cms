@@ -59,7 +59,6 @@ export const POLICIES: Record<string, TablePolicy> = {
   forms: all(editors, editors),
   mail_segments: all(editors, editors),
   media: all(editors, editors),
-  redirects: all(editors, editors),
   revisions: all(editors, editors),
   templates: all(editors, editors),
   terms: all(editors, editors),
@@ -68,11 +67,14 @@ export const POLICIES: Record<string, TablePolicy> = {
   contacts: all(editors, admins),
   mail_lists: all(editors, admins),
   members: all(editors, admins),
+  // Rules are admins' (Settings > Redirects); an entry's or term's moved address writes its own as the server.
+  redirects: all(editors, admins),
   settings: all(editors, admins),
   form_submissions: { select: editors, insert: nobody, update: nobody, delete: editors },
   not_found: { select: editors, insert: nobody, update: nobody, delete: editors },
-  ticket_orders: { select: editors, insert: nobody, update: editors, delete: nobody },
-  ticket_waitlist: { select: editors, insert: nobody, update: editors, delete: nobody },
+  // Orders and waitlists change through the attendee list's actions, which write as the server.
+  ticket_orders: readOnly(editors),
+  ticket_waitlist: readOnly(editors),
   mail_suppressions: readOnly(admins),
   // Admins change other people's profiles; editors rename themselves but don't change their own role.
   profiles: {

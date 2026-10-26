@@ -3,6 +3,7 @@ import { isTaxonomy, TAXONOMY_BASES } from '../../../lib/site';
 import { slugify } from '../../../lib/slug';
 import { termLink } from '../../../lib/permalink';
 import { redirectMovedEntry } from '../../../lib/redirects';
+import { siteDb } from '../../../lib/db/site';
 import { termFieldsFor } from '../../../lib/page-meta';
 
 /**
@@ -106,8 +107,8 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
   const fields = form.has('template') ? withTemplate(term!.fields, templateOf(form.get('template'))) : term!.fields;
   const { error } = await db.from('terms').update({ name, slug, parent_id: parent, fields }).eq('id', id).eq('taxonomy', taxonomy);
   if (error) return back('error', error.message);
-  // The term page moved with its address: the old one redirects.
-  if (term!.slug !== slug && TAXONOMY_BASES[taxonomy]) await redirectMovedEntry(db, termLink({ taxonomy, slug: term!.slug }), termLink({ taxonomy, slug }));
+  // The term page moved with its address: the old one redirects (as the server, since redirects are admins').
+  if (term!.slug !== slug && TAXONOMY_BASES[taxonomy]) await redirectMovedEntry(siteDb(), termLink({ taxonomy, slug: term!.slug }), termLink({ taxonomy, slug }));
   return back('notice', `Saved "${name}".`);
 };
 

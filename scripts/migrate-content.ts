@@ -41,7 +41,8 @@ for (const e of await all('entries', 'id, content, updated_at')) {
   if (!content) continue;
   bump('entries');
   if (dry) continue;
-  // Keep updated_at: a content migration is not an edit (the touch trigger keeps an explicit value).
+  // Keep updated_at: a content migration is not an edit (the query layer puts back an updated_at a write
+  // sets, which the touch trigger would otherwise replace).
   const { error } = await db.from('entries').update({ content, updated_at: e.updated_at }).eq('id', e.id);
   if (error) throw error;
 }

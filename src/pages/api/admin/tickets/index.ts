@@ -22,7 +22,7 @@ export const POST: APIRoute = async ({ request, locals, url }) => {
   try {
     switch (body.action) {
       case 'check-in': {
-        const { error } = await locals.db.from('ticket_orders').update({ checked_in_at: body.on ? new Date().toISOString() : null }).eq('id', id).eq('status', 'paid');
+        const { error } = await db.from('ticket_orders').update({ checked_in_at: body.on ? new Date().toISOString() : null }).eq('id', id).eq('status', 'paid');
         if (error) throw error;
         return Response.json({ ok: true });
       }
@@ -66,7 +66,7 @@ export const POST: APIRoute = async ({ request, locals, url }) => {
         return Response.json({ ok: true });
       }
       case 'waitlist-remove': {
-        const { error } = await locals.db.from('ticket_waitlist').update({ status: 'removed' }).eq('id', id);
+        const { error } = await db.from('ticket_waitlist').update({ status: 'removed' }).eq('id', id);
         if (error) throw error;
         return Response.json({ ok: true });
       }

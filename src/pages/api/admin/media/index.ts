@@ -2,7 +2,7 @@
 // (MP4/WebM/MOV, stored as is, up to 200 MB).
 import type { APIRoute } from 'astro';
 import { serviceClient } from '../../../../lib/db/site';
-import { MediaStore, processUpload } from '../../../../lib/media/process';
+import { MediaStore, PathTaken, processUpload } from '../../../../lib/media/process';
 
 export const POST: APIRoute = async ({ request, locals }) => {
   const db = locals.db;
@@ -31,17 +31,31 @@ export const POST: APIRoute = async ({ request, locals }) => {
     return (files ?? []).some((f) => f.name.startsWith(name));
   };
   let path = `${dir}/${base}`;
-  try {
-    for (let n = 1; await taken(path); n++) path = `${dir}/${base.slice(0, dot)}-${n}${base.slice(dot)}`;
-  } catch (e) {
-    return new Response((e as Error).message, { status: 400 });
+  let n = 0;
+  const freeName = async () => {
+    while (await taken(path)) path = `${dir}/${base.slice(0, dot)}-${++n}${base.slice(dot)}`;
+  };
+  // Another upload can take the same name between the check and the writes (parallel uploads of one
+  // name): this store never writes over a stored file, and the upload goes again under the next free name.
+  const store = new MediaStore(serviceClient(), undefined, true);
+  const bytes = Buffer.from(await file.arrayBuffer());
+  let processed;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await freeName();
+    } catch (e) {
+      return new Response((e as Error).message, { status: 400 });
+    }
+    try {
+      if (isVideo) await store.put(path, bytes, file.type);
+      else processed = await processUpload(store, path, bytes, file.type);
+      break;
+    } catch (e) {
+      if (e instanceof PathTaken && attempt < 5) continue;
+      return new Response(`Could not ${isVideo ? 'store the video' : 'process the image'}: ${(e as Error).message}`, { status: 400 });
+    }
   }
   if (isVideo) {
-    try {
-      await new MediaStore(serviceClient()).put(path, Buffer.from(await file.arrayBuffer()), file.type);
-    } catch (e) {
-      return new Response(`Could not store the video: ${(e as Error).message}`, { status: 400 });
-    }
     const { data, error } = await db
       .from('media')
       .insert({ path, mime_type: file.type, title: base.slice(0, dot > 0 ? dot : undefined), sizes: {}, formats: {}, processed_at: new Date().toISOString() })
@@ -49,12 +63,6 @@ export const POST: APIRoute = async ({ request, locals }) => {
       .single();
     if (error) return new Response(error.message, { status: 400 });
     return Response.json(data);
-  }
-  let processed;
-  try {
-    processed = await processUpload(new MediaStore(serviceClient()), path, Buffer.from(await file.arrayBuffer()), file.type);
-  } catch (e) {
-    return new Response(`Could not process the image: ${(e as Error).message}`, { status: 400 });
   }
   const { data, error } = await db
     .from('media')
