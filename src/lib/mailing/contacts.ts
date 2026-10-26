@@ -16,6 +16,11 @@ const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '
 /** The site's address for links in emails: SITE_URL, else the request's. */
 export const mailOrigin = (fallback?: string) => (env('SITE_URL') || fallback || 'http://localhost:4321').replace(/\/$/, '');
 
+/** Why campaigns and digests can't go out, if they can't: their links (unsubscribe among them) are made
+ * without a request (scheduled runs, the jobs queue), so they need SITE_URL; under astro dev, localhost. */
+export const mailOriginProblem = () =>
+  (env('SITE_URL') || import.meta.env?.DEV) ? '' : 'Set SITE_URL (the site’s address) first: the links in every email, unsubscribe among them, are made from it.';
+
 /** The site's name and mailing settings. */
 export async function loadMailing(db: Db): Promise<{ name: string; settings: MailingSettings; site: Record<string, any> }> {
   const { data } = await db.from('settings').select('value').eq('key', 'site').maybeSingle();

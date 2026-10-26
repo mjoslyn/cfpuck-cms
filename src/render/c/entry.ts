@@ -69,7 +69,7 @@ export const entryTitleBlock: Renderer = (b, env) => {
   const a = b.attrs;
   let title = entryTitle(post);
   if (!title) return '';
-  const tag = a.level === 0 ? 'p' : `h${a.level ?? 2}`;
+  const tag = a.level === 0 ? 'p' : `h${Math.min(6, Math.max(1, Number(a.level) || 2))}`;
   if (a.link) title = `<a href="${linkOf(post)}"${linkAttrs(a)}>${title}</a>`;
   return `<${tag} ${root(a, ['c-entry-title'])}>${title}</${tag}>`;
 };

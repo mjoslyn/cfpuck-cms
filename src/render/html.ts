@@ -43,7 +43,8 @@ export function wrapperAttrs(w: { className: string; style: string }, extra = ''
 
 /** Strip tags and trim to a number of words. */
 export function trimWords(text: string, num: number, more = '&hellip;') {
-  const stripped = text.replace(/<(script|style)[^>]*?>[\s\S]*?<\/\1>/gi, '').replace(/<[^>]*>/g, '').trim();
+  // A "<" left after the tags go (one never closed) would start markup of its own where the words go.
+  const stripped = text.replace(/<(script|style)[^>]*?>[\s\S]*?<\/\1>/gi, '').replace(/<[^>]*>/g, '').replace(/</g, '&lt;').trim();
   const words = stripped.split(/[\n\r\t ]+/).filter(Boolean);
   return words.length > num ? words.slice(0, num).join(' ') + more : words.join(' ');
 }

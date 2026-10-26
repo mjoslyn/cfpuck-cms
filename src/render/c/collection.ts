@@ -231,7 +231,7 @@ export const archiveTitle: Renderer = (b, env) => {
   const a = b.attrs;
   const kind = env.ctx.queried.kind;
   if (kind !== 'archive' && kind !== 'taxonomy' && kind !== 'search') return '';
-  const tag = `h${a.level ?? 1}`;
+  const tag = `h${Math.min(6, Math.max(1, Number(a.level) || 1))}`;
   return `<${tag} ${root(a, ['c-archive-title'])}>${archiveTitleText(env, a.showPrefix !== false)}</${tag}>`;
 };
 

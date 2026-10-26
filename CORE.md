@@ -286,8 +286,10 @@ secret those routes answer Not found. Its writes clear its page cache.
   are. Rows to delete go first, so rows written back can't clash with them; rows are written 100 at a
   time (a failed batch is retried row by row, reporting only the rows that can't go back), and entries'
   terms and unpublished changes in bulk. Deleting a file deletes its media row only: its stored images
-  stay. A form with submissions is never deleted (they would be cut loose from it); the report names
-  it. A restore runs as a job, since it outlasts a request and must not be cut off halfway:
+  stay. A form with submissions is never deleted (they would be cut loose from it), nor are rows other
+  rows came to depend on (`removeAdded`): entries with ticket orders, waitlist places or emails of their
+  own, or pages under them; terms entries still use, or with terms under them; files entries still
+  feature. The report names them. A restore runs as a job, since it outlasts a request and must not be cut off halfway:
   `restoreBackup` queues it (`queueRestore`, a file under `jobs/` in that folder) and the jobs queue runs
   it once (`runRestore`, `src/worker.ts`; without a queue the request does) and clears the page cache; the screen polls `GET /api/admin/sync?restoreJob=<id>`.
 - Mailing's contacts, campaigns, sends and clicks aren't synced or backed up, and a restore leaves
@@ -393,7 +395,8 @@ Text materials count toward the budget of what is sent in full (`MATERIAL_BUDGET
   who views them (see Members) aren't cached. Under `astro dev`
   nothing is cached. The first cover or hero image on a page loads at high priority (`optimizeImages`).
   Signed-in editors get an editor bar
-  (`public/assets/js/editor-bar.js`, `/api/admin/me`) added in the browser, so cached pages stay shared.
+  (`public/assets/js/editor-bar.js`, `/api/admin/me`) added in the browser, so cached pages stay shared;
+  it asks only when the `site.signed_in` cookie is there (see Accounts).
 
 ## Media
 
@@ -789,7 +792,9 @@ never subscribes anyone again); the settings are, with the others. Migration `*_
   Nothing goes out without that footer: `footerProblem` checks the HTML and the text for the
   recipient's unsubscribe and preferences links when a campaign is frozen, before each batch, and
   before a test send, and refuses to send without them.
-- **Sending** (`src/lib/mailing/send.ts`): a job. `startSending` claims the campaign (`mail_claim`, a
+- **Sending** (`src/lib/mailing/send.ts`): a job, which needs `SITE_URL` (outside `astro dev`): its
+  links are made without a request (`mailOriginProblem`; sends, schedules, approvals and tests are
+  refused without it). `startSending` claims the campaign (`mail_claim`, a
   token) and puts it on the jobs queue (`src/lib/jobs.ts`; in-process without one). A run
   freezes the campaign first (its HTML and text, tracked links, every recipient in `campaign_sends`, in
   batches of up to 1,000), then per batch re-checks who is still subscribed (the rest `dropped`), marks
@@ -845,7 +850,9 @@ never subscribes anyone again); the settings are, with the others. Migration `*_
 `/admin/` (a session, see Accounts; `profiles.role`: editor, admin, or viewer = no access). Editors manage content,
 templates, media, forms and compose; site settings and users (`/admin/users/`: roles, invitations, Resend invitation for those invited who haven't set a password, signed in by a link or not, `src/lib/admin/invite.ts`; Delete, not your own account: the profile and any membership go, what they made stays with its author left empty) are
 for admins, as is the redirects API (`ADMIN_ONLY` in `src/middleware.ts`; settings writes are admin-only in the policies,
-`src/lib/db/policies.ts`; the users API checks the role itself too, since making accounts is the server's). `src/puck/Editor.tsx` renders blocks through the same string renderer inside Puck
+`src/lib/db/policies.ts`; the users API checks the role itself too, since making accounts is the server's). Editors are trusted with the
+site's markup: the HTML block (and an Embed block's HTML) is put on the page as written, at the admin's
+own address, so a script in it runs as whoever views the page, an admin included. `src/puck/Editor.tsx` renders blocks through the same string renderer inside Puck
 (`BlockView.tsx` parses HTML to React; slots become the block's inner wrapper element). The left rail
 has Blocks (and Patterns), Outline and an accessibility check (`A11yPanel.tsx`). Problems a person has to judge
 (warnings, and text over an image, which is always a problem since its contrast can't be measured) can be
@@ -865,6 +872,8 @@ aren't mounted: the site's endpoints call it (`signIn`, `signOut`, `sessionUser`
 `setPassword`, `passwordToken`, `setPasswordWithToken`, `confirmToken`, `confirmAddress`) and send its
 emails themselves (`src/lib/auth/mail.ts`, over SMTP). The session is a signed cookie,
 `site.session_token` (seven days, renewed as it is used); `AUTH_SECRET` signs it and the site's links.
+Pages' scripts can't read it, so signing in also sets `site.signed_in=1` (no secret; `redirectWith`, cleared
+on signing out), which the editor bar and the member sign-in link check before asking who is signed in.
 Every account has a profile, made with it (`databaseHooks`); sign-ins set `users.last_sign_in_at`.
 Passwords are scrypt; those carried over from Supabase Auth are bcrypt, checked as such and rehashed
 on the next sign-in. Editors and admins sign in at `/admin/login/` (`/api/auth/login`); a password
@@ -921,6 +930,10 @@ times as ISO strings in UTC with milliseconds, text sorted without regard to cas
 exists). Tables and columns are checked against `schema.ts` (generated from the local D1 by
 `scripts/db-schema.ts`; run it after a migration that changes tables). Every value is bound, lists and
 written rows as one JSON value each (`json_each`), so a statement stays inside D1's 100 bound values.
+D1 also takes at most 32 arguments per SQL function and 50-byte LIKE and GLOB patterns (local SQLite
+takes more, so local runs don't show these): a row's `json_object` has 16 columns, the rest added by
+`json_insert` 15 at a time; `like`/`ilike` patterns of the shapes the code uses (exact, `prefix%`,
+`%contains%`, `%suffix`) are compared as strings (`likeSql`), any length.
 
 - Column types are the declared types in the migrations (`BOOLEAN`, `JSON_TEXT`, `ARRAY_TEXT`,
   `TIMESTAMPTZ`, `DATE`, `UUID`, `INTEGER`, `TEXT`, `REAL`); booleans are kept as 1 and 0, JSON as
@@ -933,7 +946,8 @@ written rows as one JSON value each (`json_each`), so a statement stays inside D
   `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` and `D1_DATABASE_ID`, the deployed one through
   Cloudflare's API.
 - D1 has no interactive transactions: a statement is atomic, and a role's write is checked before it
-  is made (the rows it may reach, read first; the rows it writes). The functions that needed a lock do
+  is made (the rows it may reach, read first, and the rule again in the write; the rows it writes). An
+  upsert is also an update of the rows it conflicts with: they must pass the update rule (`upsertRule`). The functions that needed a lock do
   their check inside the one statement that writes (`ticket_order_create`, `insertIf`; claims are
   conditional updates).
 - The server's functions (`db.rpc`) are in `functions.ts`: counters, ticket holds, mailing claims and

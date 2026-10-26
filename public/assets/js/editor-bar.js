@@ -2,7 +2,8 @@
 // edit what the page shows (body data-edit-entry / data-edit-template, set by the renderer). Pages are
 // cached and shared, so this runs in the browser: only visitors with a sign-in cookie ask who they are.
 (() => {
-  if (!document.cookie.split('; ').some((c) => /^sb-[^=]*-auth-token/.test(c))) return;
+  // site.signed_in: set beside the session's own cookie, which scripts can't read (src/lib/auth).
+  if (!document.cookie.split('; ').some((c) => c.startsWith('site.signed_in='))) return;
   const body = document.body;
   const entry = body.dataset.editEntry;
   const template = body.dataset.editTemplate;

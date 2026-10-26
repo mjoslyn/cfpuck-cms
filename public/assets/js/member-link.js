@@ -2,7 +2,8 @@
 // visitors with an account. Pages with it are cached and shared, so this runs in the browser, and only
 // visitors with a sign-in cookie ask who they are.
 (() => {
-  if (!document.cookie.split('; ').some((c) => /^sb-[^=]*-auth-token/.test(c))) return;
+  // site.signed_in: set beside the session's own cookie, which scripts can't read (src/lib/auth).
+  if (!document.cookie.split('; ').some((c) => c.startsWith('site.signed_in='))) return;
   fetch('/api/members/me', { credentials: 'same-origin', cache: 'no-store' })
     .then((r) => (r.ok ? r.json() : null))
     .then((me) => {

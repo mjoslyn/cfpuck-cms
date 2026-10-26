@@ -111,10 +111,27 @@ export const confirmEmail = () => env('AUTH_CONFIRM_EMAIL') !== 'false';
 /** The Set-Cookie headers a call answered with. */
 const cookiesOf = (res: Response) => res.headers.getSetCookie();
 
+/** A cookie the pages' scripts can read (the session's can't be): set while someone is signed in, so
+ * cached pages ask who they are (public/assets/js/editor-bar.js, member-link.js) only then. No secret. */
+export const SIGNED_IN_COOKIE = `${COOKIE_PREFIX}.signed_in`;
+
+/** The signed-in cookie to go with session cookies being set or cleared, if they are. */
+function signedInCookie(cookies: string[]): string | null {
+  const session = cookies.find((c) => new RegExp(`^(__Secure-)?${COOKIE_PREFIX}\\.session_token=`).test(c));
+  if (!session) return null;
+  const value = session.slice(session.indexOf('=') + 1).split(';')[0];
+  const secure = /;\s*secure/i.test(session) ? '; Secure' : '';
+  if (!value || /;\s*max-age=0\b/i.test(session)) return `${SIGNED_IN_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax${secure}`;
+  const age = session.match(/;\s*max-age=(\d+)/i)?.[1];
+  return `${SIGNED_IN_COOKIE}=1; Path=/; SameSite=Lax${age ? `; Max-Age=${age}` : ''}${secure}`;
+}
+
 /** A redirect carrying cookies (signing in or out). */
 export function redirectWith(location: string, cookies: string[], status = 303): Response {
   const headers = new Headers({ Location: location, 'Cache-Control': 'no-store' });
   for (const c of cookies) headers.append('Set-Cookie', c);
+  const hint = signedInCookie(cookies);
+  if (hint) headers.append('Set-Cookie', hint);
   return new Response(null, { status, headers });
 }
 

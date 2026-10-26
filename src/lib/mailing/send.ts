@@ -11,7 +11,7 @@ import { serviceClient } from '../db/site';
 import { emailEvents } from '../events/email';
 import { refreshSiteTimezone } from '../site/timezone';
 import { audienceOf, type Campaign } from './config';
-import { loadMailing, mailOrigin } from './contacts';
+import { loadMailing, mailOrigin, mailOriginProblem } from './contacts';
 import { emailEntries } from './entries';
 import { BATCH_SIZE, MailgunError, mailgunStatus, sendBatch, tagSeen } from './mailgun';
 import { addHoneypot, findLinks, plainText, recipientValues, renderCampaign, trackLinks, trackText, utmLinks, withUtm, footerProblem, type Recipient, type VarSpec } from './render';
@@ -78,6 +78,8 @@ export async function renderFor(db: Db, c: Campaign, origin: string) {
 
 /** Freeze a campaign: render it, make its links, write its recipients and batches. Returns an error message, or '' when done. */
 async function freeze(db: Db, c: Campaign): Promise<string> {
+  const noOrigin = mailOriginProblem();
+  if (noOrigin) return noOrigin;
   const origin = mailOrigin();
   const { rendered, name, settings } = await renderFor(db, c, origin);
   if (!settings.address) return 'Add the postal address under Settings > Mailing Lists: every email must carry it.';
@@ -259,6 +261,8 @@ async function sendOne(db: Db, c: Campaign, frozen: Frozen, b: { id: number; n: 
 
 /** A test send to a few addresses (the campaign as it would go now; no tracking, not counted). */
 export async function sendTest(db: Db, c: Campaign, to: Recipient[]): Promise<string> {
+  const noOrigin = mailOriginProblem();
+  if (noOrigin) throw new Error(noOrigin);
   const origin = mailOrigin();
   const { rendered, name, settings } = await renderFor(db, c, origin);
   if (!settings.address) throw new Error('Add the postal address under Settings > Mailing Lists first: every email must carry it.');

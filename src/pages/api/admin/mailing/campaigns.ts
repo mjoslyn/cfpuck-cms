@@ -12,6 +12,7 @@ import { EMAIL_RE, audienceOf, mailingSettings, splitName, type Campaign } from 
 import { audience, sendTest, startSending } from '../../../../lib/mailing/send';
 import { mailgunStatus, tagStats } from '../../../../lib/mailing/mailgun';
 import { setPaused } from '../../../../lib/mailing/state';
+import { mailOriginProblem } from '../../../../lib/mailing/contacts';
 import { defaultTemplate } from '../../../../lib/email-templates';
 
 const SENDABLE = ['draft', 'review', 'paused', 'failed'];
@@ -118,7 +119,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
     if (!c.subject.trim()) return 'Give it a subject.';
     if (!c.list_ids?.length) return 'Choose at least one list.';
     if (!settings.address) return 'Add the postal address under Settings > Mailing Lists: every email must carry it.';
-    return '';
+    return mailOriginProblem();
   };
   switch (action) {
     case 'schedule':

@@ -166,7 +166,16 @@ function outValue(sql: string, type: string): string {
   return sql;
 }
 
-const jsonObject = (pairs: [string, string][]) => (pairs.length ? `json_object(${pairs.map(([k, v]) => `${lit(k)}, ${v}`).join(', ')})` : `json_object()`);
+/** A row as a JSON object. D1 takes at most 32 arguments per SQL function, so the first 16 pairs are
+ * json_object's and the rest are added 15 at a time by json_insert, which keeps their order. */
+function jsonObject(pairs: [string, string][]): string {
+  let sql = `json_object(${pairs.slice(0, 16).map(([k, v]) => `${lit(k)}, ${v}`).join(', ')})`;
+  for (let i = 16; i < pairs.length; i += 15) {
+    const more = pairs.slice(i, i + 15).map(([k, v]) => `${lit(`$."${k.includes('"') ? fail(`Unsupported key: ${k}`) : k}"`)}, ${v}`);
+    sql = `json_insert(${sql}, ${more.join(', ')})`;
+  }
+  return sql;
+}
 
 const byJsonbOrder = ([a]: [string, string], [b]: [string, string]) => {
   const x = new TextEncoder().encode(a);
@@ -242,6 +251,46 @@ function relationOf(table: string, name: string, hint?: string): Relation {
 
 // ----- conditions -----
 
+type LikePart = { lit: string } | '%' | '_';
+
+/** A LIKE pattern as literal runs and wildcards (a backslash escapes the next character). */
+function likeParts(pattern: string): LikePart[] {
+  const parts: LikePart[] = [];
+  for (let i = 0; i < pattern.length; i++) {
+    let ch = pattern[i];
+    if (ch === '%' || ch === '_') {
+      if (!(ch === '%' && parts.at(-1) === '%')) parts.push(ch);
+      continue;
+    }
+    if (ch === '\\' && i + 1 < pattern.length) ch = pattern[++i];
+    const last = parts.at(-1);
+    if (typeof last === 'object') last.lit += ch;
+    else parts.push({ lit: ch });
+  }
+  return parts;
+}
+
+/**
+ * A LIKE (case-sensitive, as Postgres's) or ILIKE condition. D1 refuses LIKE and GLOB patterns over 50
+ * bytes, so the shapes the code uses (exact, prefix%, %contains%, %suffix) are compared as strings,
+ * which takes any length; other patterns go to LIKE (ILIKE) or GLOB (LIKE).
+ */
+function likeSql(col: string, pattern: string, insensitive: boolean, params: Params): string {
+  const parts = likeParts(pattern);
+  const text = (p: LikePart | undefined) => (typeof p === 'object' ? p.lit : null);
+  const c = insensitive ? `lower(${col})` : col;
+  const v = (s: string) => (insensitive ? `lower(${params.add(s)})` : params.add(s));
+  const chars = (s: string) => [...s].length;
+  const [a, b, d] = parts;
+  if (parts.length === 0) return `${col} = ''`;
+  if (parts.length === 1 && a === '%') return `${col} IS NOT NULL`;
+  if (parts.length === 1 && text(a) !== null) return `${c} = ${v(text(a)!)}`;
+  if (parts.length === 2 && text(a) !== null && b === '%') return `substr(${c}, 1, ${chars(text(a)!)}) = ${v(text(a)!)}`;
+  if (parts.length === 2 && a === '%' && text(b) !== null) return `substr(${c}, -${chars(text(b)!)}) = ${v(text(b)!)}`;
+  if (parts.length === 3 && a === '%' && text(b) !== null && d === '%') return `instr(${c}, ${v(text(b)!)}) > 0`;
+  return insensitive ? `lower(${col}) LIKE lower(${params.add(pattern)}) ESCAPE '\\'` : `${col} GLOB ${params.add(globOf(pattern))}`;
+}
+
 /** LIKE's pattern as GLOB's, which is case-sensitive as LIKE was in Postgres. */
 function globOf(like: string): string {
   let out = '';
@@ -298,8 +347,8 @@ function conditionSql(f: Filter, alias: string, table: string, params: Params): 
       case 'gte': sql = cmp('>='); break;
       case 'lt': sql = cmp('<'); break;
       case 'lte': sql = cmp('<='); break;
-      case 'like': sql = `${col} GLOB ${params.add(globOf(String(v).replace(/\*/g, '%')))}`; break;
-      case 'ilike': sql = `lower(${col}) LIKE lower(${params.add(String(v).replace(/\*/g, '%'))}) ESCAPE '\\'`; break;
+      case 'like': sql = likeSql(col, String(v).replace(/\*/g, '%'), false, params); break;
+      case 'ilike': sql = likeSql(col, String(v).replace(/\*/g, '%'), true, params); break;
       case 'is': sql = `${col} IS ${v === null ? 'NULL' : v === true ? 'TRUE' : v === false ? 'FALSE' : fail(`Unsupported is value: ${v}`)}`; break;
       case 'in': {
         const list = Array.isArray(v) ? v : fail('in() needs a list');
@@ -571,6 +620,9 @@ export class SqliteExecutor implements Executor {
         // Only the rows this role may change, as they were checked.
         const rows = await this.reachable(spec, rule);
         if (!rows.length) return shape({ data: spec.returning ? [] : null, error: null, count: spec.count ? 0 : null, status: 200 }, spec.single);
+        // The rule again in the write, so a row that stopped qualifying since it was read is left alone.
+        const using = rule.using(this.ctx);
+        if (using !== true) where.push(conditionSql(using as Filter, 't0', spec.table, params));
         where.push(`(${schema.pk.map((k) => `t0.${ident(k)}`).join(', ')}) IN (SELECT ${schema.pk.map((k) => `json_extract(value, ${lit(jsonPath([k]))})`).join(', ')} FROM json_each(${params.add(JSON.stringify(rows.map((r) => Object.fromEntries(schema.pk.map((k) => [k, r[k]])))))}))`);
       }
       const cond = where.length ? ` WHERE ${where.join(' AND ')}` : '';
@@ -602,9 +654,13 @@ export class SqliteExecutor implements Executor {
         const conflict = `(${target.map(ident).join(', ')})`;
         if (spec.ignoreDuplicates || !cols.length) text += ` ON CONFLICT ${conflict} DO NOTHING`;
         else {
+          const update = await this.upsertRule(spec.table, given, target);
+          if (update === false) return { data: null, count: null, error: rlsError(spec.table), status: 403 };
           const sets = cols.map((c) => `${ident(c)} = excluded.${ident(c)}`);
           if (schema.touch && !cols.includes('updated_at')) sets.push(`"updated_at" = ${params.add(now())}`);
-          text += ` ON CONFLICT ${conflict} DO UPDATE SET ${sets.join(', ')}`;
+          // The update rule's rows only, as the rows were when they were checked.
+          const only = update === true ? '' : ` WHERE ${conditionSql(update, ident(spec.table), spec.table, params)}`;
+          text += ` ON CONFLICT ${conflict} DO UPDATE SET ${sets.join(', ')}${only}`;
         }
       }
       text += ' RETURNING *';
@@ -614,6 +670,32 @@ export class SqliteExecutor implements Executor {
     let data: unknown[] | null = null;
     if (spec.returning) data = await this.project(spec, written);
     return shape({ data, error: null, count: spec.count ? written.length : null, status: spec.action === 'insert' ? 201 : 200 }, spec.single);
+  }
+
+  /**
+   * An upsert writes over the rows it conflicts with, so it is an update of those: each must be a row
+   * this role may update, and pass the update rule as written. False when one doesn't; else the rule's
+   * condition on the rows (true: none).
+   */
+  private async upsertRule(table: string, given: Record<string, unknown>[], target: string[]): Promise<boolean | Filter> {
+    if (this.ctx.role === 'service') return true;
+    const rule = policyFor(table, 'update', this.ctx, true);
+    if (rule === true) return true;
+    // No update at all: a row that appears before the write is left as it is.
+    const using: boolean | Filter = rule === false ? { any: [] } : rule.using(this.ctx);
+    const keyOf = (row: Record<string, unknown>) => JSON.stringify(target.map((c) => row[c] ?? null));
+    const byKey: Filter = { any: given.filter((row) => target.every((c) => row[c] != null)).map((row) => ({ all: target.map((c) => ({ col: c, op: 'eq' as const, value: row[c] })) })) };
+    const db = await this.db();
+    const read = async (filters: Filter[]) => {
+      const c = compileSelect({ table, columns: '*', filters: filters.map((item) => ({ path: '', item })), order: [] }, { role: 'service' });
+      return (await db.prepare(c.text).bind(...c.values).all<{ r: string }>()).results.map((x) => JSON.parse(x.r) as Record<string, unknown>);
+    };
+    const existing = 'any' in byKey && byKey.any.length ? await read([byKey]) : [];
+    if (!existing.length) return using;
+    if (rule === false) return false;
+    if (using !== true && (await read([byKey, using as Filter])).length < existing.length) return false;
+    const rows = new Map(given.map((row) => [keyOf(row), row]));
+    return existing.every((row) => rule.check(this.ctx, { ...row, ...rows.get(keyOf(row)) })) ? using : false;
   }
 
   /** Written rows as the caller selected them: read again for embedded relations, else picked here. */

@@ -131,7 +131,7 @@ Admins invite editors from `/admin/users/`. See [Editor and roles](../../feature
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Stripe payments |
 | `SQUARE_ACCESS_TOKEN`, `SQUARE_LOCATION_ID`, `SQUARE_ENVIRONMENT`, `SQUARE_WEBHOOK_SIGNATURE_KEY`, `SQUARE_WEBHOOK_URL` | Square payments |
 | `TICKETS_NOTIFY_EMAIL` | Where the copy of each ticket order goes (default `FORMS_ADMIN_EMAIL`, then `adminEmail`) |
-| `SITE_URL` | The site's address for links in emails (default the request's address) |
+| `SITE_URL` | The site's address for links in emails (default the request's address). Required for Mailing: campaigns and digests are sent without a request |
 | `SITE_NOINDEX` | `1` or `true` on a demo or preview copy: every answer, static files included, tells search engines to stay away (`X-Robots-Tag: noindex`). Set it in `wrangler.jsonc` `vars`, which the build reads for static files. After changing it, save anything in the admin to clear the cached pages |
 | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | Compose (`ANTHROPIC_MODEL` overrides the default model, `claude-sonnet-5-5`) |
 | `ANTHROPIC_SEO_MODEL` | SEO text generation (default Haiku 4.5) |

@@ -1061,7 +1061,13 @@ async function putBack(db: Db, kind: string, rows: Record<string, any[]>): Promi
   return [];
 }
 
-/** Delete the rows a sync added (an added file's library row, not its stored images). Returns problems, if any. */
+/**
+ * Delete the rows a sync added (an added file's library row, not its stored images). Rows that other
+ * rows came to depend on stay, since deleting them would take those along or cut them loose, and no
+ * backup holds them: entries with ticket orders, waitlist places or emails of their own, or pages
+ * under them; terms entries still use, or with terms under them; files entries still feature.
+ * Returns problems, if any (the rows kept among them).
+ */
 async function removeAdded(db: Db, kind: string, keys: string[]): Promise<string[]> {
   if (!keys.length) return [];
   const problems: string[] = [];
@@ -1072,17 +1078,38 @@ async function removeAdded(db: Db, kind: string, keys: string[]): Promise<string
     }
   };
   const ids = keys.map(Number);
+  const among = new Set(ids);
+  // Of `ids`, those a row of `table` points at through `column` (rows that are themselves among `ids` aside).
+  const usedBy = async (table: string, column: string, notAmong = false): Promise<Set<number>> => {
+    const used = new Set<number>();
+    for (let i = 0; i < ids.length; i += 200) {
+      const { data, error } = await db.from(table).select(notAmong ? `id, ${column}` : column).in(column, ids.slice(i, i + 200));
+      if (error) {
+        problems.push(`${table}: ${error.message}`);
+        ids.slice(i, i + 200).forEach((id) => used.add(id));
+        continue;
+      }
+      for (const r of (data ?? []) as Record<string, number>[]) if (!notAmong || !among.has(r.id)) used.add(r[column]);
+    }
+    return used;
+  };
+  const keeping = async (what: string, why: [string, string, boolean?][]) => {
+    const keep = new Set<number>();
+    for (const [table, column, notAmong] of why) for (const id of await usedBy(table, column, notAmong)) keep.add(id);
+    if (keep.size) problems.push(`Kept ${what} ${[...keep].join(', ')}: other rows use ${keep.size === 1 ? 'it' : 'them'}.`);
+    return ids.filter((id) => !keep.has(id));
+  };
   switch (kind) {
     case 'type':
-      await del('entries', 'id', ids);
+      await del('entries', 'id', await keeping('entries', [['ticket_orders', 'entry_id'], ['ticket_waitlist', 'entry_id'], ['ticket_emails', 'entry_id'], ['entries', 'parent_id', true]]));
       break;
     case 'taxonomy':
-      await del('terms', 'id', ids);
+      await del('terms', 'id', await keeping('terms', [['entry_terms', 'term_id'], ['terms', 'parent_id', true]]));
       break;
     case 'files':
       // The library rows only: their stored images stay, since backups don't hold images and undoing
       // this restore would otherwise bring back rows without them.
-      await del('media', 'id', ids);
+      await del('media', 'id', await keeping('files', [['entries', 'featured_media_id']]));
       break;
     case 'forms': {
       // Deleting a form detaches its submissions for good (backups don't hold them), so those forms stay.

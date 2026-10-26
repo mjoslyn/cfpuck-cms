@@ -59,7 +59,12 @@ const party = (h: string) => {
   return m ? { name: m[1].trim() || undefined, email: m[2].trim() } : h.trim();
 };
 
-export async function sendMail(mail: Mail): Promise<boolean> {
+/** A header value on one line: a line break in a subject built from someone's answers would start
+ * headers (or a body) of their own. */
+const oneLine = (v: string) => v.replace(/[\r\n\u2028\u2029]+/g, ' ').trim();
+
+export async function sendMail(message: Mail): Promise<boolean> {
+  const mail = { ...message, to: message.to.map(oneLine), subject: oneLine(message.subject), fromName: message.fromName && oneLine(message.fromName), replyTo: message.replyTo && oneLine(message.replyTo) };
   const email = bindings()?.EMAIL;
   if (email) {
     await email.send({ from: party(fromHeader(mail.fromName)), to: mail.to, replyTo: mail.replyTo ? party(mail.replyTo) : undefined, subject: mail.subject, html: mail.html, text: mail.text || textVersion(mail.html) });
