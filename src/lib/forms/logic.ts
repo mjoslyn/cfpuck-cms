@@ -53,21 +53,42 @@ export function ruleMatches(rule: Rule, values: Values) {
   return vals.length ? vals.some((v) => matches(rule.op, v, rule.value)) : matches(rule.op, '', rule.value);
 }
 
-/** Whether a field is hidden by its conditional logic or by the section it sits in. */
-export function isFieldHidden(form: FormDef, field: Field, values: Values, seen = new Set<string>()): boolean {
-  if (seen.has(field.id)) return false;
-  seen.add(field.id);
-  const logic = logicOf(field);
-  if (logic) {
-    const results = logic.rules.map((r) => ruleMatches(r, values));
-    const pass = logic.match === 'any' ? results.some(Boolean) : results.every(Boolean);
-    if ((logic.action === 'show') !== pass) return true;
+/**
+ * The fields hidden by their conditional logic or by the section they sit in. A hidden field counts as
+ * empty in other fields' rules (it isn't sent, stored or charged), so a field whose rule reads a hidden
+ * one is judged against an empty value, however long the chain. Validation, the stored entry and the
+ * total all use this one answer; public/assets/js/forms.js works it out the same way.
+ */
+export function hiddenFields(form: FormDef, values: Values): Set<string> {
+  const byId = new Map(form.fields.map((f) => [f.id, f]));
+  const sectionOf = new Map<string, Field>();
+  let section: Field | undefined;
+  for (const f of form.fields) {
+    if (f.type === 'section') section = f;
+    else if (section) sectionOf.set(f.id, section);
   }
-  if (field.type !== 'section') {
-    const i = form.fields.findIndex((f) => f.id === field.id);
-    for (let j = i - 1; j >= 0; j--) if (form.fields[j].type === 'section') return isFieldHidden(form, form.fields[j], values, seen);
-  }
-  return false;
+  const memo = new Map<string, boolean>();
+  const hidden = (field: Field): boolean => {
+    const known = memo.get(field.id);
+    if (known !== undefined) return known;
+    // Rules that go round in a circle: a field met again on the way counts as shown.
+    memo.set(field.id, false);
+    let result = false;
+    const logic = logicOf(field);
+    if (logic) {
+      const results = logic.rules.map((r) => {
+        const source = byId.get(r.field);
+        return ruleMatches(r, source && hidden(source) ? {} : values);
+      });
+      const pass = logic.match === 'any' ? results.some(Boolean) : results.every(Boolean);
+      result = (logic.action === 'show') !== pass;
+    }
+    const sec = sectionOf.get(field.id);
+    if (!result && sec) result = hidden(sec);
+    memo.set(field.id, result);
+    return result;
+  };
+  return new Set(form.fields.filter(hidden).map((f) => f.id));
 }
 
 const choiceLabel = (f: Field, v: string) => f.choices?.find((c) => c.value.trim() === v.trim())?.label ?? v;

@@ -2,9 +2,14 @@
 // counters, the total of a form that takes payment (as src/lib/forms/payment.ts works it out; the
 // server's is what is charged), and focus on the error summary or confirmation after a submission.
 (function () {
+  // Every field's value, those disabled because they are hidden included: whether they stay hidden is
+  // worked out again from what is entered.
   function values(form) {
     var out = {};
-    new FormData(form).forEach(function (v, k) {
+    Array.prototype.forEach.call(form.elements, function (el) {
+      if (!el.name || el.type === 'submit' || el.type === 'button' || ((el.type === 'checkbox' || el.type === 'radio') && !el.checked)) return;
+      var k = el.name;
+      var v = el.value;
       var m = k.match(/^([a-z0-9]+)(?:\[(\w*)\])?$/i);
       if (!m) return;
       var id = m[1];
@@ -39,19 +44,38 @@
     return list.length ? list.some(function (x) { return matches(rule.op, x, rule.value); }) : matches(rule.op, '', rule.value);
   }
 
+  // As hiddenFields in src/lib/forms/logic.ts: a hidden field counts as empty in other fields' rules,
+  // however long the chain, and a field in a hidden section is hidden.
   function apply(form, logic) {
     var vals = values(form);
-    var hidden = {};
-    Object.keys(logic).forEach(function (id) {
-      var l = logic[id];
-      var results = l.rules.map(function (r) { return ruleMatches(r, vals); });
-      var pass = l.match === 'any' ? results.some(Boolean) : results.every(Boolean);
-      if ((l.action === 'show') !== pass) hidden[id] = true;
-    });
+    var sections = {};
+    var fields = {};
     form.querySelectorAll('[data-field]').forEach(function (el) {
-      var id = el.getAttribute('data-field');
-      var section = el.getAttribute('data-section');
-      var hide = !!hidden[id] || (section && !!hidden[section]);
+      fields[el.getAttribute('data-field')] = true;
+      if (el.getAttribute('data-section')) sections[el.getAttribute('data-field')] = el.getAttribute('data-section');
+    });
+    var memo = {};
+    function hidden(id) {
+      if (id in memo) return memo[id];
+      // Rules that go round in a circle: a field met again on the way counts as shown.
+      memo[id] = false;
+      var l = logic[id];
+      var result = false;
+      if (l) {
+        var results = l.rules.map(function (r) {
+          var one = {};
+          one[r.field] = fields[r.field] && hidden(r.field) ? undefined : vals[r.field];
+          return ruleMatches(r, one);
+        });
+        var pass = l.match === 'any' ? results.some(Boolean) : results.every(Boolean);
+        result = (l.action === 'show') !== pass;
+      }
+      if (!result && sections[id]) result = hidden(sections[id]);
+      memo[id] = result;
+      return result;
+    }
+    form.querySelectorAll('[data-field]').forEach(function (el) {
+      var hide = hidden(el.getAttribute('data-field'));
       el.hidden = hide;
       // Hidden fields are not sent (the server ignores them either way).
       el.querySelectorAll('input, select, textarea').forEach(function (i) { i.disabled = hide; });

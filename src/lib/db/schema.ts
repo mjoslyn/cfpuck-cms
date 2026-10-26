@@ -281,10 +281,10 @@ export const SCHEMA: Record<string, TableSchema> = {
   },
   ticket_orders: {
     pk: ["id"],
-    columns: {"id":"int8","token":"text","code":"text","entry_id":"int8","occurrence":"text","event_title":"text","status":"text","provider":"text","provider_ref":"text","provider_order":"text","provider_payment":"text","name":"text","email":"text","phone":"text","address":"jsonb","answers":"jsonb","items":"jsonb","quantity":"int8","amount":"int8","currency":"text","refunded_amount":"int8","expires_at":"timestamptz","paid_at":"timestamptz","checked_in_at":"timestamptz","emailed_at":"timestamptz","reminded_at":"timestamptz","followed_up_at":"timestamptz","created_at":"timestamptz","updated_at":"timestamptz","page":"text","member_id":"uuid"},
+    columns: {"id":"int8","token":"text","code":"text","entry_id":"int8","occurrence":"text","event_title":"text","status":"text","provider":"text","provider_ref":"text","provider_order":"text","provider_payment":"text","name":"text","email":"text","phone":"text","address":"jsonb","answers":"jsonb","items":"jsonb","quantity":"int8","amount":"int8","currency":"text","refunded_amount":"int8","expires_at":"timestamptz","paid_at":"timestamptz","checked_in_at":"timestamptz","emailed_at":"timestamptz","reminded_at":"timestamptz","followed_up_at":"timestamptz","created_at":"timestamptz","updated_at":"timestamptz","page":"text","member_id":"uuid","ip":"text","note":"text","refund_attempt":"jsonb"},
     generated: [],
     fks: [[["entry_id"],"entries",["id"]],[["member_id"],"users",["id"]]],
-    defaults: {"occurrence":"","event_title":"","status":"pending","phone":"","answers":{},"items":[],"currency":"usd","refunded_amount":0,"page":""},
+    defaults: {"occurrence":"","event_title":"","status":"pending","phone":"","answers":{},"items":[],"currency":"usd","refunded_amount":0,"page":"","ip":"","note":""},
     touch: true,
   },
   ticket_waitlist: {

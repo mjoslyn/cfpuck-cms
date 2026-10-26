@@ -176,6 +176,7 @@ const csv = `/api/admin/tickets/attendees.csv?event=${id}${recurring ? `&date=${
                       <dt class="text-admin-muted">Ordered</dt><dd>{when(o.created_at)}</dd>
                       {o.paid_at && (<><dt class="text-admin-muted">Paid</dt><dd>{when(o.paid_at)}{o.provider !== 'free' ? ` with ${o.provider === 'stripe' ? 'Stripe' : 'Square'}` : ' (free)'}</dd></>)}
                       {o.provider_payment && (<><dt class="text-admin-muted">Payment</dt><dd class="font-mono text-xs">{o.provider_payment}</dd></>)}
+                      {o.note && (<><dt class="text-admin-muted">Note</dt><dd>{o.note}</dd></>)}
                       {o.checked_in_at && (<><dt class="text-admin-muted">Checked in</dt><dd>{when(o.checked_in_at)}</dd></>)}
                       <dt class="text-admin-muted">Emails</dt>
                       <dd>{[o.emailed_at && `confirmation ${when(o.emailed_at)}`, o.reminded_at && `reminder ${when(o.reminded_at)}`, o.followed_up_at && `follow-up ${when(o.followed_up_at)}`].filter(Boolean).join(' · ') || 'none yet'}</dd>
@@ -306,7 +307,10 @@ const csv = `/api/admin/tickets/attendees.csv?event=${id}${recurring ? `&date=${
       if (b.dataset.confirm && !confirm(b.dataset.confirm)) return;
       const r = await post({ action: b.dataset.action, id: Number(b.dataset.id) });
       if (r && b.dataset.action === 'resend') status.textContent = 'Confirmation sent.';
-      else if (r) location.reload();
+      else if (r) {
+        if (r.message) alert(r.message);
+        location.reload();
+      }
     });
   }
 

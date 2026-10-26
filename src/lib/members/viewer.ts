@@ -5,7 +5,7 @@
 import type { AstroCookies } from 'astro';
 import { siteDb } from '../db/site';
 import { hasSession, sessionUser } from '../auth';
-import type { MemberRow, Viewer } from './config';
+import { memberSettings, type MemberRow, type Viewer } from './config';
 
 export { hasSession };
 
@@ -25,4 +25,15 @@ export async function viewerOf(request: Request, _cookies?: AstroCookies): Promi
     editor: ['editor', 'admin'].includes(profile?.role ?? ''),
     member: (member as MemberRow | null) ?? null,
   };
+}
+
+/**
+ * The signed-in viewer as the site's pages see them (renderRequest): no membership while Members is off.
+ * For endpoints that act on what a page shows (ticket checkout, waitlist, availability).
+ */
+export async function siteViewer(request: Request): Promise<Viewer | null> {
+  const viewer = await viewerOf(request);
+  if (!viewer?.member) return viewer;
+  const { data } = await siteDb().from('settings').select('value').eq('key', 'site').maybeSingle();
+  return memberSettings(data?.value).enabled ? viewer : { ...viewer, member: null };
 }
