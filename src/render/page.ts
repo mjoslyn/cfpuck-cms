@@ -52,7 +52,11 @@ async function guess404(url: URL, loader: Loader): Promise<string | null> {
   if (!slug || slug.length < 2) return null;
   // The rewrite base (e.g. /event/) sets post_type, which limits the guess to that type.
   const typed = parts.length === 2 ? Object.entries(TYPE_BASES).find(([, base]) => base === parts[0])?.[0] : undefined;
-  const types = typed ? [typed] : [...ROOT_TYPES, ...Object.keys(TYPE_BASES)].filter((t) => !PAGELESS_TYPES.has(t));
+  const settings = await loader.settings();
+  // Types with pages to go to: events have none while Events is off.
+  const events = eventsOn(settings.site);
+  const types = (typed ? [typed] : [...ROOT_TYPES, ...Object.keys(TYPE_BASES)]).filter((t) => !PAGELESS_TYPES.has(t) && (events || t !== 'event'));
+  if (!types.length) return null;
   const { data } = await loader.db
     .from('entries')
     .select('id, type, slug')
@@ -63,7 +67,6 @@ async function guess404(url: URL, loader: Loader): Promise<string | null> {
     .limit(1);
   const hit = data?.[0];
   if (!hit) return null;
-  const settings = await loader.settings();
   return hit.id === settings.site?.front_page_id ? '/' : permalink(hit);
 }
 
@@ -83,6 +86,8 @@ export async function resolve(url: URL, loader: Loader): Promise<Queried> {
   let page = 1;
   const paged = path.match(/^(.*\/)page\/(\d+)\/?$/);
   if (paged) {
+    // A page number past six digits is past any listing's end (and too big for an offset).
+    if (paged[2].length > 6) return { kind: '404', page: 1, url };
     path = paged[1];
     page = parseInt(paged[2], 10);
   }

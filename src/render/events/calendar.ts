@@ -6,7 +6,7 @@
 import { site, SITE_TZ } from '../../lib/site';
 import { zoneLabel } from '../../lib/events/timezone';
 import type { Loader } from '../../lib/data';
-import { type CalEvent, addDays, excerptOf, loadCalEvents, matchesSearch, siteNow } from '../../lib/events/model';
+import { type CalEvent, addDays, excerptOf, hasEnded, loadCalEvents, matchesSearch, siteNow } from '../../lib/events/model';
 import { permalink } from '../../lib/permalink';
 import { mediaImage, mediaImgTag } from '../../lib/media/image';
 import { entryTitle } from '../c/entry';
@@ -147,10 +147,11 @@ export function grouped(events: CalEvent[], card: (ev: CalEvent) => string = (ev
   return out ? `${out}</div>` : '';
 }
 
-function listView(req: CalRequest, all: CalEvent[], now: string, today: string): Calendar {
-  const cutoff = req.date ? `${req.date} 00:00:00` : now;
+function listView(req: CalRequest, all: CalEvent[], now: Date, today: string): Calendar {
+  // Whether an event has passed is judged in its own timezone; a date to list from, on its own days.
+  const ended = (ev: CalEvent) => hasEnded(ev.entry, ev.end, now);
   if (req.view === 'past') {
-    const past = all.filter((ev) => ev.end < now).reverse();
+    const past = all.filter(ended).reverse();
     const page = past.slice((req.page - 1) * PER_PAGE, req.page * PER_PAGE);
     const more = past.length > req.page * PER_PAGE;
     return {
@@ -167,10 +168,10 @@ function listView(req: CalRequest, all: CalEvent[], now: string, today: string):
       events: page,
     };
   }
-  const upcoming = all.filter((ev) => ev.end >= cutoff);
+  const upcoming = all.filter((ev) => (req.date ? ev.end >= `${req.date} 00:00:00` : !ended(ev)));
   const page = upcoming.slice((req.page - 1) * PER_PAGE, req.page * PER_PAGE);
   const more = upcoming.length > req.page * PER_PAGE;
-  const hasPast = all.some((ev) => ev.end < now);
+  const hasPast = all.some(ended);
   const from = req.date ? `Events from ${fmtDay(req.date, { month: 'long', day: 'numeric', year: 'numeric' })}` : 'Upcoming events';
   return {
     req,
@@ -311,11 +312,10 @@ function dayView(req: CalRequest, all: CalEvent[], today: string): Calendar {
 export async function buildCalendar(url: URL, loader: Loader, now = new Date()): Promise<Calendar> {
   const req = parseCalendarUrl(url);
   const all = (await loadCalEvents(loader)).filter((ev) => matchesSearch(ev, req.q));
-  const nowStr = siteNow(now);
-  const today = nowStr.slice(0, 10);
+  const today = siteNow(now).slice(0, 10);
   if (req.view === 'month') return monthView(req, all, today);
   if (req.view === 'day') return dayView(req, all, today);
-  return listView(req, all, nowStr, today);
+  return listView(req, all, now, today);
 }
 
 /** Subscribe links for the current listing (iCal feed with the same search). */

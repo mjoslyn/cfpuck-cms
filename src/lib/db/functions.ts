@@ -104,13 +104,18 @@ export const FUNCTIONS: Record<string, Fn> = {
   /**
    * Entries the full-text index matches for `p_query` (FTS5's syntax), best first: BM25 with the title
    * weighing most, then the excerpt, then the text. At most `p_limit` (default 1000), as [{ id, rank }].
+   * `p_status` and `p_types` (optional) narrow the candidates first, so the best are drawn from entries
+   * that can be shown.
    */
   entry_search: {
     async run(exec, a) {
       const limit = Math.min(Math.max(Math.trunc(Number(a.p_limit) || 1000), 1), 5000);
+      const types = Array.isArray(a.p_types) ? a.p_types.map(String) : null;
       return exec.rows<{ id: number; rank: number }>(
-        `SELECT rowid AS id, bm25(entries_fts, 10.0, 4.0, 1.0) AS rank FROM entries_fts WHERE entries_fts MATCH ?1 ORDER BY rank LIMIT ${limit}`,
-        [String(a.p_query ?? '')],
+        `SELECT entries_fts.rowid AS id, bm25(entries_fts, 10.0, 4.0, 1.0) AS rank FROM entries_fts JOIN entries AS e ON e.id = entries_fts.rowid
+         WHERE entries_fts MATCH ?1 AND (?2 IS NULL OR e.status = ?2) AND (?3 IS NULL OR e.type IN (SELECT value FROM json_each(?3)))
+         ORDER BY rank LIMIT ${limit}`,
+        [String(a.p_query ?? ''), a.p_status == null ? null : String(a.p_status), types ? JSON.stringify(types) : null],
       );
     },
   },

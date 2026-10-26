@@ -3,7 +3,7 @@ import type { Loader } from '../data';
 import { permalink } from '../permalink';
 import { mediaUrl } from '../media/image';
 import { decodeEntities } from '../text/entities';
-import { type CalEvent, SITE_TZ, addDays, loadCalEvents, matchesSearch, siteNow } from './model';
+import { type CalEvent, SITE_TZ, addDays, hasEnded, loadCalEvents, matchesSearch } from './model';
 import { vtimezone } from './timezone';
 
 const text = (s: string) => decodeEntities(s.replace(/<[^>]*>/g, '')).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
@@ -69,11 +69,11 @@ export function icsResponse(body: string, filename: string): Response {
 
 /** The feed for a listing: upcoming (default), past, or one month; optionally searched. */
 export async function eventsFeed(loader: Loader, params: { q?: string; month?: string; past?: boolean }, origin: string): Promise<Response> {
-  const now = siteNow();
+  const now = new Date();
   let events = (await loadCalEvents(loader)).filter((ev) => matchesSearch(ev, params.q ?? ''));
   if (params.month && /^\d{4}-\d{2}$/.test(params.month)) events = events.filter((ev) => ev.startDay.slice(0, 7) <= params.month! && ev.endDay.slice(0, 7) >= params.month!);
-  else if (params.past) events = events.filter((ev) => ev.end < now).reverse();
-  else events = events.filter((ev) => ev.end >= now);
+  else if (params.past) events = events.filter((ev) => hasEnded(ev.entry, ev.end, now)).reverse();
+  else events = events.filter((ev) => !hasEnded(ev.entry, ev.end, now));
   const site = (await loader.settings()).site?.name ?? 'Events';
   return icsResponse(calendarFile(events, { origin, name: site }), 'events.ics');
 }

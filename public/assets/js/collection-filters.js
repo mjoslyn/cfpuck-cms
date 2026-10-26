@@ -62,6 +62,8 @@
       grid?.classList.add('is-loading');
       try {
         const res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+        // Not found or failed: the page itself shows what happened.
+        if (!res.ok) throw new Error(String(res.status));
         const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
         const fresh = doc.querySelector(form.dataset.target ? `[data-collection="${form.dataset.target}"]` : '.c-collection');
         if (grid && fresh) grid.innerHTML = fresh.innerHTML;
