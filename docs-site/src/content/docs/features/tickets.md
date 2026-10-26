@@ -16,7 +16,8 @@ In the event's settings, under Tickets (stored in `fields.tickets`, `src/lib/tic
 - **Ticket types**: name, description, price (empty or 0 is free), how many there are, the most in one
   order, and when they're on sale (empty: now, until the event ends). A type no longer offered stays for
   past orders; to stop selling, mark every type no longer offered or remove them.
-- **Capacity**: all types together. A recurring event sells each date separately, with the same capacity
+- **Capacity**: all types together (empty: no limit; 0: sold out, as for a type's own number). A
+  recurring event sells each date separately, with the same capacity
   for each.
 - **Waitlist**: off; on, emailing people as tickets free up; or on, notified by hand from the attendee list.
 - **Members** (when Members is on): a price per membership level, and members-only types. See

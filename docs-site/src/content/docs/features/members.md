@@ -24,7 +24,8 @@ Members sign in, sign up and reset their password at **/account/**. Make a page 
 design it yourself, with the **Member account** block on it. The links in members' emails go there:
 invitations and password links (an hour, once) open the form to set a password (which signs out the
 account everywhere else; a signed-in member changing it gives the current one), and a new account's
-confirmation link (a day) confirms the address and signs them in. New accounts confirm their address
+confirmation link (a day) confirms the address and signs them in (if someone else is signed in on that
+browser, it only confirms the address). New accounts confirm their address
 before they can sign in unless `AUTH_CONFIRM_EMAIL=false`. The site sends these emails over its SMTP
 settings.
 

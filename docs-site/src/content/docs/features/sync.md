@@ -20,6 +20,9 @@ SYNC_REMOTE_NAME=Production
 SYNC_REMOTE_URL=https://<its address>
 ```
 
+Both copies need the same version of the core: each request is signed with its route and a one-time
+value, which an older copy doesn't check or send, so update both before syncing again.
+
 The sync sends its queries and file calls to the other copy's `/api/sync/remote` and `/api/sync/files`,
 signed with the secret; the other copy answers only signed requests, and only for the tables and
 folders a sync uses. So it runs from the copy that has the address set: a local copy can push to and

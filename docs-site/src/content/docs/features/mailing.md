@@ -47,7 +47,7 @@ wording, confirmed when), lists, emails and clicks, and can **Add a contact**, *
 and name columns), **Add members to a list**, **Unsubscribe**, **Erase** and **Export as CSV**. Adding
 or importing asks how those people agreed to get your email. Anyone who unsubscribed, bounced, marked
 an email as spam or was erased is skipped, as is anyone who unsubscribed from that list: they have to
-sign up themselves. Erasing deletes a contact
+sign up themselves. Erasing deletes a contact (with Mailgun's event log for the address)
 and keeps only a one-way hash of the address, so they're never mailed again unless they sign up.
 
 ## Tags, fields and segments

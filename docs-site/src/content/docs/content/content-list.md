@@ -21,7 +21,8 @@ and bulk actions on the checked rows (`/api/admin/entries/bulk`).
 
 ## Duplicate
 
-**Duplicate** (list rows and the editor header; `src/lib/admin/duplicate.ts`) makes a draft copy
+**Duplicate** (list rows and the editor header; `src/lib/admin/duplicate.ts`) makes a draft copy (from
+the page's unpublished changes, when it has some)
 titled "(copy)" with its own address: content with any unpublished changes, fields, tags and other
 terms, template, featured image and event dates.
 
