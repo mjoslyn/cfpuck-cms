@@ -7,7 +7,7 @@ import { Select, Text } from './fields';
 import { browserClient } from '../lib/db/browser';
 import { isPlaceholderSlug, slugify } from '../lib/slug';
 
-interface Record_ { id: number; type: string; title: string; slug: string; status: string; fields: Record<string, any> }
+interface Record_ { id: number; type: string; title: string; slug: string; status: string; fields: Record<string, any>; updated_at: string }
 interface Ref { id: number; title: string; event_start: string | null }
 
 
@@ -19,7 +19,7 @@ export default function RecordEditor({ entryId, singular }: { entryId: number; s
 
   useEffect(() => {
     const db = browserClient();
-    db.from('entries').select('id, type, title, slug, status, fields').eq('id', entryId).single().then(({ data }) => setRec(data as Record_));
+    db.from('entries').select('id, type, title, slug, status, fields, updated_at').eq('id', entryId).single().then(({ data }) => setRec(data as Record_));
     db.from('entries').select('id, title, event_start').eq('type', 'event').neq('status', 'trash').eq('fields->>venue', String(entryId)).order('event_start', { ascending: false }).limit(50)
       .then(({ data }) => setUsedBy((data ?? []) as Ref[]));
   }, [entryId]);
@@ -35,13 +35,19 @@ export default function RecordEditor({ entryId, singular }: { entryId: number; s
     setStatus('Saving…');
     // Placeholder slugs from "New ..." follow the name.
     const slug = isPlaceholderSlug(rec.slug, rec.type) ? slugify(rec.title) || rec.slug : rec.slug;
-    const res = await fetch(`/api/admin/entries/${rec.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ entry: { title: rec.title, slug, status: rec.status, excerpt: '', template: null, fields: rec.fields, featured_image: null } }),
-    });
+    // Only what this form edits, based on the version loaded (`base`), so a save never replaces another's.
+    const put = (base?: string) =>
+      fetch(`/api/admin/entries/${rec.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ base, entry: { title: rec.title, slug, status: rec.status, fields: rec.fields } }),
+      });
+    let res = await put(rec.updated_at);
+    if (res.status === 409 && window.confirm(`${await res.text()}\n\nSaving now replaces their version with yours. To see theirs first, cancel and reload the page (your unsaved changes here will be lost).\n\nSave anyway?`)) res = await put();
+    if (res.status === 409) return setStatus('Not saved: someone else saved this since you opened it.');
     if (!res.ok) return setStatus(`Save failed: ${await res.text()}`);
-    setRec({ ...rec, slug });
+    const r = await res.json().catch(() => ({}));
+    setRec({ ...rec, slug: r.slug ?? slug, updated_at: r.updated_at ?? rec.updated_at });
     setDirty(false);
     setStatus(`Saved ${new Date().toLocaleTimeString()}`);
   };

@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { uniqueSlug } from '../../../../lib/admin/save';
+import { addressTakenBy, uniqueSlug } from '../../../../lib/admin/save';
 import { isPlaceholderSlug, slugify } from '../../../../lib/slug';
 
 /**
@@ -7,8 +7,8 @@ import { isPlaceholderSlug, slugify } from '../../../../lib/slug';
  * trash, restore (from the trash, as a draft) and delete (permanently; only entries in the trash);
  * add-term and remove-term ({ term }: a term of any taxonomy, on the entries at once, published ones
  * included; a tag also goes into or out of unpublished changes kept aside, so publishing them keeps it).
- * Unpublished changes kept aside stay as they are. Untitled entries can't be published; the home page
- * can't be trashed. Goes back to the list with a note of what happened.
+ * Unpublished changes kept aside stay as they are. Untitled entries, and those whose address another
+ * type's entry at the same URL has, can't be published; the home page can't be trashed. Goes back to the list with a note of what happened.
  */
 export const POST: APIRoute = async ({ request, locals, redirect }) => {
   const db = locals.db;
@@ -87,6 +87,14 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
         continue;
       }
       patch.slug = await uniqueSlug(db, r.type, slugify(r.title) || 'untitled', r.id);
+    }
+    if (status === 'publish') {
+      const slug = String(patch.slug ?? r.slug);
+      const holder = await addressTakenBy(db, r.type, slug, r.id);
+      if (holder) {
+        skipped.push(`${name}: the address “${slug}” is used by ${holder}`);
+        continue;
+      }
     }
     const { error: e } = await db.from('entries').update(patch).eq('id', r.id);
     if (e) return new Response(e.message, { status: 400 });

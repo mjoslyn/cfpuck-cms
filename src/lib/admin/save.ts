@@ -4,7 +4,7 @@ import { texturize } from '../text/formatting';
 import { trimWords, esc } from '../../render/html';
 import type { PuckItem } from '../puck/types';
 import { RECURRENCE_KEY, localToUtc, type Recurrence } from '../recurrence';
-import { SITE_TZ, typesSharingAddresses } from '../site';
+import { SITE_TZ, typeLabel, typesSharingAddresses } from '../site';
 
 /** Text content of a block tree (for automatic excerpts). */
 function text(items: PuckItem[]): string {
@@ -157,4 +157,16 @@ export async function uniqueSlug(db: Db, type: string, base: string, exceptId?: 
   let slug = base;
   for (let n = 2; used.has(slug); n++) slug = `${base}-${n}`;
   return slug;
+}
+
+/** Who has `slug` as their address already: an entry of another type at the same URL, of any status
+ *  (pages and posts both live at /<slug>/; within a type the database keeps slugs unique), as "the page
+ *  “About”". Null when it is free. */
+export async function addressTakenBy(db: Db, type: string, slug: string, exceptId?: number): Promise<string | null> {
+  const others = typesSharingAddresses(type).filter((t) => t !== type);
+  if (!slug || !others.length) return null;
+  let q = db.from('entries').select('type, title').in('type', others).eq('slug', slug);
+  if (exceptId) q = q.neq('id', exceptId);
+  const { data: clash } = await q.limit(1).maybeSingle();
+  return clash ? `the ${typeLabel(clash.type).toLowerCase()} “${clash.title}”` : null;
 }

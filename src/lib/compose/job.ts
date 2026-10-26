@@ -6,7 +6,7 @@ import { refreshSiteTimezone } from '../site/timezone';
 import { serviceClient } from '../db/site';
 import { MediaStore } from '../media/process';
 import { permalink } from '../permalink';
-import { renderedTitle } from '../admin/save';
+import { renderedTitle, uniqueSlug } from '../admin/save';
 import type { PuckItem } from '../puck/types';
 import { blocksFor, briefBlocksFor, buildMaterials, type Registry } from './materials';
 
@@ -195,11 +195,8 @@ export async function runJob(jobId: string, token: string): Promise<void> {
       items = buildPage(result.plan, built, `${s.block_prefix}-t${s.turns.length}`);
       if (!s.entry_id) {
         // First build from the admin: a new draft.
-        const base = slugify(result.plan.slug || result.plan.title);
-        const { data: taken } = await db.from('entries').select('slug').eq('type', s.entry_type).like('slug', `${base}%`);
-        const used = new Set((taken ?? []).map((r) => r.slug));
-        let slug = base;
-        for (let n = 2; used.has(slug); n++) slug = `${base}-${n}`;
+        // Free at its URL: types without a URL base share /<slug>/.
+        const slug = await uniqueSlug(db, s.entry_type, slugify(result.plan.slug || result.plan.title));
         const { data: row, error } = await db
           .from('entries')
           .insert({ type: s.entry_type, slug, title: result.plan.title, title_rendered: renderedTitle(result.plan.title), excerpt: result.plan.excerpt ?? '', status: 'draft', ...entryColumns(s.entry_type, { ...entryFields(s.entry_type, result.plan.fields, built.images), seo: planSeo(result.plan, built.images) ?? null }), content: { root: { props: {} }, content: items, zones: {} } })
