@@ -158,6 +158,11 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
     }
     case 'resume': {
       if (!['paused', 'failed'].includes(c.status)) return fail('Only a paused or failed campaign can be resumed.');
+      // Resuming a failed campaign sends its failed batches again (to those still subscribed then).
+      if (c.status === 'failed') {
+        const { error: be } = await svc.from('campaign_batches').update({ status: 'pending', error: '' }).eq('campaign_id', id).eq('status', 'failed');
+        if (be) return fail(be.message);
+      }
       const { error } = await svc.from('campaigns').update({ status: 'scheduled', scheduled_at: c.scheduled_at && Date.parse(c.scheduled_at) > Date.now() ? c.scheduled_at : new Date().toISOString(), error: '' }).eq('id', id);
       if (error) return fail(error.message);
       if (!c.scheduled_at || Date.parse(c.scheduled_at) <= Date.now()) await startSending(id, new URL(request.url).origin);

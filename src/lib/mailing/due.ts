@@ -7,7 +7,7 @@
 import { serviceClient } from '../db/site';
 import { refreshSiteTimezone } from '../site/timezone';
 import { mailingOn, type Digest } from './config';
-import { mailOrigin } from './contacts';
+import { leaveAllLists, mailOrigin } from './contacts';
 import { runDigest, tellAdmins } from './digest';
 import { suppressions } from './mailgun';
 import { startSending } from './send';
@@ -52,6 +52,8 @@ export async function runNightly(now = new Date()): Promise<string> {
       const chunk = emails.slice(i, i + 500);
       const { data } = await db.from('contacts').update({ status, unsubscribed_at: now.toISOString() }).in('email', chunk).eq('status', 'subscribed').select('id');
       changed += data?.length ?? 0;
+      // Their lists too, so a later sign-up to another list doesn't bring these back.
+      await leaveAllLists(db, (data ?? []).map((c) => Number(c.id)), now.toISOString()).catch((e) => out.push(`${list}: ${e.message}`));
       if (status !== 'unsubscribed') await db.from('mail_suppressions').upsert(chunk.map((e) => ({ email_hash: emailHash(e), reason: status })), { onConflict: 'email_hash', ignoreDuplicates: true });
     }
     if (changed) out.push(`${changed} ${status} from Mailgun`);

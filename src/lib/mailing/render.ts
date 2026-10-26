@@ -24,7 +24,7 @@ export const MAILING_TAGS: [string, string][] = [
 export const RECIPIENT_FIELDS = ['first_name', 'last_name', 'name', 'email'] as const;
 export type RecipientField = (typeof RECIPIENT_FIELDS)[number] | `field:${string}`;
 
-/** A tag in use and the variable it became: `v<n>` plain (subject, text), `v<n>_h` HTML-escaped (the HTML). */
+/** A tag in use and the variable it became: `v<n>` plain (subject, text), `v<n>_h` HTML-escaped (the HTML), `v<n>_u` URL-encoded (addresses in the HTML). */
 export interface VarSpec {
   name: string;
   field: RecipientField;
@@ -89,12 +89,24 @@ export function renderCampaign(input: RenderInput): Rendered {
     (input.address ? `<p style="margin:0 0 6px 0">${esc(input.siteName)} · ${esc(input.address).replace(/\n/g, ', ')}</p>` : '') +
     `<p style="margin:0"><a href="${unsubscribe}" style="color:#64748b;text-decoration:underline">Unsubscribe</a> · <a href="${preferences}" style="color:#64748b;text-decoration:underline">Email preferences</a></p>`;
   const subject = merge(input.subject, false);
-  const html = renderEmail(input.design, ctx, subject.replace(/%recipient\.[a-z0-9_]+%/g, ''), footer);
+  const html = urlVariables(renderEmail(input.design, ctx, subject.replace(/%recipient\.[a-z0-9_]+%/g, ''), footer));
   const own = (input.text ?? '').trim();
   const text = own
     ? `${merge(own, false)}\n\n--\nYou’re receiving this because you signed up for email from ${input.siteName}.${input.address ? `\n${input.siteName}, ${input.address.replace(/\n/g, ', ')}` : ''}\nUnsubscribe: ${unsubscribe}\nEmail preferences: ${preferences}\n`
     : plainText(html);
   return { subject, html, text, vars };
+}
+
+/**
+ * A recipient's value in an address (href, src): URL-encoded (`_u`), so no quote can end the attribute,
+ * and never at its start, where it would choose the scheme (javascript:): such an address is dropped.
+ */
+export function urlVariables(html: string): string {
+  return html.replace(/\s(href|src)="([^"]*)"/g, (whole, attr: string, url: string) => {
+    if (!/%recipient\.v\d+/.test(url)) return whole;
+    if (/^%recipient\./.test(url)) return '';
+    return ` ${attr}="${url.replace(/%recipient\.(v\d+)(?:_h)?%/g, '%recipient.$1_u%')}"`;
+  });
 }
 
 /**
@@ -134,6 +146,7 @@ export function recipientValues(specs: VarSpec[], person: Recipient, tokens: { t
     const plain = value(v.field) || v.fallback;
     out[v.name] = plain;
     out[`${v.name}_h`] = esc(plain);
+    out[`${v.name}_u`] = encodeURIComponent(plain).replace(/['()*!]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
   }
   return out;
 }

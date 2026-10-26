@@ -8,7 +8,7 @@ import { sendMail } from '../forms/mail';
 import { CONSENT_TEXT, EMAIL_RE, PREFERENCES_PATH, mailingSettings, nameParts, normalEmail, type Contact, type ContactField, type MailList, type MailingSettings } from './config';
 import { emailHash, sign } from './tokens';
 import { cleanTags } from './segments';
-import { addUnsubscribe, removeUnsubscribe } from './mailgun';
+import { addUnsubscribe, removeSuppressions, removeUnsubscribe } from './mailgun';
 import { env } from '../env';
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -160,7 +160,7 @@ export async function confirm(db: Db, id: number): Promise<Contact | null> {
   await db.from('contact_lists').update({ status: 'subscribed', subscribed_at: now, unsubscribed_at: null }).eq('contact_id', id).eq('status', 'pending');
   // A confirmed sign-up lifts an earlier suppression, here and at Mailgun.
   await db.from('mail_suppressions').delete().eq('email_hash', emailHash(contact.email));
-  if (contact.status !== 'subscribed') await removeUnsubscribe(contact.email).catch((e) => console.error(`mailing: Mailgun unsubscribe removal failed: ${e.message}`));
+  if (contact.status !== 'subscribed') await removeSuppressions(contact.email).catch((e) => console.error(`mailing: Mailgun suppression removal failed: ${e.message}`));
   return { ...contact, status: 'subscribed', confirmed_at: now };
 }
 
@@ -196,6 +196,13 @@ export async function setLists(db: Db, id: number, chosen: number[]): Promise<{ 
   return { ok: true };
 }
 
+/** Every list a contact is on (or waiting for) set to unsubscribed: they unsubscribed, bounced or complained. */
+export async function leaveAllLists(db: Db, ids: number[], at = new Date().toISOString()): Promise<void> {
+  if (!ids.length) return;
+  const { error } = await db.from('contact_lists').update({ status: 'unsubscribed', unsubscribed_at: at }).in('contact_id', ids).neq('status', 'unsubscribed');
+  if (error) throw new Error(error.message);
+}
+
 /** Unsubscribe from everything (or one list), at once; the campaign it came from records it. */
 export async function unsubscribe(db: Db, id: number, opts: { list?: number; campaign?: number } = {}): Promise<boolean> {
   const now = new Date().toISOString();
@@ -207,7 +214,7 @@ export async function unsubscribe(db: Db, id: number, opts: { list?: number; cam
     if (!data) return false;
     // Bounced and complained stay as they are: stronger than unsubscribed.
     if (!['bounced', 'complained'].includes(data.status)) await db.from('contacts').update({ status: 'unsubscribed', unsubscribed_at: now }).eq('id', id);
-    await db.from('contact_lists').update({ status: 'unsubscribed', unsubscribed_at: now }).eq('contact_id', id).neq('status', 'unsubscribed');
+    await leaveAllLists(db, [id], now);
   }
   if (opts.campaign) await db.from('campaign_sends').update({ unsubscribed_at: now }).eq('campaign_id', opts.campaign).eq('contact_id', id).is('unsubscribed_at', null);
   return true;
@@ -242,7 +249,8 @@ const mergeFields = (old: Record<string, unknown> | null | undefined, add: Recor
 
 /**
  * Add people to a list who agreed to it elsewhere (admins): subscribed at once, with the source named.
- * Addresses that unsubscribed, bounced, complained or were erased are skipped and counted.
+ * Addresses that unsubscribed (from everything or from this list), bounced, complained or were erased
+ * are skipped and counted.
  */
 export async function importContacts(db: Db, rows: ImportRow[], list: number, source: string): Promise<{ added: number; updated: number; skipped: string[]; invalid: string[] }> {
   const out = { added: 0, updated: 0, skipped: [] as string[], invalid: [] as string[] };
@@ -263,11 +271,14 @@ export async function importContacts(db: Db, rows: ImportRow[], list: number, so
     ]);
     const known = new Map((existing ?? []).map((c) => [c.email as string, c]));
     const blocked = new Set((suppressed ?? []).map((s) => s.email_hash as string));
+    // Who unsubscribed from this list stays off it, whatever their other lists.
+    const { data: left } = existing?.length ? await db.from('contact_lists').select('contact_id').eq('list_id', list).eq('status', 'unsubscribed').in('contact_id', existing.map((c) => c.id)) : { data: [] };
+    const offList = new Set((left ?? []).map((r) => Number(r.contact_id)));
     const fresh: any[] = [];
     const ids: number[] = [];
     for (const r of chunk) {
       const c = known.get(r.email);
-      if (blocked.has(emailHash(r.email)) || (c && ['unsubscribed', 'bounced', 'complained'].includes(c.status))) {
+      if (blocked.has(emailHash(r.email)) || (c && (['unsubscribed', 'bounced', 'complained'].includes(c.status) || offList.has(Number(c.id))))) {
         out.skipped.push(r.email);
         continue;
       }
