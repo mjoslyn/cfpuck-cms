@@ -39,6 +39,8 @@ export interface PageResult {
   html: string;
   /** The page depends on who views it (RenderCtx.personal): not cached, rendered again for a signed-in visitor. */
   personal?: boolean;
+  /** The page's entry is members-only and this render's viewer may not see it (Entry.locked). */
+  locked?: boolean;
   /** Set when a missing URL has an obvious new home (guess404: a unique slug match). */
   location?: string;
 }
@@ -128,6 +130,9 @@ export async function resolve(url: URL, loader: Loader): Promise<Queried> {
   if (parts.length === 3 && parts[0] === TYPE_BASES.event && /^\d{4}-\d{2}-\d{2}$/.test(parts[2])) {
     const series = await loader.entry('event', parts[1]);
     const occ = series && recurrenceOf(series) ? expandEntry(series, defaultHorizon(loader.now)).find((o) => o.occurrence === parts[2]) : null;
+    // An occurrence of a members-only series the viewer may not see: its sign-in prompt.
+    const locked = series ? null : await loader.lockedEntry(['event'], parts[1], parts[2]);
+    if (locked) return { ...base, kind: 'singular', entry: locked };
     if (!occ) return base;
     // The occurrence is its own (virtual) entry, so loops over the main query see its dates.
     loader.entries.set(occ.id, occ);
@@ -285,6 +290,8 @@ export async function renderRequest(url: URL, db: Db, form?: FormResult, preview
     }
   }
   await prepare(template ?? [], ctx);
+  // A list (or a picked entry) left out members-only entries: a member's view of the page differs.
+  if (loader.hidMembersOnly) ctx.personal = true;
   // A listing page past the last one is not found (page 1 of an empty listing is fine).
   const pages = ctx.data.get('main-pages') as number | undefined;
   if (!preview && queried.kind !== 'singular' && queried.page > 1 && pages !== undefined && queried.page > pages) {
@@ -328,5 +335,5 @@ ${scripts.join('\n')}
 </body>
 </html>
 `;
-  return { status: queried.kind === '404' ? 404 : 200, html, personal: !!ctx.personal };
+  return { status: queried.kind === '404' ? 404 : 200, html, personal: !!ctx.personal, locked: !!queried.entry?.locked };
 }
