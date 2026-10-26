@@ -4,6 +4,7 @@ import { isPlaceholderSlug, slugify } from '../../../../lib/slug';
 import { Loader } from '../../../../lib/data';
 import { permalink } from '../../../../lib/permalink';
 import { redirectMovedEntry } from '../../../../lib/redirects';
+import { siteDb } from '../../../../lib/db/site';
 import { uniqueAreas } from '../../../../lib/content/areas';
 import { taxonomiesOf } from '../../../../lib/site';
 
@@ -119,7 +120,8 @@ export const PUT: APIRoute = async ({ params, request, locals }) => {
   }
   if (wasLive && status === 'publish') {
     const now = await new Loader(db).entryById(id, false);
-    if (now && permalink(now) !== permalink(wasLive)) await redirectMovedEntry(db, permalink(wasLive), permalink(now));
+    // As the server: redirects are admins' to write, and this one follows from an edit the editor may make.
+    if (now && permalink(now) !== permalink(wasLive)) await redirectMovedEntry(siteDb(), permalink(wasLive), permalink(now));
   }
   if (Array.isArray(e.tags)) {
     try {

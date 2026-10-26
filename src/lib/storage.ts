@@ -45,6 +45,15 @@ const xmlText = (xml: string, tag: string) => [...xml.matchAll(new RegExp(`<${ta
 const decodeXml = (s: string) => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
 const encodeKey = (key: string) => key.split('/').map(encodeURIComponent).join('/');
 
+/**
+ * Whether a key (or a path in a folder) could reach outside where it is meant to be: a leading slash,
+ * a backslash, or a "." or ".." segment. An S3 address keeps those segments and the URL then collapses
+ * them, leaving the folder or the bucket, so every call refuses them.
+ */
+export const unsafeKey = (key: string) => key.startsWith('/') || key.includes('\\') || key.split('/').some((s) => s === '.' || s === '..');
+const UNSAFE = 'Not a safe file path';
+const refused = () => new Response(UNSAFE, { status: 400 });
+
 type PutOptions = { contentType?: string; cacheControl?: string; upsert?: boolean };
 type Listing = { keys: { key: string; size: number; modified: string }[]; folders: string[] };
 
@@ -191,21 +200,21 @@ export class Storage implements Files {
   }
 
   put(key: string, body: BodyInit, options: PutOptions = {}): Promise<Response> {
-    return this.backend.put(key, body, options);
+    return unsafeKey(key) ? Promise.resolve(refused()) : this.backend.put(key, body, options);
   }
 
   /** An object, passing on the request's Range and validators (for serving it). */
   get(key: string, headers: Record<string, string> = {}): Promise<Response> {
-    return this.backend.get(key, headers);
+    return unsafeKey(key) ? Promise.resolve(refused()) : this.backend.get(key, headers);
   }
 
   delete(key: string): Promise<Response> {
-    return this.backend.delete(key);
+    return unsafeKey(key) ? Promise.resolve(refused()) : this.backend.delete(key);
   }
 
   /** Every key under a prefix, with its folders at the next level when `delimit` (every page). */
   listKeys(prefix: string, delimit: boolean): Promise<Listing> {
-    return this.backend.listKeys(prefix, delimit);
+    return unsafeKey(prefix) ? Promise.reject(new Error(UNSAFE)) : this.backend.listKeys(prefix, delimit);
   }
 }
 
@@ -218,8 +227,10 @@ const failed = async (res: Response): Promise<StorageError> => {
 export class Folder {
   constructor(private store: Storage, private folder: string) {}
 
+  /** The key of a path in the folder; a path that could leave it is refused (`unsafeKey`). */
   private key(path: string) {
-    return `${this.folder}/${path.replace(/^\/+/, '')}`;
+    if (unsafeKey(path)) throw new Error(UNSAFE);
+    return `${this.folder}/${path}`;
   }
 
   async upload(path: string, body: Blob | ArrayBuffer | Uint8Array | string, options: { contentType?: string; cacheControl?: string; upsert?: boolean } = {}): Promise<Res<{ path: string }>> {
@@ -261,7 +272,8 @@ export class Folder {
    */
   async list(prefix = '', options: { limit?: number; offset?: number; search?: string; sortBy?: { column?: string; order?: string } } = {}): Promise<Res<ListedFile[]>> {
     try {
-      const dir = prefix.replace(/^\/+|\/+$/g, '');
+      const dir = prefix.replace(/\/+$/, '');
+      if (unsafeKey(dir)) throw new Error(UNSAFE);
       const base = `${this.folder}/${dir ? `${dir}/` : ''}`;
       const { keys, folders } = await this.store.listKeys(base, true);
       let items: ListedFile[] = [

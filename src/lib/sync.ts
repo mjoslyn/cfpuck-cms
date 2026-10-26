@@ -11,7 +11,7 @@
 import type { Db } from './db/query';
 import { remoteDb, syncSecret } from './sync-remote';
 import { allRows } from './rows';
-import { site as config, fieldsFor, taxonomyLabel } from './site';
+import { site as config, fieldsFor, taxonomyLabel, typesSharingAddresses } from './site';
 import { serviceClient } from './db/site';
 import { env } from './env';
 
@@ -213,8 +213,10 @@ const termList = (rows: { term_id: number; sort: number | null }[] | undefined, 
 function entryConflict(e: any, s: Awaited<ReturnType<typeof entryState>>, syncing: Set<number>): string | null {
   const there = s.tgtKeys.find((t) => t.id === e.id);
   if (there && there.type !== e.type) return `id ${e.id} is a ${there.type} (${there.slug}) there`;
-  const slugTaken = s.tgtKeys.find((t) => t.type === e.type && t.slug === e.slug && t.id !== e.id);
-  if (slugTaken) return `the address ${e.slug} belongs to another ${e.type} there (id ${slugTaken.id})`;
+  // Types without a URL base share one set of addresses (/<slug>/).
+  const sharing = typesSharingAddresses(e.type);
+  const slugTaken = s.tgtKeys.find((t) => sharing.includes(t.type) && t.slug === e.slug && t.id !== e.id);
+  if (slugTaken) return `the address ${e.slug} belongs to another ${slugTaken.type} there (id ${slugTaken.id})`;
   if (e.parent_id && !syncing.has(e.parent_id) && !s.tgtKeys.some((t) => t.id === e.parent_id)) return `its parent (id ${e.parent_id}) isn't there`;
   if (e.featured_media_id && !s.mediaThere.has(e.featured_media_id)) return `its featured image (file ${e.featured_media_id}) isn't on the target as the same file: include Files, or sort out that file's conflict`;
   return null;
@@ -974,16 +976,37 @@ function backupKeys(kind: string, rows: Record<string, any[]>): string[] {
   return [];
 }
 
+/** A batch's rows go to the database as one JSON value, which D1 takes up to 2 MB: well under that. */
+const BATCH_BYTES = 1_000_000;
+
+/** Rows in batches of up to 100 whose JSON stays within BATCH_BYTES (a larger row goes on its own). */
+function batches<T>(data: T[]): T[][] {
+  const out: T[][] = [];
+  let cur: T[] = [];
+  let size = 0;
+  for (const r of data) {
+    const bytes = new TextEncoder().encode(JSON.stringify(r)).length;
+    if (cur.length && (cur.length >= 100 || size + bytes > BATCH_BYTES)) {
+      out.push(cur);
+      cur = [];
+      size = 0;
+    }
+    cur.push(r);
+    size += bytes;
+  }
+  if (cur.length) out.push(cur);
+  return out;
+}
+
 /**
- * Upsert rows in batches of 100. A batch that fails is retried row by row, so one row that can't go
+ * Upsert rows in batches (`batches`). A batch that fails is retried row by row, so one row that can't go
  * back (an address another row has now) is reported on its own and the rest are written. Returns the
  * keys written and the problems.
  */
 async function writeRows(db: Db, table: string, data: any[], onConflict: string, key: (r: any) => string): Promise<{ written: Set<string>; problems: string[] }> {
   const written = new Set<string>();
   const problems: string[] = [];
-  for (let i = 0; i < data.length; i += 100) {
-    const batch = data.slice(i, i + 100);
+  for (const batch of batches(data)) {
     const { error } = await db.from(table).upsert(batch, { onConflict });
     if (!error) {
       batch.forEach((r) => written.add(key(r)));
@@ -1019,10 +1042,7 @@ async function putBackLinks(db: Db, ids: number[], links: any[], drafts: any[]):
       if (error) problems.push(`entry ${entry}'s terms: ${error.message}`);
     }
   }
-  for (let i = 0; i < drafts.length; i += 100) {
-    const { error } = await db.from('entry_drafts').upsert(drafts.slice(i, i + 100), { onConflict: 'entry_id' });
-    if (error) problems.push(`unpublished changes: ${error.message}`);
-  }
+  problems.push(...(await writeRows(db, 'entry_drafts', drafts, 'entry_id', (d) => String(d.entry_id))).problems);
   const hasDraft = new Set(drafts.map((d) => d.entry_id));
   const extra = (await byIds<{ entry_id: number }>(db, 'entry_drafts', 'entry_id', 'entry_id', ids)).map((d) => d.entry_id).filter((id) => !hasDraft.has(id));
   for (let i = 0; i < extra.length; i += 200) {

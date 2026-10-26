@@ -4,6 +4,7 @@
 // server, on the tables and folders a sync uses only.
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { Db, type CallSpec, type Executor, type QuerySpec, type Result } from './db/query';
+import { parseSelect } from './db/sqlite';
 import type { FolderCalls, Files, ListedFile, Res } from './storage';
 import { env } from './env';
 
@@ -48,9 +49,23 @@ export function verified(time: string | null, sig: string | null, body: string):
   return { ok: true };
 }
 
-/** Whether a query or call is one a sync makes. */
+/** Whether every relation a select string embeds, at any depth, is a sync's table. */
+function embedsAllowed(items: ReturnType<typeof parseSelect>): boolean {
+  return items.every((item) => item.kind !== 'embed' || (SYNC_TABLES.includes(item.name) && embedsAllowed(item.items)));
+}
+
+/** Whether a query or call is one a sync makes. Filters and orders on an embed's path apply only inside
+ * that embed, so checking the select string's embeds covers them. */
 export function allowed(body: { query?: QuerySpec; call?: CallSpec }): boolean {
-  if (body.query) return SYNC_TABLES.includes(body.query.table) && Array.isArray(body.query.filters) && Array.isArray(body.query.order);
+  if (body.query) {
+    const q = body.query;
+    if (!SYNC_TABLES.includes(q.table) || typeof q.columns !== 'string' || !Array.isArray(q.filters) || !Array.isArray(q.order)) return false;
+    try {
+      return embedsAllowed(parseSelect(q.columns));
+    } catch {
+      return false;
+    }
+  }
   return typeof body.call?.fn === 'string' && SYNC_FUNCTIONS.includes(body.call.fn);
 }
 

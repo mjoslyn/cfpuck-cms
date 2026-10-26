@@ -50,15 +50,20 @@ function fitDims(W: number, H: number, bw: number, bh: number): [number, number]
   return [Math.round(W * ratio), Math.round(H * ratio)];
 }
 
+/** A put onto a file already stored, by a store that keeps stored files (`keep`). */
+export class PathTaken extends Error {}
+
 export class MediaStore {
-  constructor(private db: Db, private engineOf: () => ImageEngine = imageEngine) {}
+  /** With `keep` (a new upload's files), a put never writes over a stored file: it throws PathTaken. */
+  constructor(private db: Db, private engineOf: () => ImageEngine = imageEngine, private keep = false) {}
 
   get engine(): ImageEngine {
     return this.engineOf();
   }
 
   async put(path: string, body: Uint8Array, mime: string) {
-    const { error } = await this.db.storage.from('media').upload(path, body, { contentType: mime, upsert: true, cacheControl: '31536000' });
+    const { error } = await this.db.storage.from('media').upload(path, body, { contentType: mime, upsert: !this.keep, cacheControl: '31536000' });
+    if (error && this.keep && error.statusCode === '409') throw new PathTaken(`${path} is already stored`);
     if (error) throw new Error(`${path}: ${error.message}`);
   }
 

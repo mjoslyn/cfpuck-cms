@@ -614,6 +614,8 @@ export class SqliteExecutor implements Executor {
     const schema = tableOf(spec.table);
     const params = new Params();
     let text: string;
+    // The write sets updated_at itself (a date kept on purpose), which the touch trigger replaces.
+    let stamped = false;
     if (spec.action === 'update' || spec.action === 'delete') {
       const where = scopedTo(spec.filters, '').map((f) => conditionSql(f, 't0', spec.table, params));
       if (rule !== true) {
@@ -629,6 +631,7 @@ export class SqliteExecutor implements Executor {
       if (spec.action === 'delete') text = `DELETE FROM ${ident(spec.table)} AS t0${cond} RETURNING *`;
       else {
         const values = { ...(spec.values as Record<string, unknown>) };
+        if (schema.touch && 'updated_at' in values) stamped = true;
         if (schema.touch && !('updated_at' in values)) values.updated_at = now();
         const [row] = storedRows(spec.table, [values]);
         const cols = writeColumns(spec.table, [row]);
@@ -658,6 +661,7 @@ export class SqliteExecutor implements Executor {
           if (update === false) return { data: null, count: null, error: rlsError(spec.table), status: 403 };
           const sets = cols.map((c) => `${ident(c)} = excluded.${ident(c)}`);
           if (schema.touch && !cols.includes('updated_at')) sets.push(`"updated_at" = ${params.add(now())}`);
+          else if (schema.touch) stamped = true;
           // The update rule's rows only, as the rows were when they were checked.
           const only = update === true ? '' : ` WHERE ${conditionSql(update, ident(spec.table), spec.table, params)}`;
           text += ` ON CONFLICT ${conflict} DO UPDATE SET ${sets.join(', ')}${only}`;
@@ -666,10 +670,26 @@ export class SqliteExecutor implements Executor {
       text += ' RETURNING *';
     }
     const db = await this.db();
-    const written = (await db.prepare(text).bind(...params.values).all()).results.map((r) => readRow(spec.table, r));
+    const raw = (await db.prepare(text).bind(...params.values).all()).results;
+    if (stamped && raw.length) await this.restamp(spec.table, raw);
+    const written = raw.map((r) => readRow(spec.table, r));
     let data: unknown[] | null = null;
     if (spec.returning) data = await this.project(spec, written);
     return shape({ data, error: null, count: spec.count ? written.length : null, status: spec.action === 'insert' ? 201 : 200 }, spec.single);
+  }
+
+  /**
+   * Puts back the updated_at a write set on purpose. The *_touch triggers fire when an update leaves
+   * updated_at as it was, a date written back unchanged included, and set it to now; written again
+   * here, it differs from what the trigger left, so the trigger lets it stand. RETURNING reports what
+   * the write set, which is what is stored once this has run.
+   */
+  private async restamp(table: string, rows: Record<string, unknown>[]): Promise<void> {
+    const pk = tableOf(table).pk;
+    const keys = JSON.stringify(rows.map((r) => [r.updated_at, ...pk.map((k) => r[k])]));
+    const w = `SELECT json_extract(value, '$[0]') AS u${pk.map((_, i) => `, json_extract(value, '$[${i + 1}]') AS k${i}`).join('')} FROM json_each(?)`;
+    const on = pk.map((k, i) => `${ident(table)}.${ident(k)} = w.k${i}`).join(' AND ');
+    await (await this.db()).prepare(`UPDATE ${ident(table)} SET "updated_at" = w.u FROM (${w}) AS w WHERE ${on} AND ${ident(table)}."updated_at" IS NOT w.u`).bind(keys).run();
   }
 
   /**
