@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Num, Row, Select, Text, Toggle, inputClass } from './fields';
 import { TICKETS_KEY, newId, parsePrice, type EventTickets, type TicketQuestion, type TicketType } from '../lib/tickets/config';
+import { MIN_CHARGE } from '../lib/payments/money';
 import type { MemberLevel } from '../lib/members/config';
 import { useMemberSettings } from './member-settings';
 
@@ -13,6 +14,9 @@ const small = 'rounded-sm border border-admin-ink/20 px-2 py-1 text-xs font-semi
 function PriceInput({ value, onChange, title = 'Price (empty or 0: free)', optional }: { value: number | undefined; onChange: (cents: number | undefined) => void; title?: string; optional?: boolean }) {
   const [text, setText] = useState(value ? (value / 100).toFixed(2) : optional && value === 0 ? '0.00' : '');
   const bad = text.trim() !== '' && parsePrice(text) == null;
+  const cents = bad ? null : parsePrice(text);
+  // The providers take nothing smaller: an order that comes to less can't be paid.
+  const low = cents != null && cents > 0 && cents < MIN_CHARGE;
   return (
     <Row title={title}>
       <input
@@ -28,6 +32,7 @@ function PriceInput({ value, onChange, title = 'Price (empty or 0: free)', optio
         }}
       />
       {bad && <span className="mt-1 block text-xs text-[#b3261e]">Write a price like 25 or 12.50.</span>}
+      {low && <span className="mt-1 block text-xs text-[#b3261e]">An order has to come to at least {(MIN_CHARGE / 100).toFixed(2)} to be paid online; one that comes to less is refused.</span>}
     </Row>
   );
 }
@@ -146,7 +151,7 @@ export function TicketsForm({ fields, onChange }: { fields: Record<string, any>;
             </Row>
             <PriceInput value={x.price} onChange={(price) => setType({ price: price ?? 0 })} />
             {members?.enabled && members.levels.length > 0 && <MemberPricing type={x} levels={members.levels} onChange={setType} />}
-            <Num title="How many (empty: no limit of its own)" value={x.capacity ?? undefined} min={0} onChange={(capacity) => setType({ capacity: capacity ?? null })} />
+            <Num title="How many (empty: no limit of its own; 0: sold out)" value={x.capacity ?? undefined} min={0} onChange={(capacity) => setType({ capacity: capacity ?? null })} />
             <Num title="Most in one order" value={x.maxPerOrder ?? undefined} min={1} onChange={(maxPerOrder) => setType({ maxPerOrder: maxPerOrder ?? null })} />
             <DateTime title="On sale from (empty: now)" value={x.salesStart} onChange={(salesStart) => setType({ salesStart })} />
             <DateTime title="On sale until (empty: until the event ends)" value={x.salesEnd} onChange={(salesEnd) => setType({ salesEnd })} />
@@ -160,7 +165,7 @@ export function TicketsForm({ fields, onChange }: { fields: Record<string, any>;
       {t.types.length > 0 && (
         <>
           <p className="-mt-1 mb-3 text-xs text-admin-muted">Times are in the event's timezone. A recurring event sells tickets for each date separately.</p>
-          <Num title="Capacity: tickets of all types together (empty: no limit)" value={t.capacity ?? undefined} min={0} onChange={(capacity) => set({ capacity: capacity ?? null })} />
+          <Num title="Capacity: tickets of all types together (empty: no limit; 0: sold out)" value={t.capacity ?? undefined} min={0} onChange={(capacity) => set({ capacity: capacity ?? null })} />
           <Num title="Most tickets in one order (default 10)" value={t.maxPerOrder ?? undefined} min={1} onChange={(maxPerOrder) => set({ maxPerOrder: maxPerOrder ?? null })} />
           <Select title="Waitlist when sold out" value={t.waitlist} options={[['off', 'Off'], ['auto', 'On: email people as tickets free up'], ['manual', 'On: notify people from the attendee list']]} onChange={(v) => set({ waitlist: (v as EventTickets['waitlist']) ?? 'off' })} />
 

@@ -26,7 +26,7 @@ export const POST: APIRoute = async ({ params, request, url }) => {
     const reported = await provider.parseEvent(event);
     if (reported) {
       await formsWebhook(name, reported);
-      await ticketsWebhook(name, reported);
+      await ticketsWebhook(name, reported, url.origin);
     }
   } catch (e) {
     // A failure answers 500, so the provider tries again later.

@@ -13,7 +13,7 @@ export interface TicketType {
   name: string;
   description?: string;
   price: number;
-  /** How many there are (empty: no limit of its own). */
+  /** How many there are (empty: no limit of its own; 0: none, sold out). */
   capacity?: number | null;
   /** Most of this type in one order (default: the event's). */
   maxPerOrder?: number | null;
@@ -63,7 +63,7 @@ export interface EventTickets {
   /** Heading over the ticket form (default "Tickets"). */
   heading?: string;
   types: TicketType[];
-  /** All types together (empty: no limit). For a recurring event, per date. */
+  /** All types together (empty: no limit; 0: none, sold out). For a recurring event, per date. */
   capacity?: number | null;
   /** Most tickets in one order (default 10). */
   maxPerOrder?: number | null;
@@ -342,10 +342,10 @@ export const offeredTypes = (ev: EventTickets) => ev.types.filter((t) => !t.hidd
 /** What's left: per type, and of the event (null: no limit), given what's taken. */
 export function remaining(ev: EventTickets, sold: Record<string, number>) {
   const taken = Object.values(sold).reduce((a, b) => a + b, 0);
-  const total = ev.capacity ? Math.max(ev.capacity - taken, 0) : null;
+  const total = ev.capacity != null ? Math.max(ev.capacity - taken, 0) : null;
   const types: Record<string, number | null> = {};
   for (const t of ev.types) {
-    const own = t.capacity ? Math.max(t.capacity - (sold[t.id] ?? 0), 0) : null;
+    const own = t.capacity != null ? Math.max(t.capacity - (sold[t.id] ?? 0), 0) : null;
     types[t.id] = own == null ? total : total == null ? own : Math.min(own, total);
   }
   return { total, types };
@@ -367,6 +367,7 @@ export const CHECKOUT_MESSAGES: Record<string, string> = {
   invalid: 'Please check your order: choose at least one ticket and fill in the required fields.',
   busy: 'We are receiving a lot of orders. Please try again in a minute.',
   limit: 'You have tickets set aside for this event, or several orders started, that are not paid for yet. Please finish one of them, or try again in an hour.',
+  'below-minimum': 'That order comes to less than the smallest amount we can take online. Please choose more tickets, or contact us.',
   'payments-off': 'Online payment is not available right now. Please contact us to buy tickets.',
   'payment-error': 'We could not start the payment. Please try again.',
   cancelled: 'Your payment was cancelled and nothing was charged. You can try again below.',

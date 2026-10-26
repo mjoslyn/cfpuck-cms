@@ -98,14 +98,14 @@ const csv = `/api/admin/tickets/attendees.csv?event=${id}${recurring ? `&date=${
   </div>
 
   <dl class="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-    <div class="rounded bg-white p-4 shadow-[0_0_0_1px_rgba(26,26,46,0.08)]"><dt class="text-xs text-admin-muted">Tickets sold</dt><dd class="mt-1 text-2xl">{tickets}{t.capacity ? <span class="text-sm text-admin-muted"> of {t.capacity}</span> : ''}</dd></div>
+    <div class="rounded bg-white p-4 shadow-[0_0_0_1px_rgba(26,26,46,0.08)]"><dt class="text-xs text-admin-muted">Tickets sold</dt><dd class="mt-1 text-2xl">{tickets}{t.capacity != null ? <span class="text-sm text-admin-muted"> of {t.capacity}</span> : ''}</dd></div>
     <div class="rounded bg-white p-4 shadow-[0_0_0_1px_rgba(26,26,46,0.08)]"><dt class="text-xs text-admin-muted">Checked in</dt><dd class="mt-1 text-2xl" id="checked-in" data-total={tickets}>{checkedIn}</dd></div>
     <div class="rounded bg-white p-4 shadow-[0_0_0_1px_rgba(26,26,46,0.08)]"><dt class="text-xs text-admin-muted">Takings (after refunds)</dt><dd class="mt-1 text-2xl">{money(takings, currency, '0')}</dd></div>
     <div class="rounded bg-white p-4 shadow-[0_0_0_1px_rgba(26,26,46,0.08)]"><dt class="text-xs text-admin-muted">Waitlist</dt><dd class="mt-1 text-2xl">{t.waitlist === 'off' ? 'Off' : (waitlist ?? []).filter((w) => w.status === 'waiting').length}</dd></div>
   </dl>
   {t.types.length > 0 && (
     <p class="mt-3 text-sm text-admin-muted">
-      {t.types.map((x) => `${x.name}: ${sold.get(x.id) ?? 0}${x.capacity ? ` of ${x.capacity}` : ''}`).join(' · ')}
+      {t.types.map((x) => `${x.name}: ${sold.get(x.id) ?? 0}${x.capacity != null ? ` of ${x.capacity}` : ''}`).join(' · ')}
     </p>
   )}
 
