@@ -1136,6 +1136,7 @@ npm run deploy:remote                   # apply remote migrations, then deploy w
 npx tsx --env-file=.env scripts/create-editor.ts you@example.org 'password' [editor|admin]   # a user
 npm run seed                            # starter templates, home page, sample event (skips what exists)
 npx tsx --env-file=.env scripts/migrate-content.ts [--dry-run]   # site then core content migrations
+npm test                                # unit tests (Vitest), with D1's limits checked on every statement
 npx tsx scripts/checks/formatting.ts    # autop/texturize against scripts/checks/formatting-cases.json
 npx tsx scripts/checks/recurrence.ts    # recurrence rules, DST, event date sync
 npx tsx scripts/db-schema.ts            # src/lib/db/schema.ts from the local D1, after a migration
@@ -1145,8 +1146,15 @@ npx tsx scripts/checks/mailing.ts       # signed links, mailing emails, link tra
 npx tsx --env-file=.env scripts/media-formats.ts   # backfill AVIF/WebP for existing media
 ```
 
-`.github/workflows/check.yml` runs `npm run check`, the three checks above and `scripts/checks/private-address.ts` on every push and pull
-request.
+`npm test` runs the unit tests (Vitest, `vitest.config.ts`, `tests/**/*.test.ts`): each file gets a database of
+its own, a copy of one made from `db/migrations` (`tests/setup/global.ts`, `tests/setup/db.ts`), as the
+DB binding, and every statement sent to it is checked against D1's limits first (`tests/setup/d1-limits.ts`:
+32 arguments per SQL function, 50-byte LIKE and GLOB patterns, 100 bound values, 100 KB of SQL, 2 MB per
+value), so a query local SQLite takes and D1 refuses fails there. Tests import the code they test
+directly (no dev server); a bug fixed gets a test beside the others of its area.
+
+`.github/workflows/check.yml` runs `npm run check`, `npm test`, the three checks above and
+`scripts/checks/private-address.ts` on every push and pull request.
 
 `scripts/safety-e2e.ts` (uploads, form limits, shared addresses, stale saves, tags, search, roles, restore as a job) and
 `scripts/sync-e2e.ts` (a sync stopped by a row made since Compare; undoing a half-finished sync; needs
@@ -1191,6 +1199,7 @@ a content migration or a SQL migration (`db/migrations/`) that edits the JSON. C
 
 ## Checking changes
 
+- `npm run check` and `npm test` pass; a fix comes with a test that fails without it.
 - Render the affected pages before and after and diff the HTML for unintended changes (ignore
   cache-busting `?v=` values and shuffled collections); look at screenshots (desktop and phone) of
   intended ones. Lazy-loaded images need the page scrolled before a full-page screenshot.

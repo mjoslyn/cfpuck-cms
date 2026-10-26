@@ -260,6 +260,7 @@ commit the fix on its own and `git cherry-pick` it into the core repository.
 
 ```
 npm run check                                   # typecheck
+npm test                                        # unit tests
 npx tsx scripts/checks/recurrence.ts            # recurrence rules and DST
 npx tsx scripts/checks/mailing.ts               # mailing emails, signed links, click verdicts, digest times
 npx tsx --env-file=.env scripts/publishing-e2e.ts   # drafts, preview, publish (needs LOCAL_ADMIN_* in .env)

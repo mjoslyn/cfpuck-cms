@@ -36,6 +36,7 @@ npx tsx scripts/db-schema.ts                   # src/lib/db/schema.ts from the l
 
 ```sh
 npm run check                                       # typecheck
+npm test                                            # unit tests (Vitest), D1's limits checked on every statement
 npx tsx scripts/checks/recurrence.ts                # recurrence rules, DST, event date sync
 npx tsx scripts/checks/formatting.ts                # autop/texturize against scripts/checks/formatting-cases.json
 npx tsx scripts/checks/mailing.ts                   # mailing emails, signed links, click verdicts, digest times

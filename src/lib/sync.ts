@@ -1113,7 +1113,7 @@ async function putBack(db: Db, kind: string, rows: Record<string, any[]>): Promi
  * under them; terms entries still use, or with terms under them; files entries still feature.
  * Returns problems, if any (the rows kept among them).
  */
-async function removeAdded(db: Db, kind: string, keys: string[]): Promise<string[]> {
+export async function removeAdded(db: Db, kind: string, keys: string[]): Promise<string[]> {
   if (!keys.length) return [];
   const problems: string[] = [];
   const del = async (table: string, column: string, values: (string | number)[]) => {

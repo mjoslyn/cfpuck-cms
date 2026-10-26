@@ -45,7 +45,8 @@ Update the docs in the same commit as the change, not afterwards:
 
 ## Workflow
 
-1. Change and commit here. `npm run check` (TypeScript) must pass.
+1. Change and commit here. `npm run check` (TypeScript) and `npm test` (unit tests, `tests/`) must pass;
+   a fix comes with a test that fails without it.
 2. Test on the example site, and for anything that real content exercises, in a site: in
    `../<site>`, `git fetch <path to this repository> main && git merge --no-commit FETCH_HEAD`,
    restart its dev server if config or dependencies changed, and test there.

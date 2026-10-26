@@ -54,11 +54,27 @@ land together: push the code, wait for the deploy, then `npx wrangler d1 migrati
 
 ## Workflow
 
-1. Change and commit in `cfpuck-cms`. `npm run check` must pass.
+1. Change and commit in `cfpuck-cms`. `npm run check` and `npm test` must pass (a fix comes with a
+   test in `tests/` that fails without it).
 2. Test on the example site and, for anything real content exercises, in a site: merge the core
    change there without committing and test.
 3. Push `cfpuck-cms` (it deploys nothing), then in each site `git fetch upstream && git merge upstream/main`
    and commit. The site's owner pushes the site, which deploys it.
+
+## Tests
+
+`npm test` runs the unit tests in `tests/` with [Vitest](https://vitest.dev/). A test imports the code
+it tests and calls it; nothing needs a dev server. Each test file gets a fresh database made from
+`db/migrations`, so tests that read and write through the query layer (`siteDb()`, or `sessionDb()` to
+act as an editor or admin) start from empty tables and see real SQLite.
+
+Every statement a test sends is checked against D1's limits before it runs: 32 arguments per SQL
+function, LIKE and GLOB patterns of 50 bytes, 100 bound values, 100 KB of SQL and 2 MB per value.
+Local SQLite allows more, so without this a query that works on your machine can fail on the first
+deploy. A test that breaks a limit fails with "D1 would refuse this statement" and the reason.
+
+Put a test beside the others of its area (`tests/db-policies.test.ts`, `tests/security.test.ts`...),
+and give every fix one that fails without it. CI runs `npm test` on every push.
 
 ## Checking changes
 
