@@ -7,7 +7,7 @@ import { env, type Provider } from './common';
 import * as stripe from './stripe';
 import * as square from './square';
 
-export type { Checkout, CheckoutRequest, CheckoutState, PaymentEvent, Provider } from './common';
+export type { Checkout, CheckoutRequest, CheckoutState, PaymentEvent, Provider, Refund } from './common';
 export { ProviderError } from './common';
 
 export type PaymentProvider = 'stripe' | 'square';

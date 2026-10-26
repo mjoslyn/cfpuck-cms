@@ -3,7 +3,7 @@
 // SQUARE_ENVIRONMENT (sandbox or production, the default), SQUARE_WEBHOOK_SIGNATURE_KEY and
 // SQUARE_WEBHOOK_URL (the address the webhook subscription posts to, which the signature covers, when the
 // site sees another one).
-import { ProviderError, env, hmac, sameString, type CheckoutRequest, type CheckoutState, type Provider } from './common';
+import { ProviderError, env, hmac, sameString, type CheckoutRequest, type CheckoutState, type Provider, type Refund } from './common';
 
 const VERSION = '2025-09-24';
 const sandbox = () => env('SQUARE_ENVIRONMENT') === 'sandbox';
@@ -80,8 +80,11 @@ async function refunded(paymentId: string) {
   return total;
 }
 
-async function refund(paymentId: string, amount: number, currency: string, key: string) {
-  await call('POST', '/refunds', { idempotency_key: `refund-${key}`.slice(0, 45), payment_id: paymentId, amount_money: { amount, currency: currency.toUpperCase() } });
+/** A refund's status: COMPLETED, PENDING (on its way), REJECTED or FAILED. */
+async function refund(paymentId: string, amount: number, currency: string, key: string): Promise<Refund> {
+  const { refund: r } = await call('POST', '/refunds', { idempotency_key: `refund-${key}`.slice(0, 45), payment_id: paymentId, amount_money: { amount, currency: currency.toUpperCase() } });
+  const status = r?.status === 'COMPLETED' ? 'succeeded' : r?.status === 'REJECTED' || r?.status === 'FAILED' ? 'failed' : 'pending';
+  return { id: String(r?.id ?? ''), status, reason: r?.status === 'REJECTED' || r?.status === 'FAILED' ? r.status.toLowerCase() : undefined };
 }
 
 /**

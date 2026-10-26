@@ -3,7 +3,7 @@
 // visitor to checkout instead, and notifies once paid (./checkout.ts).
 import type { Db } from '../db/query';
 import type { Field, FormDef, FormResult, FormRow, NamePart, Notification, ProductValue, SubmissionPayment, Values } from './types';
-import { HONEYPOT, INPUT_TYPES, NAME_LABELS, displayValue, isFieldHidden, isProduct, visibleNameParts } from './logic';
+import { HONEYPOT, INPUT_TYPES, NAME_LABELS, displayValue, hiddenFields, isProduct, visibleNameParts } from './logic';
 import { MAX_QUANTITY, currencyOf, lineItems, totalOf } from './payment';
 import { startCheckout } from './checkout';
 import { formatMoney } from '../payments/money';
@@ -163,11 +163,12 @@ export function mergeTags(text: string, row: FormRow, values: Values, opts: { ht
 }
 
 function allFields(def: FormDef, values: Values, html: boolean): string {
+  const hidden = hiddenFields(def, values);
   const rows: (readonly [string, string])[] = def.fields
-    .filter((f) => INPUT_TYPES.includes(f.type) && f.type !== 'hidden' && !isFieldHidden(def, f, values))
+    .filter((f) => INPUT_TYPES.includes(f.type) && f.type !== 'hidden' && !hidden.has(f.id))
     .map((f) => [f.label, displayValue(f, values, currencyOf(def))] as const)
     .filter(([, v]) => v);
-  const total = def.payment ? totalOf(lineItems(def, values)) : 0;
+  const total = def.payment ? totalOf(lineItems(def, values, hidden)) : 0;
   if (total) rows.push(['Total', formatMoney(total, currencyOf(def))]);
   if (!html) return rows.map(([k, v]) => `${k}: ${v}`).join('\n');
   return (
@@ -181,7 +182,7 @@ function allFields(def: FormDef, values: Values, html: boolean): string {
 function fieldHtml(def: FormDef, values: Values, id: string, showLabel: boolean): string {
   if (id === 'all') return allFields(def, values, true);
   const f = def.fields.find((x) => x.id === id);
-  if (!f || isFieldHidden(def, f, values)) return '';
+  if (!f || hiddenFields(def, values).has(f.id)) return '';
   const v = escHtml(displayValue(f, values, currencyOf(def))).replace(/\n/g, '<br />');
   if (!v) return '';
   return showLabel ? `<p style="margin:0 0 4px 0;font-weight:600">${escHtml(f.label)}</p><p style="margin:0">${v}</p>` : `<p style="margin:0">${v}</p>`;
@@ -246,19 +247,18 @@ export async function handleFormPost(data: FormData, request: Request): Promise<
   if (def.honeypot && String(data.get(HONEYPOT) ?? '').trim()) return { formId, ok: true, message: confirmation.message ?? '', errors: {}, values: {} };
 
   const values = collect(data, def);
+  // Which fields logic hides, decided once for validation, the stored entry and the total alike.
+  const hidden = hiddenFields(def, values);
   const errors: Record<string, string> = {};
   for (const f of def.fields) {
-    if (!INPUT_TYPES.includes(f.type) || isFieldHidden(def, f, values)) continue;
+    if (!INPUT_TYPES.includes(f.type) || hidden.has(f.id)) continue;
     const message = validate(f, values);
     if (message) errors[f.id] = message;
   }
   if (Object.keys(errors).length) return { formId, ok: false, message: '', errors, values };
 
   // Fields hidden by logic aren't part of the entry.
-  const entry: Values = Object.fromEntries(Object.entries(values).filter(([id]) => {
-    const f = def.fields.find((x) => x.id === id);
-    return f && !isFieldHidden(def, f, values);
-  }));
+  const entry: Values = Object.fromEntries(Object.entries(values).filter(([id]) => def.fields.some((x) => x.id === id) && !hidden.has(id)));
   const { count, error: countError } = await db.from('form_submissions').select('id', { count: 'exact', head: true }).eq('form_id', formId).gte('created_at', new Date(Date.now() - 60_000).toISOString());
   if (countError) throw countError;
   if ((count ?? 0) >= MAX_PER_MINUTE) return { formId, ok: false, busy: true, message: '', errors: {}, values };
@@ -266,7 +266,7 @@ export async function handleFormPost(data: FormData, request: Request): Promise<
   const stored = { entry, values: labelled, referrer: request.headers.get('referer')?.slice(0, 500), user_agent: request.headers.get('user-agent')?.slice(0, 500) };
 
   // A total to pay: stored as pending and off to checkout; notifications wait for the payment.
-  const items = def.payment ? lineItems(def, entry) : [];
+  const items = def.payment ? lineItems(def, entry, hidden) : [];
   if (def.payment && totalOf(items)) {
     const started = await startCheckout(db, form, stored, items, request);
     if ('error' in started) return { formId, ok: false, message: '', errors: {}, notice: started.error, values };

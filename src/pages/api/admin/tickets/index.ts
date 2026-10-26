@@ -2,6 +2,7 @@
 //   check-in { id, on }      mark an order checked in at the door (or not)
 //   resend { id }            send a paid order's confirmation again
 //   cancel { id }            cancel an unpaid, free or fully refunded order; its tickets go back on sale
+//                            (an unpaid one paid at its provider after all is marked paid instead: { message })
 //   refund { id, amount }    refund (part of) a paid order at Stripe or Square (admins); all of it
 //                            refunds the order and puts its tickets back on sale
 //   notify { event, date, ids? }  email the waitlist: those people, or as many as the free tickets cover
@@ -30,7 +31,8 @@ export const POST: APIRoute = async ({ request, locals, url }) => {
         await resendConfirmation(db, id, origin);
         return Response.json({ ok: true });
       case 'cancel': {
-        await cancelOrder(db, id);
+        // Paid at the provider after all: marked paid, not cancelled.
+        if ((await cancelOrder(db, id)).paid) return Response.json({ ok: true, message: 'This order was paid after all, so it is marked paid and was not cancelled. Refund it to cancel it.' });
         const { data: o } = await db.from('ticket_orders').select('entry_id, occurrence').eq('id', id).single();
         await waitlistAfterRelease(db, o?.entry_id ?? null, o?.occurrence ?? '', origin);
         return Response.json({ ok: true });
@@ -47,7 +49,7 @@ export const POST: APIRoute = async ({ request, locals, url }) => {
         return Response.json({ ok: true, ...result });
       }
       case 'notify': {
-        const ev = await loadEvent(db, Number(body.event), String(body.date ?? ''), false);
+        const ev = await loadEvent(db, Number(body.event), String(body.date ?? ''), null);
         if (!ev) return new Response('No such event or date.', { status: 404 });
         const ids = Array.isArray(body.ids) ? body.ids.map(Number).filter(Boolean) : undefined;
         return Response.json({ ok: true, sent: await notifyWaitlist(db, ev, origin, ids) });

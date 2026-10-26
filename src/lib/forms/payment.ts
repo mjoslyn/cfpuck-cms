@@ -2,7 +2,7 @@
 // renderer (the total under the fields), the submit handler (the charge) and the builder. The browser
 // works the total out the same way for display (public/assets/js/forms.js); the server's is the charge.
 import type { Field, FormDef, ProductValue, Values } from './types';
-import { isFieldHidden, isProduct } from './logic';
+import { hiddenFields, isProduct } from './logic';
 import { toMinor } from '../payments/money';
 
 /** No form takes more than this in one checkout. */
@@ -52,12 +52,12 @@ function item(f: Field, v: ProductValue): LineItem | null {
   return unit > 0 ? { fieldId: f.id, name, unit, quantity } : null;
 }
 
-/** The products answered, leaving out those conditional logic hides. */
-export function lineItems(def: FormDef, values: Values): LineItem[] {
+/** The products answered, leaving out those conditional logic hides (`hidden`: hiddenFields of these values). */
+export function lineItems(def: FormDef, values: Values, hidden = hiddenFields(def, values)): LineItem[] {
   const out: LineItem[] = [];
   for (const f of productsOf(def)) {
     const v = values[f.id];
-    if (!isProduct(v) || isFieldHidden(def, f, values)) continue;
+    if (!isProduct(v) || hidden.has(f.id)) continue;
     const it = item(f, v);
     if (it) out.push(it);
   }

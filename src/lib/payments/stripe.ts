@@ -1,7 +1,7 @@
 // Stripe Checkout (https://docs.stripe.com/api/checkout/sessions): a session per checkout, paid on
 // Stripe's page. Env: STRIPE_SECRET_KEY (sk_test_... or sk_live_..., or a restricted key with Checkout
 // Sessions and Refunds write), STRIPE_WEBHOOK_SECRET (whsec_..., for /api/payments/stripe).
-import { ProviderError, env, hmac, sameString, type CheckoutRequest, type CheckoutState, type Provider } from './common';
+import { ProviderError, env, hmac, sameString, type CheckoutRequest, type CheckoutState, type Provider, type Refund } from './common';
 
 const API = 'https://api.stripe.com/v1';
 
@@ -57,8 +57,11 @@ async function close(ref: string) {
   if (s.status === 'open') await call('POST', `/checkout/sessions/${encodeURIComponent(ref)}/expire`, new URLSearchParams());
 }
 
-async function refund(paymentId: string, amount: number, _currency: string, key: string) {
-  await call('POST', '/refunds', new URLSearchParams({ payment_intent: paymentId, amount: String(amount) }), `refund-${key}`);
+/** A refund's status: succeeded, pending or requires_action (on its way), failed or canceled. */
+async function refund(paymentId: string, amount: number, _currency: string, key: string): Promise<Refund> {
+  const r = await call('POST', '/refunds', new URLSearchParams({ payment_intent: paymentId, amount: String(amount) }), `refund-${key}`);
+  const status = r.status === 'succeeded' ? 'succeeded' : r.status === 'failed' || r.status === 'canceled' ? 'failed' : 'pending';
+  return { id: String(r.id ?? ''), status, reason: r.failure_reason ?? undefined };
 }
 
 async function refunded(paymentId: string) {

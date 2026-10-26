@@ -44,6 +44,14 @@ export interface CheckoutState {
   refunded?: number;
 }
 
+/** A refund as the provider answered it: made (`succeeded`), on its way (`pending`) or not made (`failed`). */
+export interface Refund {
+  id: string;
+  status: 'pending' | 'succeeded' | 'failed';
+  /** Why it failed, when the provider says. */
+  reason?: string;
+}
+
 /**
  * What a webhook reports, in terms both features share: a checkout to look at again (found by `ref`, or
  * Square's `order`), with `failed` or `expired` when it won't be paid; or a payment's refunds (`refunded`,
@@ -66,8 +74,8 @@ export interface Provider {
   check(checkout: { ref: string; order?: string | null }): Promise<CheckoutState>;
   /** Stop an unpaid checkout taking payment. */
   close(ref: string): Promise<void>;
-  /** Give back `amount` of a payment; `key` makes a retried refund count once. */
-  refund(paymentId: string, amount: number, currency: string, key: string): Promise<void>;
+  /** Give back `amount` of a payment; `key` makes a retried refund count once. The refund as the provider answered. */
+  refund(paymentId: string, amount: number, currency: string, key: string): Promise<Refund>;
   /** How much of a payment has been refunded so far, pending refunds included and failed ones not. */
   refunded(paymentId: string): Promise<number>;
   /** A webhook's event if it is signed by the provider; null if not. */

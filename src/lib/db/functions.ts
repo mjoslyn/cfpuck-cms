@@ -156,7 +156,9 @@ export const FUNCTIONS: Record<string, Fn> = {
   /**
    * Holds an order's tickets if the capacities allow, counting paid orders and unexpired holds: the
    * check and the insert are one statement, so two orders can't both take the last tickets (D1 runs
-   * one statement at a time).
+   * one statement at a time). `p_limits.client` limits one buyer (by address, and by email) for the
+   * event, in the same statement: orders not paid for in the last hour (holds, free orders, expired and
+   * cancelled ones), and tickets held unpaid now (with free tickets taken in the last hour).
    */
   ticket_order_create: {
     async run(exec, a) {
@@ -170,13 +172,28 @@ export const FUNCTIONS: Record<string, Fn> = {
         token: order.token, code: order.code, entry_id: entry, occurrence, event_title: order.event_title ?? '', page: order.page ?? '',
         member_id: order.member_id || null, status: order.status, provider: order.provider, name: order.name, email: order.email, phone: order.phone ?? '',
         address: order.address ?? null, answers: order.answers ?? {}, items, quantity: want, amount: Math.trunc(Number(order.amount)), currency: order.currency ?? 'usd',
-        expires_at: order.expires_at || null, paid_at: order.paid_at || null,
+        expires_at: order.expires_at || null, paid_at: order.paid_at || null, ip: String(order.ip ?? ''),
+      };
+      const client = limits.client as { orders: number; tickets: number } | undefined;
+      // One buyer's share: by address (none under astro dev) and by email.
+      const clientConds = (add: (v: unknown) => string) => {
+        if (!client) return [];
+        const hour = add(ago(3600_000));
+        const unpaid = `NOT (o.provider <> 'free' AND o.status IN ('paid', 'refunded'))`;
+        const orders = (who: string) => `(SELECT count(*) FROM ticket_orders AS o WHERE o.entry_id = ${add(entry)} AND ${who} AND o.created_at >= ${hour} AND ${unpaid}) < ${add(client.orders)}`;
+        const conds = [orders(`lower(o.email) = lower(${add(row.email)})`)];
+        if (row.ip) {
+          conds.push(orders(`o.ip = ${add(row.ip)}`));
+          const held = `(o.status = 'pending' AND o.expires_at > ${add(now())}) OR (o.provider = 'free' AND o.status = 'paid' AND o.created_at >= ${hour})`;
+          conds.push(`(SELECT coalesce(sum(o.quantity), 0) FROM ticket_orders AS o WHERE o.entry_id = ${add(entry)} AND o.ip = ${add(row.ip)} AND (${held})) + ${add(want)} <= ${add(client.tickets)}`);
+        }
+        return conds;
       };
       const made = await exec.as(SERVICE).insertIf('ticket_orders', row, (add) => {
         const held = `o.entry_id = ${add(entry)} AND o.occurrence = ${add(occurrence)} AND (o.status = 'paid' OR (o.status = 'pending' AND o.expires_at > ${add(now())}))`;
         const taken = (type?: string) =>
           `(SELECT coalesce(sum(CAST(json_extract(i.value, '$.quantity') AS INTEGER)), 0) FROM ticket_orders AS o, json_each(o.items) AS i WHERE ${held}${type === undefined ? '' : ` AND CAST(json_extract(i.value, '$.type') AS TEXT) = ${add(type)}`})`;
-        const conds = ['1'];
+        const conds = ['1', ...clientConds(add)];
         for (const i of items) {
           const limit = limitOf(limits.types?.[i.type]);
           if (limit !== null) conds.push(`${taken(String(i.type))} + ${add(i.quantity)} <= ${add(limit)}`);
@@ -186,7 +203,13 @@ export const FUNCTIONS: Record<string, Fn> = {
         return conds.join(' AND ');
       });
       if (made) return { ok: true, id: made.id as number };
-      // Refused: say which limit, from what is taken now.
+      // Refused: the buyer's own limit, or which capacity, from what is taken now.
+      if (client) {
+        const values: unknown[] = [];
+        const add = (v: unknown) => (values.push(v), `?${values.length}`);
+        const [r] = await exec.rows<{ ok: number }>(`SELECT ${clientConds(add).join(' AND ')} AS ok`, values);
+        if (!r?.ok) return { ok: false, client: true };
+      }
       const sold = Object.fromEntries((await ticketSold(serviceDb(exec), entry, occurrence)).map((s) => [s.type, s.quantity]));
       for (const i of items) {
         const limit = limitOf(limits.types?.[i.type]);

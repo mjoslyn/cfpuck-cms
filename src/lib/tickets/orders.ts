@@ -10,7 +10,9 @@ import { defaultHorizon, expandEntry, localToUtc, recurrenceOf } from '../recurr
 import { permalink } from '../permalink';
 import { eventWhen, venueLines } from '../events/model';
 import { eventsOnIn } from '../events/on';
-import { isActive, type MemberRow } from '../members/config';
+import { isActive, type Viewer } from '../members/config';
+import { PUBLIC_SCOPE, visibleTo, type LoaderScope } from '../data';
+import { isIP } from '../net';
 import { emailEvents } from '../events/email';
 import { SITE_TZ, site } from '../site';
 import { sendMail } from '../forms/mail';
@@ -25,6 +27,14 @@ import { env } from '../env';
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 /** Orders one event takes in a minute (all buyers together), against floods. */
 const MAX_PER_MINUTE = 30;
+/**
+ * One buyer's share of an event (ticket_order_create): orders not paid for in an hour, by address and
+ * by email (holds, free orders, expired and cancelled ones), and tickets held unpaid at once by one
+ * address, as multiples of the most per order. Holds need no payment, so without these one script could
+ * hold every ticket.
+ */
+const BUYER_ORDERS_PER_HOUR = 5;
+const BUYER_HELD_ORDERS = 2;
 
 export type OrderStatus = 'pending' | 'paid' | 'cancelled' | 'expired' | 'refunded';
 
@@ -40,6 +50,8 @@ export interface OrderRow {
   /** The member who placed it (member prices, members-only tickets), if any. */
   member_id: string | null;
   status: OrderStatus;
+  /** For the attendee list: a payment that came in after the order was cancelled or expired. */
+  note: string;
   provider: 'free' | 'stripe' | 'square';
   provider_ref: string | null;
   provider_order: string | null;
@@ -54,6 +66,8 @@ export interface OrderRow {
   amount: number;
   currency: string;
   refunded_amount: number;
+  /** The refund being made while its outcome is unknown: a retry of it reuses its idempotency key. */
+  refund_attempt: { key: string; amount: number; from: number; at: string } | null;
   expires_at: string | null;
   paid_at: string | null;
   checked_in_at: string | null;
@@ -97,12 +111,15 @@ export interface LoadedEvent {
   emails: Partial<Record<EmailKind, EventEmail>>;
 }
 
-/** An event (and date, for a recurring one) as tickets see it. `published`: only a published event. */
-export async function loadEvent(db: Db, id: number, occurrence: string, published = true): Promise<LoadedEvent | null> {
+/**
+ * An event (and date, for a recurring one) as tickets see it. `scope`: only an event its viewer may see
+ * (published, and members-only ones for those members, as pages); null for any event (the attendee list,
+ * emails).
+ */
+export async function loadEvent(db: Db, id: number, occurrence: string, scope: LoaderScope | null = PUBLIC_SCOPE): Promise<LoadedEvent | null> {
   if (!id) return null;
-  let q = db.from('entries').select(ENTRY_COLUMNS).eq('id', id).eq('type', 'event');
-  if (published) q = q.eq('status', 'publish');
-  const { data: series, error } = await q.maybeSingle<Entry>();
+  const q = db.from('entries').select(ENTRY_COLUMNS).eq('id', id).eq('type', 'event');
+  const { data: series, error } = await (scope ? visibleTo(q, scope) : q).maybeSingle<Entry>();
   if (error) throw error;
   if (!series) return null;
   let entry: Entry = series;
@@ -159,6 +176,18 @@ export async function expireStale(db: Db) {
 
 const field = (data: FormData, k: string, max = 300) => String(data.get(k) ?? '').trim().slice(0, max);
 
+/** A buyer's address as orders keep it: IPv4 whole, IPv6 as its /64 (what one connection is given). */
+export function buyerAddress(ip: string): string {
+  const v4 = ip.trim().replace(/^::ffff:/i, '');
+  if (isIP(v4) === 4) return v4;
+  if (isIP(ip.trim()) !== 6) return '';
+  const [head, tail = ''] = ip.trim().toLowerCase().split('::');
+  const a = head ? head.split(':') : [];
+  const b = tail ? tail.split(':') : [];
+  const full = ip.includes('::') ? [...a, ...Array(8 - a.length - b.length).fill('0'), ...b] : a;
+  return `${full.slice(0, 4).map((g) => parseInt(g, 16).toString(16)).join(':')}::/64`;
+}
+
 /** The page a ticket form was posted from: a path on this site, else '' (the event's own page). */
 const postedPage = (data: FormData) => {
   const p = field(data, 'page', 500);
@@ -182,11 +211,13 @@ const backTo = (ev: LoadedEvent, page: string) => {
 /**
  * A ticket form posted (/api/tickets/checkout): where to send the buyer next. A free order is
  * confirmed at once; a paid one holds its tickets and goes to the provider's checkout. Problems go
- * back to the event with ?tickets=<reason>. Null when there is no such event.
+ * back to the event with ?tickets=<reason>. Null when there is no such event, or not one the buyer may
+ * see. `viewer`: the signed-in buyer (no membership while Members is off); `ip`: their address.
  */
-export async function startCheckout(data: FormData, origin: string, member: MemberRow | null = null): Promise<string | null> {
+export async function startCheckout(data: FormData, origin: string, viewer: Viewer | null = null, ip = ''): Promise<string | null> {
   const db = serviceClient();
-  const ev = await loadEvent(db, Number(data.get('event')), field(data, 'occurrence', 10));
+  const member = viewer?.member ?? null;
+  const ev = await loadEvent(db, Number(data.get('event')), field(data, 'occurrence', 10), { published: true, viewer });
   if (!ev) return null;
   const page = postedPage(data);
   const back = backTo(ev, page);
@@ -240,10 +271,14 @@ export async function startCheckout(data: FormData, origin: string, member: Memb
   const code = newCode();
   const hold = (settings.hold ?? 30) * 60_000;
   const currency = settings.currency ?? 'usd';
-  const limits = { total: t.capacity || null, types: Object.fromEntries(t.types.map((x) => [x.id, x.capacity || null])) };
+  const limits = {
+    total: t.capacity || null,
+    types: Object.fromEntries(t.types.map((x) => [x.id, x.capacity || null])),
+    client: { orders: BUYER_ORDERS_PER_HOUR, tickets: BUYER_HELD_ORDERS * (t.maxPerOrder || DEFAULT_MAX_PER_ORDER) },
+  };
   const { data: made, error } = await db.rpc('ticket_order_create', {
     p_order: {
-      token, code, entry_id: ev.series.id, occurrence: (ev.entry as { occurrence?: string }).occurrence ?? '', event_title: ev.series.title, page, member_id: isActive(member) ? member.user_id : null,
+      token, code, entry_id: ev.series.id, occurrence: (ev.entry as { occurrence?: string }).occurrence ?? '', event_title: ev.series.title, page, member_id: isActive(member) ? member.user_id : null, ip: buyerAddress(ip),
       status: free ? 'paid' : 'pending', provider: free ? 'free' : providerName, name, email, phone, address, answers, items, amount, currency,
       // A paid order holds its tickets a little longer than the checkout takes payment.
       expires_at: free ? null : new Date(Date.now() + hold + 2 * 60_000).toISOString(),
@@ -252,6 +287,7 @@ export async function startCheckout(data: FormData, origin: string, member: Memb
     p_limits: limits,
   });
   if (error) throw error;
+  if (made?.client) return back('limit');
   if (!made?.ok) return back('sold-out');
   const at = ticketsAt(ev, page);
   const orderLink = `${at.path}?order=${token}${at.anchor}`;
@@ -287,18 +323,19 @@ export async function returnFromCheckout(token: string, cancelled: boolean): Pro
   const db = serviceClient();
   const { data: order } = await db.from('ticket_orders').select('*').eq('token', token).maybeSingle<OrderRow>();
   if (!order) return null;
-  const ev = order.entry_id ? await loadEvent(db, order.entry_id, order.occurrence, false) : null;
+  const ev = order.entry_id ? await loadEvent(db, order.entry_id, order.occurrence, null) : null;
   const { path, anchor } = ev ? ticketsAt(ev, order.page) : { path: '/', anchor: '' };
   if (cancelled && order.status === 'pending') {
-    // Paid after all (the buyer pressed back after paying): keep it.
-    const state = await paymentState(order).catch((): CheckoutState => ({ status: 'pending' }));
-    if (state.status === 'paid') await markPaid(db, order, state.paymentId);
-    else {
+    // Paid after all (the buyer pressed back after paying): keep it. Cancelled only when the provider
+    // says it isn't paid; a check that fails (or a payment on its way) leaves the order as it is.
+    const state = await paymentState(order).catch((e): null => (console.warn(`tickets: checking order ${order.code}: ${(e as Error).message}`), null));
+    if (state?.status === 'paid') await markPaid(db, order, state.paymentId);
+    else if (state && state.status !== 'processing') {
       await closeCheckout(order.provider, order.provider_ref);
       await db.from('ticket_orders').update({ status: 'cancelled' }).eq('id', order.id).eq('status', 'pending');
       return `${path}?tickets=cancelled&event=${order.entry_id}${anchor}`;
     }
-  } else if (order.status === 'pending' || order.status === 'expired') {
+  } else if (UNPAID.includes(order.status)) {
     try {
       const state = await paymentState(order);
       if (state.status === 'paid') await markPaid(db, order, state.paymentId);
@@ -316,16 +353,32 @@ async function paymentState(o: OrderRow): Promise<CheckoutState> {
   return p && o.provider_ref ? p.check({ ref: o.provider_ref, order: o.provider_order }) : { status: 'pending' };
 }
 
-/** Mark an order paid (once: a webhook and the buyer's return can both get here) and send its confirmation. */
+/** Orders not paid for (yet) whose checkout can still turn out paid. */
+const UNPAID: OrderStatus[] = ['pending', 'expired', 'cancelled'];
+
+/**
+ * Mark an order paid (once: a webhook and the buyer's return can both get here) and send its
+ * confirmation. Only once its provider says it is paid. An order cancelled or expired before the payment
+ * came in is marked paid too, since the money was taken, with a note for the attendee list: its tickets
+ * went back on sale meanwhile (an admin can refund it).
+ */
 export async function markPaid(db: Db, order: Pick<OrderRow, 'id'>, payment?: string) {
-  const { data } = await db
-    .from('ticket_orders')
-    .update({ status: 'paid', paid_at: new Date().toISOString(), ...(payment ? { provider_payment: payment } : {}) })
-    .eq('id', order.id)
-    .in('status', ['pending', 'expired'])
-    .select('*')
-    .maybeSingle<OrderRow>();
-  if (data) await sendConfirmation(db, data, siteOrigin());
+  const at = new Date().toISOString();
+  for (const was of UNPAID) {
+    const note = was === 'pending' ? {} : { note: `Paid after the order was ${was}: its tickets had gone back on sale, so the event may be over capacity. Refund it if they can't be honoured.` };
+    const { data } = await db
+      .from('ticket_orders')
+      .update({ status: 'paid', paid_at: at, ...(payment ? { provider_payment: payment } : {}), ...note })
+      .eq('id', order.id)
+      .eq('status', was)
+      .select('*')
+      .maybeSingle<OrderRow>();
+    if (data) {
+      if (was !== 'pending') console.warn(`tickets: order ${data.code} paid after it was ${was}`);
+      await sendConfirmation(db, data, siteOrigin());
+      return;
+    }
+  }
 }
 
 /**
@@ -356,7 +409,8 @@ export async function ticketsWebhook(provider: PaymentProvider, event: PaymentEv
     return;
   }
   const order = event.ref ? await orderBy(db, 'provider_ref', event.ref) : await orderBy(db, 'provider_order', event.order);
-  if (!order || order.provider !== provider || (order.status !== 'pending' && order.status !== 'expired')) return;
+  // A cancelled or expired order is looked at too: a payment that completed anyway is recorded.
+  if (!order || order.provider !== provider || !UNPAID.includes(order.status)) return;
   if (event.failed || event.expired) {
     await db.from('ticket_orders').update({ status: 'expired' }).eq('id', order.id).eq('status', 'pending');
     return;
@@ -367,13 +421,32 @@ export async function ticketsWebhook(provider: PaymentProvider, event: PaymentEv
 
 // ---- The attendee list -----------------------------------------------------------------------
 
-/** Cancel an order: an unpaid one's checkout closes; its tickets go back on sale. Paid orders are refunded instead. */
-export async function cancelOrder(db: Db, id: number) {
+/**
+ * Cancel an order: an unpaid one's checkout closes; its tickets go back on sale. Paid orders are refunded
+ * instead. An unpaid one is asked of its provider first: paid there after all (its webhook not in yet),
+ * it is marked paid and not cancelled (`paid`); a check that fails cancels nothing.
+ */
+export async function cancelOrder(db: Db, id: number): Promise<{ paid?: boolean }> {
   const { data: order } = await db.from('ticket_orders').select('*').eq('id', id).maybeSingle<OrderRow>();
   if (!order) throw new Error('No such order.');
   if (order.status === 'paid' && order.amount > order.refunded_amount) throw new Error('Refund a paid order to cancel it.');
-  if (order.status === 'pending') await closeCheckout(order.provider, order.provider_ref);
-  await db.from('ticket_orders').update({ status: 'cancelled' }).eq('id', id).in('status', ['pending', 'paid', 'expired']);
+  if (!['pending', 'paid', 'expired'].includes(order.status)) throw new Error('This order is already closed.');
+  const provider = providerOf(order.provider);
+  if (order.status !== 'paid' && provider && order.provider_ref) {
+    const state = await paymentState(order).catch((e) => {
+      throw new Error(`Could not check the payment at ${provider.label} (${(e as Error).message}), so the order was not cancelled. Try again in a moment.`);
+    });
+    if (state.status === 'paid') {
+      await markPaid(db, order, state.paymentId);
+      return { paid: true };
+    }
+    if (state.status === 'processing') throw new Error(`Its payment is on its way at ${provider.label} (a bank payment can take days), so the order was not cancelled.`);
+    if (order.status === 'pending') await closeCheckout(order.provider, order.provider_ref);
+  }
+  // As it was when read: an order paid meanwhile isn't cancelled.
+  const { error } = await db.from('ticket_orders').update({ status: 'cancelled' }).eq('id', id).eq('status', order.status);
+  if (error) throw error;
+  return {};
 }
 
 /** Refund `amount` of a paid order at its provider. All of it: the order is refunded and its tickets go back on sale. */
@@ -386,7 +459,15 @@ export async function refundOrder(db: Db, id: number, amount: number) {
   const provider = providerOf(order.provider);
   if (!provider) throw new ProviderError('Free orders have nothing to refund.');
   if (!order.provider_payment) throw new ProviderError('This order has no payment recorded at the provider; refund it from its dashboard.');
-  await provider.refund(order.provider_payment, amount, order.currency, `${order.id}-${order.refunded_amount}-${amount}`);
+  // Each refund has its own idempotency key, kept with the order while its outcome is unknown: retrying
+  // a refund whose request got no answer reuses it (so it is made once), and any other refund gets a new
+  // one, so the provider never replays an earlier refund's answer (one that failed, say) for it.
+  const last = order.refund_attempt;
+  const key = last && last.amount === amount && last.from === order.refunded_amount ? last.key : `${order.id}-${randomBytes(9).toString('base64url')}`;
+  await db.from('ticket_orders').update({ refund_attempt: { key, amount, from: order.refunded_amount, at: new Date().toISOString() } }).eq('id', id);
+  const made = await provider.refund(order.provider_payment, amount, order.currency, key);
+  await db.from('ticket_orders').update({ refund_attempt: null }).eq('id', id);
+  if (made.status === 'failed') throw new ProviderError(`${provider.label} did not make the refund${made.reason ? ` (${made.reason})` : ''}. Nothing was recorded.`);
   // The provider's webhook may have recorded this refund already: the total is what it was plus this one.
   const { data: now } = await db.from('ticket_orders').select('refunded_amount').eq('id', id).single();
   const total = Math.max(now?.refunded_amount ?? 0, order.refunded_amount + amount);
@@ -414,10 +495,10 @@ export interface WaitlistRow {
 /** How long a notified person's tickets count as spoken for before the next people are told. */
 const WAITLIST_CLAIM = 24 * 3600_000;
 
-/** A waitlist form posted (/api/tickets/waitlist): where to send the visitor next. Null: no such event. */
-export async function joinWaitlist(data: FormData): Promise<string | null> {
+/** A waitlist form posted (/api/tickets/waitlist): where to send the visitor next. Null: no such event (or not one `viewer` may see). */
+export async function joinWaitlist(data: FormData, viewer: Viewer | null = null): Promise<string | null> {
   const db = serviceClient();
-  const ev = await loadEvent(db, Number(data.get('event')), field(data, 'occurrence', 10));
+  const ev = await loadEvent(db, Number(data.get('event')), field(data, 'occurrence', 10), { published: true, viewer });
   if (!ev) return null;
   const page = postedPage(data);
   const back = backTo(ev, page);
@@ -492,7 +573,7 @@ function waitlistLink(ev: LoadedEvent, page: string, origin: string) {
 /** After tickets free up (a cancellation or refund): the waitlist told, when the event does that itself. */
 export async function waitlistAfterRelease(db: Db, entryId: number | null, occurrence: string, origin: string) {
   if (!entryId) return;
-  const ev = await loadEvent(db, entryId, occurrence, false);
+  const ev = await loadEvent(db, entryId, occurrence, null);
   if (ev?.tickets.waitlist === 'auto' && (ev.endUtc == null || ev.endUtc > Date.now())) {
     await notifyWaitlist(db, ev, siteOrigin(origin)).catch((e) => console.error(`tickets: waitlist for ${ev.series.title}: ${e.message}`));
   }
@@ -536,7 +617,7 @@ async function sendOrderEmail(kind: EmailKind, o: OrderRow, ev: LoadedEvent, set
 
 /** The confirmation to the buyer, and a copy for the site's admin (unless turned off). */
 export async function sendConfirmation(db: Db, o: OrderRow, origin: string, ev?: LoadedEvent | null, settings?: TicketSettings) {
-  ev ??= o.entry_id ? await loadEvent(db, o.entry_id, o.occurrence, false) : null;
+  ev ??= o.entry_id ? await loadEvent(db, o.entry_id, o.occurrence, null) : null;
   if (!ev) return;
   settings ??= await siteTicketSettings(db);
   // Someone on the waitlist who bought is off it.
@@ -554,7 +635,7 @@ export async function sendConfirmation(db: Db, o: OrderRow, origin: string, ev?:
 export async function resendConfirmation(db: Db, id: number, origin: string) {
   const { data: o } = await db.from('ticket_orders').select('*').eq('id', id).maybeSingle<OrderRow>();
   if (!o || o.status !== 'paid') throw new Error('Only paid orders have a confirmation.');
-  const ev = o.entry_id ? await loadEvent(db, o.entry_id, o.occurrence, false) : null;
+  const ev = o.entry_id ? await loadEvent(db, o.entry_id, o.occurrence, null) : null;
   if (!ev) throw new Error('The event is gone.');
   if (!(await sendOrderEmail('confirmation', o, ev, await siteTicketSettings(db), siteOrigin(origin)))) throw new Error('No mail server is set up (SMTP_* in the environment).');
   await db.from('ticket_orders').update({ emailed_at: new Date().toISOString() }).eq('id', id);
@@ -587,7 +668,7 @@ export async function sendDueTicketEmails(origin = siteOrigin()): Promise<string
   let followUps = 0;
   for (const o of (orders ?? []) as OrderRow[]) {
     const key = `${o.entry_id}:${o.occurrence}`;
-    if (!events.has(key)) events.set(key, o.entry_id ? await loadEvent(db, o.entry_id, o.occurrence, false).catch(() => null) : null);
+    if (!events.has(key)) events.set(key, o.entry_id ? await loadEvent(db, o.entry_id, o.occurrence, null).catch(() => null) : null);
     const ev = events.get(key);
     const patch: Partial<OrderRow> = {};
     if (!ev || ev.startUtc == null) {
@@ -621,7 +702,7 @@ export async function sendDueTicketEmails(origin = siteOrigin()): Promise<string
   let told = 0;
   for (const key of new Set((waiting ?? []).map((w) => `${w.entry_id}|${w.occurrence}`))) {
     const [id, occurrence] = key.split('|');
-    const ev = await loadEvent(db, Number(id), occurrence, false).catch(() => null);
+    const ev = await loadEvent(db, Number(id), occurrence, null).catch(() => null);
     if (ev?.tickets.waitlist === 'auto' && ev.tickets.enabled && (ev.endUtc == null || ev.endUtc > now)) told += await notifyWaitlist(db, ev, origin).catch((e) => (console.error(`tickets: waitlist ${key}: ${e.message}`), 0));
   }
   return `${reminders} reminder${reminders === 1 ? '' : 's'}, ${followUps} follow-up${followUps === 1 ? '' : 's'}, ${told} told from waitlists`;

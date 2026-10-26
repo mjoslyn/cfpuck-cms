@@ -366,6 +366,7 @@ export const CHECKOUT_MESSAGES: Record<string, string> = {
   closed: 'Ticket sales for this event are closed.',
   invalid: 'Please check your order: choose at least one ticket and fill in the required fields.',
   busy: 'We are receiving a lot of orders. Please try again in a minute.',
+  limit: 'You have tickets set aside for this event, or several orders started, that are not paid for yet. Please finish one of them, or try again in an hour.',
   'payments-off': 'Online payment is not available right now. Please contact us to buy tickets.',
   'payment-error': 'We could not start the payment. Please try again.',
   cancelled: 'Your payment was cancelled and nothing was charged. You can try again below.',
