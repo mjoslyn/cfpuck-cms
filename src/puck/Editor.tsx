@@ -17,6 +17,7 @@ import { templateCandidates, VENDOR_CSS } from '../render/page';
 import { hasContentBlock, type TemplateInfo } from '../lib/templates';
 import { MAIN_AREA, areaItems, areaProp, templateAreas, uniqueAreas } from '../lib/content/areas';
 import { collapseAll } from '../lib/content/linked-patterns';
+import { versionDoc } from '../lib/admin/revisions';
 import { bodyClasses } from '../render/body-classes';
 import { esc } from '../render/html';
 import '../render/blocks';
@@ -366,24 +367,36 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
     return () => window.removeEventListener('beforeunload', warn);
   }, [dirty]);
 
-  /** The version last restored: its id, its content and the content before restoring (to tell if it was undone). */
+  /** The version last restored: its id, and the page as saving would store it then and before restoring (to tell if it was edited or undone). */
   const restoredRef = useRef<{ id: number; json: string; before: string } | null>(null);
 
-  /** Load a saved version into the editor as unsaved changes (undoable; save or publish to keep it). */
-  const restore = (r: RevisionRow) => {
+  /**
+   * Whether a version can be loaded into the editor: in content mode one with content; in layout mode
+   * one saved with the page's current template (a version saved in layout mode keeps the template's content).
+   */
+  const canRestore = (r: RevisionRow) => (mode === 'content' ? !!r.content : r.template?.kind === 'template' && !!templateSlug && r.template.slug === templateSlug && Array.isArray(r.template.content?.content));
+
+  /** Load a saved version into the editor as unsaved changes (undoable). Content mode autosaves it as a draft; layout mode keeps it on Save & apply. */
+  const restore = async (r: RevisionRow) => {
     const get = puckRef.current;
-    if (!get || !r.content) return;
-    const { appState, dispatch } = get();
-    restoredRef.current = { id: r.id, json: JSON.stringify(r.content.content ?? []), before: JSON.stringify(appState.data.content) };
-    dispatch({ type: 'setData', data: { ...appState.data, content: (r.content.content ?? []) as Data['content'] }, recordHistory: true });
+    if (!get || !canRestore(r)) return;
+    const loader = new Loader(db);
+    const inline = (items: PuckItem[]) => inlinePatterns(items, loader);
+    const current = get().appState.data as Data;
+    // Content mode: the page's content and the template's other content areas as the version had them.
+    const next = (mode === 'content' ? await versionDoc(current, r.content!, areaList, inline) : { ...current, content: await inline((r.template!.content.content ?? []) as PuckItem[]) }) as Data;
+    const [before, after] = await Promise.all([collapseLinkedPatterns(current), collapseLinkedPatterns(next)]);
+    restoredRef.current = { id: r.id, json: docJson(after.data), before: docJson(before.data) };
+    get().dispatch({ type: 'setData', data: next, recordHistory: true });
     const base = stateRef.current;
     if (base) {
-      const next = r.entry ? { ...base, ...r.entry, status: base.status } : { ...base, title: r.title || base.title, fields: r.fields ?? base.fields };
-      stateRef.current = next;
-      setState(next);
+      const settings = r.entry ? { ...base, ...r.entry, status: base.status } : { ...base, title: r.title || base.title, fields: r.fields ?? base.fields };
+      stateRef.current = settings;
+      setState(settings);
     }
     edited();
-    setStatus(`Restored the version from ${new Date(r.saved_at ?? r.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`);
+    const when = new Date(r.saved_at ?? r.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    setStatus(mode === 'content' ? `Restored the version from ${when}` : `Restored the layout from ${when}: Save & apply keeps it, on every page using this template`);
   };
 
   /** Open the page as it will look, with the editor's current (unsaved) state, in a new tab. */
@@ -405,10 +418,10 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
   };
 
   /** Whether this save keeps a restored version (and whether it was edited since); nothing if the restore was undone. */
-  const restoredNote = (data: Data) => {
+  const restoredNote = (stored: Data) => {
     const r = restoredRef.current;
     if (!r) return {};
-    const now = JSON.stringify(data.content);
+    const now = docJson(stored);
     if (now === r.before) return {};
     return { restoredFrom: r.id, restoredEdited: now !== r.json };
   };
@@ -475,7 +488,7 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
       ? { kind: template.kind, slug: template.slug, content: stored }
       : mode === 'content'
         ? action === 'discard' || action === 'unpublish' ? { action } : { action, content: stored, entry: stateRef.current, ...restoredNote(stored), ...(auto ? { autosave: true } : {}) }
-        : { action: 'save', entry: stateRef.current, template: { kind: 'template', slug: templateSlug, content: stored } };
+        : { action: 'save', entry: stateRef.current, template: { kind: 'template', slug: templateSlug, content: stored }, ...restoredNote(stored) };
     const url = template ? '/api/admin/templates' : `/api/admin/entries/${entryId}`;
     const put = (bases: object) => fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, ...bases }) });
     let res = await put({ base: baseRef.current, templateBase: tplBaseRef.current }).catch(() => null);
@@ -550,7 +563,7 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
     </div>
     <div className="cms-editor-frame relative min-h-0 flex-1">
     <EnvContext.Provider value={env}>
-      <RevisionsContext.Provider value={{ entryId: entry?.id ?? null, version: revisionsVersion, contentMode: mode === 'content' && !!entry, restore }}>
+      <RevisionsContext.Provider value={{ entryId: entry?.id ?? null, version: revisionsVersion, layout: mode === 'layout' ? templateSlug : null, canRestore: (r) => !!entry && canRestore(r), restore }}>
       <A11yMarksContext.Provider value={{ save: saveA11yMarks, quiet: () => (marksOnly.current = true) }}>
       <ViewContext.Provider value={{ env, chrome, sources: admin ? templateSlug : null, form: { type: entry?.type ?? '', state, setState: (v) => { stateRef.current = v; setState(v); edited(); }, templates } }}>
       <Puck
@@ -695,8 +708,15 @@ function PuckBridge({ into, onSelect }: { into: { current: ReturnType<typeof use
  */
 const IFRAME = { enabled: true, syncHostStyles: false, waitForStyles: true };
 
-interface RevisionRow { id: number; created_at: string; saved_at: string | null; action: string | null; title: string; author_id: string | null; content: Data | null; entry: EntryState | null; fields: Record<string, any> | null; restored_from: number | null; restored_edited: boolean | null }
-interface RevisionsApi { entryId: number | null; version: number; contentMode: boolean; restore: (r: RevisionRow) => void }
+interface RevisionRow { id: number; created_at: string; saved_at: string | null; action: string | null; title: string; author_id: string | null; content: Data | null; entry: EntryState | null; fields: Record<string, any> | null; template: { kind: string; slug: string; content: Data } | null; restored_from: number | null; restored_edited: boolean | null }
+interface RevisionsApi {
+  entryId: number | null;
+  version: number;
+  /** Layout mode: the template the page is edited as. */
+  layout: string | null;
+  canRestore: (r: RevisionRow) => boolean;
+  restore: (r: RevisionRow) => void;
+}
 const RevisionsContext = createContext<RevisionsApi | null>(null);
 const ACTIONS: Record<string, string> = { draft: 'Draft saved', publish: 'Published', unpublish: 'Unpublished', save: 'Saved', autosave: 'Autosaved' };
 
@@ -712,7 +732,7 @@ function RevisionsPanel() {
   useEffect(() => {
     if (!api?.entryId) return;
     const db = browserClient();
-    db.from('revisions').select('id, created_at, saved_at, action, title, author_id, content, entry, fields, restored_from, restored_edited').eq('entry_id', api.entryId).order('id', { ascending: false }).limit(50)
+    db.from('revisions').select('id, created_at, saved_at, action, title, author_id, content, entry, fields, template, restored_from, restored_edited').eq('entry_id', api.entryId).order('id', { ascending: false }).limit(50)
       .then(async ({ data }) => {
         setRows((data ?? []) as RevisionRow[]);
         const ids = [...new Set((data ?? []).map((r) => r.author_id).filter(Boolean))];
@@ -767,12 +787,15 @@ function RevisionsPanel() {
                 <a href={`/admin/preview/${api.entryId}/?revision=${r.id}`} target="_blank" rel="noopener" className="text-admin-muted underline hover:text-admin-accent">
                   Preview
                 </a>
-                {api.contentMode && r.content && (
+                {api.canRestore(r) && (
                   <button type="button" className="text-admin-muted underline hover:text-admin-accent" onClick={() => api.restore(r)}>
                     Restore
                   </button>
                 )}
               </div>
+              {api.layout && !api.canRestore(r) && (
+                <div className="mt-0.5 text-xs text-admin-muted">{r.template ? `Saved with another template (${r.template.slug})` : 'No layout kept with this version'}: preview only.</div>
+              )}
             </li>
           );
         })}

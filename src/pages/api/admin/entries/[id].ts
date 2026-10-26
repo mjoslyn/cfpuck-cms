@@ -79,6 +79,9 @@ export const PUT: APIRoute = async ({ params, request, locals }) => {
     return tErr ? new Response(tErr.message, { status: 400 }) : { updated_at: tpl?.updated_at };
   };
 
+  // Layout mode: the template as saved, kept with the page's version so it can be restored.
+  const savedTemplate = () => (body.template ? { kind: String(body.template.kind), slug: String(body.template.slug), content: body.template.content } : null);
+
   // Layout mode on a published page with changes kept aside: the template is saved, and the page's
   // settings join those changes rather than going live, so saving the layout publishes none of them.
   if (action === 'save' && body.template && pending && current.status === 'publish' && (body.entry?.status ?? 'publish') === 'publish') {
@@ -87,7 +90,7 @@ export const PUT: APIRoute = async ({ params, request, locals }) => {
     if (error) return new Response(error.message, { status: 400 });
     const tpl = await saveTemplate();
     if (tpl instanceof Response) return tpl;
-    const { error: revErr } = await recordRevision(db, { entry_id: id, title: body.entry?.title ?? current.title, content: draft.content, fields: body.entry?.fields ?? current.fields, entry: draft.entry, action: 'draft', author_id: locals.user.id }, false);
+    const { error: revErr } = await recordRevision(db, { entry_id: id, title: body.entry?.title ?? current.title, content: draft.content, fields: body.entry?.fields ?? current.fields, entry: draft.entry, action: 'draft', author_id: locals.user.id, template: savedTemplate(), ...restored }, false);
     if (revErr) console.error(`entry ${id}: revision not saved: ${revErr.message}`);
     return Response.json({ ok: true, status: 'publish', pending: true, updated_at: await stamp(), templateUpdatedAt: tpl.updated_at, ...(revErr ? { warning: REVISION_WARNING } : {}) });
   }
@@ -151,7 +154,7 @@ export const PUT: APIRoute = async ({ params, request, locals }) => {
   const tpl = await saveTemplate();
   if (tpl instanceof Response) return tpl;
   const templateUpdatedAt = tpl.updated_at;
-  const { error: revErr } = await recordRevision(db, { entry_id: id, title: patch.title ?? current.title, content: patch.content ?? current.content, fields: patch.fields ?? current.fields, entry: Object.keys(e).length ? e : null, action, author_id: locals.user.id, ...restored }, autosave);
+  const { error: revErr } = await recordRevision(db, { entry_id: id, title: patch.title ?? current.title, content: patch.content ?? current.content, fields: patch.fields ?? current.fields, entry: Object.keys(e).length ? e : null, action, author_id: locals.user.id, template: savedTemplate(), ...restored }, autosave);
   // The entry is saved either way; a version that couldn't be kept is said, not hidden.
   if (revErr) console.error(`entry ${id}: revision not saved: ${revErr.message}`);
   return Response.json({ ok: true, status, pending: false, ...(patch.slug ? { slug: patch.slug } : {}), updated_at: await stamp(), templateUpdatedAt, ...(revErr ? { warning: REVISION_WARNING } : {}) });

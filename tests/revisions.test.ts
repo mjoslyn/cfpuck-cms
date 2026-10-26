@@ -1,6 +1,6 @@
 // The editor's history: checkpoints and autosaves (src/lib/admin/revisions.ts), and autosaves leaving the page cache alone.
 import { describe, expect, it } from 'vitest';
-import { AUTOSAVE_SPAN, recordRevision } from '../src/lib/admin/revisions';
+import { AUTOSAVE_SPAN, recordRevision, versionDoc } from '../src/lib/admin/revisions';
 import { changesPages } from '../src/lib/cache';
 import { siteDb } from '../src/lib/db/site';
 
@@ -27,6 +27,24 @@ describe('revisions', () => {
     // Nor does one after the span: the history keeps a version every AUTOSAVE_SPAN of editing.
     await save('six', b, true, 190_000 + AUTOSAVE_SPAN);
     expect((await rows()).map((r) => [r.title, r.action])).toEqual([['two', 'autosave'], ['three', 'draft'], ['four', 'autosave'], ['five', 'autosave'], ['six', 'autosave']]);
+  });
+
+  it('restores the content areas with the content, keeping the marks made since', async () => {
+    const block = (id: string) => ({ type: 'text', props: { id, attrs: {} } });
+    const current = { root: { props: { a11y: { x: 1 }, 'area-sidebar': [block('now-side')], 'area-intro': [block('now-intro')] } }, content: [block('now')] };
+    const saved = { root: { props: { 'area-sidebar': [block('then-side')] } }, content: [block('then')] };
+    const inline = async (items: any[]) => items.map((i) => ({ ...i, inlined: true }));
+    const doc = await versionDoc(current, saved, ['main', 'sidebar', 'intro'], inline);
+    expect(doc.content).toEqual([{ ...block('then'), inlined: true }]);
+    expect(doc.root.props).toEqual({ a11y: { x: 1 }, 'area-sidebar': [{ ...block('then-side'), inlined: true }], 'area-intro': [] });
+  });
+
+  it('keeps the template with a version saved in layout mode', async () => {
+    const db = siteDb();
+    const entry = (await db.from('entries').insert({ type: 'page', slug: 'layout', title: 'Layout' }).select('id').single()).data!.id as number;
+    const template = { kind: 'template', slug: 'front-page', content: { root: { props: {} }, content: [{ type: 'heading', props: { id: 'h', attrs: {} } }] } };
+    await recordRevision(db, { entry_id: entry, title: 'Layout', content: null, fields: {}, entry: null, action: 'save', author_id: '00000000-0000-4000-8000-00000000000a', template }, false);
+    expect((await db.from('revisions').select('template').eq('entry_id', entry).single()).data!.template).toEqual(template);
   });
 
   it('leaves the page cache alone for autosaves only', () => {

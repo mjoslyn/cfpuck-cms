@@ -70,6 +70,10 @@ with `types` are offered only on those entry types. A **Compose** panel docks be
 - **Revisions** (left rail): the page's saved versions, to preview or restore. Each manual save
   (Save draft, Publish, Unpublish) is a **checkpoint**; autosaves between them keep one version per
   ten minutes of editing (`src/lib/admin/revisions.ts`). **Checkpoints only** hides the autosaves.
+  **Restore** loads a version into the editor (Undo takes it back) with its page settings: in content
+  mode its content and the template's other content areas, then autosaved as a draft; in layout mode
+  the template as that version saved it (versions saved with another template are preview only), kept
+  with **Save & apply**, which changes every page using the template.
 
 A published entry whose address changes gets a redirect from the old one automatically.
 

@@ -1010,7 +1010,12 @@ Templates and layout mode don't autosave. Saved versions are in `revisions`, lis
 Revisions panel (preview, restore): each manual save is a checkpoint, a row of its own; autosaves
 between them keep one row, written over while it is the same person's and begun less than ten minutes
 ago (`recordRevision`, `src/lib/admin/revisions.ts`; `created_at` when the stretch began, `saved_at`
-its latest write). **Publish** / **Publish changes** makes them live;
+its latest write). A save in layout mode also keeps the template's content (`revisions.template`:
+kind, slug, content). Restore loads a version into the editor as an undoable change: in content mode
+its content and the template's other content areas (`versionDoc`; an area it had nothing in is
+emptied), autosaved as a draft; in layout mode, for versions saved with the page's current template,
+that template's content, kept with Save & apply. Either way the page's settings come back too, and the
+next save notes the version it restored (`restored_from`, `restored_edited`). **Publish** / **Publish changes** makes them live;
 the header also offers Discard changes and Unpublish (`PUT /api/admin/entries/:id` with `action`).
 **Preview** opens `/admin/preview/<id>/` with the editor's current state (POST) or the saved draft
 (GET), rendered like the site with a preview bar and noindex. Templates and layout mode have no drafts:
