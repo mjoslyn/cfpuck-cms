@@ -350,8 +350,23 @@ export function mediaObjects(m: { path: string; sizes?: any; formats?: any }): s
   return [...out];
 }
 
-/** Copy storage objects, six at a time; the first failure, or null. */
-async function copyObjects(ctx: Context, paths: string[]): Promise<string | null> {
+/** The size of a file stored on a copy (in the media folder), or null. */
+async function storedSize(db: Db, path: string): Promise<number | null> {
+  const slash = path.lastIndexOf('/');
+  const name = path.slice(slash + 1);
+  const { data, error } = await db.storage.from('media').list(slash > 0 ? path.slice(0, slash) : '', { search: name, limit: 1000 });
+  if (error) throw new Error(`${path}: ${error.message}`);
+  return data?.find((f) => f.name === name)?.metadata?.size ?? null;
+}
+
+/**
+ * Copy storage objects, six at a time; the first failure, or null. Only `own` (the files the target's
+ * library row lists for this item) may be written over. Any other path is written only where nothing
+ * is stored, since stored images are never overwritten: a file there that the target's library doesn't
+ * list (one whose row a restore removed) stops the copy, unless it is the same size as the source's,
+ * which is taken as the same file (left there by a sync that stopped halfway).
+ */
+async function copyObjects(ctx: Context, paths: string[], own: Set<string> = new Set()): Promise<string | null> {
   const todo = [...paths];
   let failed: string | null = null;
   const worker = async () => {
@@ -359,8 +374,12 @@ async function copyObjects(ctx: Context, paths: string[]): Promise<string | null
       const { data, error } = await ctx.source.storage.from('media').download(path);
       if (error) failed = `${path}: ${error.message || 'not found'}`;
       else {
-        const { error: up } = await ctx.target.storage.from('media').upload(path, data, { contentType: data.type || undefined, cacheControl: '31536000', upsert: true });
-        if (up) failed = `${path}: ${up.message}`;
+        const { error: up } = await ctx.target.storage.from('media').upload(path, data, { contentType: data.type || undefined, cacheControl: '31536000', upsert: own.has(path) });
+        if (up?.statusCode === '409') {
+          const size = await storedSize(ctx.target, path).catch((e: Error) => e);
+          if (size instanceof Error) failed = size.message;
+          else if (size !== data.size) failed = `${path} is already stored there, as a file its library doesn't list (such as one a restore removed): not overwritten`;
+        } else if (up) failed = `${path}: ${up.message}`;
       }
     }
   };
@@ -404,7 +423,8 @@ const applyMedia: Applier = async (ctx, _group, keys) => {
   for (const m of s.src) {
     const conflict = mediaConflict(m, s);
     // The files first, so the row never points at files that aren't there.
-    const failed = conflict ?? (await copyObjects(ctx, mediaObjects(m)));
+    const there = s.tgt.get(m.id);
+    const failed = conflict ?? (await copyObjects(ctx, mediaObjects(m), new Set(there ? mediaObjects(there) : [])));
     const { error } = failed ? { error: { message: failed } } : await ctx.target.from('media').upsert(omit(m, MEDIA_DERIVED), { onConflict: 'id' });
     if (error) skipped.push({ key: String(m.id), label: m.path, reason: error.message });
     else written++;
@@ -510,8 +530,10 @@ const applySettings: Applier = async (ctx, _group, keys) => {
     const own = Object.fromEntries(OWN_SETTINGS.filter((k) => (tgt?.value as any)?.[k] != null).map((k) => [k, (tgt?.value as any)[k]]));
     const value = { ...settingsValue(src?.value), ...own };
     // The site icon's files (site-icon/...), which aren't media library items.
-    const icons = key === 'site' ? Object.values((value as any).icons ?? {}).map((u) => String(u).replace(/^\/media\//, '').replace(/\?.*$/, '')).filter((p) => p.startsWith('site-icon/')) : [];
-    const failed = await copyObjects(ctx, icons);
+    const iconPaths = (v: any) => Object.values(v?.icons ?? {}).map((u) => String(u).replace(/^\/media\//, '').replace(/\?.*$/, '')).filter((p) => p.startsWith('site-icon/'));
+    const icons = key === 'site' ? iconPaths(value) : [];
+    // The target's own icon files may be written over; others only where nothing is stored.
+    const failed = await copyObjects(ctx, icons, new Set(key === 'site' ? iconPaths(tgt?.value) : []));
     const { error } = failed ? { error: { message: `the site icon: ${failed}` } } : await ctx.target.from('settings').upsert({ key, value }, { onConflict: 'key' });
     if (error) skipped.push({ key, label: key, reason: error.message });
     else written++;
@@ -615,7 +637,9 @@ export async function diff(direction: Direction, group: string, key: string): Pr
 // Neither holds stored images: files are backed up as their library rows only.
 
 const BACKUP_BUCKET = 'sync-backups';
-const SNAPSHOT = /-snapshot-[a-z-]+\.json$/;
+// The marker only right after the time and with a trigger after it, so a sync backup whose source is
+// named like one (`-from-snapshot-scheduled.json`) is never taken for a snapshot.
+const SNAPSHOT = /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z-snapshot-(scheduled|manual|before-restore)\.json$/;
 const isSnapshot = (name: string) => SNAPSHOT.test(name);
 
 /** A copy that keeps backups: this site, or the other copy. */
@@ -869,7 +893,7 @@ export async function scheduledSnapshot(): Promise<string> {
   const db = serviceClient();
   const { schedule } = retention(await siteSettings(db));
   if (!schedule.enabled) return 'off';
-  const last = (await listFiles(db)).find((f) => f.path.endsWith('-snapshot-scheduled.json'));
+  const last = (await listFiles(db)).find((f) => f.snapshot && f.path.endsWith('-snapshot-scheduled.json'));
   const age = last ? Date.now() - new Date(last.created_at).getTime() : Infinity;
   // A little short of the period, so a run that starts a few minutes early still takes one.
   if (age < (schedule.every === 'weekly' ? 7 * 24 - 2 : 24 - 2) * 3600_000) return `not due (last ${last!.path})`;
@@ -911,9 +935,10 @@ export async function snapshotPreview(site: Site, path: string): Promise<{ creat
  * made since the snapshot are deleted too (files: their library rows; stored images stay). A snapshot
  * of the current state is taken first, so the restore can be undone the same way.
  */
-async function restoreSnapshot(db: Db, name: string, file: any, path: string, deleteSince: boolean): Promise<{ restored: number; removed: number; problems: string[]; backup: string }> {
+async function restoreSnapshot(db: Db, name: string, file: any, path: string, deleteSince: boolean, onBackup?: (path: string) => Promise<void>): Promise<{ restored: number; removed: number; problems: string[]; backup: string }> {
   await checkWritable(db, name);
   const saved = await takeSnapshot(db, 'before-restore', path);
+  await onBackup?.(saved.path);
   const t = file.tables as Record<string, any[]>;
   const problems: string[] = [];
   const own = await siteSettings(db);
@@ -1162,12 +1187,13 @@ async function removeAdded(db: Db, kind: string, keys: string[]): Promise<string
  * go back as they were, the rows it added are deleted (files' library rows; their stored images stay).
  * A snapshot puts the copy back as the snapshot has it (`deleteSince`: rows made since go too). Either
  * way the current state is saved first, so the restore can itself be undone; changes made since to
- * those rows are lost, and stored images are never restored (backups don't hold them).
+ * those rows are lost, and stored images are never restored (backups don't hold them). `onBackup` is
+ * told the saved state's name before anything is changed.
  */
-export async function restore(site: Site, path: string, opts: { deleteSince?: boolean } = {}): Promise<{ restored: number; removed: number; problems: string[]; backup: string | null }> {
+export async function restore(site: Site, path: string, opts: { deleteSince?: boolean; onBackup?: (path: string) => Promise<void> } = {}): Promise<{ restored: number; removed: number; problems: string[]; backup: string | null }> {
   const { db, name } = siteClient(site);
   const file = JSON.parse(await (await backupFile(site, path)).text());
-  if (file.kind === 'snapshot') return restoreSnapshot(db, name, file, path, !!opts.deleteSince);
+  if (file.kind === 'snapshot') return restoreSnapshot(db, name, file, path, !!opts.deleteSince, opts.onBackup);
   const groups = file.groups as Record<string, { added: string[]; overwritten: Record<string, any[]> }>;
   // The rows the sync really added; a backup from before those were recorded has only the planned ones.
   const { data: listed, error: listError } = await db.storage.from(BACKUP_BUCKET).list('written', { search: path });
@@ -1181,6 +1207,7 @@ export async function restore(site: Site, path: string, opts: { deleteSince?: bo
   await checkWritable(db, name);
   // The current state of everything the restore changes or deletes, saved first.
   const saved = await saveRowsBackup(db, { source: name, target: name }, plans.map(({ g, rows, added }) => ({ group: g.id, added: [], changed: [...backupKeys(g.kind, rows), ...added] })), 'before-restore', path);
+  await opts.onBackup?.(saved);
   const own = await siteSettings(db);
   const problems: string[] = [];
   let restored = 0;
@@ -1206,37 +1233,95 @@ export async function restore(site: Site, path: string, opts: { deleteSince?: bo
 // A restore deletes rows and then writes thousands back, longer than a request may run; cut off
 // halfway it would leave the copy half restored. So it runs as a job: the API queues it and hands its
 // id to the jobs queue (src/lib/jobs.ts; without one it runs in the request), and the screen polls. The job is a file in this site's backup bucket, named by an id only
-// the API and the signed-in admin's browser know.
+// the API and the signed-in admin's browser know. One run claims it (a claim file made only where there
+// is none) and writes the time to it every HEARTBEAT_MS; a running job silent for RESTORE_SILENT_MS was
+// cut off (the Worker's time limit, or the Worker stopped), and the poll says so. The queue doesn't run
+// a job again (max_retries 0): a restore cut off halfway is the admin's to undo or run again.
 
-export type RestoreJob = { status: 'queued' | 'running' | 'done' | 'error'; site: Site; path: string; deleteSince: boolean; result?: Awaited<ReturnType<typeof restore>>; error?: string };
-const jobPath = (id: string) => {
+export type RestoreJob = {
+  status: 'queued' | 'running' | 'done' | 'error';
+  site: Site;
+  path: string;
+  deleteSince: boolean;
+  queued_at?: string;
+  started_at?: string;
+  /** The last time the run was heard from. */
+  heartbeat_at?: string;
+  /** The state saved before the restore changed anything. */
+  backup?: string;
+  result?: Awaited<ReturnType<typeof restore>>;
+  error?: string;
+};
+const HEARTBEAT_MS = 30_000;
+const RESTORE_SILENT_MS = 3 * 60_000;
+/** A queued restore not started by then never will be (its run failed before claiming it). */
+const RESTORE_UNSTARTED_MS = 16 * 60_000;
+const jobPath = (id: string, ending = 'json') => {
   if (!/^[a-f0-9]{32}$/.test(id)) throw new Error('Not a restore.');
-  return `jobs/${id}.json`;
+  return `jobs/${id}.${ending}`;
 };
 
 export async function queueRestore(site: Site, path: string, deleteSince: boolean): Promise<string> {
   const id = crypto.randomUUID().replace(/-/g, '');
-  await saveFile(serviceClient(), jobPath(id), { status: 'queued', site, path: safeName(path), deleteSince } satisfies RestoreJob);
+  await saveFile(serviceClient(), jobPath(id), { status: 'queued', site, path: safeName(path), deleteSince, queued_at: new Date().toISOString() } satisfies RestoreJob);
   return id;
 }
 
-/** Run a queued restore, once: a second call for the same job (a retried worker) does nothing. */
+/** Run a queued restore, once: a second run for the same job (a retried or doubled worker) finds it claimed and does nothing. */
 export async function runRestore(id: string): Promise<RestoreJob | null> {
   const db = serviceClient();
   const job: RestoreJob | null = await readFile(db, jobPath(id));
   if (job?.status !== 'queued') return null;
-  await saveFile(db, jobPath(id), { ...job, status: 'running' }, true);
+  // The claim: made only if there is none (412, as 409, otherwise), so only one run goes on.
+  const { error: claim } = await db.storage.from(BACKUP_BUCKET).upload(jobPath(id, 'claim'), new Blob([new Date().toISOString()], { type: 'text/plain' }), { contentType: 'text/plain', upsert: false });
+  if (claim?.statusCode === '409') return null;
+  const now = () => new Date().toISOString();
+  if (claim) {
+    const failed: RestoreJob = { ...job, status: 'error', error: `The restore could not start (${claim.message}). Nothing was changed: try it again.` };
+    await saveFile(db, jobPath(id), failed, true);
+    return failed;
+  }
+  let state: RestoreJob = { ...job, status: 'running', started_at: now(), heartbeat_at: now() };
+  await saveFile(db, jobPath(id), state, true);
+  // Heartbeats in turn, never over the final state (each waits for the one before).
+  let writing: Promise<void> = Promise.resolve();
+  const beat = (patch: Partial<RestoreJob> = {}) => {
+    state = { ...state, ...patch, heartbeat_at: now() };
+    const next = { ...state };
+    writing = writing.then(() => saveFile(db, jobPath(id), next, true)).catch((e: Error) => console.error(`restore ${id}: heartbeat not saved: ${e.message}`));
+    return writing;
+  };
+  const timer = setInterval(() => beat(), HEARTBEAT_MS);
   let done: RestoreJob;
   try {
-    done = { ...job, status: 'done', result: await restore(job.site, job.path, { deleteSince: job.deleteSince }) };
+    // The backup's name is in the job before the restore changes anything.
+    const result = await restore(job.site, job.path, { deleteSince: job.deleteSince, onBackup: (backup) => beat({ backup }) });
+    done = { ...state, status: 'done', result };
   } catch (e) {
-    done = { ...job, status: 'error', error: (e as Error).message };
+    done = { ...state, status: 'error', error: (e as Error).message };
+  } finally {
+    clearInterval(timer);
+    await writing;
   }
+  done.heartbeat_at = now();
   await saveFile(db, jobPath(id), done, true);
   return done;
 }
 
-export const restoreJob = (id: string): Promise<RestoreJob | null> => readFile(serviceClient(), jobPath(id));
+const since = (t: string | undefined) => Date.now() - (t ? Date.parse(t) : 0);
+
+/** A restore job's state, for the screen: a run silent too long (or never started) reads as failed. */
+export async function restoreJob(id: string): Promise<RestoreJob | null> {
+  const job: RestoreJob | null = await readFile(serviceClient(), jobPath(id));
+  if (job?.status === 'running' && since(job.heartbeat_at ?? job.started_at) > RESTORE_SILENT_MS) {
+    const error = job.backup
+      ? `The restore was cut off before it finished (nothing heard from it for ${RESTORE_SILENT_MS / 60_000} minutes), so the copy may be partly restored. Its state from before the restore is saved as ${job.backup}: restore that to put it back as it was, or run this restore again.`
+      : `The restore was cut off before it changed anything (nothing heard from it for ${RESTORE_SILENT_MS / 60_000} minutes). Try it again.`;
+    return { ...job, status: 'error', error };
+  }
+  if (job?.status === 'queued' && job.queued_at && since(job.queued_at) > RESTORE_UNSTARTED_MS) return { ...job, status: 'error', error: 'The restore never started. Nothing was changed: try it again.' };
+  return job;
+}
 
 // ---- entry points ---------------------------------------------------------------------------------
 

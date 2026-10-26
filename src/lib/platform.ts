@@ -25,8 +25,9 @@ export interface R2ObjectLike {
   writeHttpMetadata(headers: Headers): void;
 }
 export interface R2BucketLike {
-  put(key: string, value: ArrayBuffer | string, options?: { httpMetadata?: { contentType?: string; cacheControl?: string }; onlyIf?: { etagDoesNotMatch?: string } }): Promise<R2ObjectLike | null>;
-  get(key: string, options?: { onlyIf?: Headers; range?: Headers }): Promise<R2ObjectLike | null>;
+  put(key: string, value: ArrayBuffer | ArrayBufferView | string | Blob | ReadableStream<Uint8Array>, options?: { httpMetadata?: { contentType?: string; cacheControl?: string }; onlyIf?: { etagDoesNotMatch?: string } }): Promise<R2ObjectLike | null>;
+  get(key: string, options?: { onlyIf?: Headers; range?: { offset: number; length: number } }): Promise<R2ObjectLike | null>;
+  head(key: string): Promise<R2ObjectLike | null>;
   delete(key: string): Promise<void>;
   list(options?: { prefix?: string; cursor?: string; delimiter?: string }): Promise<{ objects: R2ObjectLike[]; delimitedPrefixes?: string[]; truncated: boolean; cursor?: string }>;
 }

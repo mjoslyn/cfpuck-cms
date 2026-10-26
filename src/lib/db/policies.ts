@@ -76,6 +76,8 @@ export const POLICIES: Record<string, TablePolicy> = {
   ticket_orders: readOnly(editors),
   ticket_waitlist: readOnly(editors),
   mail_suppressions: readOnly(admins),
+  // Signed sync requests' nonces (src/lib/sync-remote.ts): the server's only.
+  sync_nonces: all(nobody, nobody),
   // Admins change other people's profiles; editors rename themselves but don't change their own role.
   profiles: {
     select: editors,

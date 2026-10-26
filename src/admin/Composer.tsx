@@ -9,6 +9,7 @@ import { COMPOSABLE_TYPES } from '../lib/site';
 import { useEventsOn } from '../puck/member-settings';
 import { outline, isComposed } from '../lib/compose/outline';
 import { inline } from '../lib/compose/build';
+import { uploadMedia, VIDEO_TYPES } from '../lib/media/upload';
 
 /** Claude's replies: paragraphs and "- " lists with inline Markdown (escaped first). */
 function Reply({ text }: { text: string }) {
@@ -36,7 +37,6 @@ interface ChatTurn { role: 'user' | 'assistant'; text: string; attachments?: Att
 interface PendingMedia { id: number; url: string; name: string; kind: 'image' | 'video'; status: 'uploading' | 'ready' | 'error'; error?: string }
 
 const DOC_TYPES = /\.(pdf|docx|txt|md|markdown|html?|csv)$/i;
-const VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/quicktime'];
 const isVideoLink = (u: string) => /(youtube\.com|youtu\.be|vimeo\.com)\//i.test(u);
 
 /** The editor's live page, when docked beside it. */
@@ -130,9 +130,7 @@ export default function Composer({ entryId, live, selection, onClose, pinned, on
     const kind = file.type.startsWith('video/') ? 'video' : 'image';
     const temp = -Date.now() - Math.random();
     setMedia((m) => [...m, { id: temp, url: URL.createObjectURL(file), name: file.name, kind, status: 'uploading' }]);
-    const body = new FormData();
-    body.append('file', file);
-    const res = await fetch('/api/admin/media', { method: 'POST', body });
+    const res = await uploadMedia(file);
     if (!res.ok) {
       const error = await res.text();
       setMedia((m) => m.map((x) => (x.id === temp ? { ...x, status: 'error', error } : x)));
