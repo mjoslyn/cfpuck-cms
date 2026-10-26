@@ -1,11 +1,11 @@
 import type { APIRoute } from 'astro';
-import { eventDates, mediaIdForUrl, renderedExcerpt, renderedTitle, setEntryTerms, setEntryTags, uniqueSlug, isStale, STALE } from '../../../../lib/admin/save';
+import { addressTakenBy, eventDates, mediaIdForUrl, renderedExcerpt, renderedTitle, setEntryTerms, setEntryTags, uniqueSlug, isStale, STALE } from '../../../../lib/admin/save';
 import { isPlaceholderSlug, slugify } from '../../../../lib/slug';
 import { Loader } from '../../../../lib/data';
 import { permalink } from '../../../../lib/permalink';
 import { redirectMovedEntry } from '../../../../lib/redirects';
 import { uniqueAreas } from '../../../../lib/content/areas';
-import { taxonomiesOf, typeLabel, typesSharingAddresses } from '../../../../lib/site';
+import { taxonomiesOf } from '../../../../lib/site';
 
 /**
  * Save an entry. Body: { action, content?, entry?, template? }.
@@ -14,7 +14,9 @@ import { taxonomiesOf, typeLabel, typesSharingAddresses } from '../../../../lib/
  * - publish: save and make it live (pending draft changes are applied and cleared).
  * - unpublish: take it off the site (pending changes are applied first; drafts have no separate copy).
  * - discard: drop pending draft changes.
- * - save (default): save in place with the status in `entry` (venue forms, template layout mode).
+ * - save (default): save in place with the status in `entry` (venue forms, template layout mode; on a
+ *   published page with changes kept aside, layout mode's settings join those changes instead).
+ * Going live, or a new address, is refused when another type's entry at the same URL has the address.
  */
 /**
  * The slug to store: the one given, cleaned; but while it is the "New ..." placeholder, or empty, one
@@ -60,6 +62,26 @@ export const PUT: APIRoute = async ({ params, request, locals }) => {
     return Response.json({ ok: true, status: 'publish', pending: true, updated_at: await stamp() });
   }
 
+  // The template being edited in layout mode, saved with the page's settings.
+  const saveTemplate = async (): Promise<{ updated_at?: string } | Response> => {
+    if (!body.template) return {};
+    if (Array.isArray(body.template.content?.content)) body.template.content.content = uniqueAreas(body.template.content.content);
+    const { data: tpl, error: tErr } = await db.from('templates').update({ content: body.template.content }).eq('kind', body.template.kind).eq('slug', body.template.slug).select('updated_at').maybeSingle();
+    return tErr ? new Response(tErr.message, { status: 400 }) : { updated_at: tpl?.updated_at };
+  };
+
+  // Layout mode on a published page with changes kept aside: the template is saved, and the page's
+  // settings join those changes rather than going live, so saving the layout publishes none of them.
+  if (action === 'save' && body.template && pending && current.status === 'publish' && (body.entry?.status ?? 'publish') === 'publish') {
+    const draft = { content: pending.content ?? current.content, entry: body.entry ?? pending.entry ?? null };
+    const { error } = await db.from('entry_drafts').upsert({ entry_id: id, draft }).then((r) => (r.error ? r : db.from('entries').update({ draft_saved_at: new Date().toISOString() }).eq('id', id)));
+    if (error) return new Response(error.message, { status: 400 });
+    const tpl = await saveTemplate();
+    if (tpl instanceof Response) return tpl;
+    await db.from('revisions').insert({ entry_id: id, title: body.entry?.title ?? current.title, content: draft.content, fields: body.entry?.fields ?? current.fields, entry: draft.entry, action: 'draft', author_id: locals.user.id });
+    return Response.json({ ok: true, status: 'publish', pending: true, updated_at: await stamp(), templateUpdatedAt: tpl.updated_at });
+  }
+
   // Everything else writes the entry itself. Unpublish without new content applies pending changes.
   const e = body.entry ?? (action === 'unpublish' ? pending?.entry : undefined) ?? {};
   const newContent = body.content ?? (action === 'unpublish' || action === 'publish' ? pending?.content : undefined);
@@ -68,23 +90,24 @@ export const PUT: APIRoute = async ({ params, request, locals }) => {
   const patch: Record<string, any> = { status, draft_saved_at: null };
   if (newContent) patch.content = newContent;
   if (Object.keys(e).length) {
+    // Only the settings sent change (a record's form sends no excerpt, template or featured image).
     Object.assign(patch, {
       title: e.title,
       title_rendered: renderedTitle(e.title ?? ''),
       slug: await entrySlug(db, current, e),
-      excerpt: e.excerpt ?? '',
-      excerpt_rendered: renderedExcerpt(e.excerpt ?? '', content?.content),
-      template: e.template || null,
-      fields: e.fields ?? {},
-      featured_media_id: await mediaIdForUrl(db, e.featured_image),
+      ...('excerpt' in e || newContent ? { excerpt: e.excerpt ?? current.excerpt ?? '', excerpt_rendered: renderedExcerpt(e.excerpt ?? current.excerpt ?? '', content?.content) } : {}),
+      ...('template' in e ? { template: e.template || null } : {}),
+      ...('fields' in e ? { fields: e.fields ?? {} } : {}),
+      ...('featured_image' in e ? { featured_media_id: await mediaIdForUrl(db, e.featured_image) } : {}),
     });
-    if (current.type === 'event') Object.assign(patch, eventDates(e, patch.fields));
+    if (current.type === 'event') Object.assign(patch, eventDates(e, patch.fields ?? current.fields ?? {}));
   }
-  // A typed address another type already has at the same URL (a page and a post both live at /<slug>/).
-  const others = typesSharingAddresses(current.type).filter((t) => t !== current.type);
-  if (patch.slug && patch.slug !== current.slug && others.length) {
-    const { data: clash } = await db.from('entries').select('type, title').in('type', others).eq('slug', patch.slug).limit(1).maybeSingle();
-    if (clash) return new Response(`The address “${patch.slug}” is used by the ${typeLabel(clash.type).toLowerCase()} “${clash.title}”. Choose another.`, { status: 400 });
+  // A typed address another type already has at the same URL (a page and a post both live at /<slug>/),
+  // checked when the address changes and when the entry goes live.
+  const slug = patch.slug ?? current.slug;
+  if (slug !== current.slug || (status === 'publish' && current.status !== 'publish')) {
+    const holder = await addressTakenBy(db, current.type, slug, id);
+    if (holder) return new Response(`The address “${slug}” is used by ${holder}. Choose another.`, { status: 400 });
   }
   // A published entry's address before the save, for a redirect if it changes.
   const wasLive = current.status === 'publish' ? await new Loader(db).entryById(id, false) : null;
@@ -114,13 +137,9 @@ export const PUT: APIRoute = async ({ params, request, locals }) => {
     }
   }
 
-  let templateUpdatedAt: string | undefined;
-  if (body.template) {
-    if (Array.isArray(body.template.content?.content)) body.template.content.content = uniqueAreas(body.template.content.content);
-    const { data: tpl, error: tErr } = await db.from('templates').update({ content: body.template.content }).eq('kind', body.template.kind).eq('slug', body.template.slug).select('updated_at').maybeSingle();
-    if (tErr) return new Response(tErr.message, { status: 400 });
-    templateUpdatedAt = tpl?.updated_at;
-  }
+  const tpl = await saveTemplate();
+  if (tpl instanceof Response) return tpl;
+  const templateUpdatedAt = tpl.updated_at;
   const { error: revErr } = await db.from('revisions').insert({ entry_id: id, title: patch.title ?? current.title, content: patch.content ?? current.content, fields: patch.fields ?? current.fields, entry: Object.keys(e).length ? e : null, action, author_id: locals.user.id, ...restored });
   // The entry is saved either way; a version that couldn't be kept is said, not hidden.
   if (revErr) console.error(`entry ${id}: revision not saved: ${revErr.message}`);
