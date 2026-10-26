@@ -81,21 +81,22 @@ interface PendingSignUp {
 }
 
 /**
- * How many confirmation emails a day an address may have: none once it bounced or complained (here, or
- * in mail_suppressions), one once it was erased (a confirmed sign-up is its only way back), else 3.
+ * How many confirmation emails a day an address may have: none once it complained (here, or in
+ * mail_suppressions); one once it bounced (a mailbox can come back) or was erased, since a confirmed
+ * sign-up is their only way back; else 3.
  */
 async function confirmationsAllowed(db: Db, email: string, contact: Contact | null): Promise<number> {
-  if (contact && (contact.status === 'bounced' || contact.status === 'complained')) return 0;
+  if (contact?.status === 'complained') return 0;
   const { data } = await db.from('mail_suppressions').select('reason').eq('email_hash', emailHash(email)).maybeSingle();
-  if (!data) return 3;
-  return data.reason === 'bounced' || data.reason === 'complained' ? 0 : 1;
+  if (data?.reason === 'complained') return 0;
+  return data || contact?.status === 'bounced' ? 1 : 3;
 }
 
 /**
  * Someone asks to join some lists. A new address (or one that isn't subscribed) waits for confirmation;
  * a subscribed one's new lists wait too, and the confirmation email covers them. Nothing tells the
  * visitor whether the address was known: the answer is the same either way, also for an address that
- * bounced or complained, which is sent nothing. Anyone can type an address, so a sign-up for one already
+ * complained, which is sent nothing. Anyone can type an address, so a sign-up for one already
  * on file changes nothing on it until it is confirmed (its consent, tags and fields wait in pending_signup).
  */
 export async function signUp(db: Db, s: SignUp): Promise<SignUpResult> {
@@ -209,7 +210,8 @@ export async function setLists(db: Db, id: number, chosen: number[]): Promise<{ 
   const publicLists = await loadLists(db, true);
   const now = new Date().toISOString();
   const on = publicLists.filter((l) => chosen.includes(l.id)).map((l) => l.id);
-  if (on.length && ['bounced', 'complained'].includes(contact.status)) return { ok: false, error: 'We can’t send to this address any more. Sign up again to start receiving email.' };
+  if (on.length && contact.status === 'bounced') return { ok: false, error: 'Email to this address bounced, so nothing more is sent to it. Sign up again to start receiving email.' };
+  if (on.length && contact.status === 'complained') return { ok: false, error: 'This address marked an email as spam, so nothing more is sent to it.' };
   if (on.length && contact.status !== 'subscribed') {
     if (contact.status === 'pending') return { ok: false, error: 'Confirm your subscription first: the link is in the email we sent.' };
     await db.from('contacts').update({ status: 'subscribed', unsubscribed_at: null, consent_source: 'preferences', consent_at: now }).eq('id', id);
