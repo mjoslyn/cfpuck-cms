@@ -56,7 +56,7 @@ const when = (s: string | null) => (s ? new Date(s).toLocaleDateString('en-US', 
                 {e.status !== 'publish' && <span class="ml-2 rounded bg-[#f1f5f9] px-2 py-0.5 text-xs text-admin-muted">Draft</span>}
               </td>
               <td class="px-4 py-3 text-admin-muted">{recurrenceOf(e as any) ? 'Repeats' : when(e.event_start)}</td>
-              <td class="px-4 py-3">{s?.sold ?? 0}{t.capacity && !recurrenceOf(e as any) ? ` of ${t.capacity}` : ''}</td>
+              <td class="px-4 py-3">{s?.sold ?? 0}{t.capacity != null && !recurrenceOf(e as any) ? ` of ${t.capacity}` : ''}</td>
               <td class="px-4 py-3 text-admin-muted">{s?.orders ?? 0}</td>
               <td class="px-4 py-3 text-admin-muted">{money(s?.takings ?? 0, currency, '-')}</td>
               <td class="px-4 py-3 text-admin-muted">{t.waitlist === 'off' ? '-' : waitlist.get(e.id) ?? 0}</td>

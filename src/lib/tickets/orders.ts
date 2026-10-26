@@ -20,7 +20,7 @@ import { emailToSend, mayBuy, priceFor, localNow, maxFor, offSale, offeredTypes,
 import { PROVIDERS, ProviderError, closeCheckout, pickProvider, providerOf, type CheckoutState, type PaymentEvent, type PaymentProvider } from '../payments';
 import { ticketEmail, type EventView, type OrderView } from './email';
 import type { EmailPayment } from '../forms/email';
-import { formatMoney } from '../payments/money';
+import { MIN_CHARGE, formatMoney } from '../payments/money';
 import { defaultTemplate } from '../email-templates';
 import { env } from '../env';
 
@@ -239,6 +239,8 @@ export async function startCheckout(data: FormData, origin: string, viewer: View
   const quantity = items.reduce((n, i) => n + i.quantity, 0);
   const amount = items.reduce((n, i) => n + i.price * i.quantity, 0);
   if (!quantity || quantity > (t.maxPerOrder || DEFAULT_MAX_PER_ORDER)) return back('invalid');
+  // The providers take nothing smaller (forms refuse it too); a total of 0 is free.
+  if (amount > 0 && amount < MIN_CHARGE) return back('below-minimum');
 
   const name = field(data, 'name', 200);
   const email = field(data, 'email', 254);
@@ -272,8 +274,9 @@ export async function startCheckout(data: FormData, origin: string, viewer: View
   const hold = (settings.hold ?? 30) * 60_000;
   const currency = settings.currency ?? 'usd';
   const limits = {
-    total: t.capacity || null,
-    types: Object.fromEntries(t.types.map((x) => [x.id, x.capacity || null])),
+    // Empty: no limit; 0: none left.
+    total: t.capacity ?? null,
+    types: Object.fromEntries(t.types.map((x) => [x.id, x.capacity ?? null])),
     client: { orders: BUYER_ORDERS_PER_HOUR, tickets: BUYER_HELD_ORDERS * (t.maxPerOrder || DEFAULT_MAX_PER_ORDER) },
   };
   const { data: made, error } = await db.rpc('ticket_order_create', {
@@ -384,13 +387,15 @@ export async function markPaid(db: Db, order: Pick<OrderRow, 'id'>, payment?: st
 /**
  * Refunds the provider reports (made here or in its dashboard): `refunded` is the payment's total as the
  * provider has it now, so a refund that failed comes off again (and a fully refunded order whose refund
- * failed is paid again).
+ * failed is paid again). A full refund frees the tickets, so the waitlist is told, as after a refund
+ * from the attendee list.
  */
-export async function recordRefund(db: Db, order: OrderRow, refunded: number) {
+export async function recordRefund(db: Db, order: OrderRow, refunded: number, origin?: string) {
   const status = refunded >= order.amount ? (order.status === 'paid' ? 'refunded' : order.status) : order.status === 'refunded' ? 'paid' : order.status;
   if (refunded === order.refunded_amount && status === order.status) return;
   if (status !== order.status) console.warn(`tickets: order ${order.code} ${order.status} -> ${status}: ${refunded} of ${order.amount} refunded at the provider`);
-  await db.from('ticket_orders').update({ refunded_amount: refunded, status }).eq('id', order.id).eq('status', order.status);
+  const { data } = await db.from('ticket_orders').update({ refunded_amount: refunded, status }).eq('id', order.id).eq('status', order.status).select('id');
+  if (data?.length && order.status === 'paid' && status === 'refunded') await waitlistAfterRelease(db, order.entry_id, order.occurrence, origin);
 }
 
 // ---- Webhooks --------------------------------------------------------------------------------
@@ -401,11 +406,11 @@ const orderBy = async (db: Db, column: string, value: unknown) => (value ? (awai
  * A provider's webhook (/api/payments/<provider>, signature checked there): the order's payment asked of
  * the provider, or its refunds recorded. Orders not found are another feature's.
  */
-export async function ticketsWebhook(provider: PaymentProvider, event: PaymentEvent) {
+export async function ticketsWebhook(provider: PaymentProvider, event: PaymentEvent, origin?: string) {
   const db = serviceClient();
   if (event.kind === 'refund') {
     const order = await orderBy(db, 'provider_payment', event.payment);
-    if (order?.provider === provider) await recordRefund(db, order, event.refunded);
+    if (order?.provider === provider) await recordRefund(db, order, event.refunded, origin);
     return;
   }
   const order = event.ref ? await orderBy(db, 'provider_ref', event.ref) : await orderBy(db, 'provider_order', event.order);
@@ -513,9 +518,16 @@ export async function joinWaitlist(data: FormData, viewer: Viewer | null = null)
   const occurrence = (ev.entry as { occurrence?: string }).occurrence ?? '';
   const { count } = await db.from('ticket_waitlist').select('id', { count: 'exact', head: true }).eq('entry_id', ev.series.id).gte('created_at', new Date(Date.now() - 60_000).toISOString());
   if ((count ?? 0) >= MAX_PER_MINUTE) return back('busy');
-  // Joining again keeps one place: the new details, waiting again.
-  const { error } = await db.from('ticket_waitlist').upsert({ entry_id: ev.series.id, occurrence, name, email: email.toLowerCase(), phone, quantity, page, status: 'waiting', notified_at: null }, { onConflict: 'entry_id,occurrence,email' });
+  // Anyone can post any address, so joining again changes little: a place keeps its name, phone, status
+  // and turn, and only one still waiting takes the new number of tickets and page. A place removed or
+  // bought stays so. The answer is the same either way, so it tells nothing about who is on the list.
+  const row = { entry_id: ev.series.id, occurrence, email: email.toLowerCase() };
+  const { data: added, error } = await db.from('ticket_waitlist').upsert({ ...row, name, phone, quantity, page, status: 'waiting' }, { onConflict: 'entry_id,occurrence,email', ignoreDuplicates: true }).select('id');
   if (error) throw error;
+  if (!added?.length) {
+    const { error: again } = await db.from('ticket_waitlist').update({ quantity, page }).eq('entry_id', row.entry_id).eq('occurrence', occurrence).eq('email', row.email).eq('status', 'waiting');
+    if (again) throw again;
+  }
   return back('waitlisted');
 }
 
@@ -571,7 +583,7 @@ function waitlistLink(ev: LoadedEvent, page: string, origin: string) {
 }
 
 /** After tickets free up (a cancellation or refund): the waitlist told, when the event does that itself. */
-export async function waitlistAfterRelease(db: Db, entryId: number | null, occurrence: string, origin: string) {
+export async function waitlistAfterRelease(db: Db, entryId: number | null, occurrence: string, origin?: string) {
   if (!entryId) return;
   const ev = await loadEvent(db, entryId, occurrence, null);
   if (ev?.tickets.waitlist === 'auto' && (ev.endUtc == null || ev.endUtc > Date.now())) {
