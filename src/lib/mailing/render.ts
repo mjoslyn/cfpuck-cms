@@ -157,13 +157,20 @@ export interface FoundLink {
   label: string;
 }
 
-/** Links to track in the HTML, in order: web links, but not the unsubscribe and preferences links (anything with a variable in it). */
+/** A web link's opening tag: what comes before its address, the address, and the rest of the tag. findLinks,
+ * trackLinks and utmLinks all match links with it, so the ids trackLinks hands out line up with the links found. */
+const LINK_RE = /(<a\b[^>]*?\bhref=")(https?:\/\/[^"]+)("[^>]*>)/gi;
+
+/** Links to track in the HTML, in order: web links, but not the unsubscribe and preferences links (anything with a variable in it).
+ * A link's label is what follows its opening tag up to the next </a> or <a (so an unclosed or nested link doesn't swallow the next). */
 export function findLinks(html: string): FoundLink[] {
   const out: FoundLink[] = [];
-  for (const m of html.matchAll(/<a\b([^>]*?)\bhref="(https?:\/\/[^"]+)"([^>]*)>([\s\S]*?)<\/a>/gi)) {
+  for (const m of html.matchAll(LINK_RE)) {
     const url = m[2].replace(/&amp;/g, '&');
     if (url.includes('%recipient.')) continue;
-    const inner = m[4];
+    const rest = html.slice(m.index! + m[0].length);
+    const end = rest.search(/<\/a\s*>|<a\b/i);
+    const inner = end < 0 ? rest : rest.slice(0, end);
     const text = inner.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
     const alt = inner.match(/\balt="([^"]*)"/i)?.[1] ?? '';
     out.push({ url, label: (text || (alt ? `Image: ${alt}` : 'Image')).replace(/&amp;/g, '&').slice(0, 200) });
@@ -191,7 +198,7 @@ export const trackedUrl = (origin: string, linkId: number) => `${origin}/m/c/${l
 /** Each tracked link's address swapped for its tracked one, in the order findLinks found them (`ids`). */
 export function trackLinks(html: string, origin: string, ids: number[]): string {
   let i = 0;
-  return html.replace(/(<a\b[^>]*?\bhref=")(https?:\/\/[^"]+)(")/gi, (whole, a: string, url: string, b: string) => {
+  return html.replace(LINK_RE, (whole, a: string, url: string, b: string) => {
     if (url.includes('%recipient.')) return whole;
     const id = ids[i++];
     return id ? `${a}${trackedUrl(origin, id)}${b}` : whole;
@@ -206,7 +213,7 @@ export function addHoneypot(html: string, origin: string, id: number): string {
 
 /** Links straight to their address with UTM parameters added (tracking off). */
 export function utmLinks(html: string, origin: string, campaign: string): string {
-  return html.replace(/(<a\b[^>]*?\bhref=")(https?:\/\/[^"]+)(")/gi, (whole, a: string, url: string, b: string) => (url.includes('%recipient.') ? whole : `${a}${withUtm(url.replace(/&amp;/g, '&'), origin, campaign).replace(/&/g, '&amp;')}${b}`));
+  return html.replace(LINK_RE, (whole, a: string, url: string, b: string) => (url.includes('%recipient.') ? whole : `${a}${withUtm(url.replace(/&amp;/g, '&'), origin, campaign).replace(/&/g, '&amp;')}${b}`));
 }
 
 /** The own plain text's links swapped too (each address the HTML tracked; others stay). */

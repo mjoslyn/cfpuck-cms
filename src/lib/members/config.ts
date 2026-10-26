@@ -68,6 +68,8 @@ export interface MemberRow {
 export interface Viewer {
   id: string;
   email: string;
+  /** Whether the account's address is confirmed (only then does it manage that address's email subscription without a signed link). */
+  emailVerified?: boolean;
   name: string;
   /** An editor or admin: sees members-only pages and blocks (not member prices). */
   editor: boolean;

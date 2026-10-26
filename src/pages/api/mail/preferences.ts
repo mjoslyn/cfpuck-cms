@@ -1,5 +1,5 @@
 // The Email preferences form: which public lists a subscription is on, for the person a signed link is
-// for (t), or the signed-in visitor (their account page). A visitor without a subscription who ticks
+// for (t), or the signed-in visitor whose address is confirmed (their account page). A visitor without a subscription who ticks
 // lists signs up, confirmed by email like anyone.
 import type { APIRoute } from 'astro';
 import { serviceClient } from '../../../lib/db/site';
@@ -29,7 +29,9 @@ export const POST: APIRoute = async ({ request, cookies, redirect, url }) => {
   if (!id) {
     const viewer = await viewerOf(request, cookies);
     if (!viewer?.email) return to({ error: 'Use the link in one of our emails to manage your subscription.' });
-    const contact = await contactByEmail(db, viewer.email);
+    // An account whose address isn't confirmed (AUTH_CONFIRM_EMAIL off) could be anyone's: it can only sign
+    // up, confirmed by email, and never changes that address's subscription without the signed link.
+    const contact = viewer.emailVerified ? await contactByEmail(db, viewer.email) : null;
     if (!contact || contact.status !== 'subscribed') {
       // Signing up from the account page: member lists too.
       const allowed = (await loadLists(db)).filter((l) => l.public || settings.memberLists?.includes(l.id)).map((l) => l.id);

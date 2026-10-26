@@ -39,8 +39,11 @@ async function preparePreferences(ctx: RenderCtx): Promise<void> {
     await load(manageId);
     if (out.contact) Object.assign(out, { mode: 'manage', token: q.get('t')! });
   } else if (ctx.viewer?.email) {
-    const { data: c } = await db.from('contacts').select('id').eq('email', ctx.viewer.email.toLowerCase()).maybeSingle();
-    if (c) await load(Number(c.id));
+    // Only an account whose address is confirmed sees that address's subscription; others can only sign up (confirmed by email).
+    if (ctx.viewer.emailVerified) {
+      const { data: c } = await db.from('contacts').select('id').eq('email', ctx.viewer.email.toLowerCase()).maybeSingle();
+      if (c) await load(Number(c.id));
+    }
     out.mode = 'viewer';
   }
   ctx.data.set(PREFS_KEY, out);

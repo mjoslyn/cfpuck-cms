@@ -65,6 +65,12 @@ want('links found in order', found.map((f) => f.url).join(' ') === 'https://exam
 want('an image link is labelled by its alt', found[1].label === 'Image: Cat');
 const tracked = trackLinks(r.html, 'https://site.example', [11, 12, 13]);
 want('links go through the site', tracked.includes('href="https://site.example/m/c/11/%recipient.ct%"') && !tracked.includes('example.org/page') && tracked.includes('/email-preferences/?t=%recipient.t%'));
+// An unclosed link and a link nested in another: each opening tag is one link, so ids stay in line.
+const odd = '<p><a href="https://a.example/1">One <a href="https://b.example/2">Two</a> <a href="https://c.example/3">Three</p>';
+const oddFound = findLinks(odd);
+const oddTracked = trackLinks(odd, 'https://site.example', [21, 22, 23]);
+want('unclosed and nested links are each found', oddFound.map((f) => `${f.url}=${f.label}`).join(' ') === 'https://a.example/1=One https://b.example/2=Two https://c.example/3=Three', oddFound.map((f) => `${f.url}=${f.label}`).join(' '));
+want('unclosed and nested links keep their ids', oddTracked.includes('/m/c/21/%recipient.ct%">One') && oddTracked.includes('/m/c/22/%recipient.ct%">Two') && oddTracked.includes('/m/c/23/%recipient.ct%">Three'), oddTracked);
 const text = plainText(tracked);
 const withTrap = addHoneypot(tracked, 'https://site.example', 99);
 want('the hidden link is in the HTML', withTrap.includes('/m/c/99/%recipient.ct%') && withTrap.includes('aria-hidden="true"'));

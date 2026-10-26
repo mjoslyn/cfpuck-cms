@@ -21,6 +21,7 @@ export async function viewerOf(request: Request, _cookies?: AstroCookies): Promi
   return {
     id: user.id,
     email: user.email ?? '',
+    emailVerified: user.emailVerified,
     name: (member as MemberRow | null)?.name || profile?.display_name || '',
     editor: ['editor', 'admin'].includes(profile?.role ?? ''),
     member: (member as MemberRow | null) ?? null,

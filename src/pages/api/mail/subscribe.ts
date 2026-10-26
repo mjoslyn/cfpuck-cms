@@ -9,7 +9,7 @@ import { safeNext } from '../../../lib/members/account';
 import { clientIp } from '../../../lib/mailing/request';
 import { cleanTags } from '../../../lib/mailing/segments';
 
-/** Sign-ups a minute, site-wide, before the form answers "try again in a minute". */
+/** Confirmation emails a minute, site-wide, before the form answers "try again in a minute". */
 const PER_MINUTE = 30;
 
 export const POST: APIRoute = async ({ request, redirect, url }) => {
@@ -27,7 +27,8 @@ export const POST: APIRoute = async ({ request, redirect, url }) => {
   if (!settings.enabled) return to({ subscribe_error: 'Sign-ups are closed.' });
   // A filled-in honeypot: act as if it worked.
   if (String(form.get('_hp') ?? '').trim()) return to({ subscribe: 'sent' });
-  const { count } = await db.from('contacts').select('id', { count: 'exact', head: true }).gte('consent_at', new Date(Date.now() - 60_000).toISOString());
+  // Counted by the confirmation emails sent in the last minute (one per address), whatever the sign-up was for.
+  const { count } = await db.from('contacts').select('id', { count: 'exact', head: true }).gte('confirm_sent_at', new Date(Date.now() - 60_000).toISOString());
   if ((count ?? 0) >= PER_MINUTE) return new Response('We’re getting a lot of sign-ups right now. Please go back and try again in a minute.', { status: 429, headers: { 'Retry-After': '60' } });
   // Public lists, and the lists offered to members.
   const allowed = (await loadLists(db)).filter((l) => l.public || settings.memberLists?.includes(l.id)).map((l) => l.id);
@@ -38,14 +39,14 @@ export const POST: APIRoute = async ({ request, redirect, url }) => {
     last_name: String(form.get('last_name') ?? ''),
     // A form from before names were split.
     name: String(form.get('name') ?? ''),
-    // The site's fields (cf_<key>), checked against their types; only a new or unconfirmed address takes them.
+    // The site's fields (cf_<key>), checked against their types; a new address takes them, one on file once it confirms.
     attributes: Object.fromEntries((settings.fields ?? []).map((f) => [f.key, fieldValue(f, form.get(`cf_${f.key}`))])),
     lists,
     source: `subscribe:${back}`,
     consentText: String(form.get('consent') ?? '').slice(0, 1000),
     ip: clientIp(request),
     origin: url.origin,
-    // The block's tags (signUp adds them only to a new or unconfirmed address).
+    // The block's tags (signUp adds them to a new address, to one on file once it confirms).
     tags: cleanTags(String(form.get('tags') ?? '')).slice(0, 5),
   });
   return result.ok ? to({ subscribe: 'sent' }) : to({ subscribe_error: result.error });
