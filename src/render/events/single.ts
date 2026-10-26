@@ -12,6 +12,7 @@ import { zoneLabel } from '../../lib/events/timezone';
 import { termPagesOn } from '../../lib/templates';
 import { taxonomiesOf } from '../../lib/site';
 import { ticketPriceSummary, ticketsSection } from '../c/tickets';
+import { lockedContent } from '../c/members';
 
 /** The event type's taxonomies (its categories), from the site config. */
 const EVENT_TAXONOMIES = taxonomiesOf('event');
@@ -121,7 +122,10 @@ export const eventDetails: Renderer = (_b, env) => {
   const media = e.featured_media_id ? env.ctx.loader.media.get(e.featured_media_id) : undefined;
   const hero = media ? mediaImgTag(mediaImage(media, 'full', { className: 'c-event__hero-image', alt: '' }), { loading: 'eager' }) : '';
   const cats = categories(env, e);
-  const content = env.contentSlot ?? markImages(renderItems(env.ctx.docs.get(`content:${e.id}`), { ...env, post: e, parentLayout: null, imgCtx: 'noloop' }), 'noloop');
+  // A members-only event the viewer may not see: the sign-in prompt in place of its content and details.
+  const body = e.locked
+    ? `<div class="c-event__content">${lockedContent(env, e)}</div>`
+    : `<div class="c-event__content">${env.contentSlot ?? markImages(renderItems(env.ctx.docs.get(`content:${e.id}`), { ...env, post: e, parentLayout: null, imgCtx: 'noloop' }), 'noloop')}${env.ctx.data.get('tickets-block') ? '' : ticketsSection(env)}</div><aside class="c-event__details">${details(env, e)}</aside>`;
   const { end } = eventTimes(e);
   const past = end && end < siteNow();
   return (
@@ -131,7 +135,7 @@ export const eventDetails: Renderer = (_b, env) => {
     `<h1 class="c-event__title">${title}</h1></div></header>` +
     `<div class="c-event__main">` +
     (past ? `<p class="c-event__passed">This event has passed. <a href="/events/">See upcoming events</a>.</p>` : '') +
-    `<div class="c-event__content">${content}${env.ctx.data.get('tickets-block') ? '' : ticketsSection(env)}</div><aside class="c-event__details">${details(env, e)}</aside></div>` +
+    `${body}</div>` +
     schedule(e) +
     `<nav class="c-event__back"><a href="/events/">← All events</a></nav>` +
     `</article>`

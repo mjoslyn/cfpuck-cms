@@ -3,7 +3,7 @@
 import type { Db } from './db/query';
 import type { Data } from '@puckeditor/core';
 import { ENTRY_COLUMNS, type Entry, type Media, type Term } from './types';
-import { RECURRENCE_KEY, expandEntry, defaultHorizon } from './recurrence';
+import { RECURRENCE_KEY, expandEntry, defaultHorizon, occurrenceDates, recurrenceOf } from './recurrence';
 import type { FormRow } from './forms/types';
 import { allRows } from './rows';
 import { uniqueAreas } from './content/areas';
@@ -60,6 +60,11 @@ export interface LoaderScope {
 /** The site's view for anyone: published entries, none of them members-only. */
 export const PUBLIC_SCOPE: LoaderScope = { published: true };
 
+/** The level whose members-only entries a viewer sees: an active member's (level ids are slugs: safe in a filter). */
+const memberLevel = (v?: Viewer | null) => (isActive(v?.member) && /^[a-z0-9-]+$/.test(v!.member!.level) ? v!.member!.level : null);
+/** Members-only entries for any level, or for this one (an or() condition). */
+const forLevel = (level: string) => `fields->access->levels.is.null,fields->access->levels.eq.[],fields->access->levels.cs.["${level}"]`;
+
 /** An entries query (a PostgREST filter builder) limited to what a scope's viewer may see. */
 export function visibleTo<Q>(query: Q, scope: LoaderScope | undefined): Q {
   if (!scope) return query;
@@ -69,10 +74,18 @@ export function visibleTo<Q>(query: Q, scope: LoaderScope | undefined): Q {
   const v = scope.viewer;
   if (v?.editor) return q;
   const open = 'fields->access->>members.is.null,fields->access->>members.neq.true';
-  // A member also sees entries for any level, and for theirs (level ids are slugs: safe in the filter).
-  return isActive(v?.member) && /^[a-z0-9-]+$/.test(v!.member!.level)
-    ? q.or(`${open},fields->access->levels.is.null,fields->access->levels.eq.[],fields->access->levels.cs.["${v!.member!.level}"]`)
-    : q.or(open);
+  // A member also sees entries for any level, and for theirs.
+  const level = memberLevel(v);
+  return level ? q.or(`${open},${forLevel(level)}`) : q.or(open);
+}
+
+/** The published entries visibleTo() leaves out for being members-only; null when the scope hides none. */
+function hiddenFrom<Q>(query: Q, scope: LoaderScope | undefined): Q | null {
+  if (!scope || scope.viewer?.editor) return null;
+  let q = (query as any).eq('status', 'publish').eq('fields->access->>members', 'true');
+  if (scope.noEvents) q = q.neq('type', 'event');
+  const level = memberLevel(scope.viewer);
+  return level ? q.or(`not.or(${forLevel(level)})`) : q;
 }
 
 export class Loader {
@@ -84,6 +97,12 @@ export class Loader {
   private templates = new Map<string, Data | null>();
   private recurring?: Promise<boolean>;
   private formsCache?: Promise<FormRow[]>;
+  private hiddenCache?: Promise<Set<number>>;
+  /**
+   * A list or lookup left out a members-only entry this scope hides: what the page shows depends on who
+   * views it (RenderCtx.personal), so it is rendered again for a signed-in visitor.
+   */
+  hidMembersOnly = false;
 
   constructor(public db: Db, public now = new Date(), public scope?: LoaderScope) {}
 
@@ -142,6 +161,25 @@ export class Loader {
     }
   }
 
+  /** The ids of the published entries this scope hides for being members-only (usually none), read once. */
+  private hidden(): Promise<Set<number>> {
+    this.hiddenCache ??= (async () => {
+      const q = hiddenFrom(this.db.from('entries').select('id'), this.scope);
+      if (!q) return new Set<number>();
+      const { data, error } = await allRows(q.order('id'));
+      if (error) throw error;
+      return new Set((data ?? []).map((r: any) => r.id as number));
+    })();
+    return this.hiddenCache;
+  }
+
+  /** Notes whether any of these ids, asked for and not found, is an entry this scope hides for being members-only. */
+  private async noteHidden(ids: number[]) {
+    if (this.hidMembersOnly || !this.scope || !ids.length) return;
+    const hidden = await this.hidden();
+    if (ids.some((id) => hidden.has(id))) this.hidMembersOnly = true;
+  }
+
   async entry(type: string | string[], slug: string, withContent = true): Promise<Entry | null> {
     const cols = `${ENTRY_COLUMNS}${withContent ? ', content' : ''}, entry_terms(term_id, sort)`;
     let q = this.visible(this.db.from('entries').select(cols).eq('slug', slug).eq('status', 'publish'));
@@ -158,13 +196,15 @@ export class Loader {
   /**
    * A published members-only entry this scope's viewer may not see: what anyone may know of it, for its
    * page's sign-in prompt (its address, title, excerpt, featured image, template, search settings and
-   * access; never its content or other fields). Null when there is no such entry, or no scope.
+   * access; never its content or other fields). Null when there is no such entry, or no scope. With
+   * `occurrence` (a Y-m-d date), a recurring event's occurrence on that date, as its series' locked entry.
    */
-  async lockedEntry(types: string[], slug: string): Promise<Entry | null> {
+  async lockedEntry(types: string[], slug: string, occurrence?: string): Promise<Entry | null> {
     if (!this.scope) return null;
+    const dates = occurrence ? `, recurrence:fields->${RECURRENCE_KEY}, start:fields->>start` : '';
     const { data: rows, error } = await this.db
       .from('entries')
-      .select('id, type, slug, title, title_rendered, excerpt, excerpt_rendered, status, template, parent_id, menu_order, featured_media_id, published_at, updated_at, access:fields->access, seo:fields->seo')
+      .select(`id, type, slug, title, title_rendered, excerpt, excerpt_rendered, status, template, parent_id, menu_order, featured_media_id, published_at, updated_at, access:fields->access, seo:fields->seo${dates}`)
       .eq('slug', slug)
       .eq('status', 'publish')
       .in('type', types)
@@ -172,7 +212,13 @@ export class Loader {
     if (error) throw error;
     const row = types.map((t) => (rows as any[]).find((r) => r.type === t)).find(Boolean);
     if (!row) return null;
-    const { access, seo, ...rest } = row;
+    const { access, seo, recurrence, start, ...rest } = row;
+    // The date must be one of the series' occurrences; the entry carries none of its dates.
+    if (occurrence) {
+      const rule = recurrenceOf({ type: rest.type, fields: { [RECURRENCE_KEY]: recurrence } });
+      if (!rule || !/^\d{4}-\d{2}-\d{2}/.test(start ?? '') || !occurrenceDates(start.slice(0, 10), rule, defaultHorizon(this.now)).includes(occurrence)) return null;
+      rest.occurrence = occurrence;
+    }
     const e: Entry = { ...rest, fields: { access, seo }, content: null, event_start: null, event_end: null, event_all_day: null, term_ids: [], locked: true };
     this.entries.set(e.id, e);
     return e;
@@ -188,6 +234,7 @@ export class Loader {
     const { data, error } = await this.visible(q).maybeSingle();
     if (error) throw error;
     if (data) this.remember([data]);
+    else await this.noteHidden([id]);
     return this.entries.get(id) ?? null;
   }
 
@@ -198,6 +245,7 @@ export class Loader {
       if (error) throw error;
       this.remember(data ?? []);
     }
+    await this.noteHidden(need.filter((id) => !this.entries.has(id)));
     return ids.map((id) => this.entries.get(id)).filter(Boolean) as Entry[];
   }
 
@@ -263,16 +311,31 @@ export class Loader {
     }
     if (matchIds && !matchIds.length) return { ids: [], total: 0, pages: 0 };
     const select = `${ENTRY_COLUMNS}, entry_terms(term_id, sort)`;
-
-    let q = this.visible(this.db.from('entries').select(select, { count: 'exact' }).eq('status', 'publish').in('type', types));
-    if (matchIds) q = q.in('id', matchIds);
-    // Search: every word must start a word of the title, excerpt or text (the full-text index).
     const fts = ftsQuery(args.search);
-    if (fts) q = q.textSearch('fts', fts);
-    if (args.featuredOnly) q = q.eq('fields->>featured', 'true');
-    if (args.exclude?.length) q = q.not('id', 'in', `(${args.exclude.join(',')})`);
-    if (args.include?.length) q = q.in('id', args.include);
-    if (args.parents?.length) q = q.in('parent_id', args.parents);
+    const narrow = (q: any) => {
+      q = q.eq('status', 'publish').in('type', types);
+      if (matchIds) q = q.in('id', matchIds);
+      // Search: every word must start a word of the title, excerpt or text (the full-text index).
+      if (fts) q = q.textSearch('fts', fts);
+      if (args.featuredOnly) q = q.eq('fields->>featured', 'true');
+      if (args.exclude?.length) q = q.not('id', 'in', `(${args.exclude.join(',')})`);
+      if (args.include?.length) q = q.in('id', args.include);
+      if (args.parents?.length) q = q.in('parent_id', args.parents);
+      return q;
+    };
+    // Whether the list leaves out members-only entries this scope hides: one check, only when there are some.
+    if (!this.hidMembersOnly && this.scope) {
+      const hidden = await this.hidden();
+      if (hidden.size) {
+        let h = narrow(this.db.from('entries').select('id').in('id', [...hidden]));
+        if (args.upcoming) h = h.or(`event_start.gte.${this.now.toISOString()},fields->${RECURRENCE_KEY}.not.is.null`);
+        const { data, error } = await h.limit(1);
+        if (error) throw error;
+        if (data?.length) this.hidMembersOnly = true;
+      }
+    }
+
+    let q = narrow(this.visible(this.db.from('entries').select(select, { count: 'exact' })));
     // Search lists a recurring event once (its page leads to the next occurrence), ranked (relevance).
     if (args.orderBy === 'relevance') return this.queryRanked(q, args, perPage, offset);
     if (types.includes('event') && (await this.hasRecurring())) {

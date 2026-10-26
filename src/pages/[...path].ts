@@ -18,12 +18,13 @@ import { BROWSER_CACHE_CONTROL, PAGE_CACHE } from '../lib/cache';
 
 /**
  * The page, rendered again as the signed-in visitor sees it when it depends on who views it (members-only
- * content, member prices, the account page). Anyone else gets the first render. Either way it isn't cached.
+ * content, member prices, the account page). Anyone else gets the first render. Either way it isn't cached,
+ * and a members-only page (locked for anyone) stays marked as one.
  */
 async function asViewer(first: PageResult, request: Request, cookies: AstroCookies, render: (viewer: Viewer) => Promise<PageResult>): Promise<PageResult> {
   if (!first.personal) return first;
   const viewer = await viewerOf(request, cookies);
-  return viewer ? { ...(await render(viewer)), personal: true } : first;
+  return viewer ? { ...(await render(viewer)), personal: true, locked: first.locked } : first;
 }
 
 export const GET: APIRoute = async ({ url, request, cache, cookies }) => {
@@ -80,7 +81,7 @@ export const GET: APIRoute = async ({ url, request, cache, cookies }) => {
   // Cached at the CDN and cleared after edits (src/lib/cache.ts).
   if (cache.enabled && !personal) cache.set(location ? { ...PAGE_CACHE, swr: undefined } : PAGE_CACHE);
   if (location) {
-    return new Response(null, { status, headers: { Location: new URL(location, url).toString(), 'Cache-Control': BROWSER_CACHE_CONTROL } });
+    return new Response(null, { status, headers: { Location: new URL(location, url).toString(), 'Cache-Control': personal ? 'private, no-store' : BROWSER_CACHE_CONTROL } });
   }
   // Addresses still not found are logged for the redirects screen.
   if (status === 404 && !ignoredNotFound(url.pathname)) await siteDb().rpc('not_found_hit', { hit_path: normalizePath(url.pathname), hit_referrer: request.headers.get('referer') ?? '' }).then(() => {}, () => {});
@@ -89,7 +90,9 @@ export const GET: APIRoute = async ({ url, request, cache, cookies }) => {
     headers: {
       'Content-Type': 'text/html; charset=UTF-8',
       'Cache-Control': personal ? 'private, no-store' : BROWSER_CACHE_CONTROL,
-      ...(personal ? { 'X-Robots-Tag': 'noindex' } : {}),
+      // Members-only pages and one visitor's order or checkout outcome stay out of search engines; pages
+      // personal for other reasons (member prices, a Members only block) are public pages.
+      ...(result.locked || url.searchParams.has('order') || url.searchParams.has('tickets') ? { 'X-Robots-Tag': 'noindex' } : {}),
     },
   });
 };
