@@ -1,4 +1,4 @@
-# supapuck-cms: the core (Astro + Puck on Cloudflare)
+# cfpuck-cms: the core (Astro + Puck on Cloudflare)
 
 A CMS for small business and organisation sites: Astro SSR on a Cloudflare Worker, content in D1 and files in R2, a Puck visual editor,
 and Compose (pages written with Claude from documents, images and links). The code is split into the

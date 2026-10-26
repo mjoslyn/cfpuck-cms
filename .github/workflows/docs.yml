@@ -19,7 +19,7 @@ concurrency:
 jobs:
   build:
     # Sites carry this file from the core; only the core publishes the docs.
-    if: github.repository == 'mjoslyn/supapuck-cms'
+    if: github.repository == 'mjoslyn/cfpuck-cms'
     runs-on: ubuntu-latest
     defaults:
       run:

@@ -2,7 +2,7 @@
 
 # Working on the core
 
-This repository is supapuck-cms: the CMS (everything outside `src/site/`) and an example site in
+This repository is cfpuck-cms: the CMS (everything outside `src/site/`) and an example site in
 `src/site/` (Example Town). Real sites are forks with this repository as their `upstream` remote, kept
 beside it (`../<site>`).
 `CORE.md`, imported above, is the reference for how the core works, and every site's `AGENTS.md` imports
@@ -49,7 +49,7 @@ Update the docs in the same commit as the change, not afterwards:
 2. Test on the example site, and for anything that real content exercises, in a site: in
    `../<site>`, `git fetch <path to this repository> main && git merge --no-commit FETCH_HEAD`,
    restart its dev server if config or dependencies changed, and test there.
-3. Push supapuck-cms (it deploys nothing), then in the site `git fetch upstream && git merge upstream/main`
+3. Push cfpuck-cms (it deploys nothing), then in the site `git fetch upstream && git merge upstream/main`
    and commit; a site keeps its own `AGENTS.md`, `README.md`, `.env.example` and `wrangler.jsonc`
    when they conflict. The site's owner pushes the site, which deploys it.
 4. Stored content changes and how to check changes: `CORE.md` (Changing stored content, Checking

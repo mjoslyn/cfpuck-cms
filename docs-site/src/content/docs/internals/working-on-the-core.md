@@ -54,10 +54,10 @@ land together: push the code, wait for the deploy, then `npx wrangler d1 migrati
 
 ## Workflow
 
-1. Change and commit in `supapuck-cms`. `npm run check` must pass.
+1. Change and commit in `cfpuck-cms`. `npm run check` must pass.
 2. Test on the example site and, for anything real content exercises, in a site: merge the core
    change there without committing and test.
-3. Push `supapuck-cms` (it deploys nothing), then in each site `git fetch upstream && git merge upstream/main`
+3. Push `cfpuck-cms` (it deploys nothing), then in each site `git fetch upstream && git merge upstream/main`
    and commit. The site's owner pushes the site, which deploys it.
 
 ## Checking changes

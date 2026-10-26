@@ -20,7 +20,7 @@ Wrangler (Cloudflare's CLI) is a dev dependency, so `npx wrangler` needs no inst
 1. **Install.**
 
    ```sh
-   git clone https://github.com/mjoslyn/supapuck-cms.git my-site
+   git clone https://github.com/mjoslyn/cfpuck-cms.git my-site
    cd my-site
    npm install
    ```
