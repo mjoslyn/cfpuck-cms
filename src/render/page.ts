@@ -290,8 +290,9 @@ export async function renderRequest(url: URL, db: Db, form?: FormResult, preview
     }
   }
   await prepare(template ?? [], ctx);
-  // A list (or a picked entry) left out members-only entries: a member's view of the page differs.
-  if (loader.hidMembersOnly) ctx.personal = true;
+  // A list (or a picked entry) left out members-only entries: a member's view of the page differs (while
+  // Members is off nobody is one, and the page stays shared).
+  if (loader.hidMembersOnly && memberSettings(settings.site).enabled) ctx.personal = true;
   // A listing page past the last one is not found (page 1 of an empty listing is fine).
   const pages = ctx.data.get('main-pages') as number | undefined;
   if (!preview && queried.kind !== 'singular' && queried.page > 1 && pages !== undefined && queried.page > pages) {
