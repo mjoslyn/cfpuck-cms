@@ -1,14 +1,14 @@
 // Invitations (Users and Members screens), sent by the site over SMTP and lasting INVITE_DAYS. The link
 // (/api/auth/invite?t=) is signed here and names the account, its expiry, where it leads and the
-// account's current invitation (`users.invite`, a random value): sending a new one replaces it, and
-// setting a password clears it (setPasswordWithToken in src/lib/auth), so older links and used ones stop
-// working. Opening the link makes a one-time password token and lands on the page that sets a password.
+// account's current invitation (`users.invite`, a random value): sending a new one replaces it (and
+// spends the password tokens the older link made), and setting a password clears it
+// (setPasswordWithToken in src/lib/auth), so older links and used ones stop working. Opening the link makes a one-time password token and lands on the page that sets a password.
 // Without SMTP the admin is given the link to pass on. Waiting for a password: an open invitation, or
 // an invited account with no password at all (`awaitingPassword`). Server only.
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { site } from '../site';
 import { accountUrl } from '../members/account';
-import { createUser, updateUser, userById, awaitingPassword, type AuthUser } from '../auth';
+import { createUser, updateUser, userById, awaitingPassword, spendPasswordTokens, type AuthUser } from '../auth';
 import { sendLink } from '../auth/mail';
 import { env } from '../env';
 
@@ -34,6 +34,8 @@ async function mailInvite(user: AuthUser, to: InviteTo, origin: string): Promise
   const url = `${origin}/api/auth/invite?t=${to}.${user.id}.${exp}.${sig(to, user.id, exp, nonce)}`;
   const what = to === 'admin' ? `to help edit the ${site.name} website` : `to join ${site.name} as a member`;
   await updateUser(user.id, { invite: nonce });
+  // Password tokens made by opening the older link go too.
+  await spendPasswordTokens(user.id);
   try {
     const sent = await sendLink({
       to: user.email,

@@ -2,7 +2,7 @@ import type { APIRoute } from 'astro';
 import type { AstroCookies } from 'astro';
 import { renderRequest, type PageResult } from '../render/page';
 import { confirmAddress, redirectWith, sessionUser } from '../lib/auth';
-import { safeNext } from '../lib/members/account';
+import { accountUrl, safeNext } from '../lib/members/account';
 import { viewerOf } from '../lib/members/viewer';
 import { ACCOUNT_PATH, type Viewer } from '../lib/members/config';
 import { eventsOnIn } from '../lib/events/on';
@@ -54,14 +54,16 @@ export const GET: APIRoute = async ({ url, request, cache, cookies }) => {
   // The site's old URLs (src/site/render.ts redirect).
   const old = SITE_RENDER.redirect?.(url);
   if (old) return Response.redirect(new URL(old, url), 301);
-  // A member's link confirming their address signs them in here and goes on (to `next`, else the account
-  // page). A link that has expired or was used is only an error for someone not signed in.
+  // A member's link confirming their address signs them in here, unless another account is signed in on
+  // this browser (that stays signed in, and the account page says so), and goes on (to `next`, else the
+  // account page). A link that has expired or was used is only an error for someone not signed in.
   const confirm = url.searchParams.get('confirm');
   if (url.pathname === ACCOUNT_PATH && confirm) {
-    const signedIn = await confirmAddress(confirm, request);
+    const done = await confirmAddress(confirm, request);
+    if (done?.other) return redirectWith(new URL(accountUrl({ m: 'confirmed-other' }), url).toString(), []);
     const next = new URL(safeNext(url.searchParams.get('next')) || ACCOUNT_PATH, url);
-    if (!signedIn && !(await sessionUser(request))) next.searchParams.set('error', 'That link has expired or was already used. Sign in to get a new one.');
-    return redirectWith(next.toString(), signedIn ?? []);
+    if (!done && !(await sessionUser(request))) next.searchParams.set('error', 'That link has expired or was already used. Sign in to get a new one.');
+    return redirectWith(next.toString(), done?.cookies ?? []);
   }
   // Back from a form's checkout: its confirmation or the form again, for this visitor only (never cached).
   const paid = url.searchParams.get(RETURN_PARAM);
