@@ -12,6 +12,7 @@ import { randomBytes } from 'node:crypto';
 import { lazyD1 } from '../db/d1';
 import { siteDb } from '../db/site';
 import { env } from '../env';
+import { clearAttempts, overLimit, recordAttempt } from './attempts';
 
 /** The signed-in person, as the site reads them. */
 export interface AuthUser {
@@ -38,6 +39,8 @@ function makeAuth() {
       minPasswordLength: 10,
       // Confirmation (AUTH_CONFIRM_EMAIL) is checked by the site's sign-in routes, which can say why.
       requireEmailVerification: false,
+      // A password set from a link ends every session the account had (setPasswordWithToken then signs in).
+      revokeSessionsOnPasswordReset: true,
       password: {
         hash: hashPassword,
         verify: ({ hash, password }) => (hash.startsWith('$2') ? bcrypt.compare(password, hash) : verifyPassword({ hash, password })),
@@ -98,11 +101,25 @@ const userOf = (u: { id: string; email: string; name?: string | null; emailVerif
 /** Whether a request carries the session cookie (most visitors don't, so most requests skip the lookup). */
 export const hasSession = (request: Request) => new RegExp(`(^|;\\s*)(__Secure-)?${COOKIE_PREFIX}\\.session_token=`).test(request.headers.get('cookie') ?? '');
 
-/** The signed-in person, or null. */
+/** Session cookies Better Auth renewed while answering a request (a session in use is extended a day at a
+ * time), for the middleware to pass on with the answer (refreshedCookies). */
+const refreshed = new WeakMap<Request, string[]>();
+
+/** The signed-in person, or null. A session it extends leaves its renewed cookie for refreshedCookies. */
 export async function sessionUser(request: Request): Promise<AuthUser | null> {
   if (!hasSession(request)) return null;
-  const s = await auth().api.getSession({ headers: request.headers }).catch(() => null);
-  return s?.user ? userOf(s.user) : null;
+  const s = await auth().api.getSession({ headers: request.headers, returnHeaders: true }).catch(() => null);
+  if (!s?.response?.user) return null;
+  const cookies = s.headers.getSetCookie().filter(isSessionCookie);
+  if (cookies.length) refreshed.set(request, cookies);
+  return userOf(s.response.user);
+}
+
+/** The cookies renewing the request's session (and the signed-in hint, to expire with it), if it was extended. */
+export function refreshedCookies(request: Request): string[] {
+  const cookies = refreshed.get(request) ?? [];
+  const hint = signedInCookie(cookies);
+  return hint ? [...cookies, hint] : cookies;
 }
 
 /** Whether addresses must be confirmed by email before their account signs in (AUTH_CONFIRM_EMAIL, default on). */
@@ -115,9 +132,12 @@ const cookiesOf = (res: Response) => res.headers.getSetCookie();
  * cached pages ask who they are (public/assets/js/editor-bar.js, member-link.js) only then. No secret. */
 export const SIGNED_IN_COOKIE = `${COOKIE_PREFIX}.signed_in`;
 
+/** Whether a Set-Cookie header sets the session cookie. */
+export const isSessionCookie = (c: string) => new RegExp(`^(__Secure-)?${COOKIE_PREFIX}\\.session_token=`).test(c);
+
 /** The signed-in cookie to go with session cookies being set or cleared, if they are. */
 function signedInCookie(cookies: string[]): string | null {
-  const session = cookies.find((c) => new RegExp(`^(__Secure-)?${COOKIE_PREFIX}\\.session_token=`).test(c));
+  const session = cookies.find(isSessionCookie);
   if (!session) return null;
   const value = session.slice(session.indexOf('=') + 1).split(';')[0];
   const secure = /;\s*secure/i.test(session) ? '; Secure' : '';
@@ -137,18 +157,27 @@ export function redirectWith(location: string, cookies: string[], status = 303):
 
 type SignIn = { ok: true; cookies: string[]; user: AuthUser } | { ok: false; error: string; unconfirmed?: AuthUser };
 
-/** Sign in with a password: the session's cookies, or why not. */
-export async function signIn(email: string, password: string, request: Request): Promise<SignIn> {
+const TOO_MANY = 'Too many tries. Please wait a while and try again later.';
+
+/** Sign in with a password: the session's cookies, or why not. Failed tries are limited per address and
+ * per visitor (src/lib/auth/attempts.ts); over a limit even the right password waits. `limited` false:
+ * the password was just set from a link to their inbox. */
+export async function signIn(email: string, password: string, request: Request, limited = true): Promise<SignIn> {
+  if (limited && (await overLimit('sign-in', email, request))) return { ok: false, error: TOO_MANY };
+  const failed = async () => {
+    await recordAttempt('sign-in', email, request);
+    return { ok: false as const, error: 'That email and password don’t match an account.' };
+  };
   const found = await userByEmail(email);
-  const bad = { ok: false as const, error: 'That email and password don’t match an account.' };
-  if (!found) return bad;
+  if (!found) return failed();
   const ctx = await context();
   const account = await ctx.internalAdapter.findCredentialAccount(found.id);
-  if (!account?.password || !(await ctx.password.verify({ hash: account.password, password }))) return bad;
+  if (!account?.password || !(await ctx.password.verify({ hash: account.password, password }))) return failed();
   if (confirmEmail() && !found.emailVerified) return { ok: false, error: 'Confirm your email address first: use the link we sent you.', unconfirmed: found };
   if (account.password.startsWith('$2')) await ctx.internalAdapter.updatePassword(found.id, await ctx.password.hash(password));
   const res = await auth().api.signInEmail({ body: { email: found.email, password }, headers: request.headers, asResponse: true });
-  if (!res.ok) return bad;
+  if (!res.ok) return failed();
+  await clearAttempts('sign-in', found.email);
   return { ok: true, cookies: cookiesOf(res), user: found };
 }
 
@@ -197,12 +226,34 @@ export async function createUser(input: { email: string; name?: string; password
   return userOf(made);
 }
 
-/** Set an account's password (a signed-in member changing it, scripts). */
+/** Set an account's password (scripts; a signed-in member changes theirs with changePassword). */
 export async function setPassword(userId: string, password: string): Promise<void> {
   const ctx = await context();
   const hash = await ctx.password.hash(password);
   if (await ctx.internalAdapter.findCredentialAccount(userId)) await ctx.internalAdapter.updatePassword(userId, hash);
   else await ctx.internalAdapter.linkAccount({ userId, providerId: 'credential', accountId: userId, password: hash });
+}
+
+/**
+ * A signed-in person changing their password: the current one must match (its failures count as failed
+ * sign-ins), and every other session the account has ends; this one stays.
+ */
+export async function changePassword(request: Request, current: string, password: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const s = hasSession(request) ? await auth().api.getSession({ headers: request.headers }).catch(() => null) : null;
+  if (!s?.user) return { ok: false, error: 'Sign in again to change your password.' };
+  const ctx = await context();
+  const account = await ctx.internalAdapter.findCredentialAccount(s.user.id);
+  if (account?.password) {
+    if (await overLimit('sign-in', s.user.email, request)) return { ok: false, error: TOO_MANY };
+    if (!(await ctx.password.verify({ hash: account.password, password: current }))) {
+      await recordAttempt('sign-in', s.user.email, request);
+      return { ok: false, error: 'Your current password isn’t right.' };
+    }
+  }
+  await setPassword(s.user.id, password);
+  const others = (await ctx.internalAdapter.listSessions(s.user.id)).map((x) => x.token).filter((t) => t !== s.session.token);
+  if (others.length) await ctx.internalAdapter.deleteSessions(others);
+  return { ok: true };
 }
 
 /** Delete an account: its sessions, sign-in methods, profile and membership go with it. */
@@ -258,7 +309,9 @@ export async function setPasswordWithToken(token: string, password: string, requ
     return { ok: false, error: e instanceof APIError ? e.message : 'That link has expired or was already used. Ask for a new one.' };
   }
   await updateUser(user.id, { invite: null, email_verified: true });
-  return signIn(user.email, password, request);
+  // The link reached their inbox: failed sign-ins before it don't hold them back.
+  await clearAttempts('sign-in', user.email);
+  return signIn(user.email, password, request, false);
 }
 
 /** A token confirming an account's email address (good for a day). */

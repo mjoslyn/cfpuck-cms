@@ -2,7 +2,7 @@
 // users are for admins only. locals.db reads and writes as that role (src/lib/db/policies.ts).
 import { defineMiddleware } from 'astro:middleware';
 import { sessionDb, siteDb } from './lib/db/site';
-import { sessionUser } from './lib/auth';
+import { isSessionCookie, refreshedCookies, sessionUser } from './lib/auth';
 import { refreshSiteTimezone } from './lib/site/timezone';
 import { changesPages, PAGE_CACHE_TAG } from './lib/cache';
 import { env } from './lib/env';
@@ -36,19 +36,38 @@ async function bodyAction(request: Request, pathname: string): Promise<string | 
   return undefined;
 }
 
-/** Marks an answer noindex for search engines. */
-async function noindex(res: Response | Promise<Response>) {
-  const r = await res;
-  if (r.headers.has('X-Robots-Tag')) return r;
+/** An answer with its headers changed. */
+function withHeaders(r: Response, change: (headers: Headers) => void): Response {
   try {
-    r.headers.set('X-Robots-Tag', 'noindex');
+    change(r.headers);
     return r;
   } catch {
     // A response with fixed headers (Response.redirect, a fetched one): a copy whose headers can change.
     const copy = new Response(r.body, r);
-    copy.headers.set('X-Robots-Tag', 'noindex');
+    change(copy.headers);
     return copy;
   }
+}
+
+/** Marks an answer noindex for search engines. */
+async function noindex(res: Response | Promise<Response>) {
+  const r = await res;
+  if (r.headers.has('X-Robots-Tag')) return r;
+  return withHeaders(r, (h) => h.set('X-Robots-Tag', 'noindex'));
+}
+
+/**
+ * The session cookie renewed while answering (src/lib/auth sessionUser), with the signed-in hint, so the
+ * browser's cookie lasts as long as the session. Only on answers for this visitor alone: the admin's,
+ * member endpoints and those marked private or no-store (personal pages); never on a page cached for everyone.
+ */
+async function keepSession(request: Request, pathname: string, res: Response | Promise<Response>): Promise<Response> {
+  const r = await res;
+  const cookies = refreshedCookies(request);
+  if (!cookies.length || r.headers.getSetCookie().some(isSessionCookie)) return r;
+  const own = pathname.startsWith('/admin') || pathname.startsWith('/api/admin') || pathname.startsWith('/api/members/');
+  if (!own && !/\b(private|no-store)\b/i.test(r.headers.get('Cache-Control') ?? '')) return r;
+  return withHeaders(r, (h) => cookies.forEach((c) => h.append('Set-Cookie', c)));
 }
 
 let noindexAllValue: boolean | undefined;
@@ -84,7 +103,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
   const isAdmin = pathname.startsWith('/admin') || pathname.startsWith('/api/admin');
   // The admin is never indexed, nor is any page at an address other than the site's, nor any at all
   // while SITE_NOINDEX is set.
-  if (!isAdmin) return noindexAll() || offSite(context.url) ? noindex(next()) : next();
+  if (!isAdmin) return keepSession(context.request, pathname, noindexAll() || offSite(context.url) ? noindex(next()) : next());
   if (PUBLIC_ADMIN.some((p) => pathname.startsWith(p))) return noindex(next());
 
   const user = await sessionUser(context.request);
@@ -103,7 +122,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
   }
   context.locals.db = sessionDb({ role: profile.role, uid: user.id });
   context.locals.user = { id: user.id, email: user.email ?? '', role: profile.role, name: profile.display_name ?? '' };
-  return purgeAfter(context, () => noindex(next()));
+  return keepSession(context.request, pathname, purgeAfter(context, () => noindex(next())));
 });
 
 /** Answers the request, then clears the CDN's cached pages if it was an edit that succeeded (src/lib/cache.ts), so it shows at once. */

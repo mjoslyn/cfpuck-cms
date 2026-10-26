@@ -54,6 +54,8 @@ const field = (name: string, label: string, type: string, auto: string, extra = 
 const form = (action: string, fields: string, button: string, hidden = '') =>
   `<div class="c-form"><form class="c-form__form" method="post" action="${action}">${hidden}<div class="c-form__fields">${fields}</div><div class="c-form__footer"><button type="submit" class="c-button__link c-form__submit">${button}</button></div></form></div>`;
 const password = (label = 'Password') => field('password', label, 'password', 'new-password', ' minlength="10"') + field('confirm', 'Repeat it', 'password', 'new-password', ' minlength="10"');
+/** A signed-in member's change: their current password first. */
+const changePassword = () => field('current', 'Current password', 'password', 'current-password') + password('New password');
 
 const MESSAGES: Record<string, string> = {
   'signed-out': 'You’re signed out.',
@@ -82,7 +84,7 @@ const memberAccount: Renderer = (_b, env) => {
     // An invitation or password link: setting the password signs them in.
     body = head('Set your password') + form('/api/members/password', password('New password'), 'Save password', `<input type="hidden" name="token" value="${token}" />`);
   } else if (v && q.get('view') === 'password') {
-    body = head('Set your password') + p('c-account__note', `For ${esc(v.email)}.`) + form('/api/members/password', password('New password'), 'Save password');
+    body = head('Set your password') + p('c-account__note', `For ${esc(v.email)}.`) + form('/api/members/password', changePassword(), 'Save password');
   } else if (v) {
     const m = v.member;
     const level = m ? (s.levels.find((l) => l.id === m.level)?.name ?? m.level) : '';
@@ -99,7 +101,7 @@ const memberAccount: Renderer = (_b, env) => {
       `<dl class="c-account__details">${rows.filter(([, x]) => x).map(([k, x]) => `<dt>${k}</dt><dd>${x}</dd>`).join('')}</dl>` +
       (next ? p('c-account__note', `<a href="${escAttr(next)}">Back to where you were</a>`) : '') +
       accountEmail(ctx) +
-      `<details class="c-account__more"><summary>Change your password</summary>${form('/api/members/password', password('New password'), 'Save password')}</details>` +
+      `<details class="c-account__more"><summary>Change your password</summary>${form('/api/members/password', changePassword(), 'Save password')}</details>` +
       `<form method="post" action="/api/members/logout" class="c-account__signout"><button type="submit" class="c-button__link">Sign out</button></form>`;
   } else {
     const nextInput = next ? `<input type="hidden" name="next" value="${escAttr(next)}" />` : '';
