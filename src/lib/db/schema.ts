@@ -255,6 +255,14 @@ export const SCHEMA: Record<string, TableSchema> = {
     defaults: {},
     touch: true,
   },
+  sync_nonces: {
+    pk: ["nonce"],
+    columns: {"nonce":"text","at":"int8"},
+    generated: [],
+    fks: [],
+    defaults: {},
+    touch: false,
+  },
   templates: {
     pk: ["id"],
     columns: {"id":"int8","kind":"text","slug":"text","title":"text","content":"jsonb","updated_at":"timestamptz"},

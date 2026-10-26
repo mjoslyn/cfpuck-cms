@@ -61,8 +61,9 @@ export class MediaStore {
     return this.engineOf();
   }
 
-  async put(path: string, body: Uint8Array, mime: string) {
-    const { error } = await this.db.storage.from('media').upload(path, body, { contentType: mime, upsert: !this.keep, cacheControl: '31536000' });
+  /** A stream (a video's upload, passed on as it arrives) needs its length in `size`. */
+  async put(path: string, body: Uint8Array | ReadableStream<Uint8Array>, mime: string, size?: number) {
+    const { error } = await this.db.storage.from('media').upload(path, body, { contentType: mime, upsert: !this.keep, cacheControl: '31536000', size });
     if (error && this.keep && error.statusCode === '409') throw new PathTaken(`${path} is already stored`);
     if (error) throw new Error(`${path}: ${error.message}`);
   }

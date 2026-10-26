@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { PRESETS as themeJson } from '../lib/site';
 import { browserClient } from '../lib/db/browser';
 import { mediaUrl } from '../lib/media/image';
+import { uploadMedia } from '../lib/media/upload';
 import type { Media } from '../lib/types';
 
 type Attrs = Record<string, any>;
@@ -226,9 +227,7 @@ export function MediaModal({ onClose, onSelect, multiple, onSelectMany, only }: 
   }, [q]);
   const upload = async (file: File) => {
     setBusy(true);
-    const body = new FormData();
-    body.append('file', file);
-    const res = await fetch('/api/admin/media', { method: 'POST', body });
+    const res = await uploadMedia(file);
     setBusy(false);
     if (res.ok) load();
     else alert(await res.text());

@@ -54,13 +54,43 @@ export const unsafeKey = (key: string) => key.startsWith('/') || key.includes('\
 const UNSAFE = 'Not a safe file path';
 const refused = () => new Response(UNSAFE, { status: 400 });
 
-type PutOptions = { contentType?: string; cacheControl?: string; upsert?: boolean };
+/** `size`: the body's length in bytes, needed when the body is a stream (R2 and S3 take only a known length). */
+type PutOptions = { contentType?: string; cacheControl?: string; upsert?: boolean; size?: number };
 type Listing = { keys: { key: string; size: number; modified: string }[]; folders: string[] };
+/** What a stored object can be written from: bytes, text, a Blob, or a stream of known length. */
+export type PutBody = ArrayBuffer | ArrayBufferView | string | Blob | ReadableStream<Uint8Array>;
+/** A byte range of an object: `length` bytes from `offset`. */
+export type ByteRange = { offset: number; length: number };
+
+/**
+ * A Range header against an object of `size` bytes (RFC 9110, one range of bytes): the range to send,
+ * null when it can't be served as one range (malformed, another unit, several ranges: the whole file
+ * goes, as servers commonly answer those), or 'unsatisfiable' when it starts past the end (416).
+ * A suffix longer than the object is the whole object; an end past it is the last byte.
+ */
+export function parseRange(header: string, size: number): ByteRange | null | 'unsatisfiable' {
+  const m = /^bytes=\s*(\d*)-(\d*)\s*$/i.exec(header.trim());
+  if (!m || (!m[1] && !m[2])) return null;
+  if (!m[1]) {
+    const suffix = Number(m[2]);
+    if (suffix === 0 || size === 0) return 'unsatisfiable';
+    const length = Math.min(suffix, size);
+    return { offset: size - length, length };
+  }
+  const first = Number(m[1]);
+  if (m[2] && Number(m[2]) < first) return null;
+  if (first >= size) return 'unsatisfiable';
+  const last = m[2] ? Math.min(Number(m[2]), size - 1) : size - 1;
+  return { offset: first, length: last - first + 1 };
+}
 
 /** Where objects are kept: answers as HTTP responses (404, 412 when an object exists and upsert is off). */
 interface Backend {
-  put(key: string, body: BodyInit, options: PutOptions): Promise<Response>;
-  get(key: string, headers: Record<string, string>): Promise<Response>;
+  put(key: string, body: PutBody, options: PutOptions): Promise<Response>;
+  /** An object, or the part of it in `range` (206), passing on the validators in `headers`. */
+  get(key: string, headers: Record<string, string>, range?: ByteRange): Promise<Response>;
+  /** An object's size in bytes, or null when there is none. */
+  size(key: string): Promise<number | null>;
   delete(key: string): Promise<Response>;
   listKeys(prefix: string, delimit: boolean): Promise<Listing>;
 }
@@ -79,15 +109,30 @@ class S3 implements Backend {
     return `${this.config.endpoint}/${this.config.bucket}${key ? `/${encodeKey(key)}` : ''}${query ? `?${query}` : ''}`;
   }
 
-  put(key: string, body: BodyInit, options: PutOptions): Promise<Response> {
+  put(key: string, body: PutBody, options: PutOptions): Promise<Response> {
     const headers: Record<string, string> = { 'Content-Type': options.contentType || 'application/octet-stream' };
     if (options.cacheControl) headers['Cache-Control'] = cacheControl(options.cacheControl)!;
     if (options.upsert === false) headers['If-None-Match'] = '*';
-    return this.client.fetch(this.url(key), { method: 'PUT', headers, body });
+    // A Blob or a stream goes as it is, its payload unsigned (HTTPS carries it), not read into memory to hash.
+    if (body instanceof Blob || body instanceof ReadableStream) {
+      headers['X-Amz-Content-Sha256'] = 'UNSIGNED-PAYLOAD';
+      const size = body instanceof Blob ? body.size : options.size;
+      if (size !== undefined) headers['Content-Length'] = String(size);
+    }
+    return this.client.fetch(this.url(key), { method: 'PUT', headers, body: body as BodyInit });
   }
 
-  get(key: string, headers: Record<string, string>): Promise<Response> {
-    return this.client.fetch(this.url(key), { headers });
+  get(key: string, headers: Record<string, string>, range?: ByteRange): Promise<Response> {
+    const passed = Object.fromEntries(Object.entries(headers).filter(([h]) => h.toLowerCase() !== 'range'));
+    if (range) passed.range = `bytes=${range.offset}-${range.offset + range.length - 1}`;
+    return this.client.fetch(this.url(key), { headers: passed });
+  }
+
+  async size(key: string): Promise<number | null> {
+    const res = await this.client.fetch(this.url(key), { method: 'HEAD' });
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`Could not read ${key} (${res.status})`);
+    return Number(res.headers.get('content-length') ?? 0);
   }
 
   delete(key: string): Promise<Response> {
@@ -122,8 +167,11 @@ class R2 implements Backend {
     return Promise.resolve(this.ready);
   }
 
-  async put(key: string, body: BodyInit, options: PutOptions): Promise<Response> {
-    const value = body instanceof Blob ? await body.arrayBuffer() : (body as ArrayBuffer | string);
+  async put(key: string, body: PutBody, options: PutOptions): Promise<Response> {
+    // Bytes and Blobs go as they are; a stream with its length told (R2 takes only a known length;
+    // FixedLengthStream is the Worker's, and also refuses a body longer or shorter than that).
+    const Fixed = (globalThis as { FixedLengthStream?: new (n: number) => TransformStream<Uint8Array, Uint8Array> }).FixedLengthStream;
+    const value = body instanceof ReadableStream && options.size !== undefined && Fixed ? body.pipeThrough(new Fixed(options.size)) : body;
     const made = await (await this.bucket).put(key, value, {
       httpMetadata: { contentType: options.contentType || 'application/octet-stream', ...(options.cacheControl ? { cacheControl: cacheControl(options.cacheControl) } : {}) },
       ...(options.upsert === false ? { onlyIf: { etagDoesNotMatch: '*' } } : {}),
@@ -131,25 +179,26 @@ class R2 implements Backend {
     return new Response(null, { status: made ? 200 : 412 });
   }
 
-  async get(key: string, headers: Record<string, string>): Promise<Response> {
+  async get(key: string, headers: Record<string, string>, range?: ByteRange): Promise<Response> {
     const h = new Headers(headers);
-    const range = h.get('range');
-    const obj = await (await this.bucket).get(key, { onlyIf: h, ...(range ? { range: h } : {}) });
+    h.delete('range');
+    const obj = await (await this.bucket).get(key, { onlyIf: h, ...(range ? { range } : {}) });
     if (!obj) return new Response('Not found', { status: 404 });
     const out = new Headers({ etag: obj.httpEtag, 'last-modified': obj.uploaded.toUTCString(), 'accept-ranges': 'bytes' });
     obj.writeHttpMetadata(out);
     // No body: a validator matched.
     if (!('body' in obj) || !obj.body) return new Response(null, { status: 304, headers: out });
-    const r = obj.range as { offset?: number; length?: number; suffix?: number } | undefined;
-    if (range && r) {
-      const offset = r.suffix !== undefined ? obj.size - r.suffix : (r.offset ?? 0);
-      const length = r.suffix ?? r.length ?? obj.size - offset;
-      out.set('content-range', `bytes ${offset}-${offset + length - 1}/${obj.size}`);
-      out.set('content-length', String(length));
+    if (range) {
+      out.set('content-range', `bytes ${range.offset}-${range.offset + range.length - 1}/${obj.size}`);
+      out.set('content-length', String(range.length));
       return new Response(obj.body, { status: 206, headers: out });
     }
     out.set('content-length', String(obj.size));
     return new Response(obj.body, { status: 200, headers: out });
+  }
+
+  async size(key: string): Promise<number | null> {
+    return (await (await this.bucket).head(key))?.size ?? null;
   }
 
   async delete(key: string): Promise<Response> {
@@ -199,13 +248,24 @@ export class Storage implements Files {
     return { data: null, error: null };
   }
 
-  put(key: string, body: BodyInit, options: PutOptions = {}): Promise<Response> {
+  put(key: string, body: PutBody, options: PutOptions = {}): Promise<Response> {
     return unsafeKey(key) ? Promise.resolve(refused()) : this.backend.put(key, body, options);
   }
 
-  /** An object, passing on the request's Range and validators (for serving it). */
-  get(key: string, headers: Record<string, string> = {}): Promise<Response> {
-    return unsafeKey(key) ? Promise.resolve(refused()) : this.backend.get(key, headers);
+  /**
+   * An object, passing on the request's Range and validators (for serving it). A Range is checked
+   * against the object's size here (`parseRange`): one that isn't a single range gets the whole object,
+   * one past its end 416 with `Content-Range: bytes *` and the size.
+   */
+  async get(key: string, headers: Record<string, string> = {}): Promise<Response> {
+    if (unsafeKey(key)) return refused();
+    const header = Object.entries(headers).find(([h]) => h.toLowerCase() === 'range')?.[1];
+    if (!header) return this.backend.get(key, headers);
+    const size = await this.backend.size(key);
+    if (size === null) return new Response('Not found', { status: 404 });
+    const range = parseRange(header, size);
+    if (range === 'unsatisfiable') return new Response(null, { status: 416, headers: { 'content-range': `bytes */${size}`, 'accept-ranges': 'bytes' } });
+    return this.backend.get(key, headers, range ?? undefined);
   }
 
   delete(key: string): Promise<Response> {
@@ -233,9 +293,10 @@ export class Folder {
     return `${this.folder}/${path}`;
   }
 
-  async upload(path: string, body: Blob | ArrayBuffer | Uint8Array | string, options: { contentType?: string; cacheControl?: string; upsert?: boolean } = {}): Promise<Res<{ path: string }>> {
+  /** A stream's length goes in `size`; a stream is read once, so a refused upload can't be tried again. */
+  async upload(path: string, body: Blob | ArrayBuffer | Uint8Array | string | ReadableStream<Uint8Array>, options: { contentType?: string; cacheControl?: string; upsert?: boolean; size?: number } = {}): Promise<Res<{ path: string }>> {
     try {
-      const res = await this.store.put(this.key(path), body as BodyInit, { ...options, contentType: options.contentType || (body instanceof Blob ? body.type : undefined) });
+      const res = await this.store.put(this.key(path), body, { ...options, contentType: options.contentType || (body instanceof Blob ? body.type : undefined) });
       if (res.status === 412) return { data: null, error: { message: 'The resource already exists', statusCode: '409' } };
       if (!res.ok) return { data: null, error: await failed(res) };
       return { data: { path }, error: null };
@@ -248,8 +309,8 @@ export class Folder {
     try {
       const res = await this.store.get(this.key(path));
       if (!res.ok) return { data: null, error: await failed(res) };
-      const type = res.headers.get('content-type') ?? '';
-      return { data: new Blob([await res.arrayBuffer()], { type }), error: null };
+      // One copy of the file (its type from Content-Type).
+      return { data: await res.blob(), error: null };
     } catch (e) {
       return { data: null, error: { message: (e as Error).message } };
     }

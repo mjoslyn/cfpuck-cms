@@ -8,7 +8,7 @@ import { allowed, verified } from '../../../lib/sync-remote';
 
 export const POST: APIRoute = async ({ request }) => {
   const text = await request.text();
-  const check = verified(request.headers.get('x-sync-time'), request.headers.get('x-sync-signature'), text);
+  const check = await verified('/api/sync/remote', request.headers, text);
   if (!check.ok) return new Response(check.message, { status: check.status });
   let body: { query?: QuerySpec; call?: CallSpec } | null = null;
   try {

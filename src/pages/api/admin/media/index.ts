@@ -1,16 +1,38 @@
 // Upload an image (stored at YYYY/MM/name.ext with responsive sizes and AVIF/WebP copies) or a video
-// (MP4/WebM/MOV, stored as is, up to 200 MB).
+// (MP4/WebM/MOV, stored as is, up to 200 MB). Images come as a form (field `file`); a video comes as the
+// request's body (its type as Content-Type, its name in X-File-Name; src/lib/media/upload.ts) and is
+// streamed to the store as it arrives, since the Worker has 128 MB of memory. A form is read whole,
+// so it is refused over FORM_MAX_MB.
 import type { APIRoute } from 'astro';
 import { serviceClient } from '../../../../lib/db/site';
 import { MediaStore, PathTaken, processUpload } from '../../../../lib/media/process';
+import { VIDEO_MAX_MB, VIDEO_TYPES } from '../../../../lib/media/upload';
+
+const FORM_MAX_MB = 90;
+const MB = 1024 * 1024;
 
 export const POST: APIRoute = async ({ request, locals }) => {
   const db = locals.db;
-  const file = (await request.formData()).get('file');
-  if (!(file instanceof File)) return new Response('No file', { status: 400 });
-  const isVideo = ['video/mp4', 'video/webm', 'video/quicktime'].includes(file.type);
+  const sent = Number(request.headers.get('content-length') ?? NaN);
+  const rawType = (request.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase();
+  let file: { name: string; type: string; size: number; stream: () => ReadableStream<Uint8Array>; bytes: () => Promise<Uint8Array> };
+  if (VIDEO_TYPES.includes(rawType)) {
+    if (!request.body || !Number.isFinite(sent) || sent <= 0) return new Response('No file (or no Content-Length)', { status: 411 });
+    if (sent > VIDEO_MAX_MB * MB) return new Response(`Videos can be up to ${VIDEO_MAX_MB} MB (on Cloudflare's Free and Pro plans, up to 100 MB)`, { status: 413 });
+    let name = 'video';
+    try {
+      name = decodeURIComponent(request.headers.get('x-file-name') ?? '') || name;
+    } catch {}
+    const body = request.body;
+    file = { name, type: rawType, size: sent, stream: () => body, bytes: () => Promise.reject(new Error('not an image')) };
+  } else {
+    if (sent > FORM_MAX_MB * MB) return new Response(`Files can be up to ${FORM_MAX_MB} MB here`, { status: 413 });
+    const form = (await request.formData()).get('file');
+    if (!(form instanceof File)) return new Response('No file', { status: 400 });
+    file = { name: form.name, type: form.type, size: form.size, stream: () => form.stream(), bytes: async () => new Uint8Array(await form.arrayBuffer()) };
+  }
+  const isVideo = VIDEO_TYPES.includes(file.type);
   if (!file.type.startsWith('image/') && !isVideo) return new Response('Only images and videos (MP4, WebM, MOV) can be uploaded here', { status: 400 });
-  if (isVideo && file.size > 200 * 1024 * 1024) return new Response('Videos can be up to 200 MB', { status: 400 });
   const now = new Date();
   const dir = `${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
   const base = file.name.toLowerCase().replace(/[^a-z0-9.]+/g, '-').replace(/^-+|-+$/g, '');
@@ -37,8 +59,9 @@ export const POST: APIRoute = async ({ request, locals }) => {
   };
   // Another upload can take the same name between the check and the writes (parallel uploads of one
   // name): this store never writes over a stored file, and the upload goes again under the next free name.
+  // A video's body is read once, so it can't go again: that upload is refused instead.
   const store = new MediaStore(serviceClient(), undefined, true);
-  const bytes = Buffer.from(await file.arrayBuffer());
+  const bytes = isVideo ? null : await file.bytes();
   let processed;
   for (let attempt = 1; ; attempt++) {
     try {
@@ -47,10 +70,11 @@ export const POST: APIRoute = async ({ request, locals }) => {
       return new Response((e as Error).message, { status: 400 });
     }
     try {
-      if (isVideo) await store.put(path, bytes, file.type);
-      else processed = await processUpload(store, path, bytes, file.type);
+      if (bytes) processed = await processUpload(store, path, bytes, file.type);
+      else await store.put(path, file.stream(), file.type, file.size);
       break;
     } catch (e) {
+      if (e instanceof PathTaken && isVideo) return new Response('Another upload took this name at the same moment: upload the video again.', { status: 409 });
       if (e instanceof PathTaken && attempt < 5) continue;
       return new Response(`Could not ${isVideo ? 'store the video' : 'process the image'}: ${(e as Error).message}`, { status: 400 });
     }
