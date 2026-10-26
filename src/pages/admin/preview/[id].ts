@@ -52,10 +52,10 @@ async function render(db: any, id: number, origin: string, override?: { content?
 export const GET: APIRoute = async ({ params, locals, url }) => {
   const revisionId = Number(url.searchParams.get('revision')) || 0;
   if (!revisionId) return render(locals.db, Number(params.id), url.origin);
-  const { data: rev } = await locals.db.from('revisions').select('entry_id, title, content, fields, entry, created_at').eq('id', revisionId).single();
+  const { data: rev } = await locals.db.from('revisions').select('entry_id, title, content, fields, entry, created_at, saved_at').eq('id', revisionId).single();
   if (!rev || rev.entry_id !== Number(params.id)) return new Response('Revision not found', { status: 404 });
   const entry = rev.entry ?? { title: rev.title, fields: rev.fields };
-  return render(locals.db, Number(params.id), url.origin, { content: rev.content, entry }, `the version saved ${new Date(rev.created_at).toLocaleString('en-US', { timeZone: SITE_TZ, dateStyle: 'medium', timeStyle: 'short' })}`);
+  return render(locals.db, Number(params.id), url.origin, { content: rev.content, entry }, `the version saved ${new Date(rev.saved_at ?? rev.created_at).toLocaleString('en-US', { timeZone: SITE_TZ, dateStyle: 'medium', timeStyle: 'short' })}`);
 };
 
 export const POST: APIRoute = async ({ params, locals, request, url }) => {

@@ -5,6 +5,7 @@ import { sessionDb, siteDb } from './lib/db/site';
 import { isSessionCookie, refreshedCookies, sessionUser } from './lib/auth';
 import { refreshSiteTimezone } from './lib/site/timezone';
 import { changesPages, PAGE_CACHE_TAG } from './lib/cache';
+import { AUTOSAVE } from './lib/admin/revisions';
 import { env } from './lib/env';
 // Server-only work the page renderer calls (src/render/hooks.ts).
 import './lib/mailing/page-data';
@@ -25,8 +26,15 @@ function crossSite(request: Request, url: URL): boolean {
   return type === null || FORM_TYPES.some((t) => type.toLowerCase().includes(t));
 }
 
-/** What a sync request or an admin query from the browser does, for changesPages. */
+const ENTRY_SAVE = /^\/api\/admin\/entries\/\d+\/?$/;
+
+/** What a sync request, an admin query from the browser or an entry save does, for changesPages. */
 async function bodyAction(request: Request, pathname: string): Promise<string | undefined> {
+  // The editor's autosaves (drafts, so no public page changes).
+  if (request.method === 'PUT' && ENTRY_SAVE.test(pathname)) {
+    const body = await request.clone().json().catch(() => ({}));
+    return body?.autosave === true && body?.action === 'draft' ? AUTOSAVE : undefined;
+  }
   if (request.method !== 'POST') return undefined;
   if (pathname.startsWith('/api/admin/sync')) return (await request.clone().json().catch(() => ({})))?.action;
   if (pathname === '/api/admin/db' || pathname === '/api/sync/remote') {

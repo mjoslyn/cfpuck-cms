@@ -42,6 +42,9 @@ export interface EditorProps {
 }
 
 const CONTENT_MARKER = '<cms-content></cms-content>';
+/** Autosave: this long after the last edit, and at most this long after the first one not yet saved. */
+const AUTOSAVE_DELAY = 3000;
+const AUTOSAVE_MAX_WAIT = 30000;
 /** What saving compares: the page's blocks and its root props (the template's other content areas). */
 const docJson = (d: Data) => {
   // Accessibility marks save on their own as they are made (A11yPanel), so they aren't unsaved edits.
@@ -72,7 +75,33 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [revisionsVersion, setRevisionsVersion] = useState(0);
+  const [autosaving, setAutosaving] = useState(false);
   const savedJson = useRef('');
+  // The page settings as last saved (with savedJson: whether an autosave has anything left to save).
+  const savedEntry = useRef('');
+  // Autosave (a page's content, not templates: those apply to every page at once). It saves as Save
+  // draft does, so a published page's changes are kept aside and the live page stays as it is.
+  const canAutosave = useRef(false);
+  const autosaveTimer = useRef<number | undefined>(undefined);
+  const unsavedSince = useRef<number | null>(null);
+  // Set when someone else saved meanwhile: autosave stops, and a manual save asks before replacing theirs.
+  const autosaveBlocked = useRef(false);
+  // The save under way, so saves go one at a time (each sends the version the last one stored).
+  const inflight = useRef<Promise<unknown> | null>(null);
+  const saveRef = useRef<(action: 'draft', auto: boolean) => Promise<unknown>>(async () => {});
+  const scheduleAutosave = () => {
+    if (!canAutosave.current || autosaveBlocked.current) return;
+    const now = Date.now();
+    unsavedSince.current ??= now;
+    window.clearTimeout(autosaveTimer.current);
+    const wait = Math.max(0, Math.min(AUTOSAVE_DELAY, unsavedSince.current + AUTOSAVE_MAX_WAIT - now));
+    autosaveTimer.current = window.setTimeout(() => saveRef.current('draft', true), wait);
+  };
+  /** An edit to the page: unsaved until the next save, which autosave makes soon. */
+  const edited = () => {
+    setDirty(true);
+    scheduleAutosave();
+  };
   const [error, setError] = useState<string>('');
   const dataRef = useRef<Data | null>(null);
   const settingsRef = useRef<Record<string, any>>({});
@@ -156,6 +185,7 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
         setInitial(data);
         dataRef.current = data;
         savedJson.current = docJson(data);
+        canAutosave.current = true;
       } else {
         setMode('layout');
         setChrome([]);
@@ -221,6 +251,7 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
     if (savedJson.current && json !== savedJson.current) setDirty(true);
     if (json === lastJson.current) return;
     lastJson.current = json;
+    if (savedJson.current && json !== savedJson.current) scheduleAutosave();
     window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => rebuild().catch((err) => setError(String(err?.message ?? err))), 500);
   };
@@ -297,7 +328,7 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
         const updated = { ...s, ...dates, fields: next } as EntryState;
         stateRef.current = updated;
         setState(updated);
-        setDirty(true);
+        edited();
       },
       content: () => (puckRef.current?.().appState.data.content ?? []) as PuckItem[],
       apply: (items, prefix, replaceAll) => {
@@ -351,8 +382,8 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
       stateRef.current = next;
       setState(next);
     }
-    setDirty(true);
-    setStatus(`Restored the version from ${new Date(r.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}: save or publish to keep it`);
+    edited();
+    setStatus(`Restored the version from ${new Date(r.saved_at ?? r.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`);
   };
 
   /** Open the page as it will look, with the editor's current (unsaved) state, in a new tab. */
@@ -398,8 +429,30 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
     return null;
   };
 
-  /** save: templates and layout mode (apply at once); draft / publish / unpublish / discard: pages. */
-  const save = async (action: 'save' | 'draft' | 'publish' | 'unpublish' | 'discard') => {
+  /**
+   * save: templates and layout mode (apply at once); draft / publish / unpublish / discard: pages.
+   * auto: an autosave (a draft), recorded in the history as part of the current stretch of edits rather
+   * than as a checkpoint; it never asks anything, and stops if someone else saved meanwhile.
+   */
+  const save = async (action: 'save' | 'draft' | 'publish' | 'unpublish' | 'discard', auto = false) => {
+    window.clearTimeout(autosaveTimer.current);
+    if (auto && autosaveBlocked.current) return;
+    const before = inflight.current;
+    let done!: () => void;
+    const mine = new Promise<void>((r) => (done = r));
+    inflight.current = mine;
+    await before?.catch(() => {});
+    try {
+      await saveNow(action, auto);
+    } finally {
+      done();
+      if (inflight.current === mine) inflight.current = null;
+    }
+  };
+  const saveNow = async (action: 'save' | 'draft' | 'publish' | 'unpublish' | 'discard', auto: boolean) => {
+    // Nothing left to autosave (a save that ran meanwhile took it).
+    if (auto && savedJson.current === docJson((puckRef.current?.().appState.data as Data | undefined) ?? dataRef.current!) && savedEntry.current === JSON.stringify(stateRef.current)) return;
+    unsavedSince.current = null;
     let data = (puckRef.current?.().appState.data as Data | undefined) ?? dataRef.current!;
     // A template's Page content blocks each show their own area: a repeat gets the next free name.
     if (template || mode === 'layout') {
@@ -413,23 +466,36 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
     const sentContent = docJson(data);
     const sentEntry = JSON.stringify(stateRef.current);
     const dirtyBefore = dirty;
-    setSaving(true);
+    if (auto) setAutosaving(true);
+    else setSaving(true);
     setStatus(action === 'publish' ? 'Publishing…' : action === 'discard' ? 'Discarding…' : 'Saving…');
     // Linked patterns are stored as a reference plus this page's content changes.
     const { data: stored, detached } = await collapseLinkedPatterns(data);
     const body = template
       ? { kind: template.kind, slug: template.slug, content: stored }
       : mode === 'content'
-        ? action === 'discard' || action === 'unpublish' ? { action } : { action, content: stored, entry: stateRef.current, ...restoredNote(stored) }
+        ? action === 'discard' || action === 'unpublish' ? { action } : { action, content: stored, entry: stateRef.current, ...restoredNote(stored), ...(auto ? { autosave: true } : {}) }
         : { action: 'save', entry: stateRef.current, template: { kind: 'template', slug: templateSlug, content: stored } };
     const url = template ? '/api/admin/templates' : `/api/admin/entries/${entryId}`;
     const put = (bases: object) => fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, ...bases }) });
-    let res = await put({ base: baseRef.current, templateBase: tplBaseRef.current });
-    // Someone else saved it meanwhile: say so, and overwrite only if asked.
+    let res = await put({ base: baseRef.current, templateBase: tplBaseRef.current }).catch(() => null);
+    if (auto) setAutosaving(false);
+    if (!res) {
+      setSaving(false);
+      return setStatus(auto ? 'Not autosaved: no connection. It will try again after your next edit.' : 'Not saved: no connection.');
+    }
+    // Someone else saved it meanwhile. An autosave stops there; a save says so, and overwrites only if asked.
+    if (res.status === 409 && auto) {
+      autosaveBlocked.current = true;
+      return setStatus('Not autosaved: someone else saved this since you opened it. Save to choose whose version to keep.');
+    }
     if (res.status === 409 && window.confirm(`${await res.text()}\n\nSaving now replaces their version with yours. To see theirs first, cancel and reload the page (your unsaved changes here will be lost).\n\nSave anyway?`)) res = await put({});
     setSaving(false);
     if (res.status === 409) return setStatus('Not saved: someone else saved this since you opened it.');
-    if (!res.ok) return setStatus(`Not saved: ${await res.text()}`);
+    if (!res.ok) {
+      return setStatus(`${auto ? 'Not autosaved' : 'Not saved'}: ${await res.text()}`);
+    }
+    autosaveBlocked.current = false;
     if (action === 'discard') return location.reload();
     const r = await res.json().catch(() => ({}));
     const nowData = (puckRef.current?.().appState.data as Data | undefined) ?? dataRef.current!;
@@ -446,18 +512,25 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
     if (mode === 'content' && !template) setPending(r.pending ? new Date().toISOString() : null);
     // Unpublish sends no content: edits not saved before stay unsaved. Otherwise what was sent is saved,
     // and anything changed while the save ran is not.
-    if (action === 'unpublish') setDirty(dirtyBefore);
+    if (action === 'unpublish') {
+      setDirty(dirtyBefore);
+      if (dirtyBefore) scheduleAutosave();
+    }
     else {
       savedJson.current = sentContent;
+      savedEntry.current = sentEntry;
       setDirty(changedSince);
+      if (changedSince) scheduleAutosave();
     }
-    restoredRef.current = null;
+    // A restored version is noted on each autosave and on the checkpoint that keeps it.
+    if (!auto) restoredRef.current = null;
     setRevisionsVersion((v) => v + 1);
     const time = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
     const warned = r.warning ? ` ${r.warning}` : '';
     const note = warned + (detached ? ` ${detached === 1 ? 'A linked pattern whose blocks were changed was' : `${detached} linked patterns whose blocks were changed were`} saved as an ordinary copy.` : '');
-    setStatus((action === 'publish' ? `Published ${time}` : action === 'unpublish' ? `Unpublished ${time}` : action === 'draft' ? `Draft saved ${time}` : `Saved ${time}`) + note);
+    setStatus((auto ? `Autosaved ${time}` : action === 'publish' ? `Published ${time}` : action === 'unpublish' ? `Unpublished ${time}` : action === 'draft' ? `Draft saved ${time}` : `Saved ${time}`) + note);
   };
+  saveRef.current = save;
 
   if (error) return <p className="p-8 text-[#c4592a]">{error}</p>;
   if (!initial || !env) return <p className="p-8 text-admin-muted">Loading editor…</p>;
@@ -479,7 +552,7 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
     <EnvContext.Provider value={env}>
       <RevisionsContext.Provider value={{ entryId: entry?.id ?? null, version: revisionsVersion, contentMode: mode === 'content' && !!entry, restore }}>
       <A11yMarksContext.Provider value={{ save: saveA11yMarks, quiet: () => (marksOnly.current = true) }}>
-      <ViewContext.Provider value={{ env, chrome, sources: admin ? templateSlug : null, form: { type: entry?.type ?? '', state, setState: (v) => { stateRef.current = v; setState(v); setDirty(true); }, templates } }}>
+      <ViewContext.Provider value={{ env, chrome, sources: admin ? templateSlug : null, form: { type: entry?.type ?? '', state, setState: (v) => { stateRef.current = v; setState(v); edited(); }, templates } }}>
       <Puck
         config={config}
         data={initial}
@@ -500,7 +573,7 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
                 <span className="flex items-center gap-2 whitespace-nowrap text-xs text-admin-muted">
                   <span className={`rounded-full px-2 py-0.5 ${liveStatus === 'publish' ? 'bg-[#6db56d]/15 text-[#3f7a3f]' : 'bg-admin-muted/10'}`}>{liveStatus === 'publish' ? 'Published' : 'Draft'}</span>
                   {liveStatus === 'publish' && pending && !dirty && <span title={`Saved ${new Date(pending).toLocaleString()}`}>Unpublished changes</span>}
-                  {dirty && <span className="text-admin-accent">{status.startsWith('Restored') ? status : 'Unsaved changes'}</span>}
+                  {dirty && <span className="text-admin-accent">{autosaving ? 'Saving…' : status.startsWith('Restored') || status.startsWith('Not ') ? status : 'Unsaved changes'}</span>}
                   {!dirty && status && <span>{status}</span>}
                   {liveStatus === 'publish' && pending && (
                     <button type="button" className="underline hover:text-[#c4592a]" onClick={() => confirm('Discard the unpublished changes and go back to the live page?') && save('discard')}>
@@ -622,20 +695,24 @@ function PuckBridge({ into, onSelect }: { into: { current: ReturnType<typeof use
  */
 const IFRAME = { enabled: true, syncHostStyles: false, waitForStyles: true };
 
-interface RevisionRow { id: number; created_at: string; action: string | null; title: string; author_id: string | null; content: Data | null; entry: EntryState | null; fields: Record<string, any> | null; restored_from: number | null; restored_edited: boolean | null }
+interface RevisionRow { id: number; created_at: string; saved_at: string | null; action: string | null; title: string; author_id: string | null; content: Data | null; entry: EntryState | null; fields: Record<string, any> | null; restored_from: number | null; restored_edited: boolean | null }
 interface RevisionsApi { entryId: number | null; version: number; contentMode: boolean; restore: (r: RevisionRow) => void }
 const RevisionsContext = createContext<RevisionsApi | null>(null);
-const ACTIONS: Record<string, string> = { draft: 'Draft saved', publish: 'Published', unpublish: 'Unpublished', save: 'Saved' };
+const ACTIONS: Record<string, string> = { draft: 'Draft saved', publish: 'Published', unpublish: 'Unpublished', save: 'Saved', autosave: 'Autosaved' };
 
-/** Left rail: saved versions of this page, newest first, to preview or restore. */
+/**
+ * Left rail: saved versions of this page, newest first, to preview or restore. Manual saves (Save draft,
+ * Publish...) are checkpoints; autosaves in between show as one version per stretch of editing.
+ */
 function RevisionsPanel() {
   const api = useContext(RevisionsContext);
   const [rows, setRows] = useState<RevisionRow[] | null>(null);
   const [names, setNames] = useState<Record<string, string>>({});
+  const [checkpointsOnly, setCheckpointsOnly] = useState(false);
   useEffect(() => {
     if (!api?.entryId) return;
     const db = browserClient();
-    db.from('revisions').select('id, created_at, action, title, author_id, content, entry, fields, restored_from, restored_edited').eq('entry_id', api.entryId).order('created_at', { ascending: false }).limit(50)
+    db.from('revisions').select('id, created_at, saved_at, action, title, author_id, content, entry, fields, restored_from, restored_edited').eq('entry_id', api.entryId).order('id', { ascending: false }).limit(50)
       .then(async ({ data }) => {
         setRows((data ?? []) as RevisionRow[]);
         const ids = [...new Set((data ?? []).map((r) => r.author_id).filter(Boolean))];
@@ -647,43 +724,60 @@ function RevisionsPanel() {
   }, [api?.entryId, api?.version]);
   if (!api?.entryId) return <p className="p-4 text-sm text-admin-muted">Templates have no revisions.</p>;
   if (!rows) return <p className="p-4 text-sm text-admin-muted">Loading…</p>;
-  if (!rows.length) return <p className="p-4 text-sm text-admin-muted">No saved versions yet. Each Save draft or Publish adds one.</p>;
+  if (!rows.length) return <p className="p-4 text-sm text-admin-muted">No saved versions yet. Your edits save as you go; Save draft and Publish add checkpoints.</p>;
   const when = (s: string) => new Date(s).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: SITE_TZ });
+  const time = (s: string) => new Date(s).toLocaleString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: SITE_TZ });
+  const isAuto = (r: RevisionRow) => r.action === 'autosave';
+  const shown = checkpointsOnly ? rows.filter((r) => !isAuto(r)) : rows;
   return (
-    <ol className="divide-y divide-admin-ink/10 text-sm">
-      {rows.map((r, i) => (
-        <li key={r.id} className="px-3 py-2.5">
-          <div className="flex items-baseline gap-2">
-            <span className="font-medium">{when(r.created_at)}</span>
-            {i === 0 && <span className="text-[11px] text-admin-muted">latest</span>}
-          </div>
-          <div className="text-xs text-admin-muted">
-            {ACTIONS[r.action ?? ''] ?? 'Saved'}
-            {r.author_id && names[r.author_id] ? ` by ${names[r.author_id]}` : ''}
-            {r.title ? ` · ${r.title}` : ''}
-          </div>
-          {r.restored_from && (
-            <div className="mt-0.5 text-xs text-[#8a5a1f]">
-              Restored from {(() => {
-                const from = rows.find((x) => x.id === r.restored_from);
-                return from ? when(from.created_at) : 'an earlier version';
-              })()}
-              {r.restored_edited ? ', then edited' : ''}
-            </div>
-          )}
-          <div className="mt-1 flex gap-3 text-xs">
-            <a href={`/admin/preview/${api.entryId}/?revision=${r.id}`} target="_blank" rel="noopener" className="text-admin-muted underline hover:text-admin-accent">
-              Preview
-            </a>
-            {api.contentMode && r.content && (
-              <button type="button" className="text-admin-muted underline hover:text-admin-accent" onClick={() => api.restore(r)}>
-                Restore
-              </button>
-            )}
-          </div>
-        </li>
-      ))}
-    </ol>
+    <div className="text-sm">
+      <label className="flex items-center gap-2 border-b border-admin-ink/10 px-3 py-2 text-xs text-admin-muted">
+        <input type="checkbox" checked={checkpointsOnly} onChange={(e) => setCheckpointsOnly(e.target.checked)} />
+        Checkpoints only
+      </label>
+      {!shown.length && <p className="p-4 text-admin-muted">No checkpoints yet. Save draft or Publish adds one.</p>}
+      <ol className="divide-y divide-admin-ink/10">
+        {shown.map((r) => {
+          const at = r.saved_at ?? r.created_at;
+          // An autosave covering more than a minute of edits says when they began.
+          const since = isAuto(r) && Date.parse(at) - Date.parse(r.created_at) > 60_000 ? ` (edits since ${time(r.created_at)})` : '';
+          return (
+            <li key={r.id} className={`px-3 py-2.5 ${isAuto(r) ? '' : 'border-l-2 border-admin-accent'}`}>
+              <div className="flex items-baseline gap-2">
+                <span className={isAuto(r) ? 'text-admin-muted' : 'font-medium'}>{when(at)}</span>
+                {!isAuto(r) && <span className="rounded-full bg-admin-accent/10 px-1.5 text-[11px] text-admin-accent">Checkpoint</span>}
+                {r.id === rows[0].id && <span className="text-[11px] text-admin-muted">latest</span>}
+              </div>
+              <div className="text-xs text-admin-muted">
+                {ACTIONS[r.action ?? ''] ?? 'Saved'}
+                {since}
+                {r.author_id && names[r.author_id] ? ` by ${names[r.author_id]}` : ''}
+                {r.title ? ` · ${r.title}` : ''}
+              </div>
+              {r.restored_from && (
+                <div className="mt-0.5 text-xs text-[#8a5a1f]">
+                  Restored from {(() => {
+                    const from = rows.find((x) => x.id === r.restored_from);
+                    return from ? when(from.saved_at ?? from.created_at) : 'an earlier version';
+                  })()}
+                  {r.restored_edited ? ', then edited' : ''}
+                </div>
+              )}
+              <div className="mt-1 flex gap-3 text-xs">
+                <a href={`/admin/preview/${api.entryId}/?revision=${r.id}`} target="_blank" rel="noopener" className="text-admin-muted underline hover:text-admin-accent">
+                  Preview
+                </a>
+                {api.contentMode && r.content && (
+                  <button type="button" className="text-admin-muted underline hover:text-admin-accent" onClick={() => api.restore(r)}>
+                    Restore
+                  </button>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
   );
 }
 

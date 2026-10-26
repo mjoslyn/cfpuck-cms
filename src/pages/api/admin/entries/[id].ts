@@ -7,6 +7,7 @@ import { redirectMovedEntry } from '../../../../lib/redirects';
 import { siteDb } from '../../../../lib/db/site';
 import { uniqueAreas } from '../../../../lib/content/areas';
 import { taxonomiesOf } from '../../../../lib/site';
+import { recordRevision } from '../../../../lib/admin/revisions';
 
 /**
  * Save an entry. Body: { action, content?, entry?, template? }.
@@ -18,14 +19,19 @@ import { taxonomiesOf } from '../../../../lib/site';
  * - save (default): save in place with the status in `entry` (venue forms, template layout mode; on a
  *   published page with changes kept aside, layout mode's settings join those changes instead).
  * Going live, or a new address, is refused when another type's entry at the same URL has the address.
+ * `autosave` (with draft only): the editor saving as it goes. Its version joins the current stretch of
+ * autosaves (recordRevision), a placeholder address stays one (the title may be half typed), and the
+ * middleware leaves the page cache alone, since a draft changes no public page.
  */
 /**
  * The slug to store: the one given, cleaned; but while it is the "New ..." placeholder, or empty, one
- * made from the title (unique within the type), so a page never goes live at /new-page-m1ab2c/.
+ * made from the title (unique within the type), so a page never goes live at /new-page-m1ab2c/. An
+ * autosave leaves it as it is: the title may be half typed.
  */
-async function entrySlug(db: any, current: { id: number; type: string; slug: string }, e: { slug?: string; title?: string }): Promise<string> {
+async function entrySlug(db: any, current: { id: number; type: string; slug: string }, e: { slug?: string; title?: string }, autosave = false): Promise<string> {
   const given = slugify(String(e.slug ?? ''));
   if (!isPlaceholderSlug(given, current.type)) return given;
+  if (autosave) return given || current.slug;
   const fromTitle = slugify(String(e.title ?? ''));
   if (fromTitle) return uniqueSlug(db, current.type, fromTitle, current.id);
   return given || current.slug;
@@ -36,6 +42,7 @@ export const PUT: APIRoute = async ({ params, request, locals }) => {
   const id = Number(params.id);
   const body = await request.json();
   const action: string = body.action ?? 'save';
+  const autosave = body.autosave === true && action === 'draft';
   // Set when this save keeps an earlier version the editor restored.
   const restored = Number(body.restoredFrom) > 0 ? { restored_from: Number(body.restoredFrom), restored_edited: !!body.restoredEdited } : {};
   const { data: current, error: readErr } = await db.from('entries').select('id, type, slug, title, status, content, fields, excerpt, updated_at').eq('id', id).single();
@@ -59,8 +66,9 @@ export const PUT: APIRoute = async ({ params, request, locals }) => {
     const draft = { content: body.content ?? pending?.content ?? current.content, entry: body.entry ?? pending?.entry ?? null };
     const { error } = await db.from('entry_drafts').upsert({ entry_id: id, draft }).then((r) => (r.error ? r : db.from('entries').update({ draft_saved_at: new Date().toISOString() }).eq('id', id)));
     if (error) return new Response(error.message, { status: 400 });
-    await db.from('revisions').insert({ entry_id: id, title: body.entry?.title ?? current.title, content: draft.content, fields: body.entry?.fields ?? current.fields, entry: draft.entry, action: 'draft', author_id: locals.user.id, ...restored });
-    return Response.json({ ok: true, status: 'publish', pending: true, updated_at: await stamp() });
+    const { error: revErr } = await recordRevision(db, { entry_id: id, title: body.entry?.title ?? current.title, content: draft.content, fields: body.entry?.fields ?? current.fields, entry: draft.entry, action: 'draft', author_id: locals.user.id, ...restored }, autosave);
+    if (revErr) console.error(`entry ${id}: revision not saved: ${revErr.message}`);
+    return Response.json({ ok: true, status: 'publish', pending: true, updated_at: await stamp(), ...(revErr ? { warning: REVISION_WARNING } : {}) });
   }
 
   // The template being edited in layout mode, saved with the page's settings.
@@ -79,8 +87,9 @@ export const PUT: APIRoute = async ({ params, request, locals }) => {
     if (error) return new Response(error.message, { status: 400 });
     const tpl = await saveTemplate();
     if (tpl instanceof Response) return tpl;
-    await db.from('revisions').insert({ entry_id: id, title: body.entry?.title ?? current.title, content: draft.content, fields: body.entry?.fields ?? current.fields, entry: draft.entry, action: 'draft', author_id: locals.user.id });
-    return Response.json({ ok: true, status: 'publish', pending: true, updated_at: await stamp(), templateUpdatedAt: tpl.updated_at });
+    const { error: revErr } = await recordRevision(db, { entry_id: id, title: body.entry?.title ?? current.title, content: draft.content, fields: body.entry?.fields ?? current.fields, entry: draft.entry, action: 'draft', author_id: locals.user.id }, false);
+    if (revErr) console.error(`entry ${id}: revision not saved: ${revErr.message}`);
+    return Response.json({ ok: true, status: 'publish', pending: true, updated_at: await stamp(), templateUpdatedAt: tpl.updated_at, ...(revErr ? { warning: REVISION_WARNING } : {}) });
   }
 
   // Everything else writes the entry itself. Unpublish without new content applies pending changes.
@@ -95,7 +104,7 @@ export const PUT: APIRoute = async ({ params, request, locals }) => {
     Object.assign(patch, {
       title: e.title,
       title_rendered: renderedTitle(e.title ?? ''),
-      slug: await entrySlug(db, current, e),
+      slug: await entrySlug(db, current, e, autosave),
       ...('excerpt' in e || newContent ? { excerpt: e.excerpt ?? current.excerpt ?? '', excerpt_rendered: renderedExcerpt(e.excerpt ?? current.excerpt ?? '', content?.content) } : {}),
       ...('template' in e ? { template: e.template || null } : {}),
       ...('fields' in e ? { fields: e.fields ?? {} } : {}),
@@ -142,8 +151,10 @@ export const PUT: APIRoute = async ({ params, request, locals }) => {
   const tpl = await saveTemplate();
   if (tpl instanceof Response) return tpl;
   const templateUpdatedAt = tpl.updated_at;
-  const { error: revErr } = await db.from('revisions').insert({ entry_id: id, title: patch.title ?? current.title, content: patch.content ?? current.content, fields: patch.fields ?? current.fields, entry: Object.keys(e).length ? e : null, action, author_id: locals.user.id, ...restored });
+  const { error: revErr } = await recordRevision(db, { entry_id: id, title: patch.title ?? current.title, content: patch.content ?? current.content, fields: patch.fields ?? current.fields, entry: Object.keys(e).length ? e : null, action, author_id: locals.user.id, ...restored }, autosave);
   // The entry is saved either way; a version that couldn't be kept is said, not hidden.
   if (revErr) console.error(`entry ${id}: revision not saved: ${revErr.message}`);
-  return Response.json({ ok: true, status, pending: false, ...(patch.slug ? { slug: patch.slug } : {}), updated_at: await stamp(), templateUpdatedAt, ...(revErr ? { warning: 'Saved, but this version could not be added to the history.' } : {}) });
+  return Response.json({ ok: true, status, pending: false, ...(patch.slug ? { slug: patch.slug } : {}), updated_at: await stamp(), templateUpdatedAt, ...(revErr ? { warning: REVISION_WARNING } : {}) });
 };
+
+const REVISION_WARNING = 'Saved, but this version could not be added to the history.';

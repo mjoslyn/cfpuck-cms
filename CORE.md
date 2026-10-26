@@ -1002,7 +1002,15 @@ accent (`src/styles/admin.css`). The admin uses the system font (`--font-admin`)
 
 Saving: **Save draft** keeps changes to a published page aside (table `entry_drafts`, editors only:
 like everything else, they're read as the editor, `locals.db`) with the live page
-unchanged; unpublished pages save in place as drafts. **Publish** / **Publish changes** makes them live;
+unchanged; unpublished pages save in place as drafts. **Autosave**: a page's content and settings
+save the same way 3 seconds after the last edit (at most 30 seconds after the first unsaved one), sent
+as `autosave` with the draft, which the middleware doesn't purge the page cache for and which leaves a
+placeholder address as it is; a 409 stops autosave until a manual save, and saves go one at a time.
+Templates and layout mode don't autosave. Saved versions are in `revisions`, listed in the editor's
+Revisions panel (preview, restore): each manual save is a checkpoint, a row of its own; autosaves
+between them keep one row, written over while it is the same person's and begun less than ten minutes
+ago (`recordRevision`, `src/lib/admin/revisions.ts`; `created_at` when the stretch began, `saved_at`
+its latest write). **Publish** / **Publish changes** makes them live;
 the header also offers Discard changes and Unpublish (`PUT /api/admin/entries/:id` with `action`).
 **Preview** opens `/admin/preview/<id>/` with the editor's current state (POST) or the saved draft
 (GET), rendered like the site with a preview bar and noindex. Templates and layout mode have no drafts:

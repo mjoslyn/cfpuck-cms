@@ -23,7 +23,8 @@ const SYNC_WRITES = ['apply', 'restoreBackup'];
 
 /**
  * Whether an admin request changes what the public pages show. `action`: a sync request's action, or
- * for the admin's queries from the browser (/api/admin/db) the query's (`select` reads; a call reads).
+ * for the admin's queries from the browser (/api/admin/db) the query's (`select` reads; a call reads),
+ * for an entry save `autosave` when it is one.
  */
 export function changesPages(method: string, pathname: string, action?: string): boolean {
   if (['GET', 'HEAD', 'OPTIONS'].includes(method)) return false;
@@ -32,6 +33,8 @@ export function changesPages(method: string, pathname: string, action?: string):
   if (!pathname.startsWith('/api/admin/')) return false;
   if (pathname.endsWith('/notification-preview') || NO_PURGE.some((p) => pathname.startsWith(p))) return false;
   if (pathname.startsWith('/api/admin/sync')) return SYNC_WRITES.includes(action ?? '');
+  // The editor's autosaves are drafts: kept aside on a published page, or a page not on the site.
+  if (pathname.startsWith('/api/admin/entries/') && action === 'autosave') return false;
   if (pathname === '/api/admin/db') return !!action && action !== 'select' && action !== 'call';
   return true;
 }

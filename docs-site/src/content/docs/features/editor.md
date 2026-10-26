@@ -62,6 +62,14 @@ with `types` are offered only on those entry types. A **Compose** panel docks be
   (GET), rendered like the site with a preview bar and noindex.
 - If someone else saved the page (or template) since you opened it, your save is refused and the
   editor asks whether to save over their version; cancel and reload to see theirs first.
+- **Autosave**: a page's content and settings save as a draft 3 seconds after the last edit (at most
+  30 seconds after the first unsaved one), as Save draft does, so a published page's live version
+  stays as it is. Autosaves don't clear the page cache, and a placeholder address stays one until a
+  manual save. If someone else saved meanwhile, autosave stops and the next manual save asks.
+  Templates and layout mode don't autosave: their changes apply to every page using them.
+- **Revisions** (left rail): the page's saved versions, to preview or restore. Each manual save
+  (Save draft, Publish, Unpublish) is a **checkpoint**; autosaves between them keep one version per
+  ten minutes of editing (`src/lib/admin/revisions.ts`). **Checkpoints only** hides the autosaves.
 
 A published entry whose address changes gets a redirect from the old one automatically.
 
