@@ -64,6 +64,7 @@ const MESSAGES: Record<string, string> = {
   pending: 'Thanks! Your account is waiting for approval; we’ll let you know.',
   confirm: 'Thanks! Check your email for a link to confirm your address.',
   'password-saved': 'Your password is saved.',
+  'confirmed-other': 'That email address is confirmed. You’re still signed in to this account: sign out to sign in with that one.',
 };
 
 

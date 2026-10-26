@@ -6,7 +6,7 @@
 // bcrypt; they are checked as such and rehashed (scrypt) the next time their owner signs in.
 import { betterAuth } from 'better-auth';
 import { APIError, createEmailVerificationToken } from 'better-auth/api';
-import { hashPassword, verifyPassword } from 'better-auth/crypto';
+import { hashPassword, verifyJWT, verifyPassword } from 'better-auth/crypto';
 import bcrypt from 'bcryptjs';
 import { randomBytes } from 'node:crypto';
 import { lazyD1 } from '../db/d1';
@@ -71,7 +71,13 @@ function makeAuth() {
       modelName: 'verifications',
       fields: { expiresAt: 'expires_at', createdAt: 'created_at', updatedAt: 'updated_at' },
     },
-    advanced: { cookiePrefix: COOKIE_PREFIX, database: { generateId: () => crypto.randomUUID() } },
+    advanced: {
+      cookiePrefix: COOKIE_PREFIX,
+      // Secure cookies (`__Secure-site.session_token`) outside astro dev, whatever the base URL: without
+      // SITE_URL it is the localhost one, by which Better Auth would set them without Secure on an https site.
+      useSecureCookies: import.meta.env?.DEV ? undefined : true,
+      database: { generateId: () => crypto.randomUUID() },
+    },
     databaseHooks: {
       // Every account has a profile (its role: viewer until an admin changes it).
       user: {
@@ -288,6 +294,12 @@ export async function passwordToken(userId: string, hours = PASSWORD_LINK_HOURS)
   return token;
 }
 
+/** End every password token an account has (a new invitation replaces the old one's; a password set ends the rest). */
+export async function spendPasswordTokens(userId: string): Promise<void> {
+  const { error } = await siteDb().from('verifications').delete().like('identifier', 'reset-password:*').eq('value', userId);
+  if (error) throw new Error(error.message);
+}
+
 /** The account a password token is for, while it is good. */
 export async function passwordTokenUser(token: string | null) {
   if (!token || !/^[A-Za-z0-9_-]{20,64}$/.test(token)) return null;
@@ -309,6 +321,7 @@ export async function setPasswordWithToken(token: string, password: string, requ
     return { ok: false, error: e instanceof APIError ? e.message : 'That link has expired or was already used. Ask for a new one.' };
   }
   await updateUser(user.id, { invite: null, email_verified: true });
+  await spendPasswordTokens(user.id);
   // The link reached their inbox: failed sign-ins before it don't hold them back.
   await clearAttempts('sign-in', user.email);
   return signIn(user.email, password, request, false);
@@ -320,8 +333,22 @@ export async function confirmToken(email: string): Promise<string> {
   return createEmailVerificationToken(ctx.secret, email, undefined, 24 * 3600);
 }
 
-/** Confirm an address from its link: signs the account in (its cookies), or null for a bad link. */
-export async function confirmAddress(token: string, request: Request): Promise<string[] | null> {
+/**
+ * Confirm an address from its link, or null for a bad link. It signs the account in (its cookies) only
+ * when nobody else is signed in on this browser: with another account signed in, the address is confirmed
+ * and that session is left alone (`other`), so a link someone sends can't sign the visitor in as them.
+ */
+export async function confirmAddress(token: string, request: Request): Promise<{ cookies: string[]; other: boolean } | null> {
+  const current = await sessionUser(request);
+  if (current) {
+    const payload = await verifyJWT(token, (await context()).secret);
+    const user = typeof payload?.email === 'string' && !payload.updateTo ? await userByEmail(payload.email) : null;
+    if (!user) return null;
+    if (user.id !== current.id) {
+      if (!user.emailVerified) await updateUser(user.id, { email_verified: true });
+      return { cookies: [], other: true };
+    }
+  }
   const res = await auth().api.verifyEmail({ query: { token }, headers: request.headers, asResponse: true }).catch(() => null);
-  return res && res.status < 400 ? cookiesOf(res) : null;
+  return res && res.status < 400 ? { cookies: cookiesOf(res), other: false } : null;
 }
