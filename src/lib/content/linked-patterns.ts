@@ -3,8 +3,9 @@
 // stores the reference and only the content it changed:
 //   { type: 'pattern', props: { id, attrs: { slug, linked: true, overrides: { <block id>: { content: ... } } } } }
 // The block ids are the pattern's own. In the editor the reference is expanded into a container of
-// the pattern's blocks (attrs.expanded), each marked with the pattern block it came from (attrs.__src);
-// saving collapses it back. A pattern is offered as linked when its root props say so (linked: true).
+// the pattern's blocks (attrs.expanded), each marked with the pattern block it came from (attrs.__src),
+// with the content as it was expanded (attrs.__as) and the page's overrides then (attrs.__overrides);
+// saving collapses it back, recording only the content the editor changed. A pattern is offered as linked when its root props say so (linked: true).
 import type { PuckItem } from '../puck/types';
 import { eachBlock, mapBlocks } from '../puck/tree';
 
@@ -63,9 +64,15 @@ export function expandLinked(instance: PuckItem, patternItems: PuckItem[]): Puck
   const prefix = instance.props.id;
   const mark = (list: PuckItem[]) => mapBlocks(list, (i) => ({ type: i.type, props: { ...i.props, id: `${prefix}-${i.props.id}`, attrs: { ...(i.props.attrs ?? {}), __src: i.props.id } } }));
   const { overrides, ...attrs } = instance.props.attrs ?? {};
+  const shown = applyOverrides(patternItems, overrides as Overrides | undefined);
+  // The content as expanded, so saving can tell the editor's changes from changes to the pattern since.
+  const as: Overrides = {};
+  eachBlock(shown, (i) => {
+    for (const key of contentKeys(i.type)) (as[i.props.id] ??= {})[key] = (i.props.attrs as any)?.[key] ?? null;
+  });
   return {
     type: 'pattern',
-    props: { id: prefix, attrs: { ...attrs, linked: true, expanded: true }, children: mark(applyOverrides(patternItems, overrides as Overrides | undefined)) },
+    props: { id: prefix, attrs: { ...attrs, linked: true, expanded: true, __as: as, ...(overrides ? { __overrides: overrides } : {}) }, children: mark(shown) },
   };
 }
 
@@ -90,16 +97,24 @@ export function collapseLinked(container: PuckItem, patternItems: PuckItem[]): {
   if (flatIds(children, true).join() !== flatIds(patternItems, false).join()) return { item: container, detached: unmark(children) };
   const original = new Map<string, PuckItem>();
   eachBlock(patternItems, (i) => original.set(i.props.id, i));
+  const { expanded, overrides: _old, __as, __overrides, ...attrs } = (container.props.attrs ?? {}) as Record<string, unknown>;
+  const as = __as as Overrides | undefined;
+  const before = (__overrides ?? {}) as Overrides;
+  const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
   const overrides: Overrides = {};
   eachBlock(children, (i) => {
     const src = String((i.props.attrs as any)?.__src);
     const was = original.get(src)?.props.attrs ?? {};
     for (const key of contentKeys(i.type)) {
-      const now = (i.props.attrs as any)?.[key];
-      if (JSON.stringify(now ?? null) !== JSON.stringify((was as any)[key] ?? null)) (overrides[src] ??= {})[key] = now ?? null;
+      let now = (i.props.attrs as any)?.[key];
+      // Content the editor left as expanded keeps what the page had: its override, else the pattern as it is now.
+      if (as?.[src] && key in as[src] && same(now, as[src][key])) {
+        if (!(key in (before[src] ?? {}))) continue;
+        now = before[src][key];
+      }
+      if (!same(now, (was as any)[key])) (overrides[src] ??= {})[key] = now ?? null;
     }
   });
-  const { expanded, overrides: _old, ...attrs } = (container.props.attrs ?? {}) as Record<string, unknown>;
   return {
     item: { type: 'pattern', props: { id: container.props.id, attrs: { ...attrs, linked: true, ...(Object.keys(overrides).length ? { overrides } : {}) } } },
   };

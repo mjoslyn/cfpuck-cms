@@ -38,6 +38,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
         : await db.from('entry_terms').delete().eq('term_id', term.id).in('entry_id', affected);
       if (e) return new Response(e.message, { status: 400 });
     }
+    const touched = new Set(affected);
     // Tags also live in unpublished changes kept aside (publishing them sets the tags): keep those in step.
     if (term.taxonomy === 'tag') {
       const { data: drafts } = await db.from('entry_drafts').select('entry_id, draft').in('entry_id', ids);
@@ -49,7 +50,13 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
         if (next.length === tags.length && adding === tags.includes(term.name)) continue;
         const { error: e } = await db.from('entry_drafts').update({ draft: { ...(d.draft as any), entry: { ...entry, tags: next } } }).eq('entry_id', d.entry_id);
         if (e) return new Response(e.message, { status: 400 });
+        touched.add(d.entry_id);
       }
+    }
+    // A new version of each entry changed, so an editor with one open is asked before a save puts its terms back.
+    if (touched.size) {
+      const { error: e } = await db.from('entries').update({ updated_at: new Date().toISOString() }).in('id', [...touched]);
+      if (e) return new Response(e.message, { status: 400 });
     }
     const n = affected.length;
     const already2 = ids.length - n;

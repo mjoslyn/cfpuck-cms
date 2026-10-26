@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { Puck, blocksPlugin, createUsePuck, outlinePlugin, useGetPuck, type Data } from '@puckeditor/core';
 import Composer, { type LivePage, type Selection } from '../admin/Composer';
 import { isComposed } from '../lib/compose/outline';
-import { findBlock, replaceBlock } from '../lib/puck/tree';
+import { locateInDoc, replaceInDoc } from '../lib/puck/tree';
 import '@puckeditor/core/no-external.css'; // without its Inter webfont: the admin uses the system font
 import { SITE_TZ, taxonomiesOf } from '../lib/site';
 import { browserClient } from '../lib/db/browser';
@@ -320,7 +320,8 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
         const get = puckRef.current;
         if (!get) return;
         const { appState, dispatch } = get();
-        dispatch({ type: 'setData', data: { ...appState.data, content: replaceBlock(appState.data.content as PuckItem[], id, items) as Data['content'] }, recordHistory: true });
+        // Anywhere on the page: its content or one of the template's other content areas.
+        dispatch({ type: 'setData', data: replaceInDoc(appState.data as Data & { content: unknown }, id, items) as Data, recordHistory: true });
       },
     }),
     [],
@@ -607,11 +608,11 @@ function AreaSlot({ area, Slot }: { area: string; Slot: unknown }) {
 function PuckBridge({ into, onSelect }: { into: { current: ReturnType<typeof useGetPuck> | null }; onSelect: (s: Selection | null) => void }) {
   into.current = useGetPuck();
   const selectedId = usePuckSelector((s) => (s.selectedItem?.props as any)?.id as string | undefined);
-  const content = usePuckSelector((s) => s.appState.data.content);
+  const data = usePuckSelector((s) => s.appState.data);
   useEffect(() => {
-    const found = selectedId ? findBlock(content as PuckItem[], selectedId) : null;
+    const found = selectedId ? locateInDoc(data as Parameters<typeof locateInDoc>[0], selectedId) : null;
     onSelect(found ? { item: found.item, top: found.top } : null);
-  }, [selectedId, content]);
+  }, [selectedId, data]);
   return null;
 }
 

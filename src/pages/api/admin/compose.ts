@@ -64,7 +64,16 @@ export const GET: APIRoute = async ({ url, locals }) => {
     // A worker that was killed never writes an outcome: call it after its ceiling, or after silence.
     const now = Date.now();
     const dead = (j.status === 'queued' || j.status === 'running') && (now - Date.parse(j.created_at) > STALE_MS || now - Date.parse(j.updated_at) > SILENT_MS);
-    const out = dead ? { ...j, status: 'error', error: 'Claude stopped responding before finishing. Try again.' } : j;
+    const error = 'Claude stopped responding before finishing. Try again.';
+    // Said in the row too, so a job reported failed is never claimed or finished later (runJob).
+    if (dead)
+      await locals.db
+        .from('compose_jobs')
+        .update({ status: 'error', error })
+        .eq('id', jobId)
+        .in('status', ['queued', 'running'])
+        .or(`created_at.lt.${new Date(now - STALE_MS).toISOString()},updated_at.lt.${new Date(now - SILENT_MS).toISOString()}`);
+    const out = dead ? { ...j, status: 'error', error } : j;
     return Response.json({ status: out.status, progress: out.progress, say: out.say, notes: out.notes, result: out.result, error: out.error }, { headers: { 'Cache-Control': 'no-store' } });
   }
   const entryId = Number(url.searchParams.get('entryId')) || 0;

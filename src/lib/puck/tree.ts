@@ -48,13 +48,18 @@ interface Doc {
 }
 const areaLists = (doc: Doc) => Object.entries(doc.root?.props ?? {}).filter(([k, v]) => k.startsWith('area-') && Array.isArray(v)) as [string, PuckItem[]][];
 
-/** A block anywhere in a page document. */
-export function findInDoc(doc: Doc, id: string): PuckItem | null {
+/** A block anywhere in a page document, and the top-level block of its list containing it. */
+export function locateInDoc(doc: Doc, id: string): { item: PuckItem; top: PuckItem } | null {
   for (const list of [doc.content as PuckItem[], ...areaLists(doc).map(([, v]) => v)]) {
     const hit = findBlock(list ?? [], id);
-    if (hit) return hit.item;
+    if (hit) return hit;
   }
   return null;
+}
+
+/** A block anywhere in a page document. */
+export function findInDoc(doc: Doc, id: string): PuckItem | null {
+  return locateInDoc(doc, id)?.item ?? null;
 }
 
 /** A page document with one block (anywhere in it) replaced by a list of blocks. */
