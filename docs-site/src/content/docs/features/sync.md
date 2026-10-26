@@ -106,8 +106,9 @@ belong to each site: syncing or restoring settings never changes them.
 Either way, changes made to those rows since are lost, and the current state is saved first (named
 `before-restore`), so a restore can be undone with the same button. Deleting a file deletes its library
 row only; its stored images stay, so undoing the restore brings the file back whole. A form that has
-submissions is never deleted by a restore (its submissions would be cut loose from it); the report
-names the forms kept.
+submissions is never deleted by a restore (its submissions would be cut loose from it), nor is a row
+other rows came to depend on: an event with ticket orders or waitlists, a page with pages under it, a
+term entries still use, a file entries feature. The report names what was kept.
 
 A restore runs as a job (on the Worker's jobs queue, up to 15 minutes), so a large one isn't cut off halfway; the screen waits for it and then shows the result.
 

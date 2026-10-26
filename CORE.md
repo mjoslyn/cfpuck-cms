@@ -130,8 +130,9 @@ A shuffled collection (`shuffle`) renders part of a pool of up to 48 entries and
 `public/assets/js/collection-shuffle.js` picks a new random set on each visit.
 
 Addresses: types without a URL `base` (pages and posts in the example site) all live at `/<slug>/`, so
-an address is unique across them (`typesSharingAddresses`, `uniqueSlug`; a typed address another of
-those types has is refused on save).
+an address is unique across them (`typesSharingAddresses`, `uniqueSlug`, which Compose's new entries use
+too; a typed address another of those types has is refused on save, and so is publishing at one,
+`addressTakenBy`).
 
 Tags are terms of the `tag` taxonomy on any type: edited in each entry's settings (created on save,
 `setEntryTags`), filterable in collections (`query.taxQuery.tag`), listed at `/tag/<slug>/`.
@@ -207,7 +208,8 @@ area the next free name (`area-2`, `area-3`...; `uniqueAreas`), so two never sho
 
 The content list has All / Published / Drafts / Trash tabs and bulk actions on the checked rows
 (`/api/admin/entries/bulk`): Publish (a placeholder address gets one from the title; untitled entries
-are skipped), Move to drafts, Move to trash (not the home page); in the trash, Restore (as drafts) and
+are skipped, as are entries whose address an entry of another type has), Move to drafts, Move to trash
+(not the home page); in the trash, Restore (as drafts) and
 Delete permanently. Add a term and Remove a term change the entries' terms at once (the type's
 taxonomies, tags and any taxonomy its entries use); a tag also goes into unpublished changes kept aside. **Duplicate** (list rows and the editor header; `src/lib/admin/duplicate.ts`) makes
 a draft copy titled "(copy)" with its own address: content with any unpublished changes, fields, tags
@@ -245,14 +247,16 @@ sends its queries to the other's `/api/sync/remote` and its file calls to `/api/
 (`src/lib/sync-remote.ts`), signed with it (HMAC-SHA256 of the time and the request, good for five
 minutes; an upload's signature covers its bytes). The other copy runs them as the server, on the tables
 and folders a sync uses only (`SYNC_TABLES`, `SYNC_FOLDERS`: `media`, `sync-backups`); without the
-secret those routes answer Not found. Its writes clear its page cache.
+secret those routes answer Not found. A query whose select string embeds a table outside `SYNC_TABLES`,
+at any depth, is refused. Its writes clear its page cache.
 
 - Rows match by id (entries, terms, media, forms: the copies share ids, and a sync keeps them; D1's
   next id is past the largest, so `sync_reset_ids()` has nothing to do), by kind and slug (templates), by key (settings)
   and by old address (redirects). Derived columns (`updated_at`, `body_text`, a redirect's
   `wildcard`) are neither compared nor written.
 - Compare (`plan`) lists each group's new, changed and unchanged rows and its conflicts, which are
-  left alone: an id that is another row there, an address taken by another row, a parent or featured
+  left alone: an id that is another row there, an address taken by another row (of any type sharing its
+  addresses, `typesSharingAddresses`), a parent or featured
   image that isn't there (unless the sync brings it). Each new or changed row can be unticked, and
   **Show differences** opens a line diff of the row as the target has it and as the sync would write it.
 - Syncing (`apply`, in batches the screen sends in turn) needs a warning ticked that names the target
@@ -283,8 +287,9 @@ secret those routes answer Not found. Its writes clear its page cache.
   (`snapshotPreview` counts them and the rows made since, which are deleted only with **Also delete**).
   Either way the current state is saved first (`before-restore`, never pruning the backup being
   restored), so a restore can be undone the same way, and the copy's own sync settings stay as they
-  are. Rows to delete go first, so rows written back can't clash with them; rows are written 100 at a
-  time (a failed batch is retried row by row, reporting only the rows that can't go back), and entries'
+  are. Rows to delete go first, so rows written back can't clash with them; rows are written up to 100
+  and 1 MB at a time (D1 takes 2 MB per value) (a failed batch is retried row by row, reporting only the
+  rows that can't go back), and entries'
   terms and unpublished changes in bulk. Deleting a file deletes its media row only: its stored images
   stay. A form with submissions is never deleted (they would be cut loose from it), nor are rows other
   rows came to depend on (`removeAdded`): entries with ticket orders, waitlist places or emails of their
@@ -408,7 +413,9 @@ Scripts in Node reach the same local bucket through wrangler's platform proxy
 deployed one over R2's S3 API with `STORAGE_ENDPOINT`, `STORAGE_BUCKET`, `STORAGE_ACCESS_KEY_ID` and
 `STORAGE_SECRET_ACCESS_KEY` (set, these win in the Worker too: any S3-compatible store). The site serves
 the media folder at `/media/<path>` (`src/pages/media/[...path].ts`: ranges and validators for video and
-caching, cached a year at the CDN), refusing paths that try to leave it (`unsafeMediaPath`).
+caching, cached a year at the CDN), refusing paths that try to leave it (`unsafeMediaPath`). Keys and
+folder paths with a leading slash, a backslash or a `.` or `..` segment are refused in the store itself
+(`unsafeKey`).
 `scripts/copy-storage.ts` copies a site's files from another S3-compatible store (Supabase Storage's S3
 endpoint, whose buckets are the folders, or another copy's bucket) into the store (resumable).
 
@@ -437,7 +444,9 @@ backgrounds in the final HTML. Existing media: `scripts/media-formats.ts` backfi
 Stored images are never deleted or overwritten by the CMS: the library has no delete, a restore that
 removes a file's library row leaves its images in storage (backups hold rows, not images, so undoing
 the restore finds them again), and an upload takes a name no library row or stored file already starts
-with. Re-crops rewrite only the cropped sizes, which can be made again from the original.
+with and never writes over a stored file (conditional puts; a name another upload took meanwhile moves it
+to the next free one). Re-crops rewrite only the cropped sizes, which can be made again from the
+original.
 
 ## Forms
 
@@ -445,7 +454,10 @@ Form builder at `/admin/forms/` (`src/forms/FormBuilder.tsx`). Forms live in the
 (`src/lib/forms/types.ts`: fields with ids like `f1`, widths on a 12-column grid, conditional logic,
 confirmation; editors read them, the site with its key). The markup comes from
 `src/render/forms/form.ts` (styles `src/styles/forms.css`; `public/assets/js/forms.js` runs conditional
-logic, US phone formatting and character counters; everything is validated on the server). Place forms
+logic, US phone formatting and character counters; everything is validated on the server). Visibility is
+decided once (`hiddenFields`): a field hidden by logic counts as empty in other fields' rules, all the
+way down the chain, for validation, the stored entry and the total, and `forms.js` does the same. Place
+forms
 with the `form` block. Fields are white with black text by default and labels take the colour around
 them; the Form, Subscribe and Newsletter blocks' **Form style** (`attrs.formStyle`,
 `src/render/forms/style.ts`, `src/puck/FormStyle.tsx`) sets the form's background, border and text
@@ -515,7 +527,8 @@ export adds payment columns.
 Forms and tickets take payments through the same code, `src/lib/payments/`: `stripe.ts` (Checkout
 Sessions) and `square.ts` (payment links, an order each), over their REST APIs with no SDK, behind one
 `Provider` interface (`create` a hosted checkout, `check` where it stands, `close` an unpaid one,
-`refund`, `refunded`, `webhookEvent` with the signature checked, `parseEvent` turning it into a
+`refund` (the refund and its status), `refunded`, `webhookEvent` with the signature checked, `parseEvent`
+turning it into a
 `PaymentEvent` both features read: a checkout to look at again, or a payment's refunds; `returnLag`, a
 wait before a second look at a checkout the buyer just came back from), `providerStatus()` for the admin
 screens (configured, test or sandbox keys, the variables still missing), `pickProvider` (the provider
@@ -611,7 +624,9 @@ tickets (30-120 minutes), and the emails with the reminder's and follow-up's tim
   order (`ticket_order_status`; both read with the site's key), shown in its event's section.
   `?tickets=<reason>&event=<id>` shows a checkout's outcome in that event's section.
   Pages with either are never cached. `public/assets/js/tickets.js` adds the total, the address only
-  for paid orders, and what's left now (`GET /api/tickets/availability`).
+  for paid orders, and what's left now (`GET /api/tickets/availability`). Checkout, the waitlist and
+  availability load the event as its page does (`visibleTo` with the viewer, `siteViewer`), so
+  members-only events are only for those members.
 - Orders (`ticket_orders`, editors read, the site writes with the service key; `src/lib/tickets/orders.ts`):
   `POST /api/tickets/checkout` checks the order and holds its tickets in `ticket_order_create`, which takes
   counts paid orders and unexpired holds against the capacities in the same statement that inserts the
@@ -620,8 +635,17 @@ tickets (30-120 minutes), and the emails with the reminder's and follow-up's tim
   payments code, see Forms > Payments). `/api/tickets/return` checks the payment with the provider and
   shows the order; the webhooks (`ticketsWebhook`) confirm payments, expiries and refunds. A refund
   is counted while pending; the refunded total is the provider's (`refunded`, read again on each refund
-  event), so one that fails comes off the order, and a fully refunded order is paid again (`recordRefund`). `markPaid` is idempotent and sends the confirmation
-  once. An expired hold that is paid anyway (a Square link used late) is still marked paid.
+  event), so one that fails comes off the order, and a fully refunded order is paid again
+  (`recordRefund`). Each refund has its own idempotency key (`refund_attempt`), reused only by a retry
+  whose outcome is unknown; the provider's answer is checked, and a failed refund isn't recorded.
+  `markPaid` is idempotent and sends the confirmation
+  once. An expired or cancelled order that is paid anyway is still marked paid, with a note in the
+  attendee list (an admin can refund it). Cancelling an unpaid order, from the attendee list or the
+  checkout's Cancel, asks the provider first: paid there, it is marked paid; a check that fails cancels
+  nothing. `ticket_order_create` also limits one buyer per event in the same statement: at most 5 orders
+  not paid for in an hour per address (`ticket_orders.ip`, IPv6 as its /64) and per email, and unpaid
+  held tickets (with free ones from the last hour) per address at twice the most per order; a refused
+  order goes back with `?tickets=limit`.
 - Attendee list (`/admin/tickets/`, `/admin/tickets/<id>/[?date=]`; actions `POST /api/admin/tickets`,
   `GET /api/admin/tickets/attendees.csv`): check-in, resend, cancel (unpaid, free or fully refunded),
   refund (admins; part or all, at the provider; all of it frees the tickets), the waitlist with Notify.
@@ -658,7 +682,13 @@ member (`renderRequest` drops the viewer's membership), and the editor offers no
 - **Members only pages**: an entry's settings (Members) set `fields.access` ({ members, levels }; `access`
   is a reserved field key), applied when it is published. The site's loader (`LoaderScope`, `visibleTo`
   in `src/lib/data.ts`) leaves them out for everyone but members of those levels and editors: lists,
-  search, feeds, term counts and email Events blocks. Their address still resolves: `Loader.lockedEntry`
+  search, feeds, term counts and email Events blocks. While Members is on, a page whose lists or picked
+  entries leave out members-only entries the viewer may not see is personal (`Loader.hidMembersOnly`: the
+  ids it hides are read once per render, and each list makes one more check only when there are some), so
+  members see theirs (live search suggestions, `/api/search`, don't yet). An occurrence address of a
+  members-only recurring event resolves to its series' locked entry (`lockedEntry`'s `occurrence`), and
+  the Event details block shows the sign-in prompt in place of the event's content and details. Their
+  address still resolves: `Loader.lockedEntry`
   reads its title, excerpt, featured image, template, SEO and access only (`Entry.locked`), and the page
   renders with its Page content block as a sign-in prompt (`lockedContent`, `src/render/c/members.ts`).
 - **Members only block** (`members`, a container): its blocks for members (of `attrs.levels`), editors
@@ -667,7 +697,9 @@ member (`renderRequest` drops the viewer's membership), and the editor offers no
   access), so the page's stored content can't be read around it.
 - **Personal pages**: what depends on the viewer (a locked entry, a Members only or Member account
   block, tickets with member prices) sets `RenderCtx.personal`. The catch-all route then doesn't cache
-  the page (`private, no-store`) and, for a visitor with a sign-in cookie, renders it again as them
+  the page (`private, no-store`); only pages whose own entry is members-only (`PageResult.locked`) and
+  one buyer's `?order=` or `?tickets=` answers get `X-Robots-Tag: noindex` and, for a visitor with a
+  sign-in cookie, renders it again as them
   (`asViewer`: `viewerOf` in `src/lib/members/viewer.ts` looks the session up (`sessionUser`,
   `src/lib/auth`) and reads the profile and membership as the server; the second render's loader scope carries them,
   `RenderCtx.viewer`). Pages
@@ -675,7 +707,8 @@ member (`renderRequest` drops the viewer's membership), and the editor offers no
   render as an editor.
 - **Account page** (`ACCOUNT_PATH`, `/account/`): a page with that address, else a built-in one holding
   the **Member account** block (`member-account`): sign in, forgot password and (when sign-ups are on)
-  create an account; signed in, the member's name, level, status and expiry, change password and sign out.
+  create an account; signed in, the member's name, level, status and expiry, change password (with the
+  current one; their other sessions end) and sign out.
   Endpoints in `src/pages/api/members/`: `login` (back to a `next` path on the site; an address not yet
   confirmed is refused and sent a new link), `signup` (an account and a membership, emailing the site's
   admin address), `logout`, `forgot` and `password` (a token's, which signs them in, or the signed-in
@@ -743,7 +776,9 @@ never subscribes anyone again); the settings are, with the others. Migration `*_
   on), signed up, opened or clicked (people's, not machines') in the last N days, or signed up from a
   source; each can be turned round. `cleanRules` keeps them to known shapes; the database evaluates
   them (`mail_rule`). The editor shows who matches now (subscribed, on any list) with a count. A segment
-  a campaign or digest names can't be deleted, so no audience widens on its own.
+  a campaign or digest names can't be deleted, and only admins change its rules while a campaign that is
+  scheduled, in review, sending or paused, or a digest that is on, uses it, so no audience widens on its
+  own.
 - **Tags and fields**: set on a contact's page (the site's fields as inputs of their type, `cf_<key>`;
   other fields as key and value); Add a contact takes first and last name and tags; an import reads
   `first name`/`last name` (or `name`, split), its `tags` column (separated by `;` or `|`) tags each
@@ -761,8 +796,12 @@ never subscribes anyone again); the settings are, with the others. Migration `*_
   several), the consent wording and a honeypot; only public lists and the member lists are taken. The
   confirmation link opens the preferences page, whose button (a GET never confirms: mail scanners
   follow links) posts to `/api/mail/confirm`. Admins add people who agreed elsewhere (Add a contact,
-  Import a CSV, Add members to a list), naming how they agreed; those who unsubscribed, bounced,
-  complained or were erased are skipped. Admins can **Resend confirmation** (the Subscribers tab or a contact's page, `resendConfirmation`) to anyone with lists still waiting, within the same daily limit, never to a bounced or complained address. Unconfirmed sign-ups are deleted after 30 days.
+  Import a CSV, Add members to a list), naming how they agreed; those who unsubscribed (from everything
+  or from that list), bounced, complained or were erased are skipped. Admins can **Resend confirmation**
+  (the Subscribers tab or a contact's page, `resendConfirmation`) to anyone with lists still waiting,
+  within the same daily limit, never to a bounced or complained address. Unconfirmed sign-ups are deleted
+  after 30 days. A confirmed sign-up also takes the address off Mailgun's bounces, complaints and
+  unsubscribes.
 - **Pages**: `/subscribe/` (a Subscribe block), `/unsubscribe/` and `/email-preferences/` (the **Email
   preferences** block, `mail-preferences`, `view` unsubscribe or preferences): a page with one of these
   addresses takes its place (`MAILING_PAGES` in `src/render/page.ts`). The preferences block shows whose
@@ -789,7 +828,8 @@ never subscribes anyone again); the settings are, with the others. Migration `*_
   recipient variable (`%recipient.v1%`, escaped for HTML as `v1_h`, plain in the subject and text;
   values escaped once, by the site), and a footer under the design that it can't remove: why they get
   it, the name and postal address, unsubscribe and preferences links. Images are absolute addresses.
-  Nothing goes out without that footer: `footerProblem` checks the HTML and the text for the
+  In an address (href, src) a tag is URL-encoded (`v<n>_u`), and an address that starts with one is
+  dropped. Nothing goes out without that footer: `footerProblem` checks the HTML and the text for the
   recipient's unsubscribe and preferences links when a campaign is frozen, before each batch, and
   before a test send, and refuses to send without them.
 - **Sending** (`src/lib/mailing/send.ts`): a job, which needs `SITE_URL` (outside `astro dev`): its
@@ -804,7 +844,9 @@ never subscribes anyone again); the settings are, with the others. Migration `*_
   for the next run; another 4xx fails the campaign. A request with no answer leaves the batch `unknown`:
   the next run asks Mailgun's events for the batch's tag, resends only if none show after 10 minutes,
   once, and otherwise pauses the campaign. A run stops starting batches after 12 minutes and lets go;
-  pausing or cancelling stops it before the next batch.
+  pausing or cancelling stops it before the next batch. A batch Mailgun refuses leaves the campaign
+  failed; Resume sends its failed batches again, and a campaign is never marked sent while a batch is
+  failed.
 - **Scheduler**: the Worker's run every 5 minutes (`src/worker.ts`, deployed site) runs `runDue`:
   scheduled campaigns that are due, sends a run let go of, digest issues waiting for approval past their
   time (cancelled, the admins told), and digests due. The nightly run (06:20 UTC) runs `runNightly`:
@@ -822,7 +864,10 @@ never subscribes anyone again); the settings are, with the others. Migration `*_
   timestamp and token, within 5 minutes; each token once, `mailgun_tokens`), every event logged once by
   Mailgun's event id (`mail_events`), then: delivered, opened (people's only: `openVerdict` leaves out
   mail scanners and privacy proxies such as Apple's), failed (permanent: bounced, suppressed),
-  complained (suppressed, never mailed again), unsubscribed. A bounce or complaint runs the health
+  complained (suppressed, never mailed again), unsubscribed. Bounces, complaints and unsubscribes (and
+  the nightly reconcile) set the contact's lists to unsubscribed too. If an event's writes fail, its row
+  and token are deleted and the answer is 500, so Mailgun's retry is applied. A bounce or complaint runs
+  the health
   check (`src/lib/mailing/state.ts`): once a campaign has 500 deliveries, a complaint rate or bounce
   rate past the settings' pauses sending site-wide (settings key `mailing`, not synced), every campaign
   that is sending, and digests, and emails the admins; an admin resumes it on the Mailing screen.
@@ -871,11 +916,18 @@ copied Supabase Auth's users with their ids, passwords and open invitations). Be
 aren't mounted: the site's endpoints call it (`signIn`, `signOut`, `sessionUser`, `createUser`,
 `setPassword`, `passwordToken`, `setPasswordWithToken`, `confirmToken`, `confirmAddress`) and send its
 emails themselves (`src/lib/auth/mail.ts`, over SMTP). The session is a signed cookie,
-`site.session_token` (seven days, renewed as it is used); `AUTH_SECRET` signs it and the site's links.
+`site.session_token` (seven days, renewed as it is used: the middleware passes a renewed cookie on,
+`refreshedCookies`, with the `site.signed_in` hint at the same Max-Age, on admin answers, member
+endpoints and private or no-store answers, never on pages cached for everyone); `AUTH_SECRET` signs it
+and the site's links.
 Pages' scripts can't read it, so signing in also sets `site.signed_in=1` (no secret; `redirectWith`, cleared
 on signing out), which the editor bar and the member sign-in link check before asking who is signed in.
 Every account has a profile, made with it (`databaseHooks`); sign-ins set `users.last_sign_in_at`.
-Passwords are scrypt; those carried over from Supabase Auth are bcrypt, checked as such and rehashed
+Failed sign-ins are limited to 10 per address and 30 per visitor in 15 minutes, and password links to 3
+per address and 20 per visitor an hour (`src/lib/auth/attempts.ts`, rows in `verifications`); over a
+limit sign-in says to try again later, and a password link request answers as usual and sends nothing.
+Setting a password from a link ends the account's other sessions. Passwords are scrypt; those carried
+over from Supabase Auth are bcrypt, checked as such and rehashed
 on the next sign-in. Editors and admins sign in at `/admin/login/` (`/api/auth/login`); a password
 link (Forgot password, `/api/auth/forgot`) and an opened invitation both lead to
 `/admin/set-password/?token=` (a one-time token, an hour; members: the account page), where setting the
@@ -905,13 +957,17 @@ unchanged; unpublished pages save in place as drafts. **Publish** / **Publish ch
 the header also offers Discard changes and Unpublish (`PUT /api/admin/entries/:id` with `action`).
 **Preview** opens `/admin/preview/<id>/` with the editor's current state (POST) or the saved draft
 (GET), rendered like the site with a preview bar and noindex. Templates and layout mode have no drafts:
-"Save & apply" changes every page using them. A save says which stored version it is based on (`base`,
+"Save & apply" changes every page using them. On a published page with unpublished changes, layout mode's
+Save & apply saves the template and puts the page's settings into those changes, leaving the live page as
+it is. A save says which stored version it is based on (`base`,
 the `updated_at` the editor loaded; `templateBase` in layout mode): if someone else saved since, it is
 refused with 409 (`isStale`) and the editor asks before saving over their version. Each save and
 accessibility mark answers with the new `updated_at`. Tags and terms are linked new-first, then the
 others removed (`setLinks`), and a tag two saves create at once is made once.
 
-Record types (`record: true`, such as venues) are data only: `/admin/edit/<id>/` shows a plain form for
+Record types (`record: true`, such as venues) are data only (a record's form sends only the settings it
+edits, based on the version it loaded, so a stale save is refused with 409 as in the page editor):
+`/admin/edit/<id>/` shows a plain form for
 them (`src/puck/RecordEditor.tsx`) with the entries that use them. An `entry` field (`EntryField` in
 `src/puck/entry-fields.tsx`) picks one: search, clear, or add a new one inline. `POST
 /api/admin/entries` creates entries (form post from the list: untitled draft; JSON from pickers:
@@ -937,7 +993,8 @@ takes more, so local runs don't show these): a row's `json_object` has 16 column
 
 - Column types are the declared types in the migrations (`BOOLEAN`, `JSON_TEXT`, `ARRAY_TEXT`,
   `TIMESTAMPTZ`, `DATE`, `UUID`, `INTEGER`, `TEXT`, `REAL`); booleans are kept as 1 and 0, JSON as
-  text. `*_touch` triggers keep `updated_at` current when a write doesn't set it (the layer sets it);
+  text. `*_touch` triggers keep `updated_at` current when a write doesn't set it (the layer sets it; a
+  write that sets `updated_at` itself keeps it, the layer writing it again after the trigger);
   generated columns (`contacts.name`, `redirects.wildcard`) are D1's. What Postgres computed in
   triggers the layer fills on write: `entries.body_text` from `content`, `contacts.email_hash` (the
   address as `mail_suppressions` keeps it) from `email`.
@@ -965,8 +1022,9 @@ takes more, so local runs don't show these): a row's `json_object` has 16 column
   Previews render as the editor with no scope.
 - A signed-in person's (`locals.db`, set by the middleware: `sessionDb`) follows the policies in
   `src/lib/db/policies.ts`, the database's row security as it was: editors read every table and write
-  content, media, forms, templates, compose and segments; admins also write settings, lists, contacts
-  and members; editors save campaigns only as drafts, change digests only while off and change their
+  content, media, forms, templates, compose and segments; admins also write settings, redirects, lists,
+  contacts and members; ticket orders and waitlists change only through the server; editors save
+  campaigns only as drafts, change digests only while off and change their
   own profile but not its role; anyone else gets nothing. Reads a role may not make return no rows;
   refused inserts, and writes whose rows fail a check, are errors and write nothing.
 - The admin screens in the browser (`browserClient`, `src/lib/db/browser.ts`) send their queries
@@ -1065,7 +1123,9 @@ a content migration or a SQL migration (`db/migrations/`) that edits the JSON. C
 - Walk the JSON properly (a content migration in TypeScript; SQLite's `json_tree` for small changes):
   the key order of stored blocks varies, so text patterns miss some. A SQL migration that changes an
   entry's `content` must leave `body_text` to a content migration (the layer fills it).
-- Keep updated dates: drop the table's `*_touch` trigger before the update and create it again after
+- Keep updated dates: a content migration through the query layer writes `updated_at` back, which the
+  layer keeps; a SQL migration drops the table's `*_touch` trigger before the update and creates it again
+  after
   (as `*_init.sql` has it). It fires whenever a write leaves `updated_at` as it was, setting it to
   itself included.
 - Name migrations with the time they are written (`YYYYMMDDHHMMSS_name.sql`; a site's

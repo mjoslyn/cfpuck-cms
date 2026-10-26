@@ -42,7 +42,8 @@ sent back to where they joined.
 
 1. The form posts to `/api/tickets/checkout`. The server checks the order (what's on sale, quantities,
    the required fields) and holds the tickets in one database call (`ticket_order_create`), which locks
-   the event and date so two buyers can't both take the last ticket.
+   the event and date so two buyers can't both take the last ticket. One buyer (by address and by email)
+   gets at most 5 unpaid orders an hour per event, and can hold at most twice the most per order at once.
 2. A free order is confirmed at once. A paid one is held (30 minutes by default) and the buyer goes to
    Stripe Checkout or a Square payment link.
 3. Back from paying (`/api/tickets/return`), the payment is checked with the provider and the page the
@@ -60,14 +61,17 @@ attendee list (`/admin/tickets/<id>/`):
 
 - orders by status, searchable, with a checkbox to check people in at the door
 - each order's details: phone, address, answers, payment, emails sent
-- **Resend confirmation**, **Cancel order** (unpaid or free orders) and **Refund** (admins: all or part of a
-  paid order, at Stripe or Square; refunding all of it puts its tickets back on sale)
+- **Resend confirmation**, **Cancel order** (unpaid or free orders; an unpaid one is checked with the
+  provider first, and if it was paid after all it's marked paid instead) and **Refund** (admins: all or
+  part of a paid order, at Stripe or Square; refunding all of it puts its tickets back on sale; a refund
+  the provider refuses isn't recorded)
 - the waitlist, with **Notify selected** and **Notify as many as tickets allow**
 - the event's own **Emails**
 - **Export CSV** and **Print**
 
 Refunds made in the Stripe or Square dashboard are recorded too, through the webhook, and a refund that
-fails later comes off the order again.
+fails later comes off the order again. An order paid after it was cancelled or expired is marked paid
+with a note in its details, so you can refund it if you need to.
 
 ## Emails
 

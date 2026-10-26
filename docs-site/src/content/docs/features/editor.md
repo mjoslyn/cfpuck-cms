@@ -21,7 +21,9 @@ Auth), in its database.
 Admin-only pages are listed in `ADMIN_ONLY` (`src/middleware.ts`); settings writes are admin-only in
 the site's policies (`src/lib/db/policies.ts`). Admins manage users at `/admin/users/`: roles and invitations, with **Resend invitation** for anyone invited who hasn't set a password yet, and **Delete** (not your own account; what they made stays).
 Editors set their password at `/admin/set-password/`, where invitations (7 days) and password links
-(Forgot password on the sign-in page; an hour) land; setting it signs them in.
+(Forgot password on the sign-in page; an hour) land; setting it signs them in and signs the account
+out everywhere else. After 10 wrong passwords for an address (or 30 from one visitor) in 15 minutes,
+sign-in asks them to wait; password links go out at most 3 an hour per address.
 
 ## Admin colors and logo
 

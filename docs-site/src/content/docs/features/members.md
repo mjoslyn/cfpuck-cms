@@ -22,7 +22,8 @@ Under **Settings > Members**:
 
 Members sign in, sign up and reset their password at **/account/**. Make a page with that address to
 design it yourself, with the **Member account** block on it. The links in members' emails go there:
-invitations and password links (an hour, once) open the form to set a password, and a new account's
+invitations and password links (an hour, once) open the form to set a password (which signs out the
+account everywhere else; a signed-in member changing it gives the current one), and a new account's
 confirmation link (a day) confirms the address and signs them in. New accounts confirm their address
 before they can sign in unless `AUTH_CONFIRM_EMAIL=false`. The site sends these emails over its SMTP
 settings.
@@ -42,6 +43,7 @@ A membership counts while it is active and not past its expiry date.
 In a page's settings (the editor's sidebar), **Members** > **Members only**, and optionally the levels.
 It applies when the page is published. Everyone else sees the page's title, excerpt and featured image
 with a sign-in link in place of its content, and it's left out of lists, search and emails for them.
+Pages that list such entries show them to the members who may see them.
 Its content is never sent to anyone else: the site checks who is looking before it reads it, and only
 editors can query the site's data, so it can't be read any other way.
 

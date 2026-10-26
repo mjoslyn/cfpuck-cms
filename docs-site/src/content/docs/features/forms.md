@@ -35,7 +35,8 @@ or pill), each colour from the site's palette or a hex colour.
 
 Submissions POST back to the page (`src/lib/forms/submit.ts`):
 
-1. Validation, skipping fields hidden by conditional logic
+1. Validation, skipping fields hidden by conditional logic (a field hidden by logic counts as empty in
+   other fields' rules, so what's hidden is the same for validation, the stored answers and the total)
 2. A honeypot against spam
 3. Limits: an answer is cut at 10,000 characters (or the field's own maximum), and a form takes at
    most 20 submissions a minute (more get a "try again in a minute" answer, status 429)

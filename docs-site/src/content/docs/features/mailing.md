@@ -46,7 +46,8 @@ On the **Subscribers** tab admins search and filter everyone (by status, list or
 wording, confirmed when), lists, emails and clicks, and can **Add a contact**, **Import a CSV** (email
 and name columns), **Add members to a list**, **Unsubscribe**, **Erase** and **Export as CSV**. Adding
 or importing asks how those people agreed to get your email. Anyone who unsubscribed, bounced, marked
-an email as spam or was erased is skipped: they have to sign up themselves. Erasing deletes a contact
+an email as spam or was erased is skipped, as is anyone who unsubscribed from that list: they have to
+sign up themselves. Erasing deletes a contact
 and keeps only a one-way hash of the address, so they're never mailed again unless they sign up.
 
 ## Tags, fields and segments
@@ -62,7 +63,9 @@ offered in segments with its options, and is a merge tag (Town is `{town}`). A S
 for first and last name and any of these fields, and tag the people who sign up through it; a form only
 fills them in for someone new or not yet confirmed.
 
-A **segment** (the **Segments** tab) picks some of the people on a campaign's lists, members or not. Its
+A **segment** (the **Segments** tab) picks some of the people on a campaign's lists, members or not.
+While a scheduled, approved or sending campaign, or a digest that is on, uses a segment, only admins
+can change its rules. Its
 rules, all or any of which must match, can each be turned round:
 
 - on a list;
@@ -93,7 +96,9 @@ the people on its lists who match. A segment that a campaign or digest uses can'
 
 Editors write and test campaigns; admins **Send now** or **Schedule** (in the site's time zone), after a
 confirmation that shows how many people it goes to, and can **Pause**, **Resume** and **Cancel**. Whoever
-is still subscribed when each batch goes out gets it.
+is still subscribed when each batch goes out gets it. If Mailgun refuses a batch (a wrong key, say), the
+campaign stops as failed; once that's fixed, **Resume** sends the batches that didn't go. Campaigns and
+digests need `SITE_URL` set, since their links are made from it.
 
 Once it has gone out, the campaign shows its numbers: delivered, bounces, spam complaints, opens,
 clicks, unsubscribes, and each link's clicks, and its **Recipients**: everyone it went to, filtered by
