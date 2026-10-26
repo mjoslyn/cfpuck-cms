@@ -273,7 +273,8 @@ function likeParts(pattern: string): LikePart[] {
 /**
  * A LIKE (case-sensitive, as Postgres's) or ILIKE condition. D1 refuses LIKE and GLOB patterns over 50
  * bytes, so the shapes the code uses (exact, prefix%, %contains%, %suffix) are compared as strings,
- * which takes any length; other patterns go to LIKE (ILIKE) or GLOB (LIKE).
+ * which takes any length; other patterns go to LIKE (ILIKE) or GLOB (LIKE). ILIKE ignores case in ASCII
+ * letters only, as SQLite's lower() and LIKE do without ICU, which D1 doesn't have ("CAFÉ" misses "Café").
  */
 function likeSql(col: string, pattern: string, insensitive: boolean, params: Params): string {
   const parts = likeParts(pattern);

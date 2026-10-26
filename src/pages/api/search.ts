@@ -3,12 +3,14 @@
 // The same matching and ranking as the /search/ page, as JSON: the best matches with their type, URL
 // and a short excerpt, and the total. The types are those chosen under Settings, unless `types` names
 // others (types with pages of their own); with `taxonomy`, the terms of it whose names match come too
-// (those in use), so a filter can offer them.
+// (those in use), so a filter can offer them. A signed-in visitor also gets the members-only entries
+// they may see, in an answer for them only.
 import { BROWSER_CACHE_CONTROL, PAGE_CACHE_TAG } from '../../lib/cache';
 import type { APIRoute } from 'astro';
 import { siteDb } from '../../lib/db/site';
 import { eventsOn } from '../../lib/events/on';
 import { Loader, PUBLIC_SCOPE } from '../../lib/data';
+import { hasSession, siteViewer } from '../../lib/members/viewer';
 import { permalink, termLink } from '../../lib/permalink';
 import { COMPOSABLE_TYPES, isTaxonomy, searchTypes, taxonomySingular, typeDef } from '../../lib/site';
 import { decodeEntities } from '../../lib/text/entities';
@@ -19,21 +21,23 @@ const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n).replace(
 const PAGE_TYPES = new Set(COMPOSABLE_TYPES.map((t) => t.type));
 const TERM_LIMIT = 5;
 
-export const GET: APIRoute = async ({ url, cache }) => {
-  // Cached at the CDN like the pages, and cleared with them after edits (src/lib/cache.ts).
-  if (cache.enabled) cache.set({ maxAge: 60, swr: 600, tags: [PAGE_CACHE_TAG] });
+export const GET: APIRoute = async ({ url, request, cache }) => {
+  // Only for a visitor with a sign-in cookie does the answer depend on who asks (members-only entries).
+  const signedIn = hasSession(request);
+  // Otherwise cached at the CDN like the pages, and cleared with them after edits (src/lib/cache.ts).
+  if (cache.enabled && !signedIn) cache.set({ maxAge: 60, swr: 600, tags: [PAGE_CACHE_TAG] });
   const q = (url.searchParams.get('q') ?? '').trim().slice(0, 200);
   const limit = Math.min(10, Math.max(1, parseInt(url.searchParams.get('limit') ?? '6', 10) || 6));
   const asked = (url.searchParams.get('types') ?? '').split(',').map((t) => t.trim()).filter((t) => PAGE_TYPES.has(t));
   const taxonomy = url.searchParams.get('taxonomy') ?? '';
   const headers = {
     'Content-Type': 'application/json',
-    'Cache-Control': BROWSER_CACHE_CONTROL,
+    'Cache-Control': signedIn ? 'private, no-store' : BROWSER_CACHE_CONTROL,
     'X-Robots-Tag': 'noindex',
   };
   const none = { q, total: 0, results: [], terms: [] };
   if (q.length < 2) return new Response(JSON.stringify(none), { headers });
-  const loader = new Loader(siteDb(), undefined, { ...PUBLIC_SCOPE });
+  const loader = new Loader(siteDb(), undefined, { ...PUBLIC_SCOPE, viewer: signedIn ? await siteViewer(request) : null });
   // Events off (Settings > Events): none found.
   loader.scope!.noEvents = !eventsOn((await loader.settings()).site);
   const types = asked.length ? asked : searchTypes((await loader.settings()).site);

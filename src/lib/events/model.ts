@@ -108,15 +108,27 @@ export function excerptOf(ev: CalEvent, words = 30): string {
   return list.length > words ? `${list.slice(0, words).join(' ')}…` : list.join(' ');
 }
 
-/** Current wall-clock "Y-m-d H:i:s" in the site timezone. */
-export function siteNow(now = new Date()): string {
+// One formatter per timezone: making one is slow, and the calendar asks once per event.
+const clocks = new Map<string, Intl.DateTimeFormat>();
+const clockFor = (tz: string) =>
+  clocks.get(tz) ??
+  clocks.set(tz, new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })).get(tz)!;
+
+/** Current wall-clock "Y-m-d H:i:s" in a timezone. */
+export function nowIn(tz: string, now = new Date()): string {
   const p = Object.fromEntries(
-    new Intl.DateTimeFormat('en-US', { timeZone: SITE_TZ, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    clockFor(tz)
       .formatToParts(now)
       .map((x) => [x.type, x.value]),
   );
   return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}:${p.second}`;
 }
+
+/** Current wall-clock "Y-m-d H:i:s" in the site timezone. */
+export const siteNow = (now = new Date()): string => nowIn(SITE_TZ, now);
+
+/** Whether an event has ended: its local end against the time now in its own timezone (else the site's). */
+export const hasEnded = (e: Entry, end: string, now = new Date()): boolean => end < nowIn(e.fields?.timezone || SITE_TZ, now);
 
 export { addDays };
 

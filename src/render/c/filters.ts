@@ -66,7 +66,8 @@ export const collectionFilters: Renderer = (b, env) => {
   const a = b.attrs ?? {};
   const spec = filterSpec(a);
   const { search, terms: active } = activeFilters(spec, ctx.queried.url);
-  const path = ctx.queried.url.pathname;
+  // The listing's first page: new filters start over (page 3 of the old ones may not exist).
+  const path = ctx.queried.url.pathname.replace(/page\/\d+\/?$/, '');
   const listing = ctx.data.get('main-listing') as string | undefined;
   const postType = ctx.queried.postType ?? ctx.data.get('main-type');
   const def = typeof postType === 'string' ? typeDef(postType) : undefined;

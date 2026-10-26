@@ -72,6 +72,8 @@ export function occurrenceDates(firstDate: string, rule: Recurrence, horizon: st
   } else if (rule.freq === 'weekly') {
     const days = [...new Set(rule.byweekday?.length ? rule.byweekday : [start.getUTCDay()])].sort();
     const weekStart = addDays(start, -start.getUTCDay());
+    // The series' own date is always its first occurrence, even on a weekday the rule leaves out.
+    if (!days.includes(start.getUTCDay())) push(start);
     outer: for (let w = weekStart; ; w = addDays(w, 7 * interval)) {
       for (const wd of days) if (!push(addDays(w, wd))) break outer;
       if (ymd(w) > last) break;

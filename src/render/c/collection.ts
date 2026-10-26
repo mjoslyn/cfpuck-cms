@@ -148,7 +148,8 @@ export function pageParam(id: string): string {
 export function pageFromUrl(url: URL, id: string, queryId?: unknown): number {
   const sp = url.searchParams;
   const raw = sp.get(pageParam(id)) ?? (queryId != null ? sp.get(`query-${queryId}-page`) : null) ?? (queryId == null ? sp.get('query-page') : null);
-  return Math.max(1, parseInt(raw ?? '1', 10) || 1);
+  // Digits only, at most six: anything else (1e20, a number too big for an offset) is page 1.
+  return raw && /^\d{1,6}$/.test(raw) ? Math.max(1, parseInt(raw, 10)) : 1;
 }
 
 

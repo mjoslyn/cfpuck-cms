@@ -2,6 +2,7 @@
 //   npx tsx scripts/checks/recurrence.ts
 import { occurrenceDates, expandEntry, localToUtc } from '../../src/lib/recurrence';
 import { eventDates } from '../../src/lib/admin/save';
+import { hasEnded } from '../../src/lib/events/model';
 
 let bad = 0;
 const eq = (name: string, got: unknown, want: unknown) => {
@@ -13,6 +14,7 @@ const eq = (name: string, got: unknown, want: unknown) => {
 eq('daily x3', occurrenceDates('2026-10-01', { freq: 'daily', count: 3 }, '2028-01-01'), ['2026-10-01', '2026-10-02', '2026-10-03']);
 eq('every 2 days until', occurrenceDates('2026-10-01', { freq: 'daily', interval: 2, until: '2026-10-07' }, '2028-01-01'), ['2026-10-01', '2026-10-03', '2026-10-05', '2026-10-07']);
 eq('weekly Tue+Thu x4 (start Thu)', occurrenceDates('2026-10-01', { freq: 'weekly', byweekday: [2, 4], count: 4 }, '2028-01-01'), ['2026-10-01', '2026-10-06', '2026-10-08', '2026-10-13']);
+eq('weekly Wed+Fri x3 (start Mon) keeps the start', occurrenceDates('2026-10-26', { freq: 'weekly', byweekday: [3, 5], count: 3 }, '2028-01-01'), ['2026-10-26', '2026-10-28', '2026-10-30']);
 eq('biweekly default weekday', occurrenceDates('2026-10-01', { freq: 'weekly', interval: 2, count: 3 }, '2028-01-01'), ['2026-10-01', '2026-10-15', '2026-10-29']);
 eq('monthly by date skips short months', occurrenceDates('2026-01-31', { freq: 'monthly', count: 4 }, '2028-01-01'), ['2026-01-31', '2026-03-31', '2026-05-31', '2026-07-31']);
 eq('monthly 2nd Tuesday', occurrenceDates('2026-10-13', { freq: 'monthly', monthlyBy: 'weekday', count: 3 }, '2028-01-01'), ['2026-10-13', '2026-11-10', '2026-12-08']);
@@ -37,4 +39,7 @@ eq('save: fields from editor times', [saved.event_start, saved.event_end, saved.
 ]);
 const allDay = eventDates({ event_start: '2026-10-10T04:00:00+00:00', event_end: '2026-10-12T03:59:59+00:00', event_all_day: true }, { recurrence: { freq: '' } });
 eq('save: all-day spans whole days', [allDay.fields.start, allDay.fields.end, allDay.fields.all_day, 'recurrence' in allDay.fields], ['2026-10-10 00:00:00', '2026-10-11 23:59:59', true, false]);
+// 8-9 pm in Los Angeles on a New York site, at 8:30 pm Pacific (11:30 pm Eastern): still on.
+const la: any = { id: 8, type: 'event', fields: { start: '2026-10-26 20:00:00', end: '2026-10-26 21:00:00', timezone: 'America/Los_Angeles' } };
+eq('ended: judged in the event\'s own timezone', [hasEnded(la, la.fields.end, new Date('2026-10-27T03:30:00Z')), hasEnded(la, la.fields.end, new Date('2026-10-27T04:30:00Z'))], [false, true]);
 process.exitCode = bad ? 1 : 0;

@@ -376,14 +376,18 @@ export class Loader {
   }
 
   /**
-   * query() ordered by relevance to args.search: the full-text index ranks the matches (BM25, the title
-   * weighing most, then the excerpt, then the text; the best 1000), the query keeps those this listing
-   * shows, newest first on ties.
+   * query() ordered by relevance to args.search: the full-text index ranks the published matches of the
+   * listing's types (BM25, the title weighing most, then the excerpt, then the text; the best 1000), the
+   * query keeps those this listing shows, newest first on ties.
    */
   private async queryRanked(q: any, args: QueryArgs, perPage: number, offset: number): Promise<QueryResult> {
     const fts = ftsQuery(args.search);
     if (!fts) return { ids: [], total: 0, pages: 0 };
-    const { data: ranked, error: rankError } = await this.db.rpc('entry_search', { p_query: fts, p_limit: 1000 });
+    // Ranked among what this listing can show (published, its types; events while they are on), so the
+    // best 1000 aren't spent on drafts and other types; members-only entries are left out after.
+    const types = (Array.isArray(args.postType) ? args.postType : [args.postType]).filter((t) => !(this.scope?.noEvents && t === 'event'));
+    if (!types.length) return { ids: [], total: 0, pages: 0 };
+    const { data: ranked, error: rankError } = await this.db.rpc('entry_search', { p_query: fts, p_limit: 1000, p_status: 'publish', p_types: types });
     if (rankError) throw rankError;
     const rank = new Map<number, number>(((ranked ?? []) as { id: number; rank: number }[]).map((r) => [r.id, r.rank]));
     if (!rank.size) return { ids: [], total: 0, pages: 0 };

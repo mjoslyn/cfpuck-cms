@@ -2,7 +2,7 @@
 // calendar), and the day-by-day schedule when the event has one.
 import type { Env, Renderer } from '../env';
 import type { Entry } from '../../lib/types';
-import { eventTimes, venueIdOf, siteNow, SITE_TZ } from '../../lib/events/model';
+import { eventTimes, venueIdOf, hasEnded, SITE_TZ } from '../../lib/events/model';
 import { mediaImage, mediaImgTag, markImages } from '../../lib/media/image';
 import { permalink, termLink, byTermOrder } from '../../lib/permalink';
 import { renderItems } from '../engine';
@@ -127,7 +127,7 @@ export const eventDetails: Renderer = (_b, env) => {
     ? `<div class="c-event__content">${lockedContent(env, e)}</div>`
     : `<div class="c-event__content">${env.contentSlot ?? markImages(renderItems(env.ctx.docs.get(`content:${e.id}`), { ...env, post: e, parentLayout: null, imgCtx: 'noloop' }), 'noloop')}${env.ctx.data.get('tickets-block') ? '' : ticketsSection(env)}</div><aside class="c-event__details">${details(env, e)}</aside>`;
   const { end } = eventTimes(e);
-  const past = end && end < siteNow();
+  const past = end && hasEnded(e, end);
   return (
     `<article class="c-event">` +
     `<header class="c-event__hero${hero ? ' has-image' : ''}">${hero}<div class="c-event__hero-inner">` +
