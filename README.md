@@ -207,6 +207,10 @@ follow the config. `CORE.md` describes each option.
    both) and the optional Compose, payment and Mailgun keys; the rest (`SMTP_HOST`, `SMTP_USER`,
    `MAIL_FROM`, `SITE_URL`...) as `vars` in `wrangler.jsonc` or as secrets too. Deploy with
    `npm run deploy`, then add your domain to the Worker (Workers > the Worker > Domains & Routes).
+   - Deploying from git (Workers Builds: the Worker > Settings > Build, connected to the repository):
+     build command `npm run build`, deploy command `npm run deploy:remote`, which applies new
+     migrations before deploying. Give the build's API token D1 Edit (My Profile > API Tokens); the
+     token Cloudflare makes for builds doesn't have it.
    - Taking payments (forms or tickets): add the payment provider's webhook. One endpoint serves both:
      - Stripe: `https://<your-domain>/api/payments/stripe`, with the `checkout.session.*`,
        `charge.refunded` and `charge.refund.updated` events.
@@ -244,7 +248,7 @@ To take core updates:
 ```
 git fetch upstream
 git merge upstream/main
-npx wrangler d1 migrations apply DB --remote       # if there are new migrations
+npx wrangler d1 migrations apply DB --remote       # if there are new migrations (git deploys with deploy:remote do it)
 npx tsx --env-file=.env scripts/migrate-content.ts # if stored content needs migrating
 ```
 

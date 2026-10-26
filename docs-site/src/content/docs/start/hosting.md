@@ -60,7 +60,13 @@ Turn on Cloudflare Images for the account. Set the
 secrets with `npx wrangler secret put <NAME>` (`AUTH_SECRET`, `SYNC_SECRET`, `SMTP_PASS`,
 and the optional Compose, payment and Mailgun keys) and the other settings as `vars` in
 `wrangler.jsonc`. Deploy with `npm run deploy`, then add your domain under the Worker's **Domains &
-Routes**. SMTP goes through the Worker's sockets: use port 587 or 465 (25 is closed to Workers).
+Routes**.
+
+To deploy from git instead (the Worker's **Settings** > **Build**, connected to the repository), set the
+build command to `npm run build` and the deploy command to `npm run deploy:remote`, which applies any new
+database migrations and then deploys. The API token Cloudflare makes for builds can't change D1: add
+**D1 Edit** to it under **My Profile** > **API Tokens**. A migration that changes stored blocks has to go
+out after its code; deploy that one with `npm run deploy` and apply it straight after. SMTP goes through the Worker's sockets: use port 587 or 465 (25 is closed to Workers).
 
 The Worker does the background work itself (`src/worker.ts`):
 

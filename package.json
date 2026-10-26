@@ -14,7 +14,8 @@
     "start": "wrangler d1 migrations apply DB --local && astro dev",
     "check": "tsc --noEmit -p .",
     "seed": "tsx --env-file=.env scripts/seed.ts",
-    "deploy": "npm run build && wrangler deploy"
+    "deploy": "npm run build && wrangler deploy",
+    "deploy:remote": "wrangler d1 migrations apply DB --remote && wrangler deploy"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.129.0",

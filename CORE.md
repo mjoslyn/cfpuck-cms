@@ -1040,7 +1040,11 @@ A Cloudflare Worker (`@astrojs/cloudflare`, `wrangler.jsonc`, entry `src/worker.
 for requests, `scheduled` for the Cron Triggers, `queue` for the jobs queue), with D1 for the database
 (`npx wrangler d1 create`, its id in `wrangler.jsonc`). Migrations: `npx wrangler d1 migrations apply
 DB --remote`; SQL: `npx wrangler d1 execute DB --remote --command "..."`. `npm run deploy` builds and
-deploys (`wrangler deploy`).
+deploys (`wrangler deploy`). `npm run deploy:remote` applies the migrations not yet applied, then deploys
+what is built: the deploy command for git deploys (Workers Builds, after its build command `npm run
+build`; its API token needs D1 Edit). It migrates before the code goes out, right for migrations that
+only add; one that switches block types or settings goes out with `npm run deploy` and is applied after
+(see Changing stored content).
 
 - Each request, scheduled run and job runs in a scope of its own (`src/lib/platform.ts`, `inScope`),
   which carries the work to finish after the answer (`afterAnswer`).
@@ -1078,6 +1082,7 @@ npx wrangler d1 migrations apply DB --local   # the local database's schema (npm
 docker run -d -p 1025:1025 -p 8025:8025 axllent/mailpit   # a local mail catcher (SMTP_URL=smtp://127.0.0.1:1025)
 npx astro dev --background              # http://localhost:4321 (the Worker, in workerd)
 npm run deploy                          # build and deploy the Worker (wrangler deploy)
+npm run deploy:remote                   # apply remote migrations, then deploy what is built (git deploys)
 npx tsx --env-file=.env scripts/create-editor.ts you@example.org 'password' [editor|admin]   # a user
 npm run seed                            # starter templates, home page, sample event (skips what exists)
 npx tsx --env-file=.env scripts/migrate-content.ts [--dry-run]   # site then core content migrations
