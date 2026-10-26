@@ -82,14 +82,25 @@ export async function queueJob(db: Db, sessionId: string, authorId: string, inpu
   return data as { id: string; token: string };
 }
 
-/** Record the outcome. The row is the only way a worker nobody is awaiting can report anything. */
+/**
+ * Record the outcome. The row is the only way a worker nobody is awaiting can report anything. Only
+ * while the job is still running: one already reported failed (silent, or past its ceiling) stays so.
+ */
 async function finish(db: Db, id: string, patch: { status: 'done' | 'error'; result?: unknown; error?: string }) {
-  await db.from('compose_jobs').update(patch).eq('id', id);
+  await db.from('compose_jobs').update(patch).eq('id', id).eq('status', 'running');
+}
+
+/** Whether the job is still the conversation's running one (not reported failed since it was claimed). */
+async function stillActive(db: Db, id: string, token: string): Promise<boolean> {
+  const { data } = await db.from('compose_jobs').select('id').eq('id', id).eq('token', token).eq('status', 'running').maybeSingle();
+  return !!data;
 }
 
 /**
- * Run a queued job: claim it (queued -> running, only with its token, so it runs once), run the turn,
- * write progress as it goes and the result at the end. Never throws; failures are written to the job.
+ * Run a queued job: claim it (queued -> running, only with its token, so it runs once; never one
+ * already reported failed), run the turn, write progress as it goes and the result at the end. Never
+ * throws; failures are written to the job. A job reported failed while it ran writes no draft,
+ * conversation or outcome: the person was told it failed and may have sent the message again.
  */
 export async function runJob(jobId: string, token: string): Promise<void> {
   const db = serviceClient();
@@ -194,6 +205,7 @@ export async function runJob(jobId: string, token: string): Promise<void> {
       const built = await buildMaterials(db, s.materials);
       items = buildPage(result.plan, built, `${s.block_prefix}-t${s.turns.length}`);
       if (!s.entry_id) {
+        if (!(await stillActive(db, jobId, token))) return;
         // First build from the admin: a new draft.
         // Free at its URL: types without a URL base share /<slug>/.
         const slug = await uniqueSlug(db, s.entry_type, slugify(result.plan.slug || result.plan.title));
@@ -218,6 +230,7 @@ export async function runJob(jobId: string, token: string): Promise<void> {
       const seo = planSeo(result.plan, (await buildMaterials(db, s.materials)).images);
       if (seo && (!Object.keys(had).length || had.generated)) fieldsPatch = { ...(fieldsPatch ?? {}), fields: { ...(fieldsPatch?.fields ?? {}), seo: { ...seo, ...(had.noindex ? { noindex: true } : {}) } } };
     }
+    if (!(await stillActive(db, jobId, token))) return;
     await db.from('compose_sessions').update({ turns: s.turns, materials: s.materials, entry_id: s.entry_id, ...(result.plan ? { plan: result.plan } : {}) }).eq('id', s.id);
     clearInterval(quick);
     dirty = true;
@@ -225,6 +238,7 @@ export async function runJob(jobId: string, token: string): Promise<void> {
     await finish(db, jobId, { status: 'done', result: { reply: result.text, entryId: newEntry, fields: fieldsPatch, items: newEntry ? undefined : items, edit, prefix: s.block_prefix, title: result.plan?.title } });
   } catch (e) {
     console.error('[compose job]', e);
+    if (!(await stillActive(db, jobId, token).catch(() => false))) return;
     await db.from('compose_sessions').update({ turns: s.turns, materials: s.materials }).eq('id', s.id);
     clearInterval(quick);
     dirty = true;

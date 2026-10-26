@@ -1,6 +1,7 @@
 // An entry's readable text (entries.body_text, for search and event descriptions), from its content:
 // every block's text settings (eyebrow, title, content, text, question, answer, citation, caption,
-// html, then a list's items), in document order, tags stripped and a few entities read, spaces
+// html, then a list's items; for a linked pattern, the text this page put in it, its overrides), in
+// document order, tags stripped and a few entities read, spaces
 // collapsed. What the database's entry_body_text() did in Postgres; the query layer fills it on every
 // write of `content` (src/lib/db/sqlite.ts). Objects are walked as jsonb ordered their keys (shorter
 // first, then by bytes), so the text reads the same as before.
@@ -33,6 +34,12 @@ export function bodyText(doc: unknown): string {
     if (!attrs || typeof attrs !== 'object') continue;
     for (const k of KEYS) if (typeof attrs[k] === 'string') parts.push(attrs[k] as string);
     if (Array.isArray(attrs.items)) for (const i of attrs.items) if (i && typeof (i as { content?: unknown }).content === 'string') parts.push((i as { content: string }).content);
+    // The pattern's own text is in the pattern (not read at write time); the page's is here.
+    const overrides = attrs.linked === true && attrs.overrides && typeof attrs.overrides === 'object' ? (attrs.overrides as Record<string, unknown>) : null;
+    for (const id of Object.keys(overrides ?? {}).sort(byJsonbOrder)) {
+      const o = overrides![id] as Record<string, unknown> | null;
+      if (o && typeof o === 'object') for (const k of KEYS) if (typeof o[k] === 'string') parts.push(o[k] as string);
+    }
   }
   return parts
     .join(' ')
