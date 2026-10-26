@@ -1,4 +1,4 @@
-# supapuck-cms
+# cfpuck-cms
 
 A CMS for small business and organisation sites: Astro rendering on a
 Cloudflare Worker, content in D1 and files in R2, the Puck visual editor, and Compose, which writes pages with Claude from
