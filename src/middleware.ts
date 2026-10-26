@@ -39,23 +39,32 @@ async function bodyAction(request: Request, pathname: string): Promise<string | 
 /** Marks an answer noindex for search engines. */
 async function noindex(res: Response | Promise<Response>) {
   const r = await res;
-  if (!r.headers.has('X-Robots-Tag')) {
-    try {
-      r.headers.set('X-Robots-Tag', 'noindex');
-    } catch {
-      // A response with fixed headers (a fetched one) passes as it is.
-    }
+  if (r.headers.has('X-Robots-Tag')) return r;
+  try {
+    r.headers.set('X-Robots-Tag', 'noindex');
+    return r;
+  } catch {
+    // A response with fixed headers (Response.redirect, a fetched one): a copy whose headers can change.
+    const copy = new Response(r.body, r);
+    copy.headers.set('X-Robots-Tag', 'noindex');
+    return copy;
   }
-  return r;
 }
 
-/** Whether the whole site is kept out of search engines (SITE_NOINDEX=1 or true: a demo or preview copy). */
-const noindexAll = () => /^(1|true|yes)$/i.test(env('SITE_NOINDEX')?.trim() ?? '');
+let noindexAllValue: boolean | undefined;
+/** Whether the whole site is kept out of search engines (SITE_NOINDEX=1 or true: a demo or preview copy).
+ * Read once in the Worker, whose variables don't change while it runs; under astro dev on each request. */
+function noindexAll(): boolean {
+  if (noindexAllValue !== undefined) return noindexAllValue;
+  const value = /^(1|true)$/i.test(env('SITE_NOINDEX')?.trim() ?? '');
+  if (!import.meta.env.DEV) noindexAllValue = value;
+  return value;
+}
 
 /** Whether the request came to another address than the site's own (SITE_URL): a workers.dev or preview
  * copy, which search engines are kept out of. Without SITE_URL every address counts as the site's. */
 function offSite(url: URL): boolean {
-  const own = process.env.SITE_URL;
+  const own = env('SITE_URL');
   if (!own) return false;
   try {
     return new URL(own).host !== url.host;

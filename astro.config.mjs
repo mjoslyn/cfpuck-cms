@@ -49,12 +49,39 @@ const sitePublic = {
   },
 };
 
+let serverDir = '';
+/**
+ * SITE_NOINDEX for static files: Cloudflare serves them before the Worker (whose middleware marks every
+ * other answer), so while the deployed config's vars (wrangler.jsonc, as built into dist/server/wrangler.json)
+ * or the build's environment set it, the built _headers marks them noindex too.
+ * @type {import('astro').AstroIntegration}
+ */
+const siteNoindex = {
+  name: 'site-noindex',
+  hooks: {
+    'astro:config:done': ({ config }) => {
+      serverDir = fileURLToPath(config.build.server);
+    },
+    'astro:build:done': ({ dir, logger }) => {
+      let value = process.env.SITE_NOINDEX;
+      try {
+        value = JSON.parse(fs.readFileSync(path.join(serverDir, 'wrangler.json'), 'utf8')).vars?.SITE_NOINDEX ?? value;
+      } catch {
+        // No deployed config (another adapter): the build's environment only.
+      }
+      if (!/^(1|true)$/i.test(String(value ?? '').trim())) return;
+      fs.appendFileSync(path.join(fileURLToPath(dir), '_headers'), '\n# SITE_NOINDEX\n/*\n  X-Robots-Tag: noindex\n');
+      logger.info('SITE_NOINDEX: static files marked noindex in _headers.');
+    },
+  },
+};
+
 export default defineConfig({
   output: 'server',
   // A Cloudflare Worker (wrangler.jsonc; its entry is src/worker.ts). astro dev runs it in workerd too,
   // with local bindings (D1 in .wrangler/state, the jobs queue, Images).
   adapter: cloudflare({ imageService: 'passthrough' }),
-  integrations: [react(), siteRoutes, sitePublic],
+  integrations: [react(), siteRoutes, sitePublic, siteNoindex],
   // Cloudflare's Workers cache keeps the pages (tagged) and purges them after edits (src/lib/cache.ts).
   cache: { provider: cacheCloudflare() },
   // The same check runs in src/middleware.ts, which lets mail apps' one-click unsubscribe through.
