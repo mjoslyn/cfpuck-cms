@@ -31,6 +31,7 @@ import { EntryForm, type EntryState } from './entry-fields';
 import { inlinePatterns } from './patterns';
 import { PatternsPanel } from './PatternsPanel';
 import { A11yMarksContext, A11yPanel } from './A11yPanel';
+import { RightPanelToggle, rightPanelUi } from './RightPanel';
 import parse, { Element, type DOMNode } from 'html-react-parser';
 // The public site stylesheet, so the canvas matches the site.
 import siteCss from '../styles/site.css?url';
@@ -77,6 +78,8 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
   const [saving, setSaving] = useState(false);
   const [revisionsVersion, setRevisionsVersion] = useState(0);
   const [autosaving, setAutosaving] = useState(false);
+  // Puck's starting UI, read once (a new object would reset its state).
+  const [startUi] = useState(rightPanelUi);
   const savedJson = useRef('');
   // The page settings as last saved (with savedJson: whether an autosave has anything left to save).
   const savedEntry = useRef('');
@@ -615,6 +618,7 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
         onPublish={() => save(entry && mode === 'content' ? 'publish' : 'save')}
         plugins={PLUGINS}
         iframe={IFRAME}
+        ui={startUi}
         // The title and address are on the bar above the editor; Puck falls back to the page title when
         // this is empty, so it gets an invisible one.
         headerTitle={'\u200b'}
@@ -676,6 +680,7 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
                   Save &amp; apply
                 </button>
               )}
+              <RightPanelToggle />
             </>
           ),
         }}
