@@ -10,15 +10,15 @@ function Count({ n, max }: { n: number; max: number }) {
   return <span className={`ml-2 text-[11px] ${n > max ? 'text-[#b3261e]' : 'text-admin-muted'}`}>{n}/{max}</span>;
 }
 
-export function SeoForm({ type, title, excerpt, fields, path, pageItems, siteSearch = false, onChange }: {
+export function SeoForm({ type, title, excerpt, fields, path, pageItems, entry = false, onChange }: {
   type: string;
   title: string;
   excerpt: string;
   fields: Record<string, any>;
   path: string;
   pageItems?: () => any[];
-  /** An entry, which the site's own search lists (terms aren't): offers leaving it out. */
-  siteSearch?: boolean;
+  /** An entry (not a term page): offers leaving it out of the site's search. */
+  entry?: boolean;
   onChange: (fields: Record<string, any>) => void;
 }) {
   const seo = seoOf(fields);
@@ -70,8 +70,9 @@ export function SeoForm({ type, title, excerpt, fields, path, pageItems, siteSea
           Remove share image
         </button>
       )}
-      <Toggle title="Hide from search engines (noindex)" value={!!seo.noindex} onChange={(v) => set({ noindex: v })} />
-      {siteSearch && (
+      <Toggle title="Hide from search engines and AI answer engines" value={!!seo.noindex} onChange={(v) => set({ noindex: v })} />
+      <p className="-mt-2 mb-3 text-xs text-admin-muted">Asks Google, Bing and the like not to list this page (noindex), and the crawlers behind ChatGPT, Claude, Perplexity, Google's AI answers and others not to read it (robots.txt), once published. Crawlers that ignore these requests aren't stopped.</p>
+      {entry && (
         <>
           <Toggle title="Leave out of this site's search" value={!!seo.nosearch} onChange={(v) => set({ nosearch: v || undefined })} />
           <p className="-mt-2 mb-3 text-xs text-admin-muted">The site's search page and search box won't list it. It still shows in menus and lists, and to search engines unless noindex is on too.</p>

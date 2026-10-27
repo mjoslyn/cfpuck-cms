@@ -445,7 +445,7 @@ export function EntryForm({ type, value, onChange, templates, pageItems }: { typ
       {!PAGELESS_TYPES.has(type) && (
         <details open className="mt-4 border-t border-admin-ink/10 pt-3">
           <summary className="mb-2 cursor-pointer text-xs font-semibold tracking-wider text-admin-muted uppercase">SEO</summary>
-          <SeoForm type={type} title={value.title} excerpt={value.excerpt} fields={value.fields} path={permalink({ type, slug: value.slug })} pageItems={pageItems} siteSearch onChange={(fields) => set({ fields })} />
+          <SeoForm type={type} title={value.title} excerpt={value.excerpt} fields={value.fields} path={permalink({ type, slug: value.slug })} pageItems={pageItems} entry onChange={(fields) => set({ fields })} />
         </details>
       )}
     </div>

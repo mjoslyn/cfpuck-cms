@@ -171,7 +171,11 @@ categories, search suggestions).
 ## SEO and social
 
 An entry's SEO settings live in `fields.seo` (`src/lib/seo.ts`; `seo` is a reserved field key): search
-title, meta description, share image (media id), noindex and **Leave out of this site's search** (`nosearch`, entries
+title, meta description, share image (media id), **Hide from search engines and AI answer engines** (`noindex`:
+the robots meta tag says `noindex, follow, noai, noimageai`, and `/robots.txt`, `src/pages/robots.txt.ts`,
+disallows the page, or a term page hidden the same way, for the AI crawlers in `AI_CRAWLERS`,
+`src/lib/ai-crawlers.ts`, never for search engines' own; a site's `public/robots.txt` would replace it) and
+**Leave out of this site's search** (`nosearch`, entries
 only: `entry_search` never matches them, so `/search/` and the live results leave them out). `src/render/meta.ts` writes the head
 tags: description, canonical, robots, Open Graph and Twitter card, falling back to the excerpt, the
 featured image and the site's default share image; the home page also gets Organization data with the

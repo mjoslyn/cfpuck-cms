@@ -35,7 +35,8 @@ export async function headMeta(ctx: RenderCtx, docTitle: string): Promise<string
 
   const tags: string[] = [];
   if (description) tags.push(`<meta name="description" content="${attr(description)}" />`);
-  if (seo.noindex) tags.push('<meta name="robots" content="noindex, follow" />');
+  // noindex keeps out search engines and, with noai, the AI tools that read the tag (robots.txt asks the rest).
+  if (seo.noindex) tags.push('<meta name="robots" content="noindex, follow, noai, noimageai" />');
   if (queried.kind !== 'search' && queried.kind !== '404') tags.push(`<link rel="canonical" href="${attr(url)}" />`);
   tags.push(
     `<meta property="og:site_name" content="${attr(siteSettings.name ?? config.name)}" />`,

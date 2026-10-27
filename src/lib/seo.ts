@@ -9,6 +9,8 @@ export interface Seo {
   /** Media id of the image social cards show, and its URL for the editor's preview. */
   image?: number;
   image_url?: string;
+  /** Kept out of search engines (the robots meta tag) and AI answer engines (robots.txt and the tag's
+   * noai; src/lib/ai-crawlers.ts). */
   noindex?: boolean;
   /** Left out of the site's own search (/search/ and the search forms' live results; entry_search). */
   nosearch?: boolean;

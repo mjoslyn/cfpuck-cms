@@ -12,7 +12,12 @@ An entry's SEO settings live in `fields.seo` (`src/lib/seo.ts`; `seo` is a reser
 - search title
 - meta description
 - share image (a media id)
-- noindex
+- **Hide from search engines and AI answer engines** (`noindex`): the robots meta tag says
+  `noindex, follow, noai, noimageai`, and `/robots.txt` (`src/pages/robots.txt.ts`) disallows the page
+  for the crawlers behind AI answers (`AI_CRAWLERS` in `src/lib/ai-crawlers.ts`: GPTBot, ClaudeBot,
+  PerplexityBot, Google-Extended and others), which follow robots.txt rather than the tag. Search
+  engines' own crawlers aren't disallowed, since they must fetch the page to see noindex. Term pages
+  hidden the same way are listed too. A site's own `public/robots.txt` is served instead of this one.
 - leave out of this site's search (`nosearch`; entries only): `entry_search` never matches the entry, so
   `/search/` and the search forms' live results leave it out. Lists, menus and search engines are
   unaffected (noindex is for those).
