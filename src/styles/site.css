@@ -320,7 +320,7 @@ img.is-right {
   text-decoration: none;
 }
 .c-file__button:hover {
-  background: var(--button-hover-bg, var(--color-accent));
+  background: var(--button-hover-bg, var(--color-accent-fill, var(--color-accent)));
 }
 .c-buttons {
   display: flex;
@@ -354,7 +354,7 @@ img.is-right {
   text-align: center;
 }
 .c-button__link:hover {
-  background: var(--button-hover-bg, var(--color-accent));
+  background: var(--button-hover-bg, var(--color-accent-fill, var(--color-accent)));
   color: var(--button-hover-color, var(--color-on-dark));
 }
 .c-button.is-outline > .c-button__link {
@@ -693,7 +693,7 @@ a.c-cover {
   transition: background-color 0.2s, color 0.2s;
 }
 .c-hero__button.is-primary {
-  background: var(--color-accent);
+  background: var(--color-accent-fill, var(--color-accent));
   color: var(--color-on-accent, var(--color-on-dark));
 }
 .c-hero__button.is-secondary {
@@ -1177,7 +1177,7 @@ a.c-cover {
   text-transform: uppercase;
 }
 .c-collection__more-button:hover {
-  background: var(--color-accent);
+  background: var(--color-accent-fill, var(--color-accent));
 }
 .c-collection__more-button[aria-busy="true"] {
   opacity: 0.6;
@@ -1288,7 +1288,7 @@ a.c-cover {
   text-transform: uppercase;
 }
 .c-search-form__button:hover {
-  background: var(--color-accent);
+  background: var(--color-accent-fill, var(--color-accent));
   color: var(--color-on-accent, var(--color-on-dark));
 }
 .c-search-form__button:focus-visible {

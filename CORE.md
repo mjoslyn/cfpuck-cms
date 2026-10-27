@@ -69,8 +69,11 @@ Behaviour never keys off content class names: the core uses block settings (entr
 collection `shuffle`, `query.orderBy: 'rand'`, `query.upcoming`, `columns`, `autoplay`). Core blocks
 output `c-*` classes; a site's classes in content are only styling hooks for its `theme.css`.
 Colors: the core's styles use only role tokens (`--color-text`, `-muted`, `-accent`, `-accent-hover`,
-`-dark`, `-on-dark`, `-on-accent` (optional), `-surface`, `-surface-alt`, `-surface-soft`), which the site's `tokens.css` maps
-onto its own palette (and re-maps inside dark bands). Content and `presets.json` use the palette names.
+`-dark`, `-on-dark`, `-on-accent` (optional), `-accent-fill` (optional: the accent as a background under
+`-on-accent` text, such as the Hero's first button and button hovers; else the accent), `-surface`,
+`-surface-alt`, `-surface-soft`), which the site's `tokens.css` maps
+onto its own palette (and re-maps inside dark bands; a site whose dark bands lighten the accent sets
+`-accent-fill` outside them, so white text on a fill keeps 4.5:1). Content and `presets.json` use the palette names.
 Compose's house style comes from the config's `compose`: colors (bands `plain`/`tint`/`soft`/`dark`,
 body, on-dark, accent and card; role tokens by default), and shapes and type (`headingFont`, `rule`
 between eyebrow and heading, `bodySize`/`bodyWeight`/`bodyLineHeight`, `bandPadding`, `textWidth`,

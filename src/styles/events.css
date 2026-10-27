@@ -312,7 +312,7 @@ a.c-cal__arrow:hover {
   text-decoration: none;
 }
 .c-cal-day.is-today .c-cal-day__num {
-  background: var(--color-accent);
+  background: var(--color-accent-fill, var(--color-accent));
   color: var(--color-on-accent, var(--color-on-dark));
 }
 .c-cal-day__events {

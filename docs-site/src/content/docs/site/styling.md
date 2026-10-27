@@ -49,10 +49,13 @@ They use only **role tokens**, which `tokens.css` maps onto the palette:
 | `--color-accent`, `--color-accent-hover` | Links, buttons, eyebrows |
 | `--color-dark`, `--color-on-dark` | Dark bands and the text on them |
 | `--color-on-accent` | Text on accent fills (optional; falls back to on-dark) |
+| `--color-accent-fill` | The accent as a background under text: the Hero's first button, button and search hovers, today in the calendar (optional; falls back to the accent) |
 | `--color-surface`, `-surface-alt`, `-surface-soft` | Light backgrounds |
 
 Inside dark bands, covers and heroes, `tokens.css` re-maps the palette (lighter accent and muted
-colors) so accent text keeps 4.5:1 contrast.
+colors) so accent text keeps 4.5:1 contrast. A lighter accent can be too light under white text: set
+`--color-accent-fill` on `:root` to a deep enough accent and leave it out of the re-mapping, so filled
+buttons keep 4.5:1 there too.
 
 Other tokens: `--font-display`, `--font-body`, `--text-*` (sizes, `small` to `hero`) and
 `--space-*` (spacing). Block props store styles as CSS that uses these tokens.
