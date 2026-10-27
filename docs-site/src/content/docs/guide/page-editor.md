@@ -43,7 +43,7 @@ last change. You can undo several times.
 | Block | Use it for |
 | --- | --- |
 | **Heading** | A title for a section of the page. |
-| **Paragraph** | Ordinary text. Select words to make them bold, italic or a link. |
+| **Paragraph** | Ordinary text. Select words to make them bold, italic or a link (see Links below). |
 | **List** | Bullet points or numbered steps. |
 | **Image** | One picture. |
 | **Image gallery** | Several pictures as a grid or a slider. |
@@ -64,6 +64,20 @@ Your site may have extra blocks of its own, made for its design.
 Some blocks, like **Section** and **Columns**, hold other blocks. Drag blocks into them. The
 **Outline** on the left shows how everything is nested, and clicking a line there selects that block,
 which helps when blocks are hard to click on the page.
+
+### Links
+
+To make a link, select some words in a text box and click **Link** above it (on a button, click
+**Find** beside its **Link** box). Then:
+
+- **To a page on your site**: start typing its title and pick it from the list (use the arrow keys and
+  Enter, or click it).
+- **To a file**: click **Media library** and pick a picture or a document.
+- **To another website**: paste its address (such as `https://example.org`). Email addresses and phone
+  numbers work too.
+
+Links to other websites open in a new tab unless you untick **Open in a new tab**. To change or remove
+a link, put the cursor in it and click **Link** again.
 
 ## Patterns
 

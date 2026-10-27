@@ -84,9 +84,10 @@ Then link to them from a page in any of these ways:
 
 - **The File block** (in **Blocks**, under Media): shows the document's name, its type and size, and a
   **Download** button. Choose the file in its settings; you can change the link's words and the button.
-- **From some words in a paragraph**: select the words, then click **File** above the text box and pick
-  the document.
-- **From a button** (or an image or hero): click **File** beside its **Link** box and pick the document.
+- **From some words in a paragraph**: select the words, click **Link** above the text box, then
+  **Media library**, and pick the document.
+- **From a button** (or an image or hero): click **Find** beside its **Link** box, then **Media
+  library**, and pick the document.
 
 To put a document's address in an email or a newsletter, open it in **Media** and click **Copy link**.
 Every picture has **Copy link** too.

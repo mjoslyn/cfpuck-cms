@@ -482,10 +482,20 @@ a PDF without the sandbox (Chrome's viewer refuses a sandboxed one; nosniff keep
 OpenDocument files as downloads, everything else sandboxed. `media.filesize` (bytes) is kept for
 documents, videos and new images. The library shows documents with their type and size; their details
 panel previews a PDF and has title and caption (no alt text or focal points). Every file's details have
-**Copy link** (its full address). Links reach documents three ways: the **File** block (`file`: the
-document's name, type and size and a Download button; or any address), **File** on a link field
-(`LinkInput`: Button, Image and Hero links) and **File** in a rich text toolbar (links the selected
-words), each opening the media library on documents (`MediaModal only="document"`).
+**Copy link** (its full address). Links reach documents through the **File** block (`file`: the
+document's name, type and size and a Download button; or any address, the media library opening on
+documents, `MediaModal only="document"`) and the link picker.
+
+**Link picker** (`src/puck/LinkPicker.tsx`): the rich text toolbars' **Link** (page blocks, `RichText`,
+and emails, `RichMessage`) and **Find** beside link fields (`LinkInput`: Button, Image and Hero links)
+open it in place of a browser prompt. Typing searches the entries of types with pages by title
+(drafts marked; the latest edited when empty) and links to their address (`permalink`); an address
+typed in is taken as one (`typedAddress`, `src/lib/link-address.ts`: web addresses, a bare domain with
+https://, email addresses as mailto:, phone numbers as tel:, paths, anchors and merge tags); **Media
+library** links any file (`MediaModal only="all"`). In rich text, **Open in a new tab** (ticked for
+other sites) sets `target="_blank" rel="noopener"`, nothing selected inserts the entry's title or file's
+name as the linked words, and the cursor inside a link edits it (its address filled in, **Remove
+link**). Emails' site addresses are made absolute (`absolute`).
 
 Uploads (`/api/admin/media`) are processed by `src/lib/media/process.ts` through an image engine
 (`src/lib/media/engine.ts`: Cloudflare Images, the Worker's `IMAGES` binding; scripts in Node pass

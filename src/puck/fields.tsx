@@ -7,6 +7,7 @@ import { mediaUrl } from '../lib/media/image';
 import { uploadMedia } from '../lib/media/upload';
 import { DOC_ACCEPT, DOC_TYPES, docLabel, isDocument } from '../lib/media/documents';
 import type { Media } from '../lib/types';
+import { LinkPicker, linkSelection, selectionToLink, unlinkSelection } from './LinkPicker';
 
 type Attrs = Record<string, any>;
 type Set = (patch: Attrs) => void;
@@ -44,19 +45,19 @@ export function Text({ title, value, onChange, placeholder }: { title: string; v
   );
 }
 
-/** A link's address: typed, or a document or file from the media library (Choose a file). */
+/** A link's address: typed, or chosen (Find: the site's pages and posts, the media library, any address). */
 export function LinkInput({ title, value, onChange, placeholder }: { title: string; value: any; onChange: (v: string) => void; placeholder?: string }) {
   const [picking, setPicking] = useState(false);
   return (
-    <Row title={title}>
+    <FieldGroup title={title}>
       <div className="flex gap-1.5">
-        <input className={input} value={value ?? ''} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />
-        <button type="button" className="shrink-0 rounded border border-admin-ink/15 bg-white px-2 text-xs hover:border-admin-accent hover:text-admin-accent" title="Link to a document or file in the media library" onClick={() => setPicking(true)}>
-          File
+        <input className={input} value={value ?? ''} placeholder={placeholder} aria-label={title} onChange={(e) => onChange(e.target.value)} />
+        <button type="button" className="shrink-0 rounded border border-admin-ink/15 bg-white px-2 text-xs hover:border-admin-accent hover:text-admin-accent" title="Find a page or post, a file in the media library, or paste an address" onClick={() => setPicking((p) => !p)}>
+          Find
         </button>
       </div>
-      {picking && <MediaModal only="document" onClose={() => setPicking(false)} onSelect={(m) => (onChange(m.url), setPicking(false))} />}
-    </Row>
+      {picking && <LinkPicker initial={value ?? ''} newTabOption={false} onPick={(p) => (onChange(p.url), setPicking(false))} onClose={() => setPicking(false)} />}
+    </FieldGroup>
   );
 }
 
@@ -135,23 +136,9 @@ export function ColorPicker({ title, value, onChange }: { title: string; value: 
 /** Minimal rich text: contentEditable with bold / italic / link (to an address, or a file in the media library). Stores inline HTML. */
 export function RichText({ title, value, onChange }: { title: string; value: string; onChange: (v: string) => void }) {
   const ref = useRef<HTMLDivElement>(null);
-  // Linking to a file: the selection is kept while the media library is open, then linked.
-  const [pickingFile, setPickingFile] = useState(false);
-  const kept = useRef<Range | null>(null);
-  const linkFile = (url: string) => {
-    setPickingFile(false);
-    const sel = window.getSelection();
-    if (!kept.current || !sel) return;
-    ref.current?.focus();
-    sel.removeAllRanges();
-    sel.addRange(kept.current);
-    if (kept.current.collapsed) {
-      // Nothing selected: the file's address becomes the link's text.
-      document.execCommand('insertHTML', false, `<a href="${url.replace(/"/g, '&quot;')}">${url.split('/').pop()}</a>`);
-      onChange(ref.current?.innerHTML ?? '');
-    } else cmd('createLink', url);
-    kept.current = null;
-  };
+  // Linking: the selection is kept while the link picker has focus, then linked.
+  const [linking, setLinking] = useState<ReturnType<typeof selectionToLink> | null>(null);
+  const openLink = () => ref.current && setLinking(selectionToLink(ref.current));
   useEffect(() => {
     if (ref.current && ref.current.innerHTML !== (value ?? '')) ref.current.innerHTML = value ?? '';
   }, [value]);
@@ -174,32 +161,24 @@ export function RichText({ title, value, onChange }: { title: string; value: str
         <div className="flex gap-1 border-b border-admin-ink/10 px-1 py-1 text-xs">
           <button type="button" className="rounded px-2 py-0.5 font-bold hover:bg-admin-soft" onMouseDown={(e) => (e.preventDefault(), cmd('bold'))}>B</button>
           <button type="button" className="rounded px-2 py-0.5 italic hover:bg-admin-soft" onMouseDown={(e) => (e.preventDefault(), cmd('italic'))}>I</button>
-          <button type="button" className="rounded px-2 py-0.5 underline hover:bg-admin-soft" onMouseDown={(e) => { e.preventDefault(); const url = prompt('Link URL'); if (url) cmd('createLink', url); }}>Link</button>
-          <button
-            type="button"
-            title="Link the selected words to a document or file in the media library"
-            className="rounded px-2 py-0.5 hover:bg-admin-soft"
-            onMouseDown={(e) => {
-              e.preventDefault();
-              const sel = window.getSelection();
-              kept.current = sel && sel.rangeCount && ref.current?.contains(sel.anchorNode) ? sel.getRangeAt(0).cloneRange() : null;
-              if (!kept.current && ref.current) {
-                // No cursor in the text: link at its end.
-                const r = document.createRange();
-                r.selectNodeContents(ref.current);
-                r.collapse(false);
-                kept.current = r;
-              }
-              setPickingFile(true);
-            }}
-          >
-            File
-          </button>
+          <button type="button" title="Link the selected words to a page, a file or any address" className="rounded px-2 py-0.5 underline hover:bg-admin-soft" onMouseDown={(e) => (e.preventDefault(), openLink())}>Link</button>
           <button type="button" className="rounded px-2 py-0.5 hover:bg-admin-soft" onMouseDown={(e) => (e.preventDefault(), cmd('unlink'))}>Unlink</button>
         </div>
         <div ref={ref} contentEditable suppressContentEditableWarning role="textbox" aria-multiline="true" aria-label={title} className="min-h-16 cursor-text px-2 py-1.5 text-sm outline-none" onInput={() => onChange(ref.current?.innerHTML ?? '')} />
       </div>
-      {pickingFile && <MediaModal only="document" onClose={() => setPickingFile(false)} onSelect={(m) => linkFile(m.url)} />}
+      {linking && (
+        <LinkPicker
+          initial={linking.href}
+          initialNewTab={linking.href ? linking.newTab : undefined}
+          onPick={(p) => {
+            linkSelection(ref.current!, linking.range, p);
+            setLinking(null);
+            onChange(ref.current?.innerHTML ?? '');
+          }}
+          onRemove={linking.href != null ? () => (unlinkSelection(ref.current!, linking.range), setLinking(null), onChange(ref.current?.innerHTML ?? '')) : undefined}
+          onClose={() => setLinking(null)}
+        />
+      )}
     </FieldGroup>
   );
 }
@@ -264,7 +243,7 @@ type Picked = { url: string; id: number | null; mediaId?: number; alt: string; w
  * `multiple`, tiles toggle a selection (images and videos, or `only` one kind) confirmed with "Add"
  * (onSelectMany).
  */
-export function MediaModal({ onClose, onSelect, multiple, onSelectMany, only }: { onClose: () => void; onSelect?: (m: Picked) => void; multiple?: boolean; onSelectMany?: (list: Picked[]) => void; only?: 'image' | 'video' | 'document' }) {
+export function MediaModal({ onClose, onSelect, multiple, onSelectMany, only }: { onClose: () => void; onSelect?: (m: Picked) => void; multiple?: boolean; onSelectMany?: (list: Picked[]) => void; only?: 'image' | 'video' | 'document' | 'all' }) {
   const [items, setItems] = useState<Media[]>([]);
   const [picked, setPicked] = useState<Media[]>([]);
   const asPicked = (m: Media): Picked => ({ url: mediaUrl(m.path), id: m.id, mediaId: m.id, alt: m.alt, width: m.width, height: m.height, kind: m.mime_type.startsWith('video/') ? 'video' : isDocument(m.mime_type) ? 'document' : 'image', name: m.title || m.path.split('/').pop() });
@@ -273,7 +252,7 @@ export function MediaModal({ onClose, onSelect, multiple, onSelectMany, only }: 
   const [busy, setBusy] = useState(false);
   const load = async () => {
     let query = browserClient().from('media').select('*').order('created_at', { ascending: false }).limit(multiple ? 200 : 120);
-    query = only === 'document' ? query.in('mime_type', [...new Set(Object.values(DOC_TYPES).map((t) => t.mime))]) : multiple && !only ? query.or('mime_type.like.image/%,mime_type.like.video/%') : query.like('mime_type', `${only ?? 'image'}/%`);
+    query = only === 'all' ? query : only === 'document' ? query.in('mime_type', [...new Set(Object.values(DOC_TYPES).map((t) => t.mime))]) : multiple && !only ? query.or('mime_type.like.image/%,mime_type.like.video/%') : query.like('mime_type', `${only ?? 'image'}/%`);
     if (q) query = query.or(`title.ilike.%${q}%,path.ilike.%${q}%,alt.ilike.%${q}%`);
     const { data } = await query;
     setItems((data as Media[]) ?? []);

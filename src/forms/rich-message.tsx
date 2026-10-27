@@ -1,7 +1,8 @@
 // Rich text for email messages (with "Insert field value"), used by the form builder and the email
 // builder's Text block, and the merge tags a form offers. The tags offered are the caller's: a form's
 // fields, or a ticket order's details.
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { LinkPicker, linkSelection, selectionToLink, unlinkSelection } from '../puck/LinkPicker';
 import { INPUT_TYPES } from '../lib/forms/logic';
 import type { FormDef } from '../lib/forms/types';
 
@@ -37,6 +38,7 @@ export const messageHtml = (v: string) =>
 export function RichMessage({ label, value, tags, onChange }: { label: string; value: string | undefined; tags: [string, string][]; onChange: (v: string) => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const range = useRef<Range | null>(null);
+  const [linking, setLinking] = useState<ReturnType<typeof selectionToLink> | null>(null);
   useEffect(() => {
     const html = messageHtml(value ?? '');
     if (ref.current && ref.current.innerHTML !== html) ref.current.innerHTML = html;
@@ -77,7 +79,7 @@ export function RichMessage({ label, value, tags, onChange }: { label: string; v
           <button type="button" className={`${tool} font-bold`} onMouseDown={(e) => (e.preventDefault(), cmd('bold'))} title="Bold" aria-label="Bold">B</button>
           <button type="button" className={`${tool} italic`} onMouseDown={(e) => (e.preventDefault(), cmd('italic'))} title="Italic" aria-label="Italic">I</button>
           <button type="button" className={tool} onMouseDown={(e) => (e.preventDefault(), cmd('insertUnorderedList'))} title="Bulleted list" aria-label="Bulleted list">List</button>
-          <button type="button" className={`${tool} underline`} onMouseDown={(e) => { e.preventDefault(); keepRange(); const url = prompt('Link address'); if (url) { const sel = window.getSelection(); if (range.current) { sel?.removeAllRanges(); sel?.addRange(range.current); } cmd('createLink', url); } }} title="Link" aria-label="Link">Link</button>
+          <button type="button" className={`${tool} underline`} onMouseDown={(e) => (e.preventDefault(), ref.current && setLinking(selectionToLink(ref.current)))} title="Link to a page, a file or any address" aria-label="Link">Link</button>
           <button type="button" className={tool} onMouseDown={(e) => (e.preventDefault(), cmd('unlink'))} title="Remove link" aria-label="Remove link">Unlink</button>
           <span className="ml-auto">
             <MergeTags tags={tags} onInsert={insertTag} />
@@ -97,6 +99,16 @@ export function RichMessage({ label, value, tags, onChange }: { label: string; v
           onBlur={keepRange}
         />
       </div>
+      {linking && (
+        <LinkPicker
+          absolute
+          initial={linking.href}
+          initialNewTab={linking.href ? linking.newTab : undefined}
+          onPick={(p) => (linkSelection(ref.current!, linking.range, p), setLinking(null), emit())}
+          onRemove={linking.href != null ? () => (unlinkSelection(ref.current!, linking.range), setLinking(null), emit()) : undefined}
+          onClose={() => setLinking(null)}
+        />
+      )}
     </div>
   );
 }

@@ -51,6 +51,21 @@ The left rail has **Blocks** (and **Patterns**), **Outline** and an **accessibil
 with `types` are offered only on those entry types. A **Compose** panel docks beside the canvas
 ([Compose](../compose/)).
 
+## Link picker
+
+Rich text toolbars (**Link**: page blocks and emails) and link fields (**Find**: Button, Image, Hero)
+open the link picker (`src/puck/LinkPicker.tsx`) instead of a browser prompt:
+
+- Typing searches entries of types with pages by title (drafts marked; the latest edited when empty)
+  and links to their address.
+- An address typed in is used as is (`typedAddress`, `src/lib/link-address.ts`): web addresses (a bare
+  domain gets `https://`), email addresses (`mailto:`), phone numbers (`tel:`), paths, anchors and
+  merge tags.
+- **Media library** links any file.
+- In rich text, **Open in a new tab** (ticked for other sites) adds `target="_blank" rel="noopener"`;
+  with nothing selected the entry's title or file's name becomes the linked words; with the cursor in a
+  link it edits that link, with **Remove link**. Emails get full addresses for the site's own pages.
+
 ## Saving and publishing
 
 - **Save draft** keeps changes to a published page aside (`entry_drafts`) while the live page stays

@@ -16,9 +16,8 @@ sandboxed answer (nosniff keeps it a PDF); Office and OpenDocument files as down
 keeps the size. A document's details panel previews a PDF and edits its title and caption; every file
 has **Copy link**.
 
-Pages link to documents with the **File** block (`file`; see [Blocks](../../content/blocks/)), with
-**File** beside a link field (`LinkInput`: Button, Image, Hero) and with **File** in a text box's
-toolbar, which links the selected words.
+Pages link to documents with the **File** block (`file`; see [Blocks](../../content/blocks/)) and with
+the link picker's **Media library** (see [Editor](../editor/#link-picker)).
 
 ## Uploads
 
