@@ -171,7 +171,8 @@ categories, search suggestions).
 ## SEO and social
 
 An entry's SEO settings live in `fields.seo` (`src/lib/seo.ts`; `seo` is a reserved field key): search
-title, meta description, share image (media id) and noindex. `src/render/meta.ts` writes the head
+title, meta description, share image (media id), noindex and **Leave out of this site's search** (`nosearch`, entries
+only: `entry_search` never matches them, so `/search/` and the live results leave them out). `src/render/meta.ts` writes the head
 tags: description, canonical, robots, Open Graph and Twitter card, falling back to the excerpt, the
 featured image and the site's default share image; the home page also gets Organization data with the
 social profiles as `sameAs`. Compose includes `seo` in every `build_page` and writes it (marked
@@ -328,7 +329,8 @@ search, such as the event calendar's `?q=`, use it too). It is ranked by relevan
 `entry_search` gives the best 1,000 published matches of the types searched (events only while on) by
 BM25, title weighing 10, excerpt 4, text 1; newest
 first on ties), in the types chosen under Settings > Search (`searchTypes`,
-`settings.site.search_types`; all types with a page by default). It renders the `search` template
+`settings.site.search_types`; all types with a page by default), leaving out entries whose SEO settings say so
+(`seo.nosearch`). It renders the `search` template
 (migration 0021, `src/lib/content/search-template.ts`), else `index`; the page is noindex. The
 `search-form` block is a GET form to `/search/`. On any page with a `.c-search-form`, the page shell
 adds `public/assets/js/search.js`: live results from `GET /api/search?q=&limit=` (JSON, CDN-cached a

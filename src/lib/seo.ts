@@ -1,6 +1,6 @@
 // SEO settings of an entry, kept in its fields under the reserved key `seo` (so drafts, previews and
 // revisions carry them): the title and description search engines and social cards show, the share
-// image, and noindex. Compose fills them when it builds a page (`generated`), unless someone has
+// image, noindex, and whether the site's own search leaves it out (nosearch). Compose fills them when it builds a page (`generated`), unless someone has
 // edited them since.
 import { decodeEntities } from './text/entities';
 export interface Seo {
@@ -10,6 +10,8 @@ export interface Seo {
   image?: number;
   image_url?: string;
   noindex?: boolean;
+  /** Left out of the site's own search (/search/ and the search forms' live results; entry_search). */
+  nosearch?: boolean;
   /** Written by Compose and not edited since, so the next build may rewrite it. */
   generated?: boolean;
 }

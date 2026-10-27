@@ -84,7 +84,8 @@ settings on the right:
 - **Excerpt**: a sentence or two summing up the page, shown in lists of pages.
 - **Featured image**: the picture used for this page in lists and when it is shared on social media.
 - **Tags** and categories: see [Pages and posts](/cfpuck-cms/guide/pages-and-posts/).
-- **SEO**: how the page appears in Google. **Generate** can write these for you.
+- **SEO**: how the page appears in Google. **Generate** can write these for you. **Leave out of this
+  site's search** stops the page appearing in your own site's search (it still shows in menus and lists).
 
 Events and other kinds of content have their own extra settings here too, such as dates and venues.
 

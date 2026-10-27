@@ -13,6 +13,9 @@ An entry's SEO settings live in `fields.seo` (`src/lib/seo.ts`; `seo` is a reser
 - meta description
 - share image (a media id)
 - noindex
+- leave out of this site's search (`nosearch`; entries only): `entry_search` never matches the entry, so
+  `/search/` and the search forms' live results leave it out. Lists, menus and search engines are
+  unaffected (noindex is for those).
 
 The entry settings' SEO section (`src/puck/SeoForm.tsx`) shows lengths and a search result preview.
 **Generate** asks Claude (`POST /api/admin/seo`, `ANTHROPIC_SEO_MODEL`, default Haiku 4.5) for text

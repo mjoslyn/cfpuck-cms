@@ -14,7 +14,8 @@ relevance (`Loader.queryRanked`, the `entry_search` function): BM25 with words i
 most, then the excerpt, then the text; newest first on ties. The best 1,000 matches are ranked.
 
 It searches the types chosen under Settings > Search (`settings.site.search_types`, `searchTypes`);
-by default all types with a page. It renders the `search` template (`src/lib/content/search-template.ts`),
+by default all types with a page. Entries whose SEO settings say **Leave out of this site's search**
+(`fields.seo.nosearch`) never match. It renders the `search` template (`src/lib/content/search-template.ts`),
 else `index`. The page is noindex.
 
 ## The search form

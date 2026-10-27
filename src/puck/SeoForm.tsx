@@ -10,13 +10,15 @@ function Count({ n, max }: { n: number; max: number }) {
   return <span className={`ml-2 text-[11px] ${n > max ? 'text-[#b3261e]' : 'text-admin-muted'}`}>{n}/{max}</span>;
 }
 
-export function SeoForm({ type, title, excerpt, fields, path, pageItems, onChange }: {
+export function SeoForm({ type, title, excerpt, fields, path, pageItems, siteSearch = false, onChange }: {
   type: string;
   title: string;
   excerpt: string;
   fields: Record<string, any>;
   path: string;
   pageItems?: () => any[];
+  /** An entry, which the site's own search lists (terms aren't): offers leaving it out. */
+  siteSearch?: boolean;
   onChange: (fields: Record<string, any>) => void;
 }) {
   const seo = seoOf(fields);
@@ -69,6 +71,12 @@ export function SeoForm({ type, title, excerpt, fields, path, pageItems, onChang
         </button>
       )}
       <Toggle title="Hide from search engines (noindex)" value={!!seo.noindex} onChange={(v) => set({ noindex: v })} />
+      {siteSearch && (
+        <>
+          <Toggle title="Leave out of this site's search" value={!!seo.nosearch} onChange={(v) => set({ nosearch: v || undefined })} />
+          <p className="-mt-2 mb-3 text-xs text-admin-muted">The site's search page and search box won't list it. It still shows in menus and lists, and to search engines unless noindex is on too.</p>
+        </>
+      )}
     </div>
   );
 }
