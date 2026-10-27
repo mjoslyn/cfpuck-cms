@@ -1,6 +1,8 @@
-// One short Claude call that answers through a tool (a fixed shape): the SEO section's Generate, the
-// excerpt's Write with Claude, a term's or taxonomy's Write with Claude, and an image's alt text (Generate in
-// the media library, with the image). ANTHROPIC_SEO_MODEL (default Haiku 4.5, which is quick).
+// One short Claude call that answers in a fixed shape: the SEO section's Generate, the excerpt's Write
+// with Claude, a term's or taxonomy's Write with Claude, and an image's alt text (Generate in the media
+// library, with the image). ANTHROPIC_SEO_MODEL (default Haiku 4.5, which is quick). The answer comes as
+// JSON in the shape's schema (structured outputs, output_config.format), not a forced tool call: newer
+// models (Claude Sonnet 5.5, Opus 5.5, Fable 5.1) refuse tool_choice "tool".
 import type Anthropic from '@anthropic-ai/sdk';
 import { site } from '../site';
 import { claudeClient, env, NO_KEY } from './client';
@@ -11,19 +13,45 @@ export class QuickError extends Error {
   }
 }
 
-/** Ask for `tool`'s input, given a task (system text after the site's brief) and the page. */
-export async function quickAsk<T>(task: string, tool: { name: string; description: string; input_schema: Record<string, any> }, page: string | Anthropic.ContentBlockParam[], maxTokens = 500): Promise<T> {
+/** Keys structured outputs don't take (the descriptions say the limits in words). */
+const UNSUPPORTED = new Set(['minLength', 'maxLength', 'minimum', 'maximum', 'exclusiveMinimum', 'exclusiveMaximum', 'multipleOf', 'minItems', 'maxItems', 'pattern']);
+
+/** A shape's schema as structured outputs takes it: every object closed, unsupported limits left out. */
+export function outputSchema(schema: unknown): unknown {
+  if (Array.isArray(schema)) return schema.map(outputSchema);
+  if (!schema || typeof schema !== 'object') return schema;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(schema)) {
+    if (UNSUPPORTED.has(k)) continue;
+    out[k] = k === 'properties' && v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([p, d]) => [p, outputSchema(d)])) : outputSchema(v);
+  }
+  if (out.type === 'object') out.additionalProperties = false;
+  return out;
+}
+
+/** The answer to a quick call: its JSON, else a QuickError saying why there is none. */
+export function quickAnswer<T>(res: Pick<Anthropic.Message, 'content' | 'stop_reason'>): T {
+  if (res.stop_reason === 'refusal') throw new QuickError('Claude declined to write this. Try different notes, or write it yourself.', 502);
+  if (res.stop_reason === 'max_tokens') throw new QuickError('The answer was cut off. Try again.', 502);
+  const text = res.content.map((c) => (c.type === 'text' ? c.text : '')).join('').trim();
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new QuickError('No suggestion came back.', 502);
+  }
+}
+
+/** Ask for an answer in `shape`'s schema, given a task (system text after the site's brief) and the page. */
+export async function quickAsk<T>(task: string, shape: { name: string; description: string; input_schema: Record<string, any> }, page: string | Anthropic.ContentBlockParam[], maxTokens = 500): Promise<T> {
   const client = claudeClient();
   if (!client) throw new QuickError(NO_KEY, 503);
   const res = await client.messages.create({
     model: env('ANTHROPIC_SEO_MODEL') || 'claude-haiku-4-5-20251001',
-    max_tokens: maxTokens,
-    system: `You write for "${site.name}", the ${site.organization} site. ${site.brief}\n${task} Use only facts in the page. American English.`,
-    tools: [tool as any],
-    tool_choice: { type: 'tool', name: tool.name },
+    // Models that think first (on by default on the newest ones) need room for it before the answer.
+    max_tokens: Math.max(maxTokens, 8000),
+    system: `You write for "${site.name}", the ${site.organization} site. ${site.brief}\n${task} Answer with ${shape.description.charAt(0).toLowerCase()}${shape.description.slice(1).replace(/\.$/, '')}. Use only facts in the page. American English.`,
+    output_config: { format: { type: 'json_schema', schema: outputSchema(shape.input_schema) as Record<string, unknown> } },
     messages: [{ role: 'user', content: page }],
   });
-  const out = res.content.find((c) => c.type === 'tool_use')?.input as T | undefined;
-  if (!out) throw new QuickError('No suggestion came back.', 502);
-  return out;
+  return quickAnswer<T>(res);
 }
