@@ -67,6 +67,10 @@ with `types` are offered only on those entry types. A **Compose** panel docks be
   stays as it is. Autosaves don't clear the page cache, and a placeholder address stays one until a
   manual save. If someone else saved meanwhile, autosave stops and the next manual save asks.
   Templates and layout mode don't autosave: their changes apply to every page using them.
+- **Leaving with unsaved changes**: a link out of the editor (such as ← back to the list) asks
+  **Save your changes?**: save (as Save draft, or Save & apply for templates and layout mode) and go,
+  leave without saving, or stay. Reloading, closing the tab or the browser's Back get the browser's own
+  prompt. Templates and layout mode show "Unsaved changes" in the header too.
 - **Revisions** (left rail): the page's saved versions, to preview or restore. Each manual save
   (Save draft, Publish, Unpublish) is a **checkpoint**; autosaves between them keep one version per
   ten minutes of editing (`src/lib/admin/revisions.ts`). **Checkpoints only** hides the autosaves.

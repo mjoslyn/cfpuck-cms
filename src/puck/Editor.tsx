@@ -126,6 +126,7 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
         setChrome([]);
         setInitial(data);
         dataRef.current = data;
+        savedJson.current = docJson(data);
         return;
       }
 
@@ -194,6 +195,7 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
         const data = { root: { props: {} }, content: await inlinePatterns(tplItems, loader) } as Data;
         setInitial(data);
         dataRef.current = data;
+        savedJson.current = docJson(data);
       }
     })().catch((err) => setError(String(err?.message ?? err)));
   }, []);
@@ -360,12 +362,52 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
   );
 
 
+  // Leaving with unsaved changes: the browser asks on reload, close and back (it allows no dialog of
+  // our own there); a link on the page opens the save dialog instead (LeaveDialog).
+  const dirtyRef = useRef(false);
+  dirtyRef.current = dirty;
+  const allowLeave = useRef(false);
+  const [leaving, setLeaving] = useState<string | null>(null);
   useEffect(() => {
     if (!dirty) return;
-    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    const warn = (e: BeforeUnloadEvent) => {
+      if (!allowLeave.current) e.preventDefault();
+    };
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
   }, [dirty]);
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (!dirtyRef.current || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const link = (e.target as HTMLElement | null)?.closest?.('a[href]') as HTMLAnchorElement | null;
+      if (!link || (link.target && link.target !== '_self') || link.hasAttribute('download')) return;
+      const to = new URL(link.href, location.href);
+      // Opening in another tab, or a jump within this page, leaves nothing behind.
+      if (to.origin === location.origin && to.pathname === location.pathname && to.search === location.search) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setLeaving(to.href);
+    };
+    document.addEventListener('click', onClick, true);
+    return () => document.removeEventListener('click', onClick, true);
+  }, []);
+  /** Whether anything in the editor isn't saved: the document, or the page's settings. */
+  const unsavedNow = () => {
+    const data = (puckRef.current?.().appState.data as Data | undefined) ?? dataRef.current;
+    return !!data && (docJson(data) !== savedJson.current || (!!stateRef.current && JSON.stringify(stateRef.current) !== savedEntry.current));
+  };
+  const leaveTo = (href: string) => {
+    allowLeave.current = true;
+    location.href = href;
+  };
+  /** The dialog's Save: as Save draft does (content mode) or Save & apply (layouts), then leave if it all saved. */
+  const saveAndLeave = async () => {
+    const href = leaving;
+    if (!href) return;
+    await save(mode === 'content' && entry && !template ? 'draft' : 'save');
+    if (unsavedNow()) return setLeaving(null);
+    leaveTo(href);
+  };
 
   /** The version last restored: its id, and the page as saving would store it then and before restoring (to tell if it was edited or undone). */
   const restoredRef = useRef<{ id: number; json: string; before: string } | null>(null);
@@ -600,7 +642,7 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
                   )}
                 </span>
               )}
-              {!(entry && mode === 'content') && status && <span className="text-xs text-admin-muted">{status}</span>}
+              {!(entry && mode === 'content') && (dirty || status) && <span className={`text-xs ${dirty && !status.startsWith('Restored') ? 'text-admin-accent' : 'text-admin-muted'}`}>{dirty && !status.startsWith('Restored') && !status.startsWith('Not ') ? 'Unsaved changes' : status}</span>}
               {(entry || template) && (
                 <button type="button" onClick={() => setComposeOpen((v) => !v)} aria-pressed={composeOpen} className={`whitespace-nowrap rounded border px-3 py-1.5 text-sm ${composeOpen ? 'border-admin-accent text-admin-accent' : 'border-admin-ink/15 hover:border-admin-accent hover:text-admin-accent'}`}>
                   Compose
@@ -644,6 +686,16 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
     </EnvContext.Provider>
     </div>
     </div>
+    {leaving && (
+      <LeaveDialog
+        saveLabel={mode === 'content' && entry && !template ? (liveStatus === 'publish' ? 'Save as unpublished changes' : 'Save draft') : 'Save & apply'}
+        note={mode === 'content' && entry && !template ? (liveStatus === 'publish' ? 'The live page stays as it is until you publish.' : null) : 'Save & apply changes every page using this template.'}
+        saving={saving}
+        onSave={saveAndLeave}
+        onDiscard={() => leaveTo(leaving)}
+        onStay={() => setLeaving(null)}
+      />
+    )}
     {(entry || template) && composeOpen && (
       <aside className="h-screen w-[400px] shrink-0 border-l border-admin-ink/10" aria-label="Compose with Claude">
         <Composer
@@ -663,6 +715,38 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
 }
 
 const usePuckSelector = createUsePuck();
+
+/** Asked when a link would leave the editor with unsaved changes: save first, leave without saving, or stay. */
+function LeaveDialog({ saveLabel, note, saving, onSave, onDiscard, onStay }: { saveLabel: string; note: string | null; saving: boolean; onSave: () => void; onDiscard: () => void; onStay: () => void }) {
+  const first = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    first.current?.focus();
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && onStay();
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, []);
+  return (
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-admin-ink/40 p-4" onClick={(e) => e.target === e.currentTarget && onStay()}>
+      <div role="alertdialog" aria-modal="true" aria-labelledby="leave-title" aria-describedby="leave-text" className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
+        <h2 id="leave-title" className="text-lg">Save your changes?</h2>
+        <p id="leave-text" className="mt-1 text-sm text-admin-muted">
+          You have changes that aren't saved. {note}
+        </p>
+        <div className="mt-5 flex flex-wrap justify-end gap-2 text-sm">
+          <button type="button" onClick={onStay} className="rounded px-3 py-1.5 text-admin-muted hover:text-admin-ink">
+            Stay
+          </button>
+          <button type="button" onClick={onDiscard} className="rounded border border-admin-ink/20 px-3 py-1.5 hover:border-[#c4592a] hover:text-[#c4592a]">
+            Leave without saving
+          </button>
+          <button ref={first} type="button" disabled={saving} onClick={onSave} className="rounded bg-admin-ink px-4 py-1.5 font-medium text-white hover:bg-admin-accent disabled:opacity-50">
+            {saving ? 'Saving…' : saveLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /** The document as saved: each linked pattern collapsed to its reference and this page's content changes. */
 async function collapseLinkedPatterns(data: Data): Promise<{ data: Data; detached: number }> {

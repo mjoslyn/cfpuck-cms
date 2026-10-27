@@ -1012,7 +1012,10 @@ unchanged; unpublished pages save in place as drafts. **Autosave**: a page's con
 save the same way 3 seconds after the last edit (at most 30 seconds after the first unsaved one), sent
 as `autosave` with the draft, which the middleware doesn't purge the page cache for and which leaves a
 placeholder address as it is; a 409 stops autosave until a manual save, and saves go one at a time.
-Templates and layout mode don't autosave. Saved versions are in `revisions`, listed in the editor's
+Templates and layout mode don't autosave. Unsaved changes are tracked in every mode (the header says
+so); a link that would leave the editor with some opens **Save your changes?** (`LeaveDialog`: save as
+Save draft does, or Save & apply for layouts, then go; leave without saving; or stay), and reloading,
+closing or going back gets the browser's own prompt. Saved versions are in `revisions`, listed in the editor's
 Revisions panel (preview, restore): each manual save is a checkpoint, a row of its own; autosaves
 between them keep one row, written over while it is the same person's and begun less than ten minutes
 ago (`recordRevision`, `src/lib/admin/revisions.ts`; `created_at` when the stretch began, `saved_at`
