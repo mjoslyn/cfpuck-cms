@@ -47,10 +47,6 @@ the logo's image is missing on the other copy).
 (`BlockView.tsx` parses the HTML to React; slots become the block's inner wrapper element). What you
 see while editing is the site's own markup.
 
-The right panel (the page's settings, or the selected block's) hides with **Hide settings** at the end
-of the header for a wider canvas, and comes back with **Settings**; the browser remembers which, in the
-page editor and the email builder alike.
-
 The left rail has **Blocks** (and **Patterns**), **Outline** and an **accessibility check**. Blocks
 with `types` are offered only on those entry types. A **Compose** panel docks beside the canvas
 ([Compose](../compose/)).

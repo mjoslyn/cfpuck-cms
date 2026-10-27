@@ -950,10 +950,7 @@ for admins, as is the redirects API (`ADMIN_ONLY` in `src/middleware.ts`; settin
 `src/lib/db/policies.ts`; the users API checks the role itself too, since making accounts is the server's). Editors are trusted with the
 site's markup: the HTML block (and an Embed block's HTML) is put on the page as written, at the admin's
 own address, so a script in it runs as whoever views the page, an admin included. `src/puck/Editor.tsx` renders blocks through the same string renderer inside Puck
-(`BlockView.tsx` parses HTML to React; slots become the block's inner wrapper element). The right panel
-(the page's and blocks' settings) hides and shows from **Hide settings** / **Settings** at the end of
-the header, here and in the email builder (`src/puck/RightPanel.tsx`; remembered per browser, whichever
-toggle changed it, Puck's own included). The left rail
+(`BlockView.tsx` parses HTML to React; slots become the block's inner wrapper element). The left rail
 has Blocks (and Patterns), Outline and an accessibility check (`A11yPanel.tsx`). Problems a person has to judge
 (warnings, and text over an image, which is always a problem since its contrast can't be measured) can be
 marked as checked with a note; the marks live in the document's root props (`a11y`), save on their own as

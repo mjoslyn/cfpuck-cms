@@ -17,7 +17,6 @@ import { EventsQueryField, useEmailEvents } from './email-events';
 import { useEventsOn } from '../puck/member-settings';
 import { EntriesQueryField, useEmailEntries } from '../admin/email-entries';
 import { EmailTemplates } from './EmailTemplates';
-import { RightPanelToggle, rightPanelUi } from '../puck/RightPanel';
 import type { TemplateKit } from '../lib/email-templates';
 
 /** An email as it would be sent, for the Preview tab. */
@@ -295,8 +294,6 @@ export default function EmailBuilder({ title, kit, design: start, text, note, on
   // Using a template starts Puck again from it.
   const [generation, setGeneration] = useState(0);
   const [showTemplates, setShowTemplates] = useState(false);
-  // Puck's starting UI, read once (a new object would reset its state).
-  const [startUi] = useState(rightPanelUi);
 
   return (
     <div className="fixed inset-0 z-[900] flex flex-col bg-white" role="dialog" aria-modal="true" aria-label={title}>
@@ -335,8 +332,7 @@ export default function EmailBuilder({ title, kit, design: start, text, note, on
                   onChange({ design: d as unknown as EmailDoc });
                 }}
                 headerTitle={'\u200b'}
-                overrides={{ headerActions: () => <RightPanelToggle /> }}
-                ui={startUi}
+                overrides={{ headerActions: () => <></> }}
                 viewports={EMAIL_VIEWPORTS}
               />
             </KitContext.Provider>
