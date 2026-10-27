@@ -64,6 +64,8 @@ export interface Env {
   parentLayout: Record<string, any> | null;
   /** collection-items renders Swiper slides (slider display). */
   slider?: boolean;
+  /** Inside a collection's card (collection-items), where a featured image gets the card height. */
+  inCard?: boolean;
   /** Section blocks: the block's attrs stand in for the page's fields. */
   sectionFields?: Record<string, any>;
   /** Where images in static markup come from (template | content | part-<area>), for loading attributes. */

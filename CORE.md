@@ -149,6 +149,11 @@ page's own listing), display (grid with desktop/tablet/phone columns, list, slid
 load more: `public/assets/js/collection-more.js` fetches the next page URL and appends that
 collection's items) and an empty message. Card fields: `entry-title`, `entry-image`, `entry-excerpt`,
 `entry-date`, `event-date`, `entry-terms`, `entry-field` (any field as text/link/email/phone/image).
+A Featured image's **Height** (`attrs.height`, `src/lib/content/image-height.ts`) is Default, Auto (the
+image's own height, stored as `auto`), a preset (`IMAGE_HEIGHTS`: 160, 240, 320, 420px) or a custom CSS
+length; Default in a card (`Env.inCard`, set by `collection-items`) is `CARD_IMAGE_HEIGHT` (240px, cropped
+to fill the width) unless the block sets an aspect ratio, a fit or Fill the card, and elsewhere the
+image's own (`entryImageHeight`).
 Item, empty and pagination child blocks of older collections still render but aren't in the inserter.
 A shuffled collection (`shuffle`) renders part of a pool of up to 48 entries and
 `public/assets/js/collection-shuffle.js` picks a new random set on each visit.

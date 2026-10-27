@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react';
 import { browserClient } from '../lib/db/browser';
 import { FocalPoints } from './FocalPoints';
 import { parseRatio } from '../lib/media/focal';
+import { CARD_IMAGE_HEIGHT, IMAGE_HEIGHTS, heightChoice } from '../lib/content/image-height';
 
 type SetFn = (patch: Attrs) => void;
 export type Panel = (a: Attrs, set: SetFn) => ReactNode;
@@ -76,6 +77,43 @@ export function AspectSelect({ title, value, onChange, numeric, originalLabel = 
         {current.startsWith('custom:') && <option value={current}>Custom ({String(value)})</option>}
       </select>
     </Row>
+  );
+}
+
+/**
+ * A Featured image's height: Default (the card height in a collection's card, else the image's own),
+ * Auto, a preset, or Custom with a CSS length.
+ */
+function ImageHeight({ value, onChange }: { value: unknown; onChange: (v: string | undefined) => void }) {
+  const [custom, setCustom] = useState(heightChoice(value) === 'custom');
+  const choice = custom ? 'custom' : heightChoice(value);
+  const card = IMAGE_HEIGHTS.find(([v]) => v === CARD_IMAGE_HEIGHT)?.[1] ?? CARD_IMAGE_HEIGHT;
+  return (
+    <>
+      <Row title="Height">
+        <select
+          className={inputClass}
+          value={choice}
+          onChange={(e) => {
+            const v = e.target.value;
+            setCustom(v === 'custom');
+            if (v === 'custom') return onChange(typeof value === 'string' && value !== 'auto' ? value : CARD_IMAGE_HEIGHT);
+            onChange(v || undefined);
+          }}
+        >
+          <option value="">Default</option>
+          <option value="auto">Auto (the image's own height)</option>
+          {IMAGE_HEIGHTS.map(([v, l]) => (
+            <option key={v} value={v}>
+              {l} ({v})
+            </option>
+          ))}
+          <option value="custom">Custom</option>
+        </select>
+      </Row>
+      {choice === 'custom' && <Text title="Custom height" value={value} placeholder="e.g. 280px, 20rem, 40vh" onChange={(v) => onChange(v || undefined)} />}
+      {choice === '' && <p className="-mt-2 mb-3 text-xs text-admin-muted">In a collection's cards: {card} ({CARD_IMAGE_HEIGHT}), unless an aspect ratio, a fit or Fill the card is set. Elsewhere: the image's own height.</p>}
+    </>
   );
 }
 
@@ -447,7 +485,7 @@ Object.assign(CONTENT_PANELS, {
     <>
       {linkControls(a, set, 'entry')}
       <AspectSelect title="Aspect ratio" value={a.aspectRatio === 'auto' ? undefined : a.aspectRatio} onChange={(v) => set({ aspectRatio: (v as string) || undefined })} />
-      <Text title="Height" value={a.height} placeholder="200px" onChange={(v) => set({ height: v || undefined })} />
+      <ImageHeight value={a.height} onChange={(v) => set({ height: v })} />
       <Select title="Fit" value={a.scale} options={[['cover', 'Cover (crop to fill)'], ['contain', 'Contain (show the whole image)']]} onChange={(v) => set({ scale: v })} />
       <p className="-mt-2 mb-3 text-xs text-admin-muted">Default: a set aspect ratio or height is filled (cropped; a logo field's image is shown whole), else the image as it is. Cover and Contain also fill the block's space (a card, a column).</p>
       <Select title="Image size" value={a.size} options={IMAGE_SIZES} onChange={(v) => set({ size: v })} />

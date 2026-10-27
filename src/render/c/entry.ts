@@ -20,6 +20,7 @@ import { ARCHIVE_PATHS, typeDef } from '../../lib/site';
 import type { Env } from '../env';
 import type { Term } from '../../lib/types';
 import { lockedContent } from './members';
+import { entryImageHeight } from '../../lib/content/image-height';
 
 const esc = (s: unknown) => String(s ?? '').replace(/&(?!(?:#\d+|#x[0-9a-f]+|[a-z][a-z0-9]*);)/gi, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -129,8 +130,8 @@ export const entryImage: Renderer = (b, env) => {
     // A shape fills the width: a ratio with a height would otherwise set the width from the height.
     // With a height the ratio is left out: it would give the box a minimum width (height x ratio)
     // that pushes a narrow card wider.
-    const fixedHeight = a.height && a.height !== 'auto';
-    const box = [ratio && !fixedHeight && `aspect-ratio:${ratio}`, a.height && `height:${a.height}`, (ratio || fixedHeight) && 'width:100%'].filter(Boolean).join(';');
+    const fixedHeight = entryImageHeight(a);
+    const box = [ratio && !fixedHeight && `aspect-ratio:${ratio}`, fixedHeight && `height:${fixedHeight}`, (ratio || fixedHeight) && 'width:100%'].filter(Boolean).join(';');
     const shaped = box || a.scale ? ` style="width:100%;height:100%;object-fit:${escAttr(a.scale ?? 'contain')}"` : '';
     const img = `<img src="${escAttr(fieldSrc)}" alt="${escAttr(entryTitle(post))}"${shaped}>`;
     const inner = a.linkField ? `<a href="${escAttr(post.fields?.[a.linkField] || linkOf(post))}" target="_blank" rel="noopener noreferrer">${img}</a>` : img;
@@ -140,12 +141,15 @@ export const entryImage: Renderer = (b, env) => {
   const media = post.featured_media_id ? ctx.loader.media.get(post.featured_media_id) : undefined;
   if (!media) return '';
   const s = a.style ?? {};
+  // Its height: the block's (a preset or custom length), the card height in a collection's card, or
+  // the image's own (Auto).
+  const height = entryImageHeight(a, env.inCard);
   // Radius, borders and shadow draw on the image itself.
   const imgStyle = styleDecls({ radius: s.radius, borderWidth: s.borderWidth, borderColor: s.borderColor, borderStyle: s.borderStyle, shadow: s.shadow });
-  if (a.aspectRatio || (a.scale && !a.height)) imgStyle.push(['width', '100%'], ['height', '100%']);
-  else if (a.height) imgStyle.push(['height', a.height]);
+  if (a.aspectRatio || (a.scale && !height)) imgStyle.push(['width', '100%'], ['height', '100%']);
+  else if (height) imgStyle.push(['height', height]);
   // The image fills a fixed ratio or height, cropped ("cover") unless set otherwise.
-  if (a.scale || a.aspectRatio || a.height) imgStyle.push(['object-fit', a.scale ?? 'cover']);
+  if (a.scale || a.aspectRatio || height) imgStyle.push(['object-fit', a.scale ?? 'cover']);
   const alt = a.link ? entryTitle(post).replace(/<[^>]*>/g, '').trim() || `Untitled ${post.id}` : undefined;
   const img = mediaImgTag(mediaImage(media, a.size || 'large', { alt, style: imgStyle.map(([p, v]) => `${p}:${v}`).join(';') || undefined, ratio: parseRatio(a.aspectRatio) }));
   let overlay = '';
@@ -158,18 +162,18 @@ export const entryImage: Renderer = (b, env) => {
     if (s.radius && typeof s.radius === 'string') d.push(['border-radius', s.radius]);
     overlay += `<span class="c-entry-image__overlay" style="${escAttr(d.map(([p, v]) => `${p}:${v}`).join(';'))}" aria-hidden="true"></span>`;
   }
-  const inner = a.link ? `<a href="${linkOf(post)}"${linkAttrs(a)}${a.height ? ` style="height:${escAttr(a.height)}"` : ''}>${img}${overlay}</a>` : img + overlay;
+  const inner = a.link ? `<a href="${linkOf(post)}"${linkAttrs(a)}${height ? ` style="height:${escAttr(height)}"` : ''}>${img}${overlay}</a>` : img + overlay;
   const dims: Decl[] = [];
-  const fixedHeight = a.height && a.height !== 'auto';
+  const fixedHeight = !!height;
   // A shape fills the width unless the block sets one. With a height the ratio is left out: it would
   // set the width from the height, and give the box a minimum width that pushes a narrow card wider.
   if (a.aspectRatio && !fixedHeight) dims.push(['aspect-ratio', a.aspectRatio]);
   if (a.imgWidth) dims.push(['width', a.imgWidth]);
   else if (a.aspectRatio || fixedHeight) dims.push(['width', '100%']);
-  if (a.height) dims.push(['height', a.height]);
+  if (height) dims.push(['height', height]);
   const outer = { ...a, style: { margin: s.margin, padding: s.padding } };
   // Cover: the image fills the block it sits in, behind the rest of it (a card with its title over the photo).
-  return `<figure ${root(outer, ['c-entry-image', a.cover ? 'is-cover' : null, a.scale && !a.aspectRatio && !a.height && !a.cover ? 'is-fill' : null], a.cover ? [] : dims)}>${inner}</figure>`;
+  return `<figure ${root(outer, ['c-entry-image', a.cover ? 'is-cover' : null, a.scale && !a.aspectRatio && !height && !a.cover ? 'is-fill' : null], a.cover ? [] : dims)}>${inner}</figure>`;
 };
 
 /** The entry's own blocks (the page body inside a template). */

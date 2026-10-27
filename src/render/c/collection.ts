@@ -94,7 +94,7 @@ export const collectionItems: Renderer = (b, env, inner) => {
   if (!q || !q.result.ids.length) return '';
   const a = b.attrs;
   const posts = q.result.ids.map((id) => ctx.loader.entries.get(id)).filter(Boolean) as Entry[];
-  if (env.slider) return posts.map((post) => `<div class="swiper-slide">${inner({ post })}</div>`).join('');
+  if (env.slider) return posts.map((post) => `<div class="swiper-slide">${inner({ post, inCard: true })}</div>`).join('');
   // A grid of N columns (one column on phones), or a list with a gap between items.
   let classes: string[];
   let decls: Decl[];
@@ -112,7 +112,7 @@ export const collectionItems: Renderer = (b, env, inner) => {
     classes = l.classes;
     decls = l.decls;
   }
-  let items = posts.map((post) => `<li class="${esc(entryClasses(post))}" data-id="${post.id}">${inner({ post })}</li>`).join('');
+  let items = posts.map((post) => `<li class="${esc(entryClasses(post))}" data-id="${post.id}">${inner({ post, inCard: true })}</li>`).join('');
   // Listings of the page's own query count as the main loop for image loading.
   if (q.attrs.query?.inherit) items = items.replace(/data-cms-img="attachment"/g, 'data-cms-img="loop"');
   return `<ul ${root(a, ['c-collection__items', ...classes], decls)}>${items}</ul>`;
