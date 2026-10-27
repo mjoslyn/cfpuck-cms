@@ -28,6 +28,15 @@ terms, template, featured image and event dates.
 
 Templates, parts and patterns duplicate from the templates list (`<slug>-copy`).
 
+## Make a page from a template
+
+**Make a page** (the templates list and a template's editor header; `src/admin/MakePage.tsx`) asks for a
+title and a type with pages, then POSTs `action=make-page` to `/api/admin/templates`
+(`entryFromTemplate`, `src/lib/admin/duplicate.ts`): a new draft whose content is a copy of the
+template's, part's or pattern's blocks under new ids, and opens it in the editor. Template parts (the
+header, the footer) and Page content blocks are left out, since the entry's own template supplies
+them, unless **Keep the header, footer and Page content blocks** is ticked.
+
 ## Records
 
 Record types (`record: true`, such as venues) are data only: `/admin/edit/<id>/` shows a plain form

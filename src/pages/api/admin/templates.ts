@@ -1,10 +1,13 @@
 import type { APIRoute } from 'astro';
-import { duplicateTemplate } from '../../../lib/admin/duplicate';
+import { duplicateTemplate, entryFromTemplate } from '../../../lib/admin/duplicate';
 import { uniqueAreas } from '../../../lib/content/areas';
 import { slugify } from '../../../lib/slug';
 import { isStale, STALE } from '../../../lib/admin/save';
 
-/** Duplicate a template, part or pattern (form post { kind, slug } from the list), then open the copy. */
+/**
+ * Duplicate a template, part or pattern (form post { kind, slug } from the list), then open the copy; or,
+ * with action=make-page { type, title, keep }, make a draft entry of its blocks and open that.
+ */
 export const POST: APIRoute = async ({ request, locals, redirect }) => {
   // Save as pattern (JSON from the editor): { action: 'create-pattern', title, linked, content } -> { slug }.
   if (request.headers.get('content-type')?.includes('application/json')) {
@@ -25,6 +28,14 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
   const kind = String(form.get('kind') ?? '');
   const slug = String(form.get('slug') ?? '');
   if (!['template', 'part', 'pattern'].includes(kind) || !slug) return new Response('Bad request', { status: 400 });
+  if (form.get('action') === 'make-page') {
+    try {
+      const id = await entryFromTemplate(locals.db, kind, slug, String(form.get('type') ?? ''), String(form.get('title') ?? ''), form.get('keep') !== 'on');
+      return redirect(`/admin/edit/${id}/`, 303);
+    } catch (e) {
+      return new Response((e as Error).message, { status: 400 });
+    }
+  }
   try {
     return redirect(`/admin/templates/${kind}/${await duplicateTemplate(locals.db, kind, slug)}/`, 303);
   } catch (e) {

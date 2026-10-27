@@ -122,5 +122,10 @@ Some pages are made entirely from their template (a home page, often). When you 
 the editor's toolbar says **Editing this page's template**, and the button says **Save & apply**:
 changes go to every page using that template.
 
+To start a new page from a template or a pattern, click **Make a page** beside it in **Templates** (or
+at the top of the editor while editing it). Give the page a title, choose its type and click **Make
+the page**. You get a new draft with a copy of the template's blocks to change freely: editing it
+never changes the template.
+
 The menu's links are changed under **Settings**, not in the header itself. See
 [Menu and settings](/cfpuck-cms/guide/menu-and-settings/).

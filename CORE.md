@@ -235,7 +235,11 @@ taxonomies, tags and any taxonomy its entries use); a tag also goes into unpubli
 "(copy)" with its own address, taken from its unpublished changes when it has some (else as published):
 content, fields, excerpt, tags and other terms, template, featured image and event dates. Templates,
 parts and patterns duplicate
-from the templates list (`<slug>-copy`).
+from the templates list (`<slug>-copy`). **Make a page** (the templates list and a template's editor
+header; `src/admin/MakePage.tsx`, POST `/api/admin/templates` with `action=make-page`,
+`entryFromTemplate`) makes a draft entry of a chosen type with a page (title, type) whose content is a
+copy of a template's, part's or pattern's blocks under new ids, leaving out template parts and Page
+content blocks (the entry's own template supplies them) unless **Keep** is ticked, and opens it.
 
 ## Redirects
 

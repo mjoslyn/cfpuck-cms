@@ -3,6 +3,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Puck, blocksPlugin, createUsePuck, outlinePlugin, useGetPuck, type Data } from '@puckeditor/core';
 import Composer, { type LivePage, type Selection } from '../admin/Composer';
+import MakePage from '../admin/MakePage';
+import { eventsOn } from '../lib/events/on';
 import { isComposed } from '../lib/compose/outline';
 import { locateInDoc, replaceInDoc } from '../lib/puck/tree';
 import '@puckeditor/core/no-external.css'; // without its Inter webfont: the admin uses the system font
@@ -710,6 +712,7 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
                   </button>
                 </form>
               )}
+              {template && <MakePage kind={template.kind} slug={template.slug} title={template.slug.replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase())} events={eventsOn(settingsRef.current.site)} dirty={dirty} className="whitespace-nowrap text-sm text-admin-muted hover:text-admin-accent" />}
               {entry && mode === 'content' ? (
                 <>
                   <button type="button" disabled={saving} onClick={() => save('draft')} className="whitespace-nowrap rounded border border-admin-ink/20 px-3 py-1.5 text-sm hover:border-admin-accent hover:text-admin-accent disabled:opacity-50" title={liveStatus === 'publish' ? 'Keep your changes without changing the live page' : 'Save without publishing'}>

@@ -6,7 +6,8 @@ import type { Db } from '../db/query';
 import type { PuckItem } from '../puck/types';
 import { eventDates, mediaIdForUrl, renderedExcerpt, renderedTitle, setEntryTags, setEntryTerms, uniqueSlug } from './save';
 import { slugify } from '../slug';
-import { taxonomiesOf } from '../site';
+import { COMPOSABLE_TYPES, taxonomiesOf } from '../site';
+import { mapBlocks } from '../puck/tree';
 
 const copyTitle = (title: string) => (title ? `${title} (copy)` : '');
 
@@ -66,4 +67,36 @@ export async function duplicateTemplate(db: Db, kind: string, slug: string): Pro
   const { error: insErr } = await db.from('templates').insert({ kind, slug: next, title: copyTitle(t.title || t.slug), content: t.content });
   if (insErr) throw new Error(insErr.message);
   return next;
+}
+
+/** Blocks a page's own template supplies: template parts (the header, the footer) and Page content. */
+const SUPPLIED = new Set(['part', 'entry-content']);
+
+/** A template's blocks for a page: copies with ids of their own, optionally without `SUPPLIED`. */
+export function pageBlocksFrom(items: PuckItem[], prefix: string, leaveOut: boolean): PuckItem[] {
+  const keep = (list: PuckItem[]): PuckItem[] => list.filter((i) => !(leaveOut && SUPPLIED.has(i.type))).map((i) => (i.props.children ? { ...i, props: { ...i.props, children: keep(i.props.children) } } : i));
+  return mapBlocks(keep(items), (item) => ({ type: item.type, props: { ...item.props, id: `${prefix}-${item.props.id}` } }));
+}
+
+/**
+ * A new draft entry of `type` whose content is a copy of a template's, part's or pattern's blocks
+ * (`leaveOut`: without the header, footer and Page content blocks its own template supplies). Returns its id.
+ */
+export async function entryFromTemplate(db: Db, kind: string, slug: string, type: string, title: string, leaveOut: boolean): Promise<number> {
+  if (!COMPOSABLE_TYPES.some((t) => t.type === type)) throw new Error('Choose a type with pages.');
+  const { data: t, error } = await db.from('templates').select('title, slug, content').eq('kind', kind).eq('slug', slug).single();
+  if (error || !t) throw new Error('That template no longer exists.');
+  const name = title.trim().slice(0, 200) || t.title || t.slug;
+  const blocks = pageBlocksFrom(((t.content as { content?: PuckItem[] } | null)?.content ?? []) as PuckItem[], `t${Date.now().toString(36)}`, leaveOut);
+  const row = {
+    type,
+    slug: await uniqueSlug(db, type, slugify(name) || 'page'),
+    title: name,
+    title_rendered: renderedTitle(name),
+    status: 'draft',
+    content: { root: { props: {} }, content: blocks, zones: {} },
+  };
+  const { data: made, error: insErr } = await db.from('entries').insert(row).select('id').single();
+  if (insErr || !made) throw new Error(insErr?.message ?? 'Could not make the page.');
+  return made.id;
 }
