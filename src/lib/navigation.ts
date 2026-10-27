@@ -34,7 +34,7 @@ export const MENU_FIELDS: FieldDef[] = [
     itemName: 'menu item',
     fields: [
       { key: 'label', label: 'Label', type: 'text' },
-      { key: 'url', label: 'Link', type: 'text' },
+      { key: 'url', label: 'Link', type: 'url' },
       { key: 'open_new_tab', label: 'Open in new tab', type: 'bool' },
       { key: 'links_heading', label: 'Links heading', type: 'text' },
       {
@@ -45,7 +45,7 @@ export const MENU_FIELDS: FieldDef[] = [
         itemName: 'link',
         fields: [
           { key: 'label', label: 'Label', type: 'text' },
-          { key: 'url', label: 'Link', type: 'text' },
+          { key: 'url', label: 'Link', type: 'url' },
           { key: 'open_new_tab', label: 'Open in new tab', type: 'bool' },
         ],
       },

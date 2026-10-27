@@ -3,7 +3,7 @@
 // the linked pattern's own panel (edit the pattern, detach).
 import { useState } from 'react';
 import { useGetPuck, type Data } from '@puckeditor/core';
-import { MediaPicker, RichText, Text, inputClass, type Attrs } from './fields';
+import { LinkInput, MediaPicker, RichText, Text, inputClass, type Attrs } from './fields';
 import { CONTENT_FIELDS, expandLinked, unmark } from '../lib/content/linked-patterns';
 import { findInDoc as findInData, replaceInDoc as replaceInData } from '../lib/puck/tree';
 import type { PuckItem } from '../lib/puck/types';
@@ -23,8 +23,10 @@ export function LinkedContentPanel({ type, a, set }: { type: string; a: Attrs; s
           <RichText key={f.key} title={f.label} value={a[f.key] ?? ''} onChange={(v) => set({ [f.key]: v || undefined })} />
         ) : f.kind === 'media' ? (
           <MediaPicker key={f.key} title={f.label} url={a.src} onSelect={(m) => set({ mediaId: m.mediaId ?? m.id ?? undefined, src: m.url, alt: a.alt || m.alt || undefined })} />
+        ) : f.kind === 'link' ? (
+          <LinkInput key={f.key} title={f.label} value={a[f.key]} placeholder="https://" onChange={(v) => set({ [f.key]: v || undefined })} />
         ) : (
-          <Text key={f.key} title={f.label} value={a[f.key]} placeholder={f.kind === 'link' ? 'https://' : undefined} onChange={(v) => set({ [f.key]: v || undefined })} />
+          <Text key={f.key} title={f.label} value={a[f.key]} onChange={(v) => set({ [f.key]: v || undefined })} />
         ),
       )}
     </div>

@@ -1,6 +1,6 @@
 // Sidebar form for an entry's own data: core columns plus the fields of each content type.
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
-import { Code, MediaPicker, Num, Row, Select, Text, Toggle, inputClass, FieldGroup } from './fields';
+import { Code, LinkInput, MediaPicker, Num, Row, Select, Text, Toggle, inputClass, FieldGroup } from './fields';
 import { browserClient } from '../lib/db/browser';
 import { mediaUrl } from '../lib/media/image';
 import { RECURRENCE_KEY, occurrenceDates, type Recurrence } from '../lib/recurrence';
@@ -29,9 +29,10 @@ export function FieldsForm({ defs, value, onChange }: { defs: FieldDef[]; value:
       {defs.map((d) => {
         switch (d.type) {
           case 'text':
-          case 'url':
           case 'email':
             return <Text key={d.key} title={d.label} value={v[d.key]} onChange={(x) => set(d.key, x)} />;
+          case 'url':
+            return <LinkInput key={d.key} title={d.label} value={v[d.key]} onChange={(x) => set(d.key, x)} />;
           case 'number':
             return <Num key={d.key} title={d.label} value={v[d.key]} onChange={(x) => set(d.key, x ?? '')} />;
           case 'textarea':

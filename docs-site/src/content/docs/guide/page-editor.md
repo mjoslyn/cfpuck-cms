@@ -67,8 +67,8 @@ which helps when blocks are hard to click on the page.
 
 ### Links
 
-To make a link, select some words in a text box and click **Link** above it (on a button, click
-**Find** beside its **Link** box). Then:
+To make a link, select some words in a text box and click **Link** above it. Boxes that take a link
+(a button's **Link**, a menu item's **Link** and other link boxes) have **Find** beside them. Then:
 
 - **To a page on your site**: start typing its title and pick it from the list (use the arrow keys and
   Enter, or click it).

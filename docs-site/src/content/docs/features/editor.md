@@ -53,7 +53,8 @@ with `types` are offered only on those entry types. A **Compose** panel docks be
 
 ## Link picker
 
-Rich text toolbars (**Link**: page blocks and emails) and link fields (**Find**: Button, Image, Hero)
+Rich text toolbars (**Link**: page blocks and emails) and link fields (**Find**: Button, Image, Hero, any
+field of type `url` in a type's or a site block's fields, Settings > Menu's links, a linked pattern's links)
 open the link picker (`src/puck/LinkPicker.tsx`) instead of a browser prompt:
 
 - Typing searches entries of types with pages by title (drafts marked; the latest edited when empty)
