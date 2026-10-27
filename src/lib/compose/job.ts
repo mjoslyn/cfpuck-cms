@@ -31,7 +31,7 @@ export function turnsInFull(turns: { images: number; pdfs: number; bytes: number
   }
   return full;
 }
-import { converse, type Turn, type UserTurn } from './claude';
+import { converse, type Layout, type Turn, type UserTurn } from './claude';
 import { buildPage } from './build';
 import { outline, isComposed } from './outline';
 import { sanitizeBlocks } from './edit';
@@ -56,6 +56,8 @@ export interface JobInput {
   other?: string;
   /** The entry's own fields as the editor's form holds them. */
   liveFields?: EditorFields | null;
+  /** Working on a template, part or pattern (layout mode, or one edited on its own). */
+  layout?: Layout;
 }
 
 interface Session {
@@ -65,6 +67,8 @@ interface Session {
   turns: Turn[];
   materials: Registry;
   block_prefix: string;
+  /** A conversation about a template, part or pattern on its own ("<kind>:<slug>"), with no entry. */
+  template?: string | null;
 }
 
 /** A job older than the worker's ceiling is over, whatever its row says: a killed worker never wrote one. */
@@ -175,7 +179,7 @@ export async function runJob(jobId: string, token: string): Promise<void> {
 
     set({ progress: s.turns.length > 1 ? 'Claude is working on it' : 'Claude is laying out the page' });
     const result = await converse(
-      { turns: s.turns, materialBlocks, entryType: s.entry_type, otherContent: other || undefined, currentSections: current || undefined, sitePages: (pages ?? []).map((p) => ({ title: p.title, path: permalink(p) })), tags: [...materials.tags.keys()], currentFields: currentFields || undefined },
+      { turns: s.turns, materialBlocks, entryType: s.entry_type, otherContent: other || undefined, currentSections: current || undefined, sitePages: (pages ?? []).map((p) => ({ title: p.title, path: permalink(p) })), tags: [...materials.tags.keys()], currentFields: currentFields || undefined, layout: input.layout },
       {
         status: (t) => set({ progress: t }),
         text: (chunk) => set({ say: progress.say + chunk }),
@@ -204,7 +208,8 @@ export async function runJob(jobId: string, token: string): Promise<void> {
     if (result.plan) {
       const built = await buildMaterials(db, s.materials);
       items = buildPage(result.plan, built, `${s.block_prefix}-t${s.turns.length}`);
-      if (!s.entry_id) {
+      // A template's conversation has no entry: its sections go to the editor, never into a new draft.
+      if (!s.entry_id && !s.template && !input.layout) {
         if (!(await stillActive(db, jobId, token))) return;
         // First build from the admin: a new draft.
         // Free at its URL: types without a URL base share /<slug>/.

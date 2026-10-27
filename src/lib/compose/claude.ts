@@ -10,6 +10,8 @@ import { site, typeLabel, ARCHIVE_PATHS, CONTENT_TYPES, LISTABLE_TYPES } from '.
 /** The listable types, in words ("events, members, posts"). */
 const LISTED = LISTABLE_TYPES.map((t) => CONTENT_TYPES.find((c) => c.type === t)?.label.toLowerCase() ?? t).join(', ');
 import { describeEntryType } from './entry-fields';
+import { layoutName, type Layout } from './layout';
+export type { Layout };
 
 type Block = Anthropic.Messages.ContentBlockParam;
 
@@ -54,13 +56,26 @@ export interface ConverseRequest {
   tags: string[];
   /** The entry's own fields as they are now. */
   currentFields?: string;
+  /** Working on a template, part or pattern (shared by pages) rather than one page's content. */
+  layout?: Layout;
 }
 
-function system(r: ConverseRequest): string {
+/** The tools Claude has: no field updates without an entry (a template, part or pattern on its own). */
+export function composeTools(r: ConverseRequest): Anthropic.Messages.Tool[] {
+  const tools: Anthropic.Messages.Tool[] = [
+    { name: 'build_page', description: 'Lay out the complete page: title, slug, excerpt and every section from top to bottom.', input_schema: PLAN_SCHEMA as any },
+    { name: 'edit_block', description: 'Replace the selected block with new blocks (same component format as the selected block).', input_schema: EDIT_SCHEMA as any },
+    { name: 'update_fields', description: "Change the entry's own fields (contact details, dates...) without rebuilding the page. Send only the changed fields.", input_schema: UPDATE_FIELDS_SCHEMA as any },
+    { name: 'search_site', description: `Search the site's own content (${LISTED}, pages) to feature or link to it.`, input_schema: SEARCH_SCHEMA as any },
+  ];
+  return r.layout && !r.layout.page ? tools.filter((t) => t.name !== 'update_fields') : tools;
+}
+
+export function system(r: ConverseRequest): string {
   return `You build and revise web pages for "${site.name}", the ${site.organization} site. ${site.brief}
 
 ${describeEntryType(r.entryType, typeLabel(r.entryType))}
-
+${r.layout ? `\nYou are working on ${layoutName(r.layout)}${r.layout.page ? ', which this page is edited as (it has no content of its own)' : ''}: a layout shared by every page that uses it, not one page's content. What you build or change here shows on all of them, so keep it suited to all of them. build_page gives this layout's sections (its title, slug and excerpt are not used${r.layout.page ? ' except for this page\'s search title and description' : ''}).\n` : ''}
 You are in a conversation with a site editor. They give you a brief and materials (documents, images, videos, links), and later ask for changes.
 - To create the page or change it broadly, call build_page with the COMPLETE page plan (every section, not just the changed ones).
 - When the message comes with a selected block, change just that block: call edit_block with its replacement (same component format as the selected block). Use build_page only if they clearly ask for page-wide changes.
@@ -100,7 +115,7 @@ function messages(r: ConverseRequest): Anthropic.Messages.MessageParam[] {
     if (pendingTool) content.push({ type: 'tool_result', tool_use_id: pendingTool, content: 'Applied and shown to the editor.' });
     pendingTool = undefined;
     const last = i === r.turns.length - 1;
-    const intro = i === 0 ? `Create a new ${typeLabel(r.entryType).toLowerCase()}.\n\n` : '';
+    const intro = i === 0 ? (r.layout ? `Work on ${layoutName(r.layout)}.\n\n` : `Create a new ${typeLabel(r.entryType).toLowerCase()}.\n\n`) : '';
     // Only the latest message carries its selected block: an earlier one was answered with an edit (in
     // the reply that follows it), and re-sending every past block grew each request without end.
     const target = !t.target ? '' : last ? `\n\nSelected block (${t.target.label}), to change with edit_block:\n${t.target.json}` : `\n\n(The block selected then was: ${t.target.label}.)`;
@@ -141,12 +156,7 @@ export interface ConverseHooks {
 export async function converse(r: ConverseRequest, on: ConverseHooks): Promise<ConverseResult> {
   const client = claudeClient();
   if (!client) throw new Error(NO_KEY);
-  const tools: Anthropic.Messages.Tool[] = [
-    { name: 'build_page', description: 'Lay out the complete page: title, slug, excerpt and every section from top to bottom.', input_schema: PLAN_SCHEMA as any },
-    { name: 'edit_block', description: 'Replace the selected block with new blocks (same component format as the selected block).', input_schema: EDIT_SCHEMA as any },
-    { name: 'update_fields', description: "Change the entry's own fields (contact details, dates...) without rebuilding the page. Send only the changed fields.", input_schema: UPDATE_FIELDS_SCHEMA as any },
-    { name: 'search_site', description: `Search the site's own content (${LISTED}, pages) to feature or link to it.`, input_schema: SEARCH_SCHEMA as any },
-  ];
+  const tools = composeTools(r);
   const msgs = messages(r);
   let spoken = '';
 

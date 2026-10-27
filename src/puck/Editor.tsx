@@ -601,7 +601,7 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
                 </span>
               )}
               {!(entry && mode === 'content') && status && <span className="text-xs text-admin-muted">{status}</span>}
-              {entry && mode === 'content' && (
+              {(entry || template) && (
                 <button type="button" onClick={() => setComposeOpen((v) => !v)} aria-pressed={composeOpen} className={`whitespace-nowrap rounded border px-3 py-1.5 text-sm ${composeOpen ? 'border-admin-accent text-admin-accent' : 'border-admin-ink/15 hover:border-admin-accent hover:text-admin-accent'}`}>
                   Compose
                 </button>
@@ -644,9 +644,18 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
     </EnvContext.Provider>
     </div>
     </div>
-    {entry && mode === 'content' && composeOpen && (
+    {(entry || template) && composeOpen && (
       <aside className="h-screen w-[400px] shrink-0 border-l border-admin-ink/10" aria-label="Compose with Claude">
-        <Composer entryId={entry.id} live={live} selection={selection} pinned={pinned} onPin={pin} onClose={() => setComposeOpen(false)} />
+        <Composer
+          entryId={entry?.id}
+          templateKey={template ? `${template.kind}:${template.slug}` : undefined}
+          layout={template ? { kind: template.kind, slug: template.slug, page: false } : mode === 'layout' && templateSlug ? { kind: 'template', slug: templateSlug, page: true } : undefined}
+          live={live}
+          selection={selection}
+          pinned={pinned}
+          onPin={pin}
+          onClose={() => setComposeOpen(false)}
+        />
       </aside>
     )}
     </div>

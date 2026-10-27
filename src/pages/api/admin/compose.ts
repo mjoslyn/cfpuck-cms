@@ -3,18 +3,21 @@
 // POST (multipart): sessionId?, entryId?, type (a composable content type), message, docs (files), media (library
 //   ids, repeated), links (one per line), current (outline of the composed sections as they are now
 //   in the editor), other (outline of the rest of the page), entryFields (the editor's field form),
-//   targetId/targetLabel/targetJson (a block selected in the editor, for a targeted edit). Reads the
+//   targetId/targetLabel/targetJson (a block selected in the editor, for a targeted edit), layout (JSON
+//   { kind, slug, page }: a template, part or pattern being worked on), template ("<kind>:<slug>", the
+//   conversation of a template, part or pattern edited on its own). Reads the
 //   materials, queues the turn and answers 202 { jobId, sessionId, prefix, notes }.
 // GET ?job=<id>: the job's progress { status, progress, say, notes, result?, error? }, polled by the
 //   panel; result is { reply, entryId? (a new draft), items? + prefix (blocks to put on the page), edit?
 //   {targetId, items} (replacement for the selected block), fields? (field form patch), title? }.
-// GET ?entryId= (latest session for a page) or ?sessionId=: the conversation, for display.
+// GET ?entryId= (latest session for a page), ?template=<kind>:<slug> or ?sessionId=: the conversation, for display.
 import type { APIRoute } from 'astro';
 import { COMPOSABLE_TYPES } from '../../../lib/site';
 import type { EditorFields } from '../../../lib/compose/entry-fields';
 import { serviceClient } from '../../../lib/db/site';
 import { emptyRegistry, ingest, type Registry } from '../../../lib/compose/materials';
 import type { Turn } from '../../../lib/compose/claude';
+import { layoutOf, templateKey } from '../../../lib/compose/layout';
 import { queueJob, runJob, SILENT_MS, STALE_MS, type JobInput } from '../../../lib/compose/job';
 import { enqueue } from '../../../lib/jobs';
 import { afterAnswer } from '../../../lib/platform';
@@ -78,8 +81,9 @@ export const GET: APIRoute = async ({ url, locals }) => {
   }
   const entryId = Number(url.searchParams.get('entryId')) || 0;
   const sessionId = url.searchParams.get('sessionId');
+  const template = templateKey(url.searchParams.get('template'));
   let q = locals.db.from('compose_sessions').select('*');
-  q = sessionId ? q.eq('id', sessionId) : q.eq('entry_id', entryId);
+  q = sessionId ? q.eq('id', sessionId) : template ? q.eq('template', template) : q.eq('entry_id', entryId);
   const { data } = await q.order('updated_at', { ascending: false }).limit(1).maybeSingle();
   return Response.json(data ? view(data as Session) : null);
 };
@@ -108,7 +112,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
   if (!session) {
     const { data, error } = await db
       .from('compose_sessions')
-      .insert({ entry_id: entryId || null, entry_type: COMPOSABLE_TYPES.some((c) => c.type === form.get('type')) ? String(form.get('type')) : 'page', author_id: locals.user.id, materials: emptyRegistry() })
+      .insert({ entry_id: entryId || null, template: entryId ? null : templateKey(form.get('template')), entry_type: COMPOSABLE_TYPES.some((c) => c.type === form.get('type')) ? String(form.get('type')) : 'page', author_id: locals.user.id, materials: emptyRegistry() })
       .select('*')
       .single();
     if (error) return new Response(error.message, { status: 400 });
@@ -152,7 +156,8 @@ export const POST: APIRoute = async ({ request, locals }) => {
     await db.from('compose_jobs').update({ status: 'error', error: (e as Error).message ?? String(e) }).eq('id', job.id);
     return Response.json({ error: (e as Error).message ?? String(e), sessionId: s.id }, { status: 400 });
   }
-  const input: JobInput = { current: current || undefined, other: other || undefined, liveFields };
+  const layout = layoutOf(form.get('layout'));
+  const input: JobInput = { current: current || undefined, other: other || undefined, liveFields, ...(layout ? { layout } : {}) };
   await db.from('compose_jobs').update({ input }).eq('id', job.id);
 
   // The jobs queue runs it (src/lib/jobs.ts), with up to 15 minutes; without one it runs after this

@@ -10,6 +10,7 @@ import { useEventsOn } from '../puck/member-settings';
 import { outline, isComposed } from '../lib/compose/outline';
 import { inline } from '../lib/compose/build';
 import { uploadMedia, VIDEO_TYPES } from '../lib/media/upload';
+import { layoutName, type Layout } from '../lib/compose/layout';
 
 /** Claude's replies: paragraphs and "- " lists with inline Markdown (escaped first). */
 function Reply({ text }: { text: string }) {
@@ -70,6 +71,10 @@ function blockLabel(item: PuckItem): string {
 
 export interface ComposerProps {
   entryId?: number;
+  /** A template, part or pattern edited on its own ("<kind>:<slug>"): its own conversation, with no entry. */
+  templateKey?: string;
+  /** Working on a layout (layout mode, or a template on its own): changes reach every page using it. */
+  layout?: Layout;
   live?: LivePage;
   selection?: Selection | null;
   /** Panel chrome (docked in the editor). */
@@ -78,14 +83,14 @@ export interface ComposerProps {
   onPin?: (pinned: boolean) => void;
 }
 
-export default function Composer({ entryId, live, selection, onClose, pinned, onPin }: ComposerProps) {
+export default function Composer({ entryId, templateKey, layout, live, selection, onClose, pinned, onPin }: ComposerProps) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   // A new conversation doesn't create events while they're off (Settings > Events).
   const eventsAreOn = useEventsOn();
   /** Id prefix of the blocks this conversation built (they are replaced on each update). */
   const [prefix, setPrefix] = useState('');
   const [turns, setTurns] = useState<ChatTurn[]>([]);
-  const [loaded, setLoaded] = useState(!entryId);
+  const [loaded, setLoaded] = useState(!entryId && !templateKey);
   const [message, setMessage] = useState('');
   // A new conversation's type: from the list it was opened from (/admin/compose/?type=event), else a page.
   const [type, setType] = useState(() => {
@@ -110,8 +115,8 @@ export default function Composer({ entryId, live, selection, onClose, pinned, on
   const scroller = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!entryId) return;
-    fetch(`/api/admin/compose?entryId=${entryId}`)
+    if (!entryId && !templateKey) return;
+    fetch(`/api/admin/compose?${entryId ? `entryId=${entryId}` : `template=${encodeURIComponent(templateKey!)}`}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((s) => {
         if (s) {
@@ -121,7 +126,7 @@ export default function Composer({ entryId, live, selection, onClose, pinned, on
         }
         setLoaded(true);
       });
-  }, [entryId]);
+  }, [entryId, templateKey]);
   useEffect(() => {
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' });
   }, [turns]);
@@ -171,6 +176,8 @@ export default function Composer({ entryId, live, selection, onClose, pinned, on
     const body = new FormData();
     if (sessionId) body.append('sessionId', sessionId);
     if (entryId) body.append('entryId', String(entryId));
+    else if (templateKey) body.append('template', templateKey);
+    if (layout) body.append('layout', JSON.stringify(layout));
     body.append('type', type);
     body.append('message', message);
     for (const d of docs) body.append('docs', d);
@@ -257,7 +264,7 @@ export default function Composer({ entryId, live, selection, onClose, pinned, on
         <div className="flex items-center gap-2 border-b border-admin-ink/10 bg-white px-3 py-2">
           <h2 className="text-lg">Compose</h2>
           <span className="text-[11px] text-admin-muted">with Claude</span>
-          {entryId && turns.length > 0 && !busy && (
+          {(entryId || templateKey) && turns.length > 0 && !busy && (
             <button
               type="button"
               className="ml-auto rounded border border-admin-ink/15 px-2 py-0.5 text-xs text-admin-muted hover:text-admin-ink"
@@ -273,7 +280,7 @@ export default function Composer({ entryId, live, selection, onClose, pinned, on
             </button>
           )}
           {onPin && (
-            <button type="button" onClick={() => onPin(!pinned)} aria-pressed={pinned} title={pinned ? 'Unpin from the sidebar' : 'Pin to the sidebar (stays open)'} className={`${entryId && turns.length > 0 && !busy ? '' : 'ml-auto '}rounded border px-2 py-0.5 text-xs ${pinned ? 'border-admin-accent bg-admin-accent/10 text-admin-accent' : 'border-admin-ink/15 text-admin-muted hover:text-admin-ink'}`}>
+            <button type="button" onClick={() => onPin(!pinned)} aria-pressed={pinned} title={pinned ? 'Unpin from the sidebar' : 'Pin to the sidebar (stays open)'} className={`${(entryId || templateKey) && turns.length > 0 && !busy ? '' : 'ml-auto '}rounded border px-2 py-0.5 text-xs ${pinned ? 'border-admin-accent bg-admin-accent/10 text-admin-accent' : 'border-admin-ink/15 text-admin-muted hover:text-admin-ink'}`}>
               {pinned ? 'Pinned' : 'Pin'}
             </button>
           )}
@@ -289,8 +296,8 @@ export default function Composer({ entryId, live, selection, onClose, pinned, on
         {!loaded && <p className="text-xs text-admin-muted">Loading the conversation…</p>}
         {loaded && !turns.length && (
           <div className="rounded border border-dashed border-admin-ink/15 p-3 text-sm text-admin-muted">
-            <p className="mb-2 font-medium text-admin-ink">{live ? 'Add sections to this page' : 'Describe the page you want'}</p>
-            <p>Add documents, images, videos, video links and web links, and say what the page is for. Claude lays it out in the site's style; then ask for changes here, now or later.</p>
+            <p className="mb-2 font-medium text-admin-ink">{layout ? 'Add or change sections in this layout' : live ? 'Add sections to this page' : 'Describe the page you want'}</p>
+            <p>Add documents, images, videos, video links and web links, and say what the page is for. Claude lays it out in the site's style; then ask for changes here, now or later.{layout ? ' Select a block or section to change just that.' : ''}</p>
           </div>
         )}
         {turns.map((t, i) => (
@@ -318,6 +325,11 @@ export default function Composer({ entryId, live, selection, onClose, pinned, on
       </div>
 
       <div className={`border-t border-admin-ink/10 bg-white p-3 ${dragging ? 'ring-2 ring-admin-accent ring-inset' : ''}`}>
+        {layout && (
+          <p className="mb-2 text-[11px] text-admin-muted">
+            Working on {layoutName(layout)}: changes show on every page that uses it, once you Save &amp; apply.
+          </p>
+        )}
         {selection && live && (
           <div className="mb-2 flex items-center gap-1.5 text-[11px]">
             {targetItem ? (

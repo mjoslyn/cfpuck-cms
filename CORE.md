@@ -381,7 +381,13 @@ panel targets it (or its whole section): Claude answers with `edit_block`;
 `src/lib/compose/edit.ts` checks the replacement (known types, kept ids, materials resolved; markup cut
 to inline formatting and links, addresses to web/mail/phone/site links and raw HTML never taken from
 Claude: `safe-html.ts`, since materials can carry instructions). Claude can
-also call `search_site` (`src/lib/compose/site.ts`) to feature the site's own entries. Needs
+also call `search_site` (`src/lib/compose/site.ts`) to feature the site's own entries. The panel is in
+layout mode and on templates, parts and patterns edited on their own too (`src/lib/compose/layout.ts`):
+the turn names the layout (`layout`: kind, slug, and whether it is a page in layout mode), so Claude is
+told every page using it shares what it builds or changes; builds and targeted edits go to the document
+being edited, kept with Save & apply. A template's conversation is keyed by it
+(`compose_sessions.template`, `<kind>:<slug>`), never makes a draft entry, and has no `update_fields`
+(`composeTools`). Needs
 `ANTHROPIC_API_KEY` (optional `ANTHROPIC_MODEL`, default claude-sonnet-5-5).
 
 A turn runs as a job (`src/lib/compose/job.ts`, table `compose_jobs`) because a build takes 30-90s or

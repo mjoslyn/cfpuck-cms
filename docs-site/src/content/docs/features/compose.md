@@ -8,6 +8,12 @@ sidebar:
 Compose writes pages with Claude from the documents, images and links an editor adds. It is at
 `/admin/compose/` and in the page editor as a panel docked beside the canvas (pin keeps it open).
 
+The panel is also there for layouts: a page edited in layout mode (its template is what it shows) and
+a template, part or pattern edited on its own. Claude is told it is working on a layout every page
+using it shares; builds add or replace its sections and a selected block or section is changed in
+place, kept with **Save & apply**. A template's conversation is kept with it
+(`compose_sessions.template`), never creates a draft page, and has no field updates.
+
 Needs `ANTHROPIC_API_KEY`. `ANTHROPIC_MODEL` overrides the model (default `claude-sonnet-5-5`).
 
 ## Conversations

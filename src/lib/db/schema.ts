@@ -64,7 +64,7 @@ export const SCHEMA: Record<string, TableSchema> = {
   },
   compose_sessions: {
     pk: ["id"],
-    columns: {"id":"uuid","entry_id":"int8","author_id":"uuid","entry_type":"text","turns":"jsonb","materials":"jsonb","plan":"jsonb","block_prefix":"text","created_at":"timestamptz","updated_at":"timestamptz"},
+    columns: {"id":"uuid","entry_id":"int8","author_id":"uuid","entry_type":"text","turns":"jsonb","materials":"jsonb","plan":"jsonb","block_prefix":"text","created_at":"timestamptz","updated_at":"timestamptz","template":"text"},
     generated: [],
     fks: [[["author_id"],"users",["id"]],[["entry_id"],"entries",["id"]]],
     defaults: {"entry_type":"page","turns":[],"materials":{"docs":[],"links":[],"images":[],"videos":[]}},
