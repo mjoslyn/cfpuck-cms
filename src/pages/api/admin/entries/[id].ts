@@ -45,6 +45,8 @@ export const PUT: APIRoute = async ({ params, request, locals }) => {
   const autosave = body.autosave === true && action === 'draft';
   // Set when this save keeps an earlier version the editor restored.
   const restored = Number(body.restoredFrom) > 0 ? { restored_from: Number(body.restoredFrom), restored_edited: !!body.restoredEdited } : {};
+  // A publish the accessibility check held, made anyway: what was left open, and why, kept with the version.
+  const note = action === 'publish' && typeof body.note === 'string' && body.note.trim() ? { note: body.note.trim().slice(0, 1000) } : {};
   const { data: current, error: readErr } = await db.from('entries').select('id, type, slug, title, status, content, fields, excerpt, updated_at').eq('id', id).single();
   if (readErr) return new Response(readErr.message, { status: 404 });
   // Two editors on one page: the second to save is told, instead of silently replacing the first's work.
@@ -154,7 +156,7 @@ export const PUT: APIRoute = async ({ params, request, locals }) => {
   const tpl = await saveTemplate();
   if (tpl instanceof Response) return tpl;
   const templateUpdatedAt = tpl.updated_at;
-  const { error: revErr } = await recordRevision(db, { entry_id: id, title: patch.title ?? current.title, content: patch.content ?? current.content, fields: patch.fields ?? current.fields, entry: Object.keys(e).length ? e : null, action, author_id: locals.user.id, template: savedTemplate(), ...restored }, autosave);
+  const { error: revErr } = await recordRevision(db, { entry_id: id, title: patch.title ?? current.title, content: patch.content ?? current.content, fields: patch.fields ?? current.fields, entry: Object.keys(e).length ? e : null, action, author_id: locals.user.id, template: savedTemplate(), ...restored, ...note }, autosave);
   // The entry is saved either way; a version that couldn't be kept is said, not hidden.
   if (revErr) console.error(`entry ${id}: revision not saved: ${revErr.message}`);
   return Response.json({ ok: true, status, pending: false, ...(patch.slug ? { slug: patch.slug } : {}), updated_at: await stamp(), templateUpdatedAt, ...(revErr ? { warning: REVISION_WARNING } : {}) });

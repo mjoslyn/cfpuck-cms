@@ -1,6 +1,6 @@
 // Site settings island, in tabs: General (name, tagline, front page), Types (the templates for
 // each type's pages and listing), Search (the types it covers), Social (profile links, default share
-// image), Events (on or off, the default time zone), Tickets (payments and ticket emails; while events are on), Members, Mailing (lists, sender, tracking), Admin (the admin's colors and logo), Redirects (saved as they are added, with the Not found log), Sync (with another copy of the
+// image), Events (on or off, the default time zone), Tickets (payments and ticket emails; while events are on), Members, Mailing (lists, sender, tracking), Accessibility (checking pages before they are published), Admin (the admin's colors and logo), Redirects (saved as they are added, with the Not found log), Sync (with another copy of the
 // site), Backups (snapshots and sync backups) and the site's own options. One Save for all;
 // the tab is in the URL (#search), and leaving with unsaved changes asks first.
 import type { PaymentProvider, ProviderStatus } from '../lib/payments';
@@ -27,7 +27,7 @@ import type { TaxonomyMeta } from '../lib/page-meta';
 import { ADMIN_THEME_DEFAULTS, ADMIN_THEME_FIELDS, adminThemeVars, contrast, type AdminTheme } from '../lib/admin-theme';
 
 interface Props {
-  site: { name?: string; description?: string; front_page_id?: number | null; timezone?: string; search_types?: string[]; social?: { network: string; url: string }[]; share_image?: number; share_image_url?: string; templates?: TemplateMap; taxonomy_templates?: Record<string, string>; taxonomy_pages_off?: string[]; taxonomy_meta?: Record<string, TaxonomyMeta>; listing_meta?: Record<string, TaxonomyMeta>; listings_off?: string[]; icons?: Record<string, string>; icon_media_id?: number | null; icon_preview?: string; admin_theme?: AdminTheme; tickets?: TicketSettings; members?: Partial<MemberSettings>; mailing?: MailingSettings; events?: { enabled?: boolean } };
+  site: { name?: string; description?: string; front_page_id?: number | null; timezone?: string; search_types?: string[]; social?: { network: string; url: string }[]; share_image?: number; share_image_url?: string; templates?: TemplateMap; taxonomy_templates?: Record<string, string>; taxonomy_pages_off?: string[]; taxonomy_meta?: Record<string, TaxonomyMeta>; listing_meta?: Record<string, TaxonomyMeta>; listings_off?: string[]; icons?: Record<string, string>; icon_media_id?: number | null; icon_preview?: string; admin_theme?: AdminTheme; tickets?: TicketSettings; members?: Partial<MemberSettings>; mailing?: MailingSettings; events?: { enabled?: boolean }; a11y?: { block_publish?: boolean } };
   options: Record<string, any>;
   pages: { id: number; title: string }[];
   templates: TemplateInfo[];
@@ -256,6 +256,18 @@ export default function SiteSettings({ site: initialSite, options: initialOption
       id: 'mailing-lists',
       label: 'Mailing Lists',
       panel: <MailingSettingsPanel value={site.mailing ?? {}} mailgun={mailgun} lists={mailLists} membersOn={!!site.members?.enabled} onChange={(mailing) => setSite((s) => ({ ...s, mailing }))} />,
+    },
+    {
+      id: 'accessibility',
+      label: 'Accessibility',
+      panel: (
+        <>
+          <Toggle title="Check accessibility before publishing" value={site.a11y?.block_publish} onChange={(on) => setSite((s) => ({ ...s, a11y: { block_publish: on } }))} />
+          <p className="text-xs text-admin-muted">
+            Publish and Publish changes first run the editor's accessibility check on the page, for every type with a page, and publish only when nothing is left open: each problem fixed, or marked as checked by someone who looked. Otherwise the editor offers to show the problems, or to publish anyway with a reason, which Revisions keeps with that version. Bulk Publish in the content list then skips those entries, since the check runs in the editor. Templates and their Save &amp; apply aren't held.
+          </p>
+        </>
+      ),
     },
     {
       id: 'admin',

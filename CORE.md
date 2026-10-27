@@ -211,7 +211,8 @@ area the next free name (`area-2`, `area-3`...; `uniqueAreas`), so two never sho
 
 The content list has All / Published / Drafts / Trash tabs and bulk actions on the checked rows
 (`/api/admin/entries/bulk`): Publish (a placeholder address gets one from the title; untitled entries
-are skipped, as are entries whose address an entry of another type has), Move to drafts, Move to trash
+are skipped, as are entries whose address an entry of another type has, and, with Settings >
+Accessibility's gate on, entries with a page), Move to drafts, Move to trash
 (not the home page); in the trash, Restore (as drafts) and
 Delete permanently. Add a term and Remove a term change the entries' terms at once (and their
 `updated_at`, so an editor with one open is asked before saving over it) (the type's
@@ -954,7 +955,13 @@ own address, so a script in it runs as whoever views the page, an admin included
 has Blocks (and Patterns), Outline and an accessibility check (`A11yPanel.tsx`). Problems a person has to judge
 (warnings, and text over an image, which is always a problem since its contrast can't be measured) can be
 marked as checked with a note; the marks live in the document's root props (`a11y`), save on their own as
-they are made (`PUT /api/admin/a11y`; not an unsaved edit), and lapse when the text or image they were about changes. Blocks with `types`
+they are made (`PUT /api/admin/a11y`; not an unsaved edit), and lapse when the text or image they were about changes.
+With Settings > Accessibility's gate on (`settings.site.a11y.block_publish`, `src/lib/a11y-gate.ts`), Publish
+and Publish changes on an entry of any type with a page first run the check on the canvas afresh
+(`openIssues`); anything left open (not fixed, nor marked as checked) holds the publish in a dialog that
+shows the problems in the A11y panel or publishes anyway with an optional reason, which Revisions keeps
+with that version (`revisions.note`: what was left open, and why). Bulk Publish skips those entries, since
+the check runs in the editor; templates' Save & apply isn't held. Blocks with `types`
 are offered only on those entry types. Pages whose template has no `post-content` are edited in layout
 mode: the template document itself. In content mode the template around the page's content shows as it
 will on the site; for admins, hovering one of its blocks, a template part or a pattern outlines it with a

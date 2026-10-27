@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { addressTakenBy, uniqueSlug } from '../../../../lib/admin/save';
 import { isPlaceholderSlug, slugify } from '../../../../lib/slug';
+import { publishNeedsCheck } from '../../../../lib/a11y-gate';
 
 /**
  * Bulk actions from the content list (form post { ids[], action, back }): publish, draft (unpublish),
@@ -8,7 +9,8 @@ import { isPlaceholderSlug, slugify } from '../../../../lib/slug';
  * add-term and remove-term ({ term }: a term of any taxonomy, on the entries at once, published ones
  * included; a tag also goes into or out of unpublished changes kept aside, so publishing them keeps it).
  * Unpublished changes kept aside stay as they are. Untitled entries, and those whose address another
- * type's entry at the same URL has, can't be published; the home page can't be trashed. Goes back to the list with a note of what happened.
+ * type's entry at the same URL has, can't be published, nor (with Settings > Accessibility's gate on)
+ * entries with a page, which the editor publishes after its accessibility check; the home page can't be trashed. Goes back to the list with a note of what happened.
  */
 export const POST: APIRoute = async ({ request, locals, redirect }) => {
   const db = locals.db;
@@ -94,6 +96,10 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
         continue;
       }
       patch.slug = await uniqueSlug(db, r.type, slugify(r.title) || 'untitled', r.id);
+    }
+    if (status === 'publish' && publishNeedsCheck(site?.value as Record<string, unknown> | null, r.type)) {
+      skipped.push(`${name}: publish it from the editor, where the accessibility check runs first`);
+      continue;
     }
     if (status === 'publish') {
       const slug = String(patch.slug ?? r.slug);

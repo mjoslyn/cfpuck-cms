@@ -4,7 +4,8 @@
 // common problems only, so the panel says so. Problems a person has to judge (warnings, and text over
 // an image, whose contrast can't be measured) can be marked as checked: the marks are kept in the
 // document's root props (`a11y`, saved with the page or template) and lapse when what they were about
-// changes (the issue's `sig`).
+// changes (the issue's `sig`). With Settings > Accessibility's gate on, the editor runs `openIssues`
+// before publishing and holds the publish while any problem is left open.
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { createUsePuck, useGetPuck, type Data } from '@puckeditor/core';
 
@@ -12,7 +13,7 @@ const usePuck = createUsePuck();
 const NO_MARKS: Record<string, Mark> = {};
 
 /** Where marks are saved as they are made (the editor provides it: the entry or the template). */
-export const A11yMarksContext = createContext<{ save: (marks: Record<string, unknown>) => Promise<string | null>; quiet: () => void } | null>(null);
+export const A11yMarksContext = createContext<{ save: (marks: Record<string, unknown>) => Promise<string | null>; quiet: () => void; gate?: boolean } | null>(null);
 
 /** A person's judgement of an issue: who, when, a note, and what the issue looked like then. */
 interface Mark {
@@ -221,6 +222,23 @@ function check(doc: Document): Issue[] {
   return out.sort((a, b) => (a.level === b.level ? 0 : a.level === 'error' ? -1 : 1));
 }
 
+/** A problem marked as checked, as it still is (a mark lapses when what it was about changes). */
+const checkedBy = (marks: Record<string, Mark>, i: Issue) => !!(i.review && i.key && marks[i.key] && marks[i.key].sig === (i.sig ?? ''));
+
+/**
+ * The canvas checked now, and what is left open given the document's marks: for the editor to run
+ * before publishing. Null when the canvas isn't there to check.
+ */
+export async function openIssues(marks: Record<string, unknown> | undefined): Promise<{ errors: number; warnings: number } | null> {
+  // The canvas draws the latest edit on the next frame.
+  await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
+  const doc = canvasDoc();
+  if (!doc?.body?.querySelector('[data-puck-component]')) return null;
+  const open = check(doc).filter((i) => !checkedBy((marks ?? NO_MARKS) as Record<string, Mark>, i));
+  const errors = open.filter((i) => i.level === 'error').length;
+  return { errors, warnings: open.length - errors };
+}
+
 export function A11yPanel() {
   const getPuck = useGetPuck();
   const [issues, setIssues] = useState<Issue[] | null>(null);
@@ -301,7 +319,7 @@ export function A11yPanel() {
   };
 
   if (!issues) return <p className="p-4 text-sm text-admin-muted">Checking…</p>;
-  const isChecked = (i: Issue) => !!(i.review && i.key && marks[i.key] && marks[i.key].sig === (i.sig ?? ''));
+  const isChecked = (i: Issue) => checkedBy(marks, i);
   const lapsed = (i: Issue) => !!(i.review && i.key && marks[i.key] && marks[i.key].sig !== (i.sig ?? ''));
   const open = issues.filter((i) => !isChecked(i));
   const checked = issues.filter(isChecked);
@@ -363,6 +381,7 @@ export function A11yPanel() {
       <div className="border-b border-admin-ink/10 p-3">
         <p className="font-medium">{open.length ? `${errors} ${errors === 1 ? 'problem' : 'problems'}, ${warnings} ${warnings === 1 ? 'warning' : 'warnings'}` : 'No problems found'}</p>
         <p className="mt-1 text-xs text-admin-muted">Checks the page as visitors see it (at this canvas width). Automated checks find common problems only; also try the page with a keyboard. Marking something as checked saves straight away.</p>
+        {saveMarks?.gate && <p className="mt-1 text-xs text-admin-muted">This site checks pages before publishing: fix each problem or mark it as checked, or publish anyway with a reason, kept in Revisions.</p>}
         {saveNote && (
           <p className={`mt-1 text-xs ${saveNote.startsWith('Not') ? 'text-[#b3261e]' : 'text-[#3f7a3f]'}`} role="status">
             {saveNote}

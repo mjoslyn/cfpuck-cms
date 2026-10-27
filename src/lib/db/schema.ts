@@ -233,7 +233,7 @@ export const SCHEMA: Record<string, TableSchema> = {
   },
   revisions: {
     pk: ["id"],
-    columns: {"id":"int8","entry_id":"int8","title":"text","content":"jsonb","fields":"jsonb","author_id":"uuid","created_at":"timestamptz","action":"text","entry":"jsonb","restored_from":"int8","restored_edited":"bool","saved_at":"timestamptz","template":"jsonb"},
+    columns: {"id":"int8","entry_id":"int8","title":"text","content":"jsonb","fields":"jsonb","author_id":"uuid","created_at":"timestamptz","action":"text","entry":"jsonb","restored_from":"int8","restored_edited":"bool","saved_at":"timestamptz","template":"jsonb","note":"text"},
     generated: [],
     fks: [[["author_id"],"users",["id"]],[["entry_id"],"entries",["id"]],[["restored_from"],"revisions",["id"]]],
     defaults: {},

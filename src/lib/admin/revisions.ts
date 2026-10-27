@@ -20,13 +20,15 @@ export interface RevisionInput {
   author_id: string;
   restored_from?: number;
   restored_edited?: boolean;
+  /** Said with the save (a page published with accessibility problems left open, and why). */
+  note?: string | null;
   /** Layout mode: the template as saved with the page. */
   template?: { kind: string; slug: string; content: unknown } | null;
 }
 
 export async function recordRevision(db: Db, row: RevisionInput, autosave: boolean, now = new Date()): Promise<{ error: { message: string } | null }> {
   const saved_at = now.toISOString();
-  const values = { ...row, action: autosave ? AUTOSAVE : row.action, restored_from: row.restored_from ?? null, restored_edited: row.restored_from ? !!row.restored_edited : null, template: row.template ?? null, saved_at };
+  const values = { ...row, action: autosave ? AUTOSAVE : row.action, restored_from: row.restored_from ?? null, restored_edited: row.restored_from ? !!row.restored_edited : null, template: row.template ?? null, note: row.note ?? null, saved_at };
   if (autosave) {
     const { data: last } = await db.from('revisions').select('id, action, author_id, created_at').eq('entry_id', row.entry_id).order('id', { ascending: false }).limit(1).maybeSingle();
     if (last && last.action === AUTOSAVE && last.author_id === row.author_id && now.getTime() - Date.parse(last.created_at) < AUTOSAVE_SPAN) {

@@ -88,6 +88,13 @@ image, whose contrast can't be measured) can be marked as checked with a note. T
 document's root props (`a11y`), save on their own as they are made (`PUT /api/admin/a11y`; not an
 unsaved edit), and lapse when the text or image they were about changes.
 
+Settings > Accessibility can make publishing wait for the check: Publish and Publish changes, on an
+entry of any type with a page, first run it afresh. If anything is left open (a problem not fixed, or a
+warning not marked as checked), the publish is held and a dialog offers **Show the problems** (the A11y
+panel) or **Publish anyway** with an optional reason. A publish made anyway keeps a note in Revisions
+with that version: what was left open, and why. Bulk Publish in the content list skips entries with a
+page while this is on, since the check runs in the editor. Templates' Save & apply isn't held.
+
 ## Editor bar on the site
 
 Pages are cached at the CDN, so the editor bar signed-in editors see on the public site is added in

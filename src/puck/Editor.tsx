@@ -30,7 +30,8 @@ import { EnvContext, StaticHtml } from './BlockView';
 import { EntryForm, type EntryState } from './entry-fields';
 import { inlinePatterns } from './patterns';
 import { PatternsPanel } from './PatternsPanel';
-import { A11yMarksContext, A11yPanel } from './A11yPanel';
+import { A11yMarksContext, A11yPanel, openIssues } from './A11yPanel';
+import { publishNeedsCheck } from '../lib/a11y-gate';
 import parse, { Element, type DOMNode } from 'html-react-parser';
 // The public site stylesheet, so the canvas matches the site.
 import siteCss from '../styles/site.css?url';
@@ -103,6 +104,9 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
     setDirty(true);
     scheduleAutosave();
   };
+  // A publish the accessibility check held (Settings > Accessibility): what it found.
+  const [held, setHeld] = useState<Held | null>(null);
+  const publishNote = useRef<string | null>(null);
   const [error, setError] = useState<string>('');
   const dataRef = useRef<Data | null>(null);
   const settingsRef = useRef<Record<string, any>>({});
@@ -484,6 +488,40 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
     return null;
   };
 
+  /** Whether publishing this entry waits for the accessibility check (Settings > Accessibility). */
+  const gated = () => !!entry && publishNeedsCheck(settingsRef.current.site, entry.type);
+  /**
+   * Publish, after a fresh accessibility check of the canvas when the site asks for one: anything left
+   * open (not fixed, nor marked as checked) holds it, and the A11y panel opens to show what.
+   */
+  const publish = async () => {
+    if (gated()) {
+      setStatus('Checking accessibility…');
+      const marks = (puckRef.current?.().appState.data.root?.props as Record<string, unknown> | undefined)?.a11y as Record<string, unknown> | undefined;
+      const open = await openIssues(marks);
+      if (!open || open.errors + open.warnings) {
+        setStatus('');
+        return setHeld(open ?? { errors: 0, warnings: 0, failed: true });
+      }
+    }
+    publishNote.current = null;
+    await save('publish');
+  };
+  /** The A11y panel, open in the left rail. */
+  const showA11y = () => puckRef.current?.().dispatch({ type: 'setUi', ui: { leftSideBarVisible: true, plugin: { current: 'a11y' } } });
+  /** Published although the check found problems: what was left open, and why, go into the history. */
+  const publishAnyway = async (reason: string) => {
+    const h = held!;
+    const left = h.failed ? 'the accessibility check couldn\'t run' : `${heldText(h)} left open`;
+    publishNote.current = `Published with ${left}${reason.trim() ? `: ${reason.trim()}` : '.'}`;
+    setHeld(null);
+    try {
+      await save('publish');
+    } finally {
+      publishNote.current = null;
+    }
+  };
+
   /**
    * save: templates and layout mode (apply at once); draft / publish / unpublish / discard: pages.
    * auto: an autosave (a draft), recorded in the history as part of the current stretch of edits rather
@@ -529,7 +567,7 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
     const body = template
       ? { kind: template.kind, slug: template.slug, content: stored }
       : mode === 'content'
-        ? action === 'discard' || action === 'unpublish' ? { action } : { action, content: stored, entry: stateRef.current, ...restoredNote(stored), ...(auto ? { autosave: true } : {}) }
+        ? action === 'discard' || action === 'unpublish' ? { action } : { action, content: stored, entry: stateRef.current, ...restoredNote(stored), ...(auto ? { autosave: true } : {}), ...(action === 'publish' && publishNote.current ? { note: publishNote.current } : {}) }
         : { action: 'save', entry: stateRef.current, template: { kind: 'template', slug: templateSlug, content: stored }, ...restoredNote(stored) };
     const url = template ? '/api/admin/templates' : `/api/admin/entries/${entryId}`;
     const put = (bases: object) => fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, ...bases }) });
@@ -606,13 +644,13 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
     <div className="cms-editor-frame relative min-h-0 flex-1">
     <EnvContext.Provider value={env}>
       <RevisionsContext.Provider value={{ entryId: entry?.id ?? null, version: revisionsVersion, layout: mode === 'layout' ? templateSlug : null, canRestore: (r) => !!entry && canRestore(r), restore }}>
-      <A11yMarksContext.Provider value={{ save: saveA11yMarks, quiet: () => (marksOnly.current = true) }}>
+      <A11yMarksContext.Provider value={{ save: saveA11yMarks, quiet: () => (marksOnly.current = true), gate: gated() }}>
       <ViewContext.Provider value={{ env, chrome, sources: admin ? templateSlug : null, form: { type: entry?.type ?? '', state, setState: (v) => { stateRef.current = v; setState(v); edited(); }, templates } }}>
       <Puck
         config={config}
         data={initial}
         onChange={onChange}
-        onPublish={() => save(entry && mode === 'content' ? 'publish' : 'save')}
+        onPublish={() => (entry && mode === 'content' ? publish() : save('save'))}
         plugins={PLUGINS}
         iframe={IFRAME}
         // The title and address are on the bar above the editor; Puck falls back to the page title when
@@ -667,7 +705,7 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
                   <button type="button" disabled={saving} onClick={() => save('draft')} className="whitespace-nowrap rounded border border-admin-ink/20 px-3 py-1.5 text-sm hover:border-admin-accent hover:text-admin-accent disabled:opacity-50" title={liveStatus === 'publish' ? 'Keep your changes without changing the live page' : 'Save without publishing'}>
                     Save draft
                   </button>
-                  <button type="button" disabled={saving} onClick={() => save('publish')} className="whitespace-nowrap rounded bg-admin-ink px-4 py-1.5 text-sm font-medium text-white hover:bg-admin-accent disabled:opacity-50">
+                  <button type="button" disabled={saving} onClick={publish} title={gated() ? 'Checks the page\'s accessibility first' : undefined} className="whitespace-nowrap rounded bg-admin-ink px-4 py-1.5 text-sm font-medium text-white hover:bg-admin-accent disabled:opacity-50">
                     {liveStatus === 'publish' ? 'Publish changes' : 'Publish'}
                   </button>
                 </>
@@ -686,6 +724,14 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
     </EnvContext.Provider>
     </div>
     </div>
+    {held && (
+      <A11yHoldDialog
+        held={held}
+        onShow={() => (setHeld(null), showA11y())}
+        onPublish={publishAnyway}
+        onCancel={() => setHeld(null)}
+      />
+    )}
     {leaving && (
       <LeaveDialog
         saveLabel={mode === 'content' && entry && !template ? (liveStatus === 'publish' ? 'Save as unpublished changes' : 'Save draft') : 'Save & apply'}
@@ -748,6 +794,55 @@ function LeaveDialog({ saveLabel, note, saving, onSave, onDiscard, onStay }: { s
   );
 }
 
+interface Held {
+  errors: number;
+  warnings: number;
+  /** The check couldn't run (the canvas wasn't there). */
+  failed?: boolean;
+}
+const heldText = (h: Held) => [h.errors && `${h.errors} accessibility ${h.errors === 1 ? 'problem' : 'problems'}`, h.warnings && `${h.warnings} ${h.warnings === 1 ? 'warning' : 'warnings'}`].filter(Boolean).join(' and ');
+
+/** A publish the accessibility check held: see the problems, or publish anyway with a note in the history. */
+function A11yHoldDialog({ held, onShow, onPublish, onCancel }: { held: Held; onShow: () => void; onPublish: (reason: string) => void; onCancel: () => void }) {
+  const [reason, setReason] = useState('');
+  const first = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    first.current?.focus();
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && onCancel();
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, []);
+  return (
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-admin-ink/40 p-4" onClick={(e) => e.target === e.currentTarget && onCancel()}>
+      <div role="alertdialog" aria-modal="true" aria-labelledby="held-title" aria-describedby="held-text" className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
+        <h2 id="held-title" className="text-lg">Not published yet</h2>
+        <p id="held-text" className="mt-1 text-sm text-admin-muted">
+          {held.failed
+            ? "The accessibility check couldn't run on this page."
+            : `The accessibility check found ${heldText(held)} left open. This site publishes pages once each one is fixed or marked as checked.`}
+        </p>
+        <label className="mt-4 block text-sm">
+          Why publish anyway? <span className="text-admin-muted">(optional, kept in Revisions)</span>
+          <textarea className="mt-1 w-full rounded border border-admin-ink/15 px-2 py-1.5 text-sm" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. urgent notice; alt text to follow" />
+        </label>
+        <div className="mt-4 flex flex-wrap justify-end gap-2 text-sm">
+          <button type="button" onClick={onCancel} className="rounded px-3 py-1.5 text-admin-muted hover:text-admin-ink">
+            Cancel
+          </button>
+          <button type="button" onClick={() => onPublish(reason)} className="rounded border border-admin-ink/20 px-3 py-1.5 hover:border-[#c4592a] hover:text-[#c4592a]">
+            Publish anyway
+          </button>
+          {!held.failed && (
+            <button ref={first} type="button" onClick={onShow} className="rounded bg-admin-ink px-4 py-1.5 font-medium text-white hover:bg-admin-accent">
+              Show the problems
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** The document as saved: each linked pattern collapsed to its reference and this page's content changes. */
 async function collapseLinkedPatterns(data: Data): Promise<{ data: Data; detached: number }> {
   const cache = new Map<string, PuckItem[] | null>();
@@ -801,7 +896,7 @@ function PuckBridge({ into, onSelect }: { into: { current: ReturnType<typeof use
  */
 const IFRAME = { enabled: true, syncHostStyles: false, waitForStyles: true };
 
-interface RevisionRow { id: number; created_at: string; saved_at: string | null; action: string | null; title: string; author_id: string | null; content: Data | null; entry: EntryState | null; fields: Record<string, any> | null; template: { kind: string; slug: string; content: Data } | null; restored_from: number | null; restored_edited: boolean | null }
+interface RevisionRow { id: number; created_at: string; saved_at: string | null; action: string | null; title: string; author_id: string | null; content: Data | null; entry: EntryState | null; fields: Record<string, any> | null; template: { kind: string; slug: string; content: Data } | null; restored_from: number | null; restored_edited: boolean | null; note: string | null }
 interface RevisionsApi {
   entryId: number | null;
   version: number;
@@ -825,7 +920,7 @@ function RevisionsPanel() {
   useEffect(() => {
     if (!api?.entryId) return;
     const db = browserClient();
-    db.from('revisions').select('id, created_at, saved_at, action, title, author_id, content, entry, fields, template, restored_from, restored_edited').eq('entry_id', api.entryId).order('id', { ascending: false }).limit(50)
+    db.from('revisions').select('id, created_at, saved_at, action, title, author_id, content, entry, fields, template, restored_from, restored_edited, note').eq('entry_id', api.entryId).order('id', { ascending: false }).limit(50)
       .then(async ({ data }) => {
         setRows((data ?? []) as RevisionRow[]);
         const ids = [...new Set((data ?? []).map((r) => r.author_id).filter(Boolean))];
@@ -876,6 +971,7 @@ function RevisionsPanel() {
                   {r.restored_edited ? ', then edited' : ''}
                 </div>
               )}
+              {r.note && <div className="mt-0.5 text-xs text-[#a3441c]">{r.note}</div>}
               <div className="mt-1 flex gap-3 text-xs">
                 <a href={`/admin/preview/${api.entryId}/?revision=${r.id}`} target="_blank" rel="noopener" className="text-admin-muted underline hover:text-admin-accent">
                   Preview
