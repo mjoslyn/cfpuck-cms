@@ -14,6 +14,7 @@ export default defineConfig({
       editLink: { baseUrl: 'https://github.com/mjoslyn/cfpuck-cms/edit/main/docs-site/' },
       lastUpdated: true,
       sidebar: [
+        { label: 'Site guide (editors and admins)', items: [{ autogenerate: { directory: 'guide' } }] },
         { label: 'Getting started', items: [{ autogenerate: { directory: 'start' } }] },
         { label: 'Building a site', items: [{ autogenerate: { directory: 'site' } }] },
         { label: 'Content', items: [{ autogenerate: { directory: 'content' } }] },

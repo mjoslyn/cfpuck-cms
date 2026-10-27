@@ -945,7 +945,9 @@ never subscribes anyone again); the settings are, with the others. Migration `*_
 
 ## Editor
 
-`/admin/` (a session, see Accounts; `profiles.role`: editor, admin, or viewer = no access). Editors manage content,
+`/admin/` (a session, see Accounts; `profiles.role`: editor, admin, or viewer = no access). The admin bar's **?**
+opens the site guide for editors and admins (`docs-site/src/content/docs/guide/`, published with the
+docs; `helpUrl`, `src/lib/help.ts`; `HELP_URL` points it elsewhere, such as a site's own guide). Editors manage content,
 templates, media, forms and compose; site settings and users (`/admin/users/`: roles, invitations, Resend invitation for those invited who haven't set a password, signed in by a link or not, `src/lib/admin/invite.ts`; Delete, not your own account: the profile and any membership go, what they made stays with its author left empty) are
 for admins, as is the redirects API (`ADMIN_ONLY` in `src/middleware.ts`; settings writes are admin-only in the policies,
 `src/lib/db/policies.ts`; the users API checks the role itself too, since making accounts is the server's). Editors are trusted with the

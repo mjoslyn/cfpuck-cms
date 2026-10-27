@@ -6,6 +6,7 @@ import { siteDb } from '../lib/db/site';
 import { memberSettings } from '../lib/members/config';
 import { eventsOn } from '../lib/events/on';
 import { mailingOn } from '../lib/mailing/config';
+import { helpUrl } from '../lib/help';
 // Admin chrome. Tailwind only; the public site's CSS never loads here.
 import '../styles/tailwind.css';
 import '../styles/admin.css';
@@ -66,6 +67,7 @@ const nav = [
               ))}
             </nav>
             <div class="flex shrink-0 items-center gap-4 text-sm text-admin-on-bar/65">
+              <a href={helpUrl()} target="_blank" rel="noopener" title="Help: the site guide" aria-label="Help: the site guide (opens in a new tab)" class="flex h-7 w-7 items-center justify-center rounded-full border border-admin-on-bar/40 text-sm font-semibold hover:border-admin-on-bar hover:text-admin-on-bar">?</a>
               <a href="/" target="_blank" class="whitespace-nowrap hover:text-admin-on-bar">View site</a>
               <details class="relative">
                 <summary class="flex cursor-pointer list-none items-center gap-2 rounded-full py-1 pr-2 pl-1 hover:bg-admin-on-bar/10 [&::-webkit-details-marker]:hidden" aria-label="Account">
