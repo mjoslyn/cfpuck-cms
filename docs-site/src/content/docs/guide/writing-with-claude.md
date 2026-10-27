@@ -47,4 +47,5 @@ block's name, and your request only changes that block (or its whole section, if
 - Compose can also work on templates and the header or footer; the panel says when a change affects
   every page.
 - **Write with Claude** buttons elsewhere (for example under the excerpt, or **Generate** in the SEO
-  settings) write just that one piece of text.
+  settings, or **Generate** beside an image's alt text in **Media**) write just that one piece of
+  text.

@@ -9,6 +9,7 @@ import { mediaUrl } from '../lib/media/image';
 import type { Media } from '../lib/types';
 import { SHAPES, position, type Point } from '../lib/media/focal';
 import { MediaModal } from '../puck/fields';
+import { describable } from '../lib/media/alt-text';
 
 const input = 'w-full rounded border border-admin-ink/15 bg-white px-2 py-1.5 text-sm outline-none focus:border-admin-accent';
 const label = 'mb-1 block text-xs font-medium text-admin-muted';
@@ -32,6 +33,9 @@ export default function MediaDetail() {
   // Which point clicks on the image set: the main one, or a crop shape's own.
   const [editing, setEditing] = useState<string>('main');
   const [status, setStatus] = useState('');
+  // Alt text from Claude (Generate): under way, or what went wrong.
+  const [writing, setWriting] = useState(false);
+  const [altNote, setAltNote] = useState('');
   const frame = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
 
@@ -39,6 +43,7 @@ export default function MediaDetail() {
     const open = async (e: Event) => {
       const id = (e as CustomEvent<number>).detail;
       setStatus('');
+      setAltNote('');
       const { data } = await browserClient().from('media').select('*').eq('id', id).single();
       if (!data) return;
       setM(data as Row);
@@ -82,6 +87,18 @@ export default function MediaDetail() {
   const changed = draft.alt !== (m.alt ?? '') || draft.title !== (m.title ?? '') || draft.caption !== (m.caption ?? '') || focusChanged || swapsChanged;
   const formats = Object.keys(m.formats ?? {});
 
+  /** Alt text written by Claude from the image, into the form (saved with Save). */
+  const generateAlt = async () => {
+    if (!m) return;
+    setWriting(true);
+    setAltNote('');
+    const res = await fetch('/api/admin/media/describe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: m.id }) }).catch(() => null);
+    setWriting(false);
+    if (!res?.ok) return setAltNote(res ? await res.text() : 'No connection.');
+    const { alt } = await res.json();
+    setDraft((d) => ({ ...d, alt }));
+    setAltNote('Written by Claude: check it, then Save.');
+  };
   const save = async () => {
     setStatus(focusChanged ? 'Saving and re-cropping thumbnails...' : 'Saving...');
     const res = await fetch(`/api/admin/media/${m.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ alt: draft.alt, title: draft.title, caption: draft.caption, focal_point: draft.focal, crop_focals: draft.crops, crop_images: draft.swaps }) });
@@ -188,10 +205,24 @@ export default function MediaDetail() {
               Close
             </button>
           </div>
-          <label className="mb-3 block">
-            <span className={label}>Alt text (describes the image for screen readers)</span>
-            <textarea className={input} rows={3} value={draft.alt} onChange={(e) => setDraft({ ...draft, alt: e.target.value })} />
-          </label>
+          <div className="mb-3">
+            <div className="mb-1 flex items-end justify-between gap-2">
+              <label htmlFor="media-alt" className="block text-xs font-medium text-admin-muted">
+                Alt text (describes the image for screen readers)
+              </label>
+              {describable(m) && (
+                <button type="button" onClick={generateAlt} disabled={writing} className="shrink-0 rounded border border-admin-ink/15 bg-white px-2 py-0.5 text-xs hover:border-admin-accent hover:text-admin-accent disabled:opacity-50" title="Claude looks at the image and writes a description">
+                  {writing ? 'Writing…' : 'Generate'}
+                </button>
+              )}
+            </div>
+            <textarea id="media-alt" className={input} rows={3} value={draft.alt} onChange={(e) => setDraft({ ...draft, alt: e.target.value })} />
+            {altNote && (
+              <p className="mt-1 text-xs text-admin-muted" role="status">
+                {altNote}
+              </p>
+            )}
+          </div>
           <label className="mb-3 block">
             <span className={label}>Title</span>
             <input className={input} value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />

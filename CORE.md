@@ -460,7 +460,11 @@ a `-scaled` copy as the full size, the standard sizes are generated (hard crops 
 point), and every file gets AVIF and WebP copies next to it. An SVG is stored as uploaded. It can carry script and
 `/media/` is the site's own address, so every `/media/` answer carries `Content-Security-Policy:
 sandbox` and `X-Content-Type-Options: nosniff` (`MEDIA_HEADERS`): a
-file opened on its own can't run script, and images in pages are unaffected. `media.focal_point` ({x, y} in 0..1) is set
+file opened on its own can't run script, and images in pages are unaffected. An image's alt text has
+**Generate** in the media library (`POST /api/admin/media/describe`, `describeImage` in
+`src/lib/media/describe.ts`): Claude (`quickAsk`, `ANTHROPIC_SEO_MODEL`) looks at the image as a JPEG
+(`imageForClaude`) with its file name, title, caption and current alt text (`altContext`) and writes one
+sentence into the form, saved with Save; raster images only (`describable`). `media.focal_point` ({x, y} in 0..1) is set
 in the media library, with optional overrides per crop shape (`media.crop_focals`: square, 16:9, 4:3,
 3:4; `src/lib/media/focal.ts`). Changes re-crop the cropped sizes; the point for the nearest shape
 becomes `object-position` wherever the image is cropped to a ratio. Each shape can also use another

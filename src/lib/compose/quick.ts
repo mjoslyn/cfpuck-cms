@@ -1,5 +1,7 @@
 // One short Claude call that answers through a tool (a fixed shape): the SEO section's Generate, the
-// excerpt's Write with Claude, and a term's or taxonomy's Write with Claude. ANTHROPIC_SEO_MODEL (default Haiku 4.5, which is quick).
+// excerpt's Write with Claude, a term's or taxonomy's Write with Claude, and an image's alt text (Generate in
+// the media library, with the image). ANTHROPIC_SEO_MODEL (default Haiku 4.5, which is quick).
+import type Anthropic from '@anthropic-ai/sdk';
 import { site } from '../site';
 import { claudeClient, env, NO_KEY } from './client';
 
@@ -10,7 +12,7 @@ export class QuickError extends Error {
 }
 
 /** Ask for `tool`'s input, given a task (system text after the site's brief) and the page. */
-export async function quickAsk<T>(task: string, tool: { name: string; description: string; input_schema: Record<string, any> }, page: string, maxTokens = 500): Promise<T> {
+export async function quickAsk<T>(task: string, tool: { name: string; description: string; input_schema: Record<string, any> }, page: string | Anthropic.ContentBlockParam[], maxTokens = 500): Promise<T> {
   const client = claudeClient();
   if (!client) throw new QuickError(NO_KEY, 503);
   const res = await client.messages.create({
