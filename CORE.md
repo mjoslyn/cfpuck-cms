@@ -192,6 +192,10 @@ social profiles as `sameAs`. Compose includes `seo` in every `build_page` and wr
 `generated`) on each build until someone edits it by hand. The entry settings' SEO section
 (`src/puck/SeoForm.tsx`) shows lengths and a search result preview, and Generate asks Claude
 (`POST /api/admin/seo`, `ANTHROPIC_SEO_MODEL`, default Haiku 4.5) for the page as it is in the editor.
+These quick calls (`quickAsk`, `src/lib/compose/quick.ts`: SEO, excerpts, term texts, alt text) get their
+answer as JSON in a fixed schema through structured outputs (`output_config.format`, `outputSchema`), not a
+forced tool call, which Claude Sonnet 5.5, Opus 5.5 and Fable 5.1 refuse; a refusal or a cut-off answer is
+reported as such (`quickAnswer`).
 Term pages (`termSeo`): the search title is the term's, else its taxonomy's (with `{term}` filled in),
 also used for the `<title>`; the description the term's SEO description, else its description, else
 the taxonomy's; the share image the term's, else its featured image, else the taxonomy's; noindex
