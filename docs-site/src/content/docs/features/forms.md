@@ -143,6 +143,8 @@ form: **Next**, then **Test Payment** pays the order, and the last step links ba
 
 ## Mail
 
-Mail goes out over SMTP: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE`, or one
-`SMTP_URL`. The sender is `MAIL_FROM`, defaulting to `mailFrom` in the site config. Without SMTP,
+Mail goes out through Cloudflare Email Service when the Worker has its `EMAIL` binding
+(`"send_email": [{ "name": "EMAIL" }]` in `wrangler.jsonc`, the sender's domain onboarded under Email
+Sending), else over SMTP: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE`, or one
+`SMTP_URL`. The sender is `MAIL_FROM`, defaulting to `mailFrom` in the site config. With neither,
 submissions are stored and no mail is sent.

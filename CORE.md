@@ -781,7 +781,8 @@ member (`renderRequest` drops the viewer's membership), and the editor offers no
 An optional feature, on under Settings > Mailing Lists (`settings.site.mailing`, `mailingSettings`,
 `src/lib/mailing/config.ts`, `src/admin/MailingSettings.tsx`): mailing lists people sign up to, campaigns
 and a weekly digest sent through Mailgun from a marketing subdomain, and each email's deliveries, opens
-and clicks. The site's other email (form notifications, tickets, confirmations) goes over SMTP as before.
+and clicks. The site's other email (form notifications, tickets, confirmations) goes out as before (`sendMail`:
+Email Service, else SMTP; see Forms).
 Off, the Mailing Lists screen (`/admin/mailing-lists/`), its blocks and pages are gone (`mailingOn`). Lists,
 subscribers and segments are for anyone, members or not. Contacts, campaigns, sends, clicks
 and Mailgun's events aren't synced or backed up (they stay on the copy where they were made, so a restore
@@ -836,7 +837,7 @@ never subscribes anyone again); the settings are, with the others. Migration `*_
   an address already on file they wait in `contacts.pending_signup` until it is confirmed, so a form
   can't change anyone on file. The segment editor offers the site's fields
   with their options.
-- **Signing up** (`src/lib/mailing/contacts.ts`): always confirmed by email (double opt-in, over SMTP,
+- **Signing up** (`src/lib/mailing/contacts.ts`): always confirmed by email (double opt-in, through the site's own mail,
   at most 3 confirmation emails a day to one address, none to a complained one (the answer is the same)
   and one a day to a bounced or erased one; 30 confirmation emails a minute site-wide,
   `contacts.confirm_sent_at`). The **Subscribe**
@@ -976,7 +977,7 @@ Accounts are the site's own (`src/lib/auth`, server only), kept by Better Auth i
 copied Supabase Auth's users with their ids, passwords and open invitations). Better Auth's routes
 aren't mounted: the site's endpoints call it (`signIn`, `signOut`, `sessionUser`, `createUser`,
 `setPassword`, `passwordToken`, `setPasswordWithToken`, `confirmToken`, `confirmAddress`) and send its
-emails themselves (`src/lib/auth/mail.ts`, over SMTP). The session is a signed cookie,
+emails themselves (`src/lib/auth/mail.ts`, through `sendMail`: Email Service, else SMTP). The session is a signed cookie,
 `site.session_token` (seven days, renewed as it is used: the middleware passes a renewed cookie on,
 `refreshedCookies`, with the `site.signed_in` hint at the same Max-Age, on admin answers, member
 endpoints and private or no-store answers, never on pages cached for everyone); `AUTH_SECRET` signs it

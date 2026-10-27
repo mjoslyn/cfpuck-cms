@@ -33,8 +33,9 @@ What you get:
 - Node 22.12 or later
 - Optional: a local mail catcher to see the site's email (Mailpit, through Docker or Homebrew)
 - For hosting: a Cloudflare account (Workers paid plan: the jobs queue and CPU time)
-- Optional: an Anthropic API key (Compose), an SMTP account (form notifications and ticket emails)
-  and a Stripe or Square account (paid forms and tickets)
+- Optional: an Anthropic API key (Compose), a domain onboarded for Cloudflare Email Service (or an SMTP
+  account) for the site's email (form notifications, tickets, account emails), and a Stripe or Square
+  account (paid forms and tickets)
 
 Wrangler (Cloudflare's CLI) is a dev dependency, so `npx wrangler` needs no install.
 
@@ -97,12 +98,16 @@ Wrangler (Cloudflare's CLI) is a dev dependency, so `npx wrangler` needs no inst
 
 - **Compose.** Set `ANTHROPIC_API_KEY`, and optionally `ANTHROPIC_MODEL` (default claude-sonnet-5-5).
   Restart the dev server after setting it.
-- **Form notification mail.** Set either `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` and
-  `SMTP_SECURE`, or a single `SMTP_URL` such as `smtp://user:pass@host:587`. Also set `MAIL_FROM`.
+- **Email** (form notifications, ticket emails, account emails and mailing-list confirmations; not
+  campaigns, which go through Mailgun). Deployed, mail goes through Cloudflare Email Service: add
+  `"send_email": [{ "name": "EMAIL" }]` to `wrangler.jsonc`, onboard the sender's domain under Email
+  Service > Email Sending in the Cloudflare dashboard, and set `MAIL_FROM` to an address on it. Without
+  that binding the site sends over SMTP instead: either `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`,
+  `SMTP_PASS` and `SMTP_SECURE`, or a single `SMTP_URL` such as `smtp://user:pass@host:587` (port 587 or
+  465; Workers can't use port 25). With neither, submissions are stored but no mail is sent.
   Notifications go to each form's addresses, or to `FORMS_ADMIN_EMAIL`, or to `adminEmail` in the
-  site config. Without SMTP, submissions are stored but no mail is sent.
-  Locally, `SMTP_URL=smtp://127.0.0.1:1025` sends to a mail catcher such as Mailpit (inbox at
-  http://127.0.0.1:8025).
+  site config. Locally, `SMTP_URL=smtp://127.0.0.1:1025` sends to a mail catcher such as Mailpit (inbox
+  at http://127.0.0.1:8025).
 - **Events.** Turn them on under Settings > Events (admins): event and venue types, the calendar at
   `/events/`, event categories, `.ics` feeds and the event blocks, plus the default time zone (an event
   can choose its own). Run `npm run seed` again afterwards for the event templates and a sample
@@ -124,7 +129,7 @@ Wrangler (Cloudflare's CLI) is a dev dependency, so `npx wrangler` needs no inst
     `SQUARE_WEBHOOK_SIGNATURE_KEY` and `SQUARE_WEBHOOK_URL`.
 
   With both set, choose one under Settings > Tickets, which also has the currency, how long an
-  unpaid order holds its tickets, and the emails. Ticket emails need SMTP; their links use
+  unpaid order holds its tickets, and the emails. Ticket emails need email set up (see Email above); their links use
   `SITE_URL` (default the request's address), and the copy of each order goes to `TICKETS_NOTIFY_EMAIL`
   (default `FORMS_ADMIN_EMAIL`, then `adminEmail`). Orders and the waitlist are at `/admin/tickets/`.
   The same keys take payments on forms (a form's Payment tab).
@@ -138,11 +143,11 @@ Wrangler (Cloudflare's CLI) is a dev dependency, so `npx wrangler` needs no inst
     block on it.
 
   Members' emails (confirming an address, resetting a password, invitations) are sent by the site
-  over SMTP; locally they arrive in the mail catcher.
+  like its other email (see Email above); locally they arrive in the mail catcher.
 - **Mailing.** Turn it on under Settings > Mailing Lists (admins) and fill in the postal address every email
   carries (nothing sends without it). Add lists on the Mailing Lists screen (Lists tab), put a **Subscribe** block where
   people should sign up (or link to `/subscribe/`), then write campaigns or set up a weekly digest there. Segments (tags, fields, sign-up date, opens and clicks) send to part of a list, members or not.
-  Sign-ups are confirmed by email over SMTP. Sending needs Mailgun (see Hosting): `MAILGUN_API_KEY`,
+  Sign-ups are confirmed by the site's own email (see Email above). Sending campaigns needs Mailgun (see Hosting): `MAILGUN_API_KEY`,
   `MAILGUN_DOMAIN`, `MAILGUN_REGION` (`eu` for EU accounts) and `MAILGUN_WEBHOOK_SIGNING_KEY`, plus
   `MAIL_LINK_SECRET` for the signed links in emails. Locally, without Mailgun, campaigns go to the mail
   catcher one address at a time. With Members on, member sign-up and the account page offer the lists
@@ -202,10 +207,12 @@ follow the config. `CORE.md` describes each option.
    with `scripts/pg-to-d1.ts` instead (`docs/cloudflare-migration.md`, Moving an existing site).
 4. **The Worker.**
    Set the secrets (`npx wrangler secret put <NAME>`): `AUTH_SECRET` (a long random value of its own,
-   e.g. `openssl rand -hex 32`), `SMTP_PASS` (invitations, password links and confirmations are sent
-   over SMTP; port 587 or 465), `SYNC_SECRET` (to sync with another copy: the same long random value on
-   both) and the optional Compose, payment and Mailgun keys; the rest (`SMTP_HOST`, `SMTP_USER`,
-   `MAIL_FROM`, `SITE_URL`...) as `vars` in `wrangler.jsonc` or as secrets too. Deploy with
+   e.g. `openssl rand -hex 32`), `SYNC_SECRET` (to sync with another copy: the same long random value on
+   both) and the optional Compose, payment and Mailgun keys; the rest (`MAIL_FROM`, `SITE_URL`...) as
+   `vars` in `wrangler.jsonc` or as secrets too. For email (invitations, password links, form
+   notifications), add the `EMAIL` binding to `wrangler.jsonc` and onboard `MAIL_FROM`'s domain under
+   Email Service > Email Sending; or, without the binding, set `SMTP_PASS` as a secret and the other
+   `SMTP_*` values as `vars`. Deploy with
    `npm run deploy`, then add your domain to the Worker (Workers > the Worker > Domains & Routes).
    - Deploying from git (Workers Builds: the Worker > Settings > Build, connected to the repository):
      build command `npm run build`, deploy command `npm run deploy:remote`, which applies new

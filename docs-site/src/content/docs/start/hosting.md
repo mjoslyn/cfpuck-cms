@@ -31,8 +31,8 @@ npx wrangler d1 migrations apply DB --remote
 Put the database's id in `wrangler.jsonc` (`database_id`). The site reads and writes it only on the
 server; the admin screens' queries go through the site, which checks each person's role. Accounts are
 the site's own (in its database). Invitations (7 days), password links (an hour) and members'
-confirmation links (a day) are sent by the site over its SMTP settings; without SMTP, admins are shown
-invitation and password links to pass on themselves.
+confirmation links (a day) are sent by the site's email (Cloudflare Email Service, else SMTP); without
+either, admins are shown invitation and password links to pass on themselves.
 
 ## 3. Seed and create an admin
 
@@ -57,16 +57,20 @@ npx wrangler queues create <site>-jobs
 ```
 
 Turn on Cloudflare Images for the account. Set the
-secrets with `npx wrangler secret put <NAME>` (`AUTH_SECRET`, `SYNC_SECRET`, `SMTP_PASS`,
-and the optional Compose, payment and Mailgun keys) and the other settings as `vars` in
-`wrangler.jsonc`. Deploy with `npm run deploy`, then add your domain under the Worker's **Domains &
+secrets with `npx wrangler secret put <NAME>` (`AUTH_SECRET`, `SYNC_SECRET` and the optional Compose,
+payment and Mailgun keys) and the other settings as `vars` in `wrangler.jsonc`.
+
+For the site's email, add `"send_email": [{ "name": "EMAIL" }]` to `wrangler.jsonc`, onboard the
+sender's domain under **Email Service** > **Email Sending** in the Cloudflare dashboard, and set
+`MAIL_FROM` to an address on it. Without that binding the site sends over SMTP (`SMTP_PASS` as a
+secret, the other `SMTP_*` settings as `vars`). Deploy with `npm run deploy`, then add your domain under the Worker's **Domains &
 Routes**.
 
 To deploy from git instead (the Worker's **Settings** > **Build**, connected to the repository), set the
 build command to `npm run build` and the deploy command to `npm run deploy:remote`, which applies any new
 database migrations and then deploys. The API token Cloudflare makes for builds can't change D1: add
 **D1 Edit** to it under **My Profile** > **API Tokens**. A migration that changes stored blocks has to go
-out after its code; deploy that one with `npm run deploy` and apply it straight after. SMTP goes through the Worker's sockets: use port 587 or 465 (25 is closed to Workers).
+out after its code; deploy that one with `npm run deploy` and apply it straight after. SMTP, when used, goes through the Worker's sockets: use port 587 or 465 (25 is closed to Workers).
 
 The Worker does the background work itself (`src/worker.ts`):
 
@@ -131,7 +135,7 @@ Admins invite editors from `/admin/users/`. See [Editor and roles](../../feature
 | `AUTH_SECRET` | Signs sessions and the site's links: a long random value (`openssl rand -hex 32`) |
 | `AUTH_CONFIRM_EMAIL` | `false` lets member sign-ups in without confirming their address |
 | `DATABASE_URL` | Moving a site only: the Postgres database `scripts/pg-to-d1.ts` copies from |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE` or `SMTP_URL` | Outgoing mail |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE` or `SMTP_URL` | Outgoing mail over SMTP, when the Worker has no `EMAIL` binding (Cloudflare Email Service) |
 | `MAIL_FROM` | Sender, overriding the config's `mailFrom` |
 | `FORMS_ADMIN_EMAIL` | Where form notifications go when a form doesn't say |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Stripe payments |

@@ -8,7 +8,7 @@ sidebar:
 Mailing is optional: turn it on under **Settings > Mailing Lists**. People sign up to your mailing lists (and
 confirm by email), and you send them campaigns and a weekly digest through Mailgun from a marketing
 subdomain. Each email's deliveries, opens and clicks are recorded. The site's other email (form
-notifications, tickets) goes out over SMTP as before. Mailgun's setup is under
+notifications, tickets) goes out as before, through Cloudflare Email Service or SMTP. Mailgun's setup is under
 [Hosting](../../start/hosting/#mailing).
 
 ## Settings

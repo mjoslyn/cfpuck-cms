@@ -10,8 +10,8 @@ sidebar:
 - Node 22.12 or later
 - Optional: a local mail catcher to see the site's email (Mailpit, through Docker or Homebrew)
 - For hosting: a Cloudflare account (Workers paid plan)
-- Optional: an Anthropic API key (Compose), an SMTP account (form notifications and ticket emails)
-  and a Stripe or Square account (paid forms and tickets)
+- Optional: an Anthropic API key (Compose), a domain onboarded for Cloudflare Email Service (or an SMTP
+  account) for the site's email, and a Stripe or Square account (paid forms and tickets)
 
 Wrangler (Cloudflare's CLI) is a dev dependency, so `npx wrangler` needs no install.
 
@@ -68,12 +68,16 @@ Wrangler (Cloudflare's CLI) is a dev dependency, so `npx wrangler` needs no inst
 Set `ANTHROPIC_API_KEY`, and optionally `ANTHROPIC_MODEL` (default `claude-sonnet-5-5`). Restart the
 dev server after setting it. See [Compose](../../features/compose/).
 
-### Form notification mail
+### Email
 
-Set either `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` and `SMTP_SECURE`, or a single
-`SMTP_URL` such as `smtp://user:pass@host:587`. Also set `MAIL_FROM`. Notifications go to each form's
-addresses, or to `FORMS_ADMIN_EMAIL`, or to `adminEmail` in the site config. Without SMTP,
-submissions are stored but no mail is sent.
+The site's own email (form notifications, ticket emails, account emails and mailing-list
+confirmations) goes through Cloudflare Email Service when the Worker has its `EMAIL` binding
+(`"send_email": [{ "name": "EMAIL" }]` in `wrangler.jsonc`, the sender's domain onboarded under Email
+Service > Email Sending, `MAIL_FROM` an address on it; see Hosting). Without the binding it goes over
+SMTP: either `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` and `SMTP_SECURE`, or a single
+`SMTP_URL` such as `smtp://user:pass@host:587`. With neither, submissions are stored but no mail is
+sent. Notifications go to each form's addresses, or to `FORMS_ADMIN_EMAIL`, or to `adminEmail` in the
+site config.
 
 Locally, run a mail catcher such as Mailpit (`docker run -d -p 1025:1025 -p 8025:8025 axllent/mailpit`)
 and set `SMTP_URL=smtp://127.0.0.1:1025`; its inbox is at http://127.0.0.1:8025.
@@ -94,7 +98,7 @@ Tickets); the Event details block shows the form, or place a Tickets block on an
   `SQUARE_WEBHOOK_SIGNATURE_KEY` and `SQUARE_WEBHOOK_URL`.
 
 With both set, choose one under **Settings > Tickets**, which also has the currency, how long an
-unpaid order holds its tickets, and the emails. Ticket emails need SMTP; their links use `SITE_URL`
+unpaid order holds its tickets, and the emails. Ticket emails need email set up (see Email); their links use `SITE_URL`
 (default the request's address), and the copy of each order goes to `TICKETS_NOTIFY_EMAIL` (default
 `FORMS_ADMIN_EMAIL`, then `adminEmail`). The same keys take payments on forms. See
 [Tickets](../../features/tickets/) and [Forms](../../features/forms/).
@@ -103,7 +107,7 @@ unpaid order holds its tickets, and the emails. Ticket emails need SMTP; their l
 
 Turn it on under **Settings > Members** (admins): the levels, how people join and the message
 visitors see. Members sign in at `/account/`; their emails (confirming an address, resetting a
-password, invitations) are sent by the site over SMTP and, locally, arrive in the mail catcher. See
+password, invitations) are sent by the site's email and, locally, arrive in the mail catcher. See
 [Members](../../features/members/).
 
 ## Troubleshooting
