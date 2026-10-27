@@ -30,7 +30,18 @@ type renders its children.
 
 ### Notable blocks
 
-- **`hero`**: a full-bleed image with eyebrow, title, text and two buttons.
+- **`hero`**: a full-bleed image with eyebrow, title, text and two buttons. Its overlay keeps the text
+  readable: **Overlay** (`overlay`: none, light, medium by default, strong) and **Darkest at**
+  (`overlayFrom`: bottom by default, left, or all over).
+- **`cover`**'s overlay is a colour and opacity, **Even** or a gradient **From bottom** or **From left**
+  (`overlayStyle`), clearing towards the other side.
+- **Focal points per screen size** (Hero, Cover, and Image when it is cropped): Desktop, Tablet and
+  Phone (`focal`, `focalTablet`, `focalPhone`, set by clicking the image in the block's settings,
+  `src/puck/FocalPoints.tsx`). A size without its own uses the image's focal points from the media
+  library: its point for the crop's shape on that size (16:9 on desktop and 3:4 on tablets and phones
+  for Hero and Cover, the block's ratio for Image), else its main point. They are written as CSS
+  variables (`--focal`, `--focal-tablet`, `--focal-phone`) and the stylesheet picks one per screen
+  (tablet up to 1024px wide, phone up to 599px).
 - **`gallery`, `video-gallery`**: image blocks, or embed and video blocks, shown as a grid, masonry
   columns or a slider (`display`). The slider is a scroll-snap row with buttons and autoplay
   (`public/assets/js/gallery-slider.js`). Media picked in the panel arrive as `attrs.add` and become

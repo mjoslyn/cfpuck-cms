@@ -658,9 +658,19 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
         headerTitle={'\u200b'}
         overrides={{
           iframe: CanvasFrame,
+          // A page edited in layout mode: a line under the header saying the template is what's edited.
+          header: ({ children }) => (
+            <>
+              {children}
+              {mode === 'layout' && entry && (
+                <p className="m-0 border-b border-admin-ink/10 bg-admin-soft px-4 py-1.5 text-xs text-admin-muted">
+                  Editing this page's template (<span className="font-mono">{templateSlug}</span>): changes apply to every page using it.
+                </p>
+              )}
+            </>
+          ),
           headerActions: ({ children }) => (
             <>
-              {mode === 'layout' && entry && <span className="max-w-xs text-xs text-admin-muted">Editing this page's template ({templateSlug}); changes apply to every page using it.</span>}
               <PuckBridge into={puckRef} onSelect={setSelection} />
               {entry && mode === 'content' && (
                 <span className="flex items-center gap-2 whitespace-nowrap text-xs text-admin-muted">

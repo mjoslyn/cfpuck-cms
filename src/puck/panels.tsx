@@ -8,6 +8,8 @@ import { site } from '../lib/site';
 import { LIST_ICONS, iconSvg } from '../render/c/icons';
 import { useEffect, useState } from 'react';
 import { browserClient } from '../lib/db/browser';
+import { FocalPoints } from './FocalPoints';
+import { parseRatio } from '../lib/media/focal';
 
 type SetFn = (patch: Attrs) => void;
 export type Panel = (a: Attrs, set: SetFn) => ReactNode;
@@ -245,7 +247,7 @@ function LayoutControls({ a, set }: { a: Attrs; set: SetFn }) {
 }
 
 const imagePicker = (a: Attrs, set: SetFn) => (
-  <MediaPicker title="Image" url={a.src} onSelect={(m) => set({ mediaId: m.mediaId ?? undefined, src: m.url, alt: a.alt || m.alt || undefined })} />
+  <MediaPicker title="Image" url={a.src} onSelect={(m) => set({ mediaId: m.mediaId ?? undefined, src: m.url, alt: a.alt || m.alt || undefined, focal: undefined, focalTablet: undefined, focalPhone: undefined })} />
 );
 
 export const CONTENT_PANELS: Record<string, Panel> = {
@@ -300,6 +302,9 @@ export const CONTENT_PANELS: Record<string, Panel> = {
       <Toggle title="Circle" value={a.variant === 'circle'} onChange={(v) => set({ variant: v ? 'circle' : undefined })} />
       <Toggle title="Fill the block behind the content" value={!!a.cover} onChange={(v) => set({ cover: v || undefined })} />
       <Toggle title="Shade (darker towards the bottom)" value={!!a.shade} onChange={(v) => set({ shade: v || undefined })} />
+      {(parseRatio(a.aspectRatio) || a.cover || a.scale === 'cover') && (
+        <FocalPoints a={a} set={set} ratios={[parseRatio(a.aspectRatio) ?? 4 / 3, parseRatio(a.aspectRatio) ?? 4 / 3, parseRatio(a.aspectRatio) ?? 4 / 3]} />
+      )}
       <StyleControls a={a} set={set} parts={{ colors: false, spacing: true, width: false }} />
     </>
   ),
@@ -340,9 +345,12 @@ export const CONTENT_PANELS: Record<string, Panel> = {
       {imagePicker(a, set)}
       <Toggle title="Use the page's featured image" value={a.useFeaturedImage} onChange={(v) => set({ useFeaturedImage: v || undefined })} />
       <Text title="Alt text" value={a.alt} onChange={(v) => set({ alt: v || undefined })} />
+      {!a.useFeaturedImage && <FocalPoints a={a} set={set} ratios={[16 / 9, 3 / 4, 3 / 4]} />}
       <Color title="Overlay color" value={a.overlay} onChange={(v) => set({ overlay: v })} />
-      <Row title={`Overlay opacity (${a.dim ?? 50}%)`}>
-        <input type="range" min={0} max={100} step={10} className="w-full" value={a.dim ?? 50} onChange={(e) => set({ dim: Number(e.target.value) })} />
+      <Segmented title="Overlay" value={a.overlayStyle ?? 'solid'} options={[['solid', 'Even'], ['bottom', 'From bottom'], ['left', 'From left']]} onChange={(v) => set({ overlayStyle: v === 'solid' ? undefined : v })} />
+      <p className="-mt-2 mb-3 text-xs text-admin-muted">A gradient keeps text readable where it sits and leaves the rest of the picture clear.</p>
+      <Row title={`Overlay opacity (${a.dim ?? (a.overlayStyle ? 80 : 50)}%)`}>
+        <input type="range" min={0} max={100} step={10} className="w-full" value={a.dim ?? (a.overlayStyle ? 80 : 50)} onChange={(e) => set({ dim: Number(e.target.value) })} />
       </Row>
       <Text title="Minimum height" value={a.minHeight} placeholder="430px" onChange={(v) => set({ minHeight: v || undefined })} />
       <Select
@@ -358,7 +366,10 @@ export const CONTENT_PANELS: Record<string, Panel> = {
   ),
   hero: (a, set) => (
     <>
-      <MediaPicker title="Image" url={a.src} onSelect={(m) => set({ mediaId: m.mediaId ?? undefined, src: m.url })} />
+      <MediaPicker title="Image" url={a.src} onSelect={(m) => set({ mediaId: m.mediaId ?? undefined, src: m.url, focal: undefined, focalTablet: undefined, focalPhone: undefined })} />
+      <FocalPoints a={a} set={set} ratios={[16 / 9, 3 / 4, 3 / 4]} />
+      <Segmented title="Overlay (keeps the text readable)" value={a.overlay ?? 'medium'} options={[['none', 'None'], ['light', 'Light'], ['medium', 'Medium'], ['strong', 'Strong']]} onChange={(v) => set({ overlay: v === 'medium' ? undefined : v })} />
+      {a.overlay !== 'none' && <Segmented title="Darkest at" value={a.overlayFrom ?? 'bottom'} options={[['bottom', 'Bottom'], ['left', 'Left'], ['even', 'All over']]} onChange={(v) => set({ overlayFrom: v === 'bottom' ? undefined : v })} />}
       <Text title="Eyebrow" value={a.eyebrow} placeholder="(none)" onChange={(v) => set({ eyebrow: v || undefined })} />
       <Text title="Title" value={a.title} onChange={(v) => set({ title: v || undefined })} />
       <Row title="Text">

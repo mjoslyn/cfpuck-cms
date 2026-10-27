@@ -48,8 +48,8 @@ last change. You can undo several times.
 | **Image** | One picture. |
 | **Image gallery** | Several pictures as a grid or a slider. |
 | **Button** / **Buttons** | A link styled as a button, such as "Book now". |
-| **Hero** | A large picture across the top of a page, with a title and buttons. |
-| **Cover** | A picture with text laid over it. |
+| **Hero** | A large picture across the top of a page, with a title and buttons. **Overlay** darkens the picture so the text stays readable. |
+| **Cover** | A picture with text laid over it. Its **Overlay** can be even, or a gradient from the bottom or left, where the text sits. |
 | **Media & text** | A picture beside some text. |
 | **Columns** | Puts blocks side by side. |
 | **Section** | Groups blocks, with a background colour or spacing around them. |
@@ -102,6 +102,10 @@ They are in **Templates**. When you hover over them in the editor, admins see a 
 A change to a template or the header changes every page that uses it, straight away. Take care, and
 check a few pages afterwards.
 :::
+
+Some pages are made entirely from their template (a home page, often). When you open one, a line under
+the editor's toolbar says **Editing this page's template**, and the button says **Save & apply**:
+changes go to every page using that template.
 
 The menu's links are changed under **Settings**, not in the header itself. See
 [Menu and settings](/cfpuck-cms/guide/menu-and-settings/).

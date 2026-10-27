@@ -94,7 +94,16 @@ children } }`, rendered by `src/render/c/`: content blocks (`section`, `columns`
 `media-text`...), entry fields (`entry-title`, `entry-image`, ...), collections (`collection`,
 `collection-items`, `pagination`...), events (`event-date`, `events-calendar`, `event-calendar`,
 `event-details`), `form`, and structure (`part`, `pattern`, `reusable`). A site's blocks come from its
-`render.ts`. `hero` is a full-bleed image with eyebrow, title, text and two buttons. Galleries hold
+`render.ts`. `hero` is a full-bleed image with eyebrow, title, text and two buttons, under an overlay
+that keeps the text readable (`overlay`: none, light, medium by default, strong; `overlayFrom`: darkest at
+the bottom by default, the left, or even; `is-shade-*` classes). `cover`'s overlay is a colour and
+opacity, even or (`overlayStyle`) a gradient from the bottom or the left. **Focal points per screen
+size** (Hero, Cover, and Image when it is cropped; `src/puck/FocalPoints.tsx`): `attrs.focal`,
+`focalTablet` and `focalPhone`, each falling back to the image's own from the media library (its point
+for the crop's shape on that size: 16:9 on desktop and 3:4 on tablets and phones for Hero and Cover, the
+block's ratio for Image; else its main point), written as `--focal`, `--focal-tablet`, `--focal-phone`
+on the block; the stylesheet picks one as `--focal-at` (tablet up to 1024px, phone up to 599px), which
+the image's `object-position` reads (`screenFocal`, `src/render/c/content.ts`). Galleries hold
 image blocks (`gallery`) or embed and video blocks (`video-gallery`) and show them as a grid, masonry
 columns or a slider (`display`; a scroll-snap row, buttons and autoplay from
 `public/assets/js/gallery-slider.js`); media picked in the panel arrive as `attrs.add` and become
@@ -977,7 +986,7 @@ shows the problems in the A11y panel or publishes anyway with an optional reason
 with that version (`revisions.note`: what was left open, and why). Bulk Publish skips those entries, since
 the check runs in the editor; templates' Save & apply isn't held. Blocks with `types`
 are offered only on those entry types. Pages whose template has no `post-content` are edited in layout
-mode: the template document itself. In content mode the template around the page's content shows as it
+mode: the template document itself (a line under the editor's header says so, naming the template). In content mode the template around the page's content shows as it
 will on the site; for admins, hovering one of its blocks, a template part or a pattern outlines it with a
 link to edit that template, part or pattern in a new tab (`markSources`, `SourceLinks`; globals get none).
 

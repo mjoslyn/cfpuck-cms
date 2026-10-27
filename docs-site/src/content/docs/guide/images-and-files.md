@@ -56,6 +56,14 @@ look a little blurry on big screens: use a larger photo, or **Use another image*
 If one crop still doesn't work, for example a wide photo that looks wrong as a square, click **Use
 another image** under that preview and pick a different picture to use only for that shape.
 
+### Focal points for one block
+
+The **Hero**, **Cover** and (when cropped) **Image** blocks can have their own focal point for each
+screen size. Select the block, then under **Focal point** pick **Desktop**, **Tablet** or **Phone** and
+click the picture. The small preview beside it shows how it will be cropped on that screen. A size you
+don't set uses the picture's own focal point from **Media**; **Use the image's own** goes back to it.
+Tip: in the editor, the phone and tablet buttons above the page show it at that size.
+
 ## Finding an image
 
 Type in the search box on the **Media** screen. It searches file names and alt text, which is another

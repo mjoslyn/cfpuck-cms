@@ -551,6 +551,27 @@ a.c-cover {
   min-height: 50vh;
   min-height: 50svh;
 }
+/* Hero, Cover and Image: the focal point for this screen size (set inline as --focal, --focal-tablet and
+   --focal-phone; the image's object-position reads --focal-at). */
+.c-hero,
+.c-cover,
+.c-image {
+  --focal-at: var(--focal, 50% 50%);
+}
+@media (max-width: 1024px) {
+  .c-hero,
+  .c-cover,
+  .c-image {
+    --focal-at: var(--focal-tablet, var(--focal, 50% 50%));
+  }
+}
+@media (max-width: 599px) {
+  .c-hero,
+  .c-cover,
+  .c-image {
+    --focal-at: var(--focal-phone, var(--focal-tablet, var(--focal, 50% 50%)));
+  }
+}
 .c-hero__image {
   position: absolute;
   inset: 0;
@@ -562,7 +583,28 @@ a.c-cover {
 .c-hero__overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to top, rgb(26 26 46 / 0.85) 0%, rgb(26 26 46 / 0.45) 60%, rgb(26 26 46 / 0.3) 100%);
+  background: linear-gradient(var(--hero-shade-to, to top), rgb(26 26 46 / var(--hero-shade-1, 0.85)) 0%, rgb(26 26 46 / var(--hero-shade-2, 0.45)) 60%, rgb(26 26 46 / var(--hero-shade-3, 0.3)) 100%);
+}
+/* Overlay options (the block's Overlay and Darkest at). */
+.c-hero.is-shade-none .c-hero__overlay {
+  display: none;
+}
+.c-hero.is-shade-light {
+  --hero-shade-1: 0.6;
+  --hero-shade-2: 0.25;
+  --hero-shade-3: 0.1;
+}
+.c-hero.is-shade-strong {
+  --hero-shade-1: 0.95;
+  --hero-shade-2: 0.7;
+  --hero-shade-3: 0.55;
+}
+.c-hero.is-shade-left {
+  --hero-shade-to: to right;
+}
+.c-hero.is-shade-even {
+  --hero-shade-1: var(--hero-shade-2, 0.45);
+  --hero-shade-3: var(--hero-shade-2, 0.45);
 }
 .c-hero__inner {
   position: relative;

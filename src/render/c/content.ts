@@ -5,7 +5,8 @@ import type { Renderer, Env } from '../env';
 import { mediaImage, mediaImgTag } from '../../lib/media/image';
 import { attrs, alignClass, escAttr, itemDecls, styleDecls, type Decl } from './style';
 import { layout } from './layout';
-import { parseRatio } from '../../lib/media/focal';
+import { focalFor, parseRatio } from '../../lib/media/focal';
+import type { Media } from '../../lib/types';
 import { iconSvg } from './icons';
 
 const esc = (s: unknown) => String(s ?? '').replace(/&(?!(?:#\d+|#x[0-9a-f]+|[a-z][a-z0-9]*);)/gi, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -77,7 +78,11 @@ export function imageTag(env: Env, a: Record<string, any>, opts: { className?: s
 
 export const image: Renderer = (b, env) => {
   const a = b.attrs;
-  let img = imageTag(env, a);
+  // Focal points per screen size, when the block sets any (else the image's own, as mediaImage places it).
+  const m = a.mediaId ? env.ctx.loader.media.get(Number(a.mediaId)) : undefined;
+  const ratio = parseRatio(a.aspectRatio);
+  const points = hasOwnFocal(a) ? screenFocal(a, m, [ratio, ratio, ratio]) : [];
+  let img = imageTag(env, a, points.length ? { style: 'object-position:var(--focal-at)' } : {});
   if (!img) return '';
   if (a.href) img = `<a href="${escAttr(a.href)}"${a.target ? ` target="${escAttr(a.target)}"` : ''}${a.rel ? ` rel="${escAttr(a.rel)}"` : ''}>${img}</a>`;
   const caption = a.caption ? `<figcaption>${a.caption}</figcaption>` : '';
@@ -85,7 +90,7 @@ export const image: Renderer = (b, env) => {
   // Cover: the image fills the block it is in, behind the rest (as the card image's option); Shade
   // darkens it towards the bottom.
   const shade = a.shade ? '<span class="c-entry-image__overlay is-shade" aria-hidden="true"></span>' : '';
-  return `<figure ${root({ ...a, width: a.align }, ['c-image', a.variant === 'circle' ? 'is-circle' : null, fill ? 'is-fill' : null, a.cover ? 'is-cover' : null])}>${img}${shade}${caption}</figure>`;
+  return `<figure ${root({ ...a, width: a.align }, ['c-image', a.variant === 'circle' ? 'is-circle' : null, fill ? 'is-fill' : null, a.cover ? 'is-cover' : null], points)}>${img}${shade}${caption}</figure>`;
 };
 
 export const buttons: Renderer = (b, env, inner) => {
@@ -165,18 +170,49 @@ export const separator: Renderer = (b) => {
  * buttons. Attrs: mediaId/src, eyebrow, title, text, primaryLabel/primaryHref, secondaryLabel/secondaryHref,
  * height (screen, large, medium), level (1 or 2), width (full unless set).
  */
+/** A focal point ({ x, y } in 0..1) as CSS, or undefined. */
+function focalCss(p: unknown): string | undefined {
+  const q = p as { x?: unknown; y?: unknown } | null | undefined;
+  const x = Number(q?.x);
+  const y = Number(q?.y);
+  if (!q || !Number.isFinite(x) || !Number.isFinite(y)) return undefined;
+  const pc = (v: number) => `${Math.round(Math.min(1, Math.max(0, v)) * 100)}%`;
+  return `${pc(x)} ${pc(y)}`;
+}
+
+/**
+ * The Hero's and Image's focal points per screen size, as the variables the stylesheet picks from
+ * (--focal, --focal-tablet, --focal-phone; it sets --focal-at for the screen, and the image's style is
+ * object-position:var(--focal-at)). Each size: the block's own (attrs.focal, focalTablet, focalPhone),
+ * else the image's from the media library for the crop's shape on that size (`ratios`), else its main point.
+ */
+function screenFocal(a: Record<string, any>, m: Media | undefined, ratios: [number | null, number | null, number | null]): Decl[] {
+  const own = [a.focal, a.focalTablet, a.focalPhone];
+  const out: Decl[] = [];
+  (['--focal', '--focal-tablet', '--focal-phone'] as const).forEach((name, i) => {
+    const v = focalCss(own[i]) ?? (m ? focalCss(focalFor(m, ratios[i])) : undefined);
+    if (v) out.push([name, v]);
+  });
+  return out;
+}
+const hasOwnFocal = (a: Record<string, any>) => [a.focal, a.focalTablet, a.focalPhone].some((p) => focalCss(p));
+
 export const hero: Renderer = (b, env) => {
   const a = b.attrs;
   const m = a.mediaId ? env.ctx.loader.media.get(Number(a.mediaId)) : undefined;
-  const focal = m?.focal_point as { x: number; y: number } | null | undefined;
-  const pos = focal ? `object-position:${Math.round(focal.x * 100)}% ${Math.round(focal.y * 100)}%` : undefined;
+  // Focal points per screen size (screenFocal): a hero is wide on desktop and tall on tablets and phones.
+  const points = screenFocal(a, m, [16 / 9, 3 / 4, 3 / 4]);
+  const pos = points.length ? 'object-position:var(--focal-at)' : undefined;
   const img = a.mediaId || a.src ? imageTag(env, { mediaId: a.mediaId, src: a.src, alt: '', size: 'full' }, { className: 'c-hero__image', style: pos }).replace(/\swidth="\d+"|\sheight="\d+"/g, '').replace(/<img\b/, '<img data-cms-img="cover"') : '';
   const level = a.level === 2 ? 2 : 1;
   const btn = (label: unknown, href: unknown, cls: string) => (label && href ? `<a class="c-hero__button ${cls}" href="${escAttr(String(href))}">${esc(String(label))}</a>` : '');
   const buttons = btn(a.primaryLabel, a.primaryHref, 'is-primary') + btn(a.secondaryLabel, a.secondaryHref, 'is-secondary');
   const height = a.height === 'large' || a.height === 'medium' ? a.height : 'screen';
+  // The overlay that keeps the text readable: how dark (medium by default) and where it is darkest.
+  const shade = ['none', 'light', 'strong'].includes(a.overlay) ? `is-shade-${a.overlay}` : null;
+  const shadeFrom = ['left', 'even'].includes(a.overlayFrom) ? `is-shade-${a.overlayFrom}` : null;
   return (
-    `<section ${root({ ...a, width: a.width ?? 'full' }, ['c-hero', `is-${height}`])}>${img}<span class="c-hero__overlay" aria-hidden="true"></span>` +
+    `<section ${root({ ...a, width: a.width ?? 'full' }, ['c-hero', `is-${height}`, shade, shadeFrom], points)}>${img}<span class="c-hero__overlay" aria-hidden="true"></span>` +
     `<div class="c-hero__inner"><div class="c-hero__content">` +
     (a.eyebrow ? `<p class="c-hero__eyebrow">${esc(String(a.eyebrow))}</p>` : '') +
     (a.title ? `<h${level} class="c-hero__title">${esc(String(a.title))}</h${level}>` : '') +
@@ -196,11 +232,18 @@ export const spacer: Renderer = (b) => {
 export const cover: Renderer = (b, env, inner) => {
   const a = b.attrs;
   const src = a.useFeaturedImage ? featuredImage(env) : a.mediaId || a.src ? a : null;
-  const pos = a.focal ? `${Math.round(a.focal.x * 100)}% ${Math.round(a.focal.y * 100)}%` : '';
-  const img = src ? imageTag(env, src, { className: 'c-cover__image', style: pos ? `object-position:${pos}` : undefined }).replace(/\swidth="\d+"|\sheight="\d+"/g, '').replace(/<img\b/, '<img data-cms-img="cover"') : '';
-  const dim = a.dim ?? (src ? 50 : 100);
+  // Focal points per screen size (screenFocal): a cover is usually wide on desktop and tall on phones.
+  const m = src?.mediaId ? env.ctx.loader.media.get(Number(src.mediaId)) : undefined;
+  const points = src ? screenFocal(a, m, [16 / 9, 3 / 4, 3 / 4]) : [];
+  const img = src ? imageTag(env, src, { className: 'c-cover__image', style: points.length ? 'object-position:var(--focal-at)' : undefined }).replace(/\swidth="\d+"|\sheight="\d+"/g, '').replace(/<img\b/, '<img data-cms-img="cover"') : '';
+  // Overlay: a solid colour, or (overlayStyle) a gradient from it, darkest at the bottom or the left
+  // (where the text usually is), clearing towards the other side.
+  const shade = a.overlayStyle === 'bottom' || a.overlayStyle === 'left' ? a.overlayStyle : null;
+  const dim = a.dim ?? (src ? (shade ? 80 : 50) : 100);
   const overlayDecls: Decl[] = [['opacity', String(dim / 100)]];
+  const color = a.overlay || 'var(--color-dark)';
   if (a.gradient) overlayDecls.push(['background', a.gradient]);
+  else if (shade) overlayDecls.push(['background', `linear-gradient(${shade === 'left' ? 'to right' : 'to top'}, ${color} 0%, color-mix(in srgb, ${color} 55%, transparent) 50%, transparent 100%)`]);
   else if (a.overlay) overlayDecls.push(['background-color', a.overlay]);
   const overlay = `<span aria-hidden="true" class="c-cover__overlay" style="${escAttr(overlayDecls.map(([p, v]) => `${p}:${v}`).join(';'))}"></span>`;
   const l = layout(env.ctx, a.layout ?? { type: 'flow' }, a.gap, a.style?.padding);
@@ -208,7 +251,7 @@ export const cover: Renderer = (b, env, inner) => {
   const minHeight: Decl[] = a.minHeight ? [['min-height', a.minHeight]] : [];
   const position = a.position && a.position !== 'center-center' ? `is-${a.position}` : null;
   return (
-    `<${tag} ${root(a, ['c-cover', a.light ? 'is-light' : null, a.fixed ? 'is-fixed' : null, position], minHeight)}>` +
+    `<${tag} ${root(a, ['c-cover', a.light ? 'is-light' : null, a.fixed ? 'is-fixed' : null, position], [...minHeight, ...points])}>` +
     `${img}${overlay}<div class="${['c-cover__inner', ...l.classes].join(' ')}"${l.decls.length ? ` style="${escAttr(l.decls.map(([p, v]) => `${p}:${v}`).join(';'))}"` : ''}>${inner()}</div></${tag}>`
   );
 };
