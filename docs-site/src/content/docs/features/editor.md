@@ -67,6 +67,20 @@ open the link picker (`src/puck/LinkPicker.tsx`) instead of a browser prompt:
   with nothing selected the entry's title or file's name becomes the linked words; with the cursor in a
   link it edits that link, with **Remove link**. Emails get full addresses for the site's own pages.
 
+## Copy and paste styles
+
+Every block's settings end with **Copy styles** and **Paste styles** (`src/puck/StyleCopy.tsx`,
+`src/lib/content/style-copy.ts`). The copy is kept in the browser (`localStorage`), so it pastes into
+another page, template, part or pattern.
+
+- Any block takes the shared style settings (`SHARED_STYLE`: `style`, `width`, `className`, `formStyle`).
+- A block of the same type also takes its look settings (`LOOK`: alignment, gap, overlay, height, size,
+  columns, display...).
+- Each setting the copy covers is set to its value or cleared; content is never copied. The paste is an
+  ordinary, undoable edit.
+- Blocks inside a linked pattern, and the linked pattern itself, don't offer it: their styles are the
+  pattern's.
+
 ## Saving and publishing
 
 - **Save draft** keeps changes to a published page aside (`entry_drafts`) while the live page stays

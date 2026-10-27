@@ -18,6 +18,7 @@ import { cardTemplate, DEFAULT_CARD } from '../lib/content/card-presets';
 import { moveItemsLayout } from '../lib/content/collections';
 import type { PuckItem } from '../lib/puck/types';
 import { LinkedContentPanel, LinkedPatternPanel, SaveAsPattern } from './LinkedPatterns';
+import { StyleCopy } from './StyleCopy';
 
 type Panel = (a: Attrs, set: (patch: Attrs) => void) => React.ReactNode;
 
@@ -181,6 +182,7 @@ function AttrsPanel({ type, value, onChange }: { type: string; value: Attrs; onC
   return (
     <div className="px-1">
       {panel ? panel(a, set) : <p className="mb-2 text-xs text-admin-muted">Configure this block in the attributes below.</p>}
+      <StyleCopy type={type} label={label(type)} value={a} onChange={onChange} />
       <JsonAttrs value={a} onChange={onChange} />
       <SaveAsPattern />
     </div>

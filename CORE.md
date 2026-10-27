@@ -127,6 +127,15 @@ reference and the changed content (`collapseAll`), or an ordinary copy if its bl
 the pattern; Detach makes the copy on purpose. Globals (the `global` type, placed with the Global
 block) share content and style alike.
 
+**Copy styles / Paste styles** (the end of every block's settings, `src/puck/StyleCopy.tsx`,
+`src/lib/content/style-copy.ts`): copies a block's look into the browser's storage (`localStorage`), so it
+pastes in any page, template, part or pattern. Any block takes the shared style settings (`SHARED_STYLE`:
+`style`, `width`, `className`, `formStyle`); a block of the same type also takes its look settings (`LOOK`:
+alignment, gap, overlay, height, size, columns, display...). Each setting the copy covers is set to its
+value or cleared, so the block looks like the one copied; content is never copied. A pasted change is an
+ordinary, undoable edit. Blocks inside a linked pattern, and the linked pattern itself, don't offer it
+(`takesStyle`): their styles are the pattern's.
+
 ## Collections and tags
 
 A `collection` lists entries with its settings on the block itself (`src/puck/CollectionPanel.tsx`):

@@ -65,6 +65,16 @@ Some blocks, like **Section** and **Columns**, hold other blocks. Drag blocks in
 **Outline** on the left shows how everything is nested, and clicking a line there selects that block,
 which helps when blocks are hard to click on the page.
 
+### Copying a block's look
+
+To make one block look like another, select the block whose look you like, scroll to the end of its
+settings and click **Copy styles**. Then select the other block and click **Paste styles**. Its colours,
+spacing, text style and borders change to match; its words and pictures stay as they are. Between two
+blocks of the same kind (two sections, say) the layout comes too: alignment, gaps, height and overlay.
+
+The copy stays in your browser, so you can paste it on another page or in a pattern. Changed your mind?
+Click Undo.
+
 ### Links
 
 To make a link, select some words in a text box and click **Link** above it. Boxes that take a link
