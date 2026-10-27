@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { browserClient } from '../lib/db/browser';
 import { mediaUrl } from '../lib/media/image';
 import type { Media } from '../lib/types';
-import { SHAPES, position, type Point } from '../lib/media/focal';
+import { SHAPES, position, ratioLabel, smallFor, type Point } from '../lib/media/focal';
 import { MediaModal } from '../puck/fields';
 import { describable } from '../lib/media/alt-text';
 
@@ -136,6 +136,7 @@ export default function MediaDetail() {
             {[{ key: 'main', name: 'All crops' }, ...SHAPES].map((s) => (
               <button key={s.key} type="button" onClick={() => setEditing(s.key)} className={`rounded px-2 py-0.5 ${editing === s.key ? 'bg-admin-ink text-white' : 'bg-white text-admin-ink hover:bg-[#e5e1dc]'}`}>
                 {s.name}
+                {s.key !== 'main' && <span className="ml-1 opacity-60">{ratioLabel(s.key)}</span>}
               </button>
             ))}
           </div>
@@ -161,6 +162,9 @@ export default function MediaDetail() {
           <div className="mt-4 grid shrink-0 grid-cols-4 items-start gap-3">
             {SHAPES.map((s) => {
               const o = other(s.key);
+              // The image that fills this shape (another one, if it uses one), against the shape's best size.
+              const used = o ?? m;
+              const small = smallFor(s, used.width, used.height);
               return (
                 <figure key={s.key} className="m-0">
                   <button type="button" onClick={() => setEditing(s.key)} className={`mx-auto block rounded ${editing === s.key ? 'ring-2 ring-admin-accent ring-offset-2' : ''}`}>
@@ -189,6 +193,10 @@ export default function MediaDetail() {
                         )}
                       </>
                     )}
+                    <span className={`block ${small ? 'text-[#a3441c]' : ''}`} title={`${s.name} crops are ${ratioLabel(s.key)}. An image at least ${s.best[0]} × ${s.best[1]} fills them sharply.`}>
+                      {ratioLabel(s.key)} · {s.best[0]} × {s.best[1]} or larger
+                      {small ? ' (this one is smaller)' : ''}
+                    </span>
                     <button type="button" className="mt-0.5 block w-full text-admin-accent hover:underline" onClick={() => setChoosing(s.key)}>
                       {draft.swaps[s.key] ? 'Use a different image' : 'Use another image'}
                     </button>

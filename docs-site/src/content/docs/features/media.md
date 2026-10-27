@@ -31,7 +31,9 @@ offered for raster images (JPEG, PNG, GIF, WebP, AVIF), not SVGs or videos, and 
 `media.focal_point` (`{ x, y }` in 0..1) is set in the media library, with optional overrides per crop
 shape (`media.crop_focals`: square, 16:9, 4:3, 3:4; `src/lib/media/focal.ts`). Changing them
 re-crops the cropped sizes. Wherever an image is cropped to a ratio, the point for the nearest shape
-becomes its `object-position`.
+becomes its `object-position`. The library shows each shape's ratio (1:1, 16:9, 4:3, 3:4) and the
+smallest image that fills it sharply (`SHAPES[].best`: 1000 × 1000, 1600 × 900, 1200 × 900, 900 × 1200),
+and marks a crop that comes out smaller than that (`smallFor`).
 
 ## A different image for a crop
 

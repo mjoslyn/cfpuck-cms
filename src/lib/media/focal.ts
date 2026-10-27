@@ -3,12 +3,22 @@ import type { Media } from '../types';
 
 export type Point = { x: number; y: number };
 
-export const SHAPES: { key: string; ratio: number; name: string }[] = [
-  { key: '1/1', ratio: 1, name: 'Square' },
-  { key: '16/9', ratio: 16 / 9, name: 'Wide' },
-  { key: '4/3', ratio: 4 / 3, name: 'Landscape' },
-  { key: '3/4', ratio: 3 / 4, name: 'Portrait' },
+/** The crop shapes, each with its ratio and the smallest image that fills it sharply (`best`). */
+export const SHAPES: { key: string; ratio: number; name: string; best: [number, number] }[] = [
+  { key: '1/1', ratio: 1, name: 'Square', best: [1000, 1000] },
+  { key: '16/9', ratio: 16 / 9, name: 'Wide', best: [1600, 900] },
+  { key: '4/3', ratio: 4 / 3, name: 'Landscape', best: [1200, 900] },
+  { key: '3/4', ratio: 3 / 4, name: 'Portrait', best: [900, 1200] },
 ];
+
+/** A shape's aspect ratio as people write it ("16:9"). */
+export const ratioLabel = (key: string) => key.replace('/', ':');
+
+/** Whether an image of this size, cropped to the shape, falls short of its best size. */
+export function smallFor(shape: { ratio: number; best: [number, number] }, width?: number | null, height?: number | null): boolean {
+  if (!width || !height) return false;
+  return Math.min(width, height * shape.ratio) < shape.best[0];
+}
 
 /** "4/3", "4 / 3", "1.333" or a number -> width / height. */
 export function parseRatio(v: unknown): number | null {

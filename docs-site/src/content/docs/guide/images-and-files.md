@@ -49,6 +49,10 @@ Pictures are often cropped to fit, for example into a square on a list of posts.
 always stays in view, **click on the most important part of the picture** (a face, a building).
 The small previews underneath show how each crop will look.
 
+Under each preview is its shape (for example **16:9**, wide like a TV screen) and the smallest picture
+that fills it sharply, such as **1600 × 900 or larger**. If it says **this one is smaller**, that crop may
+look a little blurry on big screens: use a larger photo, or **Use another image** for that shape.
+
 If one crop still doesn't work, for example a wide photo that looks wrong as a square, click **Use
 another image** under that preview and pick a different picture to use only for that shape.
 

@@ -468,7 +468,8 @@ file opened on its own can't run script, and images in pages are unaffected. An 
 (`imageForClaude`) with its file name, title, caption and current alt text (`altContext`) and writes one
 sentence into the form, saved with Save; raster images only (`describable`). `media.focal_point` ({x, y} in 0..1) is set
 in the media library, with optional overrides per crop shape (`media.crop_focals`: square, 16:9, 4:3,
-3:4; `src/lib/media/focal.ts`). Changes re-crop the cropped sizes; the point for the nearest shape
+3:4; `src/lib/media/focal.ts`; the library shows each shape's ratio and the smallest image that fills
+it sharply, `SHAPES[].best`, marking a crop that comes out smaller, `smallFor`). Changes re-crop the cropped sizes; the point for the nearest shape
 becomes `object-position` wherever the image is cropped to a ratio. Each shape can also use another
 image instead (`media.crop_images`: { shape: { id, focal } }, set from the crop previews): wherever the image
 is cropped to that shape (a block's aspect ratio, or the square thumbnail size), `mediaImage` shows the
