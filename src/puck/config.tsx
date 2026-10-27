@@ -233,7 +233,7 @@ export function buildConfig(types: string[], entryType?: string, opts: { members
   return {
     categories: offered({
       text: { title: 'Text', components: withSite('text', ['text', 'heading', 'list', 'quote', 'button', 'buttons']) },
-      media: { title: 'Media', components: withSite('media', ['image', 'cover', 'gallery', 'video-gallery', 'media-text', 'embed', 'video']) },
+      media: { title: 'Media', components: withSite('media', ['image', 'cover', 'gallery', 'video-gallery', 'media-text', 'embed', 'video', 'file']) },
       layout: { title: 'Layout', components: withSite('layout', ['section', 'columns', 'column', 'spacer', 'separator', 'global', 'site-title', 'navigation', 'social-links']) },
       dynamic: { title: 'Lists and listings', components: withSite('dynamic', ['collection', 'collection-filters', 'map', 'search-form', 'event-calendar', 'events-calendar', 'archive-title']) },
       card: { title: 'Card fields', components: withSite('card', ['entry-title', 'entry-image', 'entry-excerpt', 'entry-date', 'event-date', 'entry-terms', 'entry-field']) },

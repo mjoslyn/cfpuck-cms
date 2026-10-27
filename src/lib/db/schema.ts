@@ -193,7 +193,7 @@ export const SCHEMA: Record<string, TableSchema> = {
   },
   media: {
     pk: ["id"],
-    columns: {"id":"int8","path":"text","mime_type":"text","width":"int8","height":"int8","alt":"text","caption":"text","title":"text","sizes":"jsonb","created_at":"timestamptz","focal_point":"jsonb","formats":"jsonb","processed_at":"timestamptz","updated_at":"timestamptz","crop_focals":"jsonb","crop_images":"jsonb"},
+    columns: {"id":"int8","path":"text","mime_type":"text","width":"int8","height":"int8","alt":"text","caption":"text","title":"text","sizes":"jsonb","created_at":"timestamptz","focal_point":"jsonb","formats":"jsonb","processed_at":"timestamptz","updated_at":"timestamptz","crop_focals":"jsonb","crop_images":"jsonb","filesize":"int8"},
     generated: [],
     fks: [],
     defaults: {"alt":"","caption":"","title":"","sizes":{},"formats":{},"crop_focals":{},"crop_images":{}},

@@ -1,4 +1,4 @@
-// Sending a file to the media library (POST /api/admin/media), from the browser. Images go as a form;
+// Sending a file to the media library (POST /api/admin/media), from the browser. Images and documents go as a form;
 // videos go as the request's body, with their name in X-File-Name, so the Worker streams them to the
 // store without holding them in memory (it has 128 MB).
 export const VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/quicktime'];

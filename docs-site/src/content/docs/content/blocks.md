@@ -17,7 +17,7 @@ Props are clean values: styles as CSS with design tokens (`var(--color-*)`, `var
 | --- | --- |
 | Layout | `section`, `columns` / `column`, `separator`, `spacer` |
 | Text | `text` (paragraph), `heading`, `list` / `list-item`, `quote`, `buttons` / `button`, `html` |
-| Media | `image`, `cover`, `hero`, `gallery`, `video-gallery`, `video`, `embed`, `media-text` |
+| Media | `image`, `cover`, `hero`, `gallery`, `video-gallery`, `video`, `embed`, `media-text`, `file` |
 | Entry fields | `entry-title`, `entry-excerpt`, `entry-date`, `entry-terms`, `entry-image`, `entry-field`, `entry-content` (Page content) |
 | Collections | `collection`, `pagination`, `archive-title` (and older `collection-items`, `collection-empty`, `pagination-*` children) |
 | Events | `event-date`, `event-details`, `event-schedule`, `event-calendar`, `events-calendar` |
@@ -30,6 +30,8 @@ type renders its children.
 
 ### Notable blocks
 
+- **`file`**: a link to a document from the media library (or any address), with its type and size
+  (`details`, on by default) and a Download button (`button`, its label; empty for none).
 - **`hero`**: a full-bleed image with eyebrow, title, text and two buttons. Its overlay keeps the text
   readable: **Overlay** (`overlay`: none, light, medium by default, strong) and **Darkest at**
   (`overlayFrom`: bottom by default, left, or all over).

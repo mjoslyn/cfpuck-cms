@@ -470,7 +470,7 @@ export default function Composer({ entryId, templateKey, layout, live, selection
           multiple
           onClose={() => setPicking(false)}
           onSelectMany={(list) => {
-            setMedia((x) => [...x, ...list.filter((m) => m.mediaId && !x.some((y) => y.id === m.mediaId)).map((m) => ({ id: m.mediaId!, url: m.url, name: m.name ?? 'media', kind: m.kind ?? 'image', status: 'ready' as const }))]);
+            setMedia((x) => [...x, ...list.filter((m) => m.mediaId && !x.some((y) => y.id === m.mediaId)).map((m) => ({ id: m.mediaId!, url: m.url, name: m.name ?? 'media', kind: m.kind === 'video' ? ('video' as const) : ('image' as const), status: 'ready' as const }))]);
             setPicking(false);
           }}
         />

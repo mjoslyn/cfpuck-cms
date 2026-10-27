@@ -1,6 +1,6 @@
 ---
 title: Images and files
-description: "Uploading photos, describing them and choosing which part stays in view."
+description: "Uploading photos and documents, describing them, choosing which part stays in view, and linking to files."
 sidebar:
   order: 4
 ---
@@ -74,8 +74,26 @@ good reason to write alt text.
 - **Videos from YouTube or Vimeo**: add an **Embed** or video block to the page and paste the video's
   web address.
 - **Video files**: upload them like images. Large videos take a while to upload.
-- **PDFs and other documents**: link to them from a paragraph or button. Ask your site's admin if you
-  need a document hosted.
+
+## Documents (PDFs, Word, Excel...)
+
+You can upload documents to **Media** just like pictures: PDFs, Word, Excel and PowerPoint files,
+OpenDocument files, plain text and CSV, up to 50 MB each. You can choose several files at once.
+
+Then link to them from a page in any of these ways:
+
+- **The File block** (in **Blocks**, under Media): shows the document's name, its type and size, and a
+  **Download** button. Choose the file in its settings; you can change the link's words and the button.
+- **From some words in a paragraph**: select the words, then click **File** above the text box and pick
+  the document.
+- **From a button** (or an image or hero): click **File** beside its **Link** box and pick the document.
+
+To put a document's address in an email or a newsletter, open it in **Media** and click **Copy link**.
+Every picture has **Copy link** too.
+
+:::tip
+PDFs open in the visitor's browser. Word, Excel and PowerPoint files download.
+:::
 
 :::note
 Images are never deleted from the library, so a picture used on an old page can't go missing by

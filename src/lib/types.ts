@@ -32,6 +32,8 @@ export interface Media {
   crop_media?: Record<string, Media>;
   /** Modern-format copies of the full size. */
   formats?: Record<string, string>;
+  /** The stored file's size in bytes (documents and videos; null for images processed before). */
+  filesize?: number | null;
 }
 
 export interface Term {

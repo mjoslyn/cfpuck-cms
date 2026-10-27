@@ -2,11 +2,14 @@
 import Admin from '../../../layouts/Admin.astro';
 import { mediaUrl } from '../../../lib/media/image';
 import MediaDetail from '../../../admin/MediaDetail';
+import { DOC_ACCEPT, docLabel, fileSize, isDocument } from '../../../lib/media/documents';
+
+const ACCEPT = `image/*,video/mp4,video/webm,video/quicktime,${DOC_ACCEPT}`;
 
 const q = (Astro.url.searchParams.get('q') ?? '').trim();
 const page = Math.max(1, Number(Astro.url.searchParams.get('page') ?? 1));
 const per = 60;
-let query = Astro.locals.db.from('media').select('id, path, mime_type, width, height, alt, title, sizes, created_at, focal_point, formats', { count: 'exact' }).order('created_at', { ascending: false }).order('id', { ascending: false });
+let query = Astro.locals.db.from('media').select('id, path, mime_type, width, height, alt, title, sizes, created_at, focal_point, formats, filesize', { count: 'exact' }).order('created_at', { ascending: false }).order('id', { ascending: false });
 if (q) query = query.or(`title.ilike.%${q}%,path.ilike.%${q}%,alt.ilike.%${q}%`);
 const { data, count, error } = await query.range((page - 1) * per, page * per - 1);
 if (error) throw error;
@@ -19,9 +22,12 @@ const link = (p: number) => `?${new URLSearchParams({ ...(q ? { q } : {}), page:
       <h1 class="text-3xl font-normal">Media</h1>
       <p class="mt-1 text-sm text-admin-muted">{count ?? 0} files</p>
     </div>
-    <form id="upload" class="flex items-center gap-2">
-      <input type="file" name="file" accept="image/*" required class="text-sm" />
-      <button class="rounded-sm bg-admin-ink px-4 py-2 text-xs font-semibold tracking-wider text-white uppercase hover:bg-admin-accent">Upload</button>
+    <form id="upload" class="flex flex-col items-end gap-1">
+      <div class="flex items-center gap-2">
+        <input type="file" name="file" accept={ACCEPT} multiple required class="text-sm" />
+        <button class="rounded-sm bg-admin-ink px-4 py-2 text-xs font-semibold tracking-wider text-white uppercase hover:bg-admin-accent">Upload</button>
+      </div>
+      <p class="text-[11px] text-admin-muted" id="upload-note">Images, videos, and documents: PDF, Word, Excel, PowerPoint, OpenDocument, text, CSV.</p>
     </form>
   </div>
   <form class="mt-6">
@@ -33,13 +39,15 @@ const link = (p: number) => `?${new URLSearchParams({ ...(q ? { q } : {}), page:
         <button type="button" data-media={m.id} class="block w-full cursor-pointer text-left">
           {m.mime_type.startsWith('image/') ? (
             <img src={mediaUrl((m.sizes?.thumbnail ?? m.sizes?.medium ?? m).path)} alt={m.alt} loading="lazy" class="aspect-square w-full object-cover" />
+          ) : isDocument(m.mime_type) ? (
+            <div class="flex aspect-square items-center justify-center bg-admin-soft text-sm font-semibold tracking-wider text-admin-ink uppercase">{docLabel(m.mime_type, m.path)}</div>
           ) : (
             <div class="flex aspect-square items-center justify-center bg-admin-soft text-xs text-admin-muted">{m.mime_type}</div>
           )}
         </button>
         <div class="p-2">
           <p class="truncate text-xs" title={m.path}>{m.path.split('/').pop()}</p>
-          <p class="text-[11px] text-admin-muted">{m.width && m.height ? `${m.width} × ${m.height}` : m.mime_type}{Object.keys(m.formats ?? {}).length ? ' · AVIF, WebP' : ''}{m.focal_point ? ' · focal point' : ''}</p>
+          <p class="text-[11px] text-admin-muted">{m.width && m.height ? `${m.width} × ${m.height}` : isDocument(m.mime_type) ? [docLabel(m.mime_type, m.path), fileSize(m.filesize)].filter(Boolean).join(' · ') : m.mime_type}{Object.keys(m.formats ?? {}).length ? ' · AVIF, WebP' : ''}{m.focal_point ? ' · focal point' : ''}</p>
         </div>
       </li>
     ))}
@@ -53,15 +61,23 @@ const link = (p: number) => `?${new URLSearchParams({ ...(q ? { q } : {}), page:
   )}
   <MediaDetail client:load />
   <script>
+    import { uploadMedia } from '../../../lib/media/upload';
     for (const b of document.querySelectorAll<HTMLButtonElement>('[data-media]')) {
       b.addEventListener('click', () => window.dispatchEvent(new CustomEvent('cms:media-open', { detail: Number(b.dataset.media) })));
     }
     document.getElementById('upload')?.addEventListener('submit', async (e) => {
       e.preventDefault();
       const form = e.currentTarget as HTMLFormElement;
-      const res = await fetch('/api/admin/media', { method: 'POST', body: new FormData(form) });
-      if (res.ok) location.reload();
-      else alert(await res.text());
+      const files = [...((form.elements.namedItem('file') as HTMLInputElement).files ?? [])];
+      const note = document.getElementById('upload-note');
+      const failed: string[] = [];
+      for (const [i, f] of files.entries()) {
+        if (note) note.textContent = `Uploading ${i + 1} of ${files.length}: ${f.name}…`;
+        const res = await uploadMedia(f);
+        if (!res.ok) failed.push(`${f.name}: ${await res.text()}`);
+      }
+      if (failed.length) alert(failed.join('\n'));
+      location.reload();
     });
   </script>
 </Admin>

@@ -54,6 +54,7 @@ last change. You can undo several times.
 | **Columns** | Puts blocks side by side. |
 | **Section** | Groups blocks, with a background colour or spacing around them. |
 | **Form** | One of your [forms](/cfpuck-cms/guide/forms/). |
+| **File** | A link to a document (a PDF, say) with its type, size and a Download button. |
 | **Collection** | An automatic list of your latest posts, events or other content. |
 
 Your site may have extra blocks of its own, made for its design.

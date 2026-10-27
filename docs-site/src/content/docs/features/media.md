@@ -5,6 +5,21 @@ sidebar:
   order: 5
 ---
 
+## Documents
+
+The library takes documents too (`src/lib/media/documents.ts`): PDF, Word, Excel, PowerPoint,
+OpenDocument, plain text and CSV, up to 50 MB. They are stored as they are, under the type their
+ending says, once their first bytes show they are one (a PDF starts `%PDF-`, Office files are zips or
+OLE files, text mustn't be markup), so a web page named `.pdf` is refused. `/media/` serves them by type
+(`mediaHeaders`): a PDF without the sandbox the other files get, since Chrome's PDF viewer refuses a
+sandboxed answer (nosniff keeps it a PDF); Office and OpenDocument files as downloads. `media.filesize`
+keeps the size. A document's details panel previews a PDF and edits its title and caption; every file
+has **Copy link**.
+
+Pages link to documents with the **File** block (`file`; see [Blocks](../../content/blocks/)), with
+**File** beside a link field (`LinkInput`: Button, Image, Hero) and with **File** in a text box's
+toolbar, which links the selected words.
+
 ## Uploads
 
 Uploads (`/api/admin/media`) are processed by `src/lib/media/process.ts` with Cloudflare Images (the

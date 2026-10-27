@@ -156,6 +156,7 @@ async function walk(items: PuckItem[], ctx: RenderCtx, state: WalkState) {
       case 'cover':
       case 'media-text':
       case 'hero':
+      case 'file':
         // Loaded together at the end of prepare().
         if (attrs.mediaId) state.mediaIds.push(Number(attrs.mediaId));
         if (type === 'cover' && attrs.useFeaturedImage && ctx.queried.entry?.featured_media_id) state.mediaIds.push(ctx.queried.entry.featured_media_id);

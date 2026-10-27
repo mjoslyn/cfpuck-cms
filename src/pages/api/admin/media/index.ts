@@ -1,5 +1,7 @@
-// Upload an image (stored at YYYY/MM/name.ext with responsive sizes and AVIF/WebP copies) or a video
-// (MP4/WebM/MOV, stored as is, up to 200 MB). Images come as a form (field `file`); a video comes as the
+// Upload an image (stored at YYYY/MM/name.ext with responsive sizes and AVIF/WebP copies), a video
+// (MP4/WebM/MOV, stored as is, up to 200 MB) or a document (PDF, Office, OpenDocument, text, CSV, up to
+// DOC_MAX_MB, stored as is under the type its ending says, once its first bytes show it is one;
+// src/lib/media/documents.ts). Images come as a form (field `file`); a video comes as the
 // request's body (its type as Content-Type, its name in X-File-Name; src/lib/media/upload.ts) and is
 // streamed to the store as it arrives, since the Worker has 128 MB of memory. A form is read whole,
 // so it is refused over FORM_MAX_MB.
@@ -7,6 +9,7 @@ import type { APIRoute } from 'astro';
 import { serviceClient } from '../../../../lib/db/site';
 import { MediaStore, PathTaken, processUpload } from '../../../../lib/media/process';
 import { VIDEO_MAX_MB, VIDEO_TYPES } from '../../../../lib/media/upload';
+import { DOC_MAX_MB, contentMatches, docType } from '../../../../lib/media/documents';
 
 const FORM_MAX_MB = 90;
 const MB = 1024 * 1024;
@@ -32,7 +35,9 @@ export const POST: APIRoute = async ({ request, locals }) => {
     file = { name: form.name, type: form.type, size: form.size, stream: () => form.stream(), bytes: async () => new Uint8Array(await form.arrayBuffer()) };
   }
   const isVideo = VIDEO_TYPES.includes(file.type);
-  if (!file.type.startsWith('image/') && !isVideo) return new Response('Only images and videos (MP4, WebM, MOV) can be uploaded here', { status: 400 });
+  const doc = !isVideo && !file.type.startsWith('image/') ? docType(file.name) : null;
+  if (!file.type.startsWith('image/') && !isVideo && !doc) return new Response('Only images, videos (MP4, WebM, MOV) and documents (PDF, Word, Excel, PowerPoint, OpenDocument, text, CSV) can be uploaded here', { status: 400 });
+  if (doc && file.size > DOC_MAX_MB * MB) return new Response(`Documents can be up to ${DOC_MAX_MB} MB`, { status: 413 });
   const now = new Date();
   const dir = `${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
   const base = file.name.toLowerCase().replace(/[^a-z0-9.]+/g, '-').replace(/^-+|-+$/g, '');
@@ -62,6 +67,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
   // A video's body is read once, so it can't go again: that upload is refused instead.
   const store = new MediaStore(serviceClient(), undefined, true);
   const bytes = isVideo ? null : await file.bytes();
+  if (doc && !contentMatches(file.name, bytes!)) return new Response(`That file isn't a ${doc.label} file inside, whatever its name says.`, { status: 400 });
   let processed;
   for (let attempt = 1; ; attempt++) {
     try {
@@ -70,19 +76,20 @@ export const POST: APIRoute = async ({ request, locals }) => {
       return new Response((e as Error).message, { status: 400 });
     }
     try {
-      if (bytes) processed = await processUpload(store, path, bytes, file.type);
+      if (doc) await store.put(path, bytes!, doc.mime);
+      else if (bytes) processed = await processUpload(store, path, bytes, file.type);
       else await store.put(path, file.stream(), file.type, file.size);
       break;
     } catch (e) {
       if (e instanceof PathTaken && isVideo) return new Response('Another upload took this name at the same moment: upload the video again.', { status: 409 });
       if (e instanceof PathTaken && attempt < 5) continue;
-      return new Response(`Could not ${isVideo ? 'store the video' : 'process the image'}: ${(e as Error).message}`, { status: 400 });
+      return new Response(`Could not ${isVideo ? 'store the video' : doc ? 'store the document' : 'process the image'}: ${(e as Error).message}`, { status: 400 });
     }
   }
-  if (isVideo) {
+  if (isVideo || doc) {
     const { data, error } = await db
       .from('media')
-      .insert({ path, mime_type: file.type, title: base.slice(0, dot > 0 ? dot : undefined), sizes: {}, formats: {}, processed_at: new Date().toISOString() })
+      .insert({ path, mime_type: doc ? doc.mime : file.type, title: base.slice(0, dot > 0 ? dot : undefined), sizes: {}, formats: {}, filesize: file.size, processed_at: new Date().toISOString() })
       .select('*')
       .single();
     if (error) return new Response(error.message, { status: 400 });
@@ -90,7 +97,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
   }
   const { data, error } = await db
     .from('media')
-    .insert({ ...processed, title: base.slice(0, dot > 0 ? dot : undefined), processed_at: new Date().toISOString() })
+    .insert({ ...processed, title: base.slice(0, dot > 0 ? dot : undefined), filesize: file.size, processed_at: new Date().toISOString() })
     .select('*')
     .single();
   if (error) return new Response(error.message, { status: 400 });

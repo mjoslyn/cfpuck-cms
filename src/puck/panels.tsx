@@ -1,7 +1,7 @@
 // Editor panels for the content blocks (src/render/c/content.ts). Values are stored as CSS, with the
 // design tokens as var(--color-*), var(--space-*), var(--text-*), var(--font-*).
 import type { ReactNode } from 'react';
-import { Code, MediaModal, MediaPicker, RichText, Row, Segmented, Select, Text, Toggle, inputClass, type Attrs, FieldGroup } from './fields';
+import { Code, LinkInput, MediaModal, MediaPicker, RichText, Row, Segmented, Select, Text, Toggle, inputClass, type Attrs, FieldGroup } from './fields';
 import { videoEmbedAttrs } from '../lib/media/video-link';
 import { PRESETS as themeJson } from '../lib/site';
 import { site } from '../lib/site';
@@ -292,7 +292,7 @@ export const CONTENT_PANELS: Record<string, Panel> = {
       {imagePicker(a, set)}
       <Text title="Alt text (describes the image)" value={a.alt} onChange={(v) => set({ alt: v || undefined })} />
       <RichText title="Caption" value={a.caption ?? ''} onChange={(v) => set({ caption: v || undefined })} />
-      <Text title="Link" value={a.href} placeholder="https://" onChange={(v) => set({ href: v || undefined })} />
+      <LinkInput title="Link" value={a.href} placeholder="https://" onChange={(v) => set({ href: v || undefined })} />
       {a.href && <Toggle title="Open link in a new tab" value={a.target === '_blank'} onChange={(v) => set({ target: v ? '_blank' : undefined, rel: v ? 'noopener' : undefined })} />}
       <Select title="Placement" value={a.align} options={[['left', 'Float left'], ['right', 'Float right'], ['center', 'Centred'], ['wide', 'Wide'], ['full', 'Full width']]} onChange={(v) => set({ align: v })} />
       {a.mediaId && <Select title="Image size" value={a.size} options={IMAGE_SIZES} onChange={(v) => set({ size: v })} />}
@@ -318,7 +318,7 @@ export const CONTENT_PANELS: Record<string, Panel> = {
   button: (a, set) => (
     <>
       <Text title="Label" value={a.text} onChange={(v) => set({ text: v })} />
-      <Text title="Link" value={a.href} placeholder="/plan-your-trip/" onChange={(v) => set({ href: v || undefined })} />
+      <LinkInput title="Link" value={a.href} placeholder="/plan-your-trip/" onChange={(v) => set({ href: v || undefined })} />
       <Toggle title="Open in a new tab" value={a.target === '_blank'} onChange={(v) => set({ target: v ? '_blank' : undefined, rel: v ? 'noopener' : undefined })} />
       <Select title="Style" value={a.variant} options={[['outline', 'Outline']]} onChange={(v) => set({ variant: v })} />
       <Select title="Width" value={a.widthPct ? String(a.widthPct) : undefined} options={[['25', '25%'], ['50', '50%'], ['75', '75%'], ['100', '100%']]} onChange={(v) => set({ widthPct: v ? Number(v) : undefined })} />
@@ -376,9 +376,9 @@ export const CONTENT_PANELS: Record<string, Panel> = {
         <textarea className={inputClass} rows={4} value={a.text ?? ''} onChange={(e) => set({ text: e.target.value || undefined })} />
       </Row>
       <Text title="Button label" value={a.primaryLabel} placeholder="(no button)" onChange={(v) => set({ primaryLabel: v || undefined })} />
-      <Text title="Button link" value={a.primaryHref} placeholder="/plan-your-trip/" onChange={(v) => set({ primaryHref: v || undefined })} />
+      <LinkInput title="Button link" value={a.primaryHref} placeholder="/plan-your-trip/" onChange={(v) => set({ primaryHref: v || undefined })} />
       <Text title="Second button label" value={a.secondaryLabel} placeholder="(no button)" onChange={(v) => set({ secondaryLabel: v || undefined })} />
-      <Text title="Second button link" value={a.secondaryHref} placeholder="/experiences/" onChange={(v) => set({ secondaryHref: v || undefined })} />
+      <LinkInput title="Second button link" value={a.secondaryHref} placeholder="/experiences/" onChange={(v) => set({ secondaryHref: v || undefined })} />
       <Segmented title="Height" value={a.height ?? 'screen'} options={[['screen', 'Full screen'], ['large', 'Large'], ['medium', 'Medium']]} onChange={(v) => set({ height: v === 'screen' ? undefined : v })} />
       <Toggle title="Title is the page's main heading (h1)" value={a.level !== 2} onChange={(v) => set({ level: v ? undefined : 2 })} />
     </>
@@ -393,6 +393,7 @@ export const CONTENT_PANELS: Record<string, Panel> = {
     </>
   ),
   html: (a, set) => <Code title="HTML" value={a.html ?? ''} rows={14} onChange={(v) => set({ html: v })} />,
+  file: (a, set) => <FilePanel a={a} set={set} />,
   'media-text': (a, set) => (
     <>
       {imagePicker(a, set)}
@@ -569,7 +570,43 @@ Object.assign(CONTENT_PANELS, {
   global: (a: Attrs, set: SetFn) => <GlobalPicker value={a.ref} onChange={(ref) => set({ ref })} />,
 });
 
+/** The File block's settings: the document (from the media library, or an address), its link text, details and button. */
+function FilePanel({ a, set }: { a: Attrs; set: SetFn }) {
+  const [picking, setPicking] = useState(false);
+  // The chosen file's name, from the library (a block made elsewhere has only its id).
+  const [libName, setLibName] = useState('');
+  useEffect(() => {
+    setLibName('');
+    if (!a.mediaId || a.name) return;
+    browserClient()
+      .from('media')
+      .select('title, path')
+      .eq('id', Number(a.mediaId))
+      .maybeSingle()
+      .then(({ data }) => data && setLibName(data.title || String(data.path).split('/').pop()));
+  }, [a.mediaId, a.name]);
+  return (
+    <>
+      <FieldGroup title="File">
+        <div className="flex items-center gap-2">
+          <span className="min-w-0 flex-1 truncate text-xs">{a.name || libName || (a.href ? String(a.href).split('/').pop() : 'None chosen')}</span>
+          <button type="button" className="shrink-0 rounded border border-admin-ink/15 bg-white px-3 py-1.5 text-xs hover:border-admin-accent" onClick={() => setPicking(true)}>
+            {a.mediaId || a.href ? 'Replace' : 'Choose'}
+          </button>
+        </div>
+      </FieldGroup>
+      {picking && <MediaModal only="document" onClose={() => setPicking(false)} onSelect={(m) => (set({ mediaId: m.mediaId ?? undefined, href: undefined, name: m.name }), setPicking(false))} />}
+      {!a.mediaId && <LinkInput title="Or an address" value={a.href} placeholder="https://" onChange={(v) => set({ href: v || undefined, name: undefined })} />}
+      <Text title="Link text" value={a.label} placeholder={a.name || libName || 'The file\'s title'} onChange={(v) => set({ label: v || undefined })} />
+      <Toggle title="Show its type and size" value={a.details !== false} onChange={(v) => set({ details: v ? undefined : false })} />
+      <Text title="Button" value={a.button ?? 'Download'} placeholder="(no button)" onChange={(v) => set({ button: v === 'Download' ? undefined : v })} />
+      <StyleControls a={a} set={set} parts={{ colors: true, spacing: true, width: false }} />
+    </>
+  );
+}
+
 export const CONTENT_LABELS: Record<string, string> = {
+  file: 'File',
   section: 'Section',
   columns: 'Columns',
   column: 'Column',

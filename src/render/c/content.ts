@@ -2,7 +2,8 @@
 // spacers, covers, galleries, embeds, raw HTML, media & text. Props are documented in
 // src/lib/content/types.ts; styles in ./style.ts; container layouts in ./layout.ts.
 import type { Renderer, Env } from '../env';
-import { mediaImage, mediaImgTag } from '../../lib/media/image';
+import { mediaImage, mediaImgTag, mediaUrl } from '../../lib/media/image';
+import { docLabel, fileSize } from '../../lib/media/documents';
 import { attrs, alignClass, escAttr, itemDecls, styleDecls, type Decl } from './style';
 import { layout } from './layout';
 import { focalFor, parseRatio } from '../../lib/media/focal';
@@ -310,6 +311,28 @@ export const video: Renderer = (b) => {
 
 export const html: Renderer = (b) => String(b.attrs.html ?? '');
 
+/**
+ * File: a link to a document (a media library file, `mediaId`, or any address, `href`), with its type and
+ * size from the library (`details`, on unless false) and a Download button (`button`, its label; empty
+ * for none). The link opens the file (a PDF in the browser); the button saves it.
+ */
+export const file: Renderer = (b, env) => {
+  const a = b.attrs;
+  const m = a.mediaId ? env.ctx.loader.media.get(Number(a.mediaId)) : undefined;
+  const href = m ? mediaUrl(m.path) : typeof a.href === 'string' ? a.href.trim() : '';
+  if (!href) return '';
+  const name = String(a.label || m?.title || href.split('/').pop() || 'File');
+  const meta = a.details !== false && m ? [docLabel(m.mime_type, m.path), fileSize(m.filesize)].filter(Boolean).join(' · ') : '';
+  const button = a.button === '' ? '' : String(a.button ?? 'Download');
+  return (
+    `<div ${root(a, ['c-file'])}>` +
+    `<a class="c-file__link" href="${escAttr(href)}">${esc(name)}</a>` +
+    (meta ? `<span class="c-file__meta">${esc(meta)}</span>` : '') +
+    (button ? `<a class="c-file__button" href="${escAttr(href)}" download aria-label="${escAttr(`${button}: ${name}`)}">${esc(button)}</a>` : '') +
+    `</div>`
+  );
+};
+
 export const mediaText: Renderer = (b, env, inner) => {
   const a = b.attrs;
   const img = imageTag(env, a);
@@ -342,5 +365,6 @@ export const CONTENT_RENDERERS: Record<string, Renderer> = {
   video,
   html,
   'media-text': mediaText,
+  file,
 };
 

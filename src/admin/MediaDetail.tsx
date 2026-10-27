@@ -1,8 +1,9 @@
-// Media library detail panel: alt text, title, caption, and the focal point (click or drag on the
+// Media library detail panel: alt text, title, caption, the focal point (click or drag on the
 // image). Crop previews show how the image fills common shapes; each shape can use another image instead
 // (crop_images), shown wherever this one is cropped to that shape; with that shape chosen, clicks set the
-// focal point for that use (kept with this image; the other image's own are untouched). Opens on
-// `cms:media-open` events.
+// focal point for that use (kept with this image; the other image's own are untouched). A document
+// shows a preview (PDFs) with its title, caption and size. Every file has Open and Copy link (its full
+// address). Opens on `cms:media-open` events.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { browserClient } from '../lib/db/browser';
 import { mediaUrl } from '../lib/media/image';
@@ -10,6 +11,7 @@ import type { Media } from '../lib/types';
 import { SHAPES, position, ratioLabel, smallFor, type Point } from '../lib/media/focal';
 import { MediaModal } from '../puck/fields';
 import { describable } from '../lib/media/alt-text';
+import { docLabel, fileSize, isDocument } from '../lib/media/documents';
 
 const input = 'w-full rounded border border-admin-ink/15 bg-white px-2 py-1.5 text-sm outline-none focus:border-admin-accent';
 const label = 'mb-1 block text-xs font-medium text-admin-muted';
@@ -35,6 +37,8 @@ export default function MediaDetail() {
   const [status, setStatus] = useState('');
   // Alt text from Claude (Generate): under way, or what went wrong.
   const [writing, setWriting] = useState(false);
+  // Copy link: done (for a moment), or what went wrong.
+  const [copied, setCopied] = useState('');
   const [altNote, setAltNote] = useState('');
   const frame = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
@@ -44,6 +48,7 @@ export default function MediaDetail() {
       const id = (e as CustomEvent<number>).detail;
       setStatus('');
       setAltNote('');
+      setCopied('');
       const { data } = await browserClient().from('media').select('*').eq('id', id).single();
       if (!data) return;
       setM(data as Row);
@@ -74,6 +79,19 @@ export default function MediaDetail() {
 
   if (!m) return null;
   const src = mediaUrl((m.sizes?.large ?? m.sizes?.medium_large ?? m).path);
+  // Documents (PDF, Office...) have no alt text, focal points or crops: a preview (PDFs) and their details.
+  const doc = isDocument(m.mime_type);
+  const fileUrl = mediaUrl(m.path);
+  /** The file's full address on the site, to paste into an email or another page. */
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(new URL(fileUrl, location.origin).toString());
+      setCopied('Link copied');
+    } catch {
+      setCopied('Could not copy: open the file and copy its address instead.');
+    }
+    window.setTimeout(() => setCopied(''), 2500);
+  };
   const focal = draft.focal ?? { x: 0.5, y: 0.5 };
   const pointFor = (key: string) => draft.crops[key] ?? focal;
   const other = (key: string) => (draft.swaps[key] ? others[draft.swaps[key].id] : undefined);
@@ -126,6 +144,17 @@ export default function MediaDetail() {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-admin-ink/50 p-6" onClick={() => setM(null)}>
       <div className="flex max-h-full w-full max-w-5xl overflow-hidden rounded bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex min-w-0 flex-1 flex-col overflow-y-auto bg-admin-soft p-4">
+          {doc ? (
+            m.mime_type === 'application/pdf' ? (
+              <iframe src={fileUrl} title={`Preview of ${m.path.split('/').pop()}`} className="min-h-[60vh] w-full flex-1 rounded border border-admin-ink/10 bg-white" />
+            ) : (
+              <div className="flex min-h-[40vh] flex-1 flex-col items-center justify-center gap-3 rounded bg-white text-admin-muted">
+                <span className="text-3xl font-semibold tracking-wider text-admin-ink uppercase">{docLabel(m.mime_type, m.path)}</span>
+                <span className="text-sm">No preview: open the file to see it.</span>
+              </div>
+            )
+          ) : (
+          <>
           {editingOther && (
             <p className="mb-2 rounded bg-white px-2 py-1 text-xs text-admin-muted">
               The {SHAPES.find((x) => x.key === editing)?.name.toLowerCase()} crop uses another image. Click it to set its focal point for this crop; it applies only here.
@@ -205,6 +234,8 @@ export default function MediaDetail() {
               );
             })}
           </div>
+          </>
+          )}
         </div>
         <aside className="w-80 shrink-0 overflow-y-auto p-4">
           <div className="mb-3 flex items-start justify-between gap-2">
@@ -213,6 +244,7 @@ export default function MediaDetail() {
               Close
             </button>
           </div>
+          {!doc && (
           <div className="mb-3">
             <div className="mb-1 flex items-end justify-between gap-2">
               <label htmlFor="media-alt" className="block text-xs font-medium text-admin-muted">
@@ -231,6 +263,7 @@ export default function MediaDetail() {
               </p>
             )}
           </div>
+          )}
           <label className="mb-3 block">
             <span className={label}>Title</span>
             <input className={input} value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
@@ -239,6 +272,7 @@ export default function MediaDetail() {
             <span className={label}>Caption</span>
             <textarea className={input} rows={2} value={draft.caption} onChange={(e) => setDraft({ ...draft, caption: e.target.value })} />
           </label>
+          {!doc && (
           <div className="mb-3 flex items-center justify-between text-xs text-admin-muted">
             <span>Main focal point: {draft.focal ? `${Math.round(focal.x * 100)}%, ${Math.round(focal.y * 100)}%` : 'centre (default)'}</span>
             {draft.focal && (
@@ -247,31 +281,54 @@ export default function MediaDetail() {
               </button>
             )}
           </div>
+          )}
           <button type="button" disabled={!changed || status.startsWith('Saving')} onClick={save} className="w-full rounded bg-admin-accent px-4 py-2 text-sm font-medium text-white hover:bg-admin-accent-dark disabled:opacity-40">
             Save
           </button>
           {status && <p className={`mt-2 text-xs ${status === 'Saved' ? 'text-[#047857]' : 'text-admin-muted'}`}>{status}</p>}
           <dl className="mt-5 space-y-1 border-t border-admin-ink/10 pt-3 text-xs text-admin-muted">
-            <div className="flex justify-between">
-              <dt>Dimensions</dt>
-              <dd>{m.width && m.height ? `${m.width} × ${m.height}` : '-'}</dd>
-            </div>
+            {!doc && (
+              <div className="flex justify-between">
+                <dt>Dimensions</dt>
+                <dd>{m.width && m.height ? `${m.width} × ${m.height}` : '-'}</dd>
+              </div>
+            )}
+            {!!m.filesize && (
+              <div className="flex justify-between">
+                <dt>Size</dt>
+                <dd>{fileSize(m.filesize)}</dd>
+              </div>
+            )}
             <div className="flex justify-between">
               <dt>Type</dt>
-              <dd>{m.mime_type}</dd>
+              <dd>{doc ? docLabel(m.mime_type, m.path) : m.mime_type}</dd>
             </div>
-            <div className="flex justify-between">
-              <dt>Modern formats</dt>
-              <dd>{formats.length ? formats.map((f) => f.toUpperCase()).join(', ') : m.processed_at ? 'Not applicable' : 'Pending'}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt>Sizes</dt>
-              <dd>{Object.keys(m.sizes ?? {}).filter((k) => k !== 'original_image').length}</dd>
-            </div>
+            {!doc && (
+              <>
+                <div className="flex justify-between">
+                  <dt>Modern formats</dt>
+                  <dd>{formats.length ? formats.map((f) => f.toUpperCase()).join(', ') : m.processed_at ? 'Not applicable' : 'Pending'}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt>Sizes</dt>
+                  <dd>{Object.keys(m.sizes ?? {}).filter((k) => k !== 'original_image').length}</dd>
+                </div>
+              </>
+            )}
           </dl>
-          <a href={mediaUrl(m.path)} target="_blank" className="mt-3 inline-block text-xs text-admin-muted underline hover:text-admin-accent">
-            Open original
-          </a>
+          <div className="mt-3 flex items-center gap-3 text-xs">
+            <a href={fileUrl} target="_blank" className="text-admin-muted underline hover:text-admin-accent">
+              {doc ? 'Open file' : 'Open original'}
+            </a>
+            <button type="button" onClick={copyLink} className="rounded border border-admin-ink/15 bg-white px-2 py-0.5 hover:border-admin-accent hover:text-admin-accent" title="Copy the file's address, to paste into an email or a link">
+              Copy link
+            </button>
+            {copied && (
+              <span className="text-admin-muted" role="status">
+                {copied}
+              </span>
+            )}
+          </div>
         </aside>
       </div>
     </div>

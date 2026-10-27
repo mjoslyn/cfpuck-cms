@@ -91,7 +91,7 @@ and event descriptions. Site-wide values are in `settings` (`site`, `options`). 
 Content is Puck data (`entries.content`, `templates.content`): items `{ type, props: { id, attrs,
 children } }`, rendered by `src/render/c/`: content blocks (`section`, `columns`, `text`, `heading`,
 `image`, `buttons`, `list`, `quote`, `cover`, `hero`, `gallery`, `video-gallery`, `embed`, `html`,
-`media-text`...), entry fields (`entry-title`, `entry-image`, ...), collections (`collection`,
+`media-text`, `file`...), entry fields (`entry-title`, `entry-image`, ...), collections (`collection`,
 `collection-items`, `pagination`...), events (`event-date`, `events-calendar`, `event-calendar`,
 `event-details`), `form`, and structure (`part`, `pattern`, `reusable`). A site's blocks come from its
 `render.ts`. `hero` is a full-bleed image with eyebrow, title, text and two buttons, under an overlay
@@ -466,6 +466,20 @@ file, one past its end 416 (`parseRange`). Videos are sent as the request's body
 100 MB on its Free and Pro plans); forms over 90 MB are refused.
 `scripts/copy-storage.ts` copies a site's files from another S3-compatible store (Supabase Storage's S3
 endpoint, whose buckets are the folders, or another copy's bucket) into the store (resumable).
+
+**Documents** (`src/lib/media/documents.ts`): PDF, Word, Excel, PowerPoint, OpenDocument, plain text and
+CSV, up to `DOC_MAX_MB` (50), are uploaded like images (the Media screen takes several files at once)
+and stored as they are, under the type their ending says (`DOC_TYPES`), once their first bytes show
+they are one (`contentMatches`: a PDF's `%PDF-`, a zip, an OLE file, text that isn't markup), so a page
+named `.pdf` is refused. `/media/` serves each by type (`mediaHeaders`, `src/lib/media/path-guard.ts`):
+a PDF without the sandbox (Chrome's viewer refuses a sandboxed one; nosniff keeps it a PDF), Office and
+OpenDocument files as downloads, everything else sandboxed. `media.filesize` (bytes) is kept for
+documents, videos and new images. The library shows documents with their type and size; their details
+panel previews a PDF and has title and caption (no alt text or focal points). Every file's details have
+**Copy link** (its full address). Links reach documents three ways: the **File** block (`file`: the
+document's name, type and size and a Download button; or any address), **File** on a link field
+(`LinkInput`: Button, Image and Hero links) and **File** in a rich text toolbar (links the selected
+words), each opening the media library on documents (`MediaModal only="document"`).
 
 Uploads (`/api/admin/media`) are processed by `src/lib/media/process.ts` through an image engine
 (`src/lib/media/engine.ts`: Cloudflare Images, the Worker's `IMAGES` binding; scripts in Node pass
