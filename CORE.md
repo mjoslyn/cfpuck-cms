@@ -249,6 +249,12 @@ in PostgREST's, `*` means `%`). Uses are counted (`redirect_hit`). A rule that w
 (`loopReason`: a wildcard whose target is under its own prefix). A published entry whose address
 changes gets one automatically (`redirectMovedEntry`, from the entries API).
 
+What a missing address shows: the page chosen as the **Not found page** (Settings > General,
+`settings.site.not_found_page_id`, `notFoundPage` in `src/render/page.ts`), while it is published,
+rendered through its own template with status 404, noindex and no canonical (`Queried.notFound`;
+`is-404` on the body); else the `404` template, then `index`. The page's own address stays an ordinary
+page, noindex too. Listing pages past their last page show it as well.
+
 Addresses still not found are logged (`not_found`, via `not_found_hit`; files, admin and probes are
 left out; at most 5,000 addresses, those not seen for 30 days making room for new ones) and listed on the screen with Add redirect. Saving a rule clears the entries it covers (for a
 wildcard, every entry under its prefix, which can be many); the API returns the cleared paths, and

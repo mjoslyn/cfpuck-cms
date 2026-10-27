@@ -258,6 +258,12 @@ export interface PreviewOverride {
   template?: PuckItem[];
 }
 
+/** The page chosen as the site's Not found page (settings.site.not_found_page_id), while it is published. */
+export async function notFoundPage(site: Record<string, any> | undefined, loader: Loader): Promise<Entry | null> {
+  const id = Number(site?.not_found_page_id) || 0;
+  return id ? loader.entryById(id) : null;
+}
+
 export async function renderRequest(url: URL, db: Db, form?: FormResult, preview?: PreviewOverride, viewer?: Viewer | null): Promise<PageResult> {
   // The site's view: published entries, members-only ones for whoever may see them. Previews read with
   // the editor's own session, whose database policies decide instead.
@@ -266,7 +272,7 @@ export async function renderRequest(url: URL, db: Db, form?: FormResult, preview
   // A member counts as one only while Members is on.
   const who = viewer && !memberSettings(settings.site).enabled ? { ...viewer, member: null } : viewer;
   if (loader.scope) Object.assign(loader.scope, { viewer: who, noEvents: !eventsOn(settings.site) });
-  const queried: Queried = preview ? { kind: 'singular', entry: preview.entry, page: 1, url, isFront: settings.site?.front_page_id === preview.entry.id } : await resolve(url, loader);
+  let queried: Queried = preview ? { kind: 'singular', entry: preview.entry, page: 1, url, isFront: settings.site?.front_page_id === preview.entry.id } : await resolve(url, loader);
   if (queried.redirect) return { status: 302, html: '', location: queried.redirect };
   if (queried.kind === '404' && url.pathname !== '/__not-found__/') {
     // The editors' redirects first (/admin/redirects/), then a guess from the address.
@@ -278,6 +284,12 @@ export async function renderRequest(url: URL, db: Db, form?: FormResult, preview
     }
     const guess = await guess404(url, loader);
     if (guess && guess !== url.pathname) return { status: 301, html: '', location: guess };
+  }
+  // Nothing here: the site's Not found page (Settings > General), if one is set and published, else the
+  // 404 template.
+  if (queried.kind === '404') {
+    const entry = await notFoundPage(settings.site, loader);
+    if (entry) queried = { kind: 'singular', entry, page: 1, url, notFound: true };
   }
   const ctx: RenderCtx = { loader, queried, settings, queries: new Map(), docs: new Map(), css: [], assets: new Set(), data: new Map(), scripts: [], rendered: [], viewer: who ?? null };
 
@@ -341,5 +353,5 @@ ${scripts.join('\n')}
 </body>
 </html>
 `;
-  return { status: queried.kind === '404' ? 404 : 200, html, personal: !!ctx.personal, locked: !!queried.entry?.locked };
+  return { status: queried.kind === '404' || queried.notFound ? 404 : 200, html, personal: !!ctx.personal, locked: !!queried.entry?.locked };
 }

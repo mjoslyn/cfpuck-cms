@@ -25,7 +25,7 @@ export async function headMeta(ctx: RenderCtx, docTitle: string): Promise<string
   const listing = queried.kind === 'archive' && queried.postType ? queried.postType : undefined;
   const seo = term ? termSeo(term, siteSettings) : listing ? listingSeo(siteSettings, listing, ARCHIVE_PATHS[listing] === queried.url.pathname && !queried.url.searchParams.get('q')) : seoOf(entry?.fields);
   const description = seo.description || (entry ? summary(entry.excerpt_rendered ?? entry.excerpt) : '') || (queried.isFront || !entry ? summary(siteSettings.description) : '');
-  const path = entry ? (queried.isFront ? '/' : permalink(entry)) : queried.kind === 'search' ? '/search/' : queried.url.pathname;
+  const path = queried.notFound ? queried.url.pathname : entry ? (queried.isFront ? '/' : permalink(entry)) : queried.kind === 'search' ? '/search/' : queried.url.pathname;
   const url = origin + path;
 
   const imageId = [seo.image, entry?.featured_media_id, siteSettings.share_image].map(Number).find((n) => n > 0);
@@ -36,8 +36,10 @@ export async function headMeta(ctx: RenderCtx, docTitle: string): Promise<string
   const tags: string[] = [];
   if (description) tags.push(`<meta name="description" content="${attr(description)}" />`);
   // noindex keeps out search engines and, with noai, the AI tools that read the tag (robots.txt asks the rest).
-  if (seo.noindex) tags.push('<meta name="robots" content="noindex, follow, noai, noimageai" />');
-  if (queried.kind !== 'search' && queried.kind !== '404') tags.push(`<link rel="canonical" href="${attr(url)}" />`);
+  // The Not found page stays out too, at a missing address and at its own.
+  const notFoundPage = queried.notFound || (!!entry && entry.id === Number(siteSettings.not_found_page_id));
+  if (seo.noindex || notFoundPage) tags.push('<meta name="robots" content="noindex, follow, noai, noimageai" />');
+  if (queried.kind !== 'search' && queried.kind !== '404' && !queried.notFound) tags.push(`<link rel="canonical" href="${attr(url)}" />`);
   tags.push(
     `<meta property="og:site_name" content="${attr(siteSettings.name ?? config.name)}" />`,
     `<meta property="og:type" content="${entry && entry.type !== 'page' ? 'article' : 'website'}" />`,

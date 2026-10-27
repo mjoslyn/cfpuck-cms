@@ -14,6 +14,8 @@ export interface Queried {
   page: number;
   url: URL;
   isFront?: boolean;
+  /** The site's Not found page (Settings), shown at an address with nothing there: answered with 404. */
+  notFound?: boolean;
   /** Canonical location to redirect to (recurring event series -> next occurrence). */
   redirect?: string;
 }

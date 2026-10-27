@@ -31,6 +31,15 @@ API returns the cleared paths and reports a failed clear rather than hiding it.
 - A published entry whose address changes gets one (`redirectMovedEntry`).
 - A term whose address changes leaves one from the old term page.
 
+## Not found page
+
+When no redirect or guess covers a missing address, the visitor sees the page chosen as **Not found
+page** (Settings > General, `settings.site.not_found_page_id`) while it is published: an ordinary page,
+edited like any other and rendered through its own template, answered with 404, `noindex` and no
+canonical, with `is-404` on the body. Without one, the `404` template (then `index`) is shown. The
+page's own address stays an ordinary page, also `noindex`. Listing pages past their last page show it
+too.
+
 ## Not found log
 
 Addresses still not found are logged (`not_found`, via `not_found_hit`; files, admin and probes are

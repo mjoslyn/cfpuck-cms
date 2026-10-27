@@ -27,7 +27,7 @@ import type { TaxonomyMeta } from '../lib/page-meta';
 import { ADMIN_THEME_DEFAULTS, ADMIN_THEME_FIELDS, adminThemeVars, contrast, type AdminTheme } from '../lib/admin-theme';
 
 interface Props {
-  site: { name?: string; description?: string; front_page_id?: number | null; timezone?: string; search_types?: string[]; social?: { network: string; url: string }[]; share_image?: number; share_image_url?: string; templates?: TemplateMap; taxonomy_templates?: Record<string, string>; taxonomy_pages_off?: string[]; taxonomy_meta?: Record<string, TaxonomyMeta>; listing_meta?: Record<string, TaxonomyMeta>; listings_off?: string[]; icons?: Record<string, string>; icon_media_id?: number | null; icon_preview?: string; admin_theme?: AdminTheme; tickets?: TicketSettings; members?: Partial<MemberSettings>; mailing?: MailingSettings; events?: { enabled?: boolean }; a11y?: { block_publish?: boolean } };
+  site: { name?: string; description?: string; front_page_id?: number | null; not_found_page_id?: number | null; timezone?: string; search_types?: string[]; social?: { network: string; url: string }[]; share_image?: number; share_image_url?: string; templates?: TemplateMap; taxonomy_templates?: Record<string, string>; taxonomy_pages_off?: string[]; taxonomy_meta?: Record<string, TaxonomyMeta>; listing_meta?: Record<string, TaxonomyMeta>; listings_off?: string[]; icons?: Record<string, string>; icon_media_id?: number | null; icon_preview?: string; admin_theme?: AdminTheme; tickets?: TicketSettings; members?: Partial<MemberSettings>; mailing?: MailingSettings; events?: { enabled?: boolean }; a11y?: { block_publish?: boolean } };
   options: Record<string, any>;
   pages: { id: number; title: string }[];
   templates: TemplateInfo[];
@@ -118,6 +118,8 @@ export default function SiteSettings({ site: initialSite, options: initialOption
         <Text title="Site name" value={site.name} onChange={(v) => setSite({ ...site, name: v })} />
         <Text title="Tagline" value={site.description} onChange={(v) => setSite({ ...site, description: v })} />
         <Select title="Front page" value={site.front_page_id ? String(site.front_page_id) : ''} options={pages.map((p) => [String(p.id), p.title])} onChange={(v) => setSite({ ...site, front_page_id: v ? Number(v) : null })} />
+        <Select title="Not found page" value={site.not_found_page_id ? String(site.not_found_page_id) : ''} options={pages.map((p) => [String(p.id), p.title])} onChange={(v) => setSite({ ...site, not_found_page_id: v ? Number(v) : null })} />
+        <p className="-mt-2 mb-4 text-xs text-admin-muted">Shown when an address has nothing there (with no redirect for it). Without one, the 404 template is shown.</p>
         </>
       ),
     },

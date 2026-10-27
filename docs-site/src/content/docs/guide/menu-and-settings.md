@@ -27,7 +27,7 @@ An item can also open a larger drop-down panel: add **Links** under a **Links he
 
 | Tab | What it's for |
 | --- | --- |
-| **General** | The site's name, tagline and which page is the home page. |
+| **General** | The site's name, tagline, which page is the home page, and which page people see when an address doesn't exist. |
 | **Types** | Which layout (template) each kind of content uses. Usually set up once. |
 | **Search** | Which kinds of content the site search covers. |
 | **Social** | Your social media profiles (shown as icons) and the picture used when a page without its own image is shared. |
@@ -49,6 +49,16 @@ links. On the **Redirects** tab:
   you can catch broken links.
 
 Changing a published page's address adds a redirect for you automatically.
+
+## When a page isn't found
+
+Someone who follows a broken link sees a "page not found" page. To make your own:
+
+1. Make an ordinary page (for example "Sorry, we couldn't find that") with a friendly message, a
+   search box and links to your main pages. Publish it.
+2. In **Settings > General**, choose it as the **Not found page**, then **Save settings**.
+
+Search engines don't list it. To go back to the standard one, set **Not found page** to **Default**.
 
 ## Backups
 

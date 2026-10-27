@@ -7,6 +7,7 @@ export function bodyClasses(q: Queried): string {
   if (q.kind === 'singular' && e) {
     c.push('is-single', `type-${e.type}`);
     if (q.isFront) c.push('is-front');
+    if (q.notFound) c.push('is-404');
     if (e.template && e.template !== 'default') c.push(`template-${e.template.replace(/[/.]/g, '-')}`);
   } else if (q.kind === 'archive') {
     c.push('is-archive', `archive-${q.postType}`);
