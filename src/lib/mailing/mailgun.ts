@@ -1,6 +1,6 @@
 // Mailgun, over its REST API (no SDK): sending a batch, looking for a batch's events, the domain's
-// suppression lists, and checking a webhook's signature. The keys are environment variables, never
-// settings (settings sync between copies): MAILGUN_API_KEY, MAILGUN_DOMAIN (the marketing subdomain),
+// suppression lists, and checking a webhook's signature. The keys are saved under Settings > Connections
+// or set in the environment, never settings (settings sync between copies): MAILGUN_API_KEY, MAILGUN_DOMAIN (the marketing subdomain),
 // MAILGUN_REGION (us, the default, or eu), MAILGUN_WEBHOOK_SIGNING_KEY and MAILGUN_TEST_MODE (Mailgun
 // accepts and delivers nothing). Without keys nothing goes to Mailgun: a batch is sent one by one to a
 // local mail catcher (an SMTP host on this machine), else logged. Server only.

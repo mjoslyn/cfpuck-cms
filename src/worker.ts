@@ -59,6 +59,7 @@ export default {
     if (!s) return console.error(`no scheduled run for ${event.cron}`);
     await inScope({ waitUntil: (p) => ctx.waitUntil(p) }, async () => {
       try {
+        await (await import('./lib/site-keys')).refreshSavedKeys();
         console.log(`${s.name}: ${await s.run()}`);
       } catch (e) {
         console.error(`${s.name} failed: ${(e as Error).message}`);
@@ -71,6 +72,7 @@ export default {
     for (const message of batch.messages) {
       await inScope({ waitUntil: (p) => ctx.waitUntil(p) }, async () => {
         try {
+          await (await import('./lib/site-keys')).refreshSavedKeys();
           await runJob(message.body);
         } catch (e) {
           console.error(`job ${message.body.kind} failed: ${(e as Error).message}`);

@@ -96,8 +96,9 @@ Wrangler (Cloudflare's CLI) is a dev dependency, so `npx wrangler` needs no inst
 
 ### Optional features
 
-- **Compose.** Set `ANTHROPIC_API_KEY`, and optionally `ANTHROPIC_MODEL` (default claude-sonnet-5-5).
-  Restart the dev server after setting it.
+- **Compose.** Connect Claude under Settings > Connections, or set `ANTHROPIC_API_KEY` (and optionally
+  `ANTHROPIC_MODEL`, default claude-sonnet-5-5) and restart the dev server. Stripe, Square and Mailgun
+  connect the same way on the deployed site, which sets up their webhooks.
 - **Email** (form notifications, ticket emails, account emails and mailing-list confirmations; not
   campaigns, which go through Mailgun). Deployed, mail goes through Cloudflare Email Service: add
   `"send_email": [{ "name": "EMAIL" }]` to `wrangler.jsonc`, onboard the sender's domain under Email

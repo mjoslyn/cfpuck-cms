@@ -454,7 +454,8 @@ told every page using it shares what it builds or changes; builds and targeted e
 being edited, kept with Save & apply. A template's conversation is keyed by it
 (`compose_sessions.template`, `<kind>:<slug>`), never makes a draft entry, and has no `update_fields`
 (`composeTools`). Needs
-`ANTHROPIC_API_KEY` (optional `ANTHROPIC_MODEL`, default claude-sonnet-5-5).
+`ANTHROPIC_API_KEY` (Settings > Connections, or the environment; optional `ANTHROPIC_MODEL`, default
+claude-sonnet-5-5).
 
 A turn runs as a job (`src/lib/compose/job.ts`, table `compose_jobs`) because a build takes 30-90s or
 more: `POST /api/admin/compose` reads the materials, queues the turn and puts `{ jobId, token }` on the
@@ -678,8 +679,9 @@ or Square payment link, `order` Square's order (which its payment is on). One we
 serves both features, `/api/payments/stripe` and `/api/payments/square`
 (`src/pages/api/payments/[provider].ts`): it checks the signature and hands the parsed event to
 `formsWebhook` and `ticketsWebhook`, each ignoring checkouts that aren't its own and asking the provider
-where a checkout stands. Provider-specific code stays in `src/lib/payments/`. Keys are environment
-variables, never settings (settings sync between copies): `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
+where a checkout stands. Provider-specific code stays in `src/lib/payments/`. Keys are set under
+Settings > Connections or as environment variables, never in settings (settings sync between copies; see
+Connections): `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
 `SQUARE_ACCESS_TOKEN`, `SQUARE_LOCATION_ID`, `SQUARE_ENVIRONMENT`, `SQUARE_WEBHOOK_SIGNATURE_KEY`,
 `SQUARE_WEBHOOK_URL` (`.env.example`). The email builder's **Payment** block (`paymentTable` in
 `src/lib/forms/email.ts`, offered by a kit's `payment`) shows a payment's items, total, status,
@@ -900,7 +902,8 @@ never subscribes anyone again); the settings are, with the others. Migration `*_
   complaint and bounce rates that pause sending, and **Subscriber fields** (`fields`, `ContactField`:
   label, key from it, type text, number, date or choice with options; `cleanFields` leaves out keys that
   are built-in tags, `RESERVED_FIELD_KEYS`; a saved field keeps its key).
-- **Mailgun** (`src/lib/mailing/mailgun.ts`, REST, no SDK; keys in the environment, never settings):
+- **Mailgun** (`src/lib/mailing/mailgun.ts`, REST, no SDK; keys under Settings > Connections or in the
+  environment, never in settings):
   `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `MAILGUN_REGION` (`us`, default, or `eu`),
   `MAILGUN_WEBHOOK_SIGNING_KEY`, `MAILGUN_TEST_MODE` (`o:testmode`; Mailgun accepts and delivers nothing),
   `MAILGUN_API_BASE` (a stand-in server, for tests). Without keys a batch goes, one address at a time,
@@ -1258,6 +1261,31 @@ only add; one that switches block types or settings goes out with `npm run deplo
   `site-noindex` integration adds to the built `_headers` when `wrangler.jsonc`'s `vars` (or the build's
   environment) set it, so set it there, not only in the dashboard. Cached pages keep the header they were
   cached with until they refresh: after changing it, clear the page cache (any admin save does).
+
+### Connections
+
+Settings > Connections (admins; `src/admin/Connections.tsx`, GET and POST `/api/admin/connections`)
+keeps the keys for Claude, Stripe, Square and Mailgun (`SERVICES` in `src/lib/site-keys.ts`), so an admin
+sets a service up by pasting one key. `connect` (`src/lib/connections.ts`) checks it with the service and
+sets the service up: Stripe's webhook endpoint made afresh at `/api/payments/stripe` (an old one at that
+address deleted; its signing secret kept), Square's environment found from the token, its location
+(chosen when there are several) and a webhook subscription (signature key and address kept), Mailgun's
+region found from the key, its sending domain (chosen when there are several), its webhooks
+(`MAILGUN_EVENTS`, an existing one moved to this site) and signing key. Webhooks need the site's public
+address (`SITE_URL`, else the request's; `publicOrigin`): a local copy saves the keys and says so.
+Stripe's and Mailgun's signing secrets can be entered by hand.
+
+- Kept in `site_keys` (migration `*_site_keys.sql`), each value AES-GCM encrypted with its name as
+  associated data, under a key made from `AUTH_SECRET` by HKDF (`seal`, `unseal`): a database export or
+  leaked backup holds nothing usable, and changing `AUTH_SECRET` makes them unreadable (the screen asks
+  for them again). The table is in no role's policies, isn't synced, backed up or restored.
+- Write-only: the screen shows a secret's last 4 characters (`hint`) and plain settings (location,
+  domain, region) as they are, with who saved them and when (`keyStatus`), never a secret's value.
+- `env()` (`src/lib/env.ts`) reads the environment first (`hostEnv`), then the saved keys, which the
+  middleware, scheduled runs and jobs load at most once a minute per instance (`refreshSavedKeys`); a
+  key the host sets is shown as such and can't be saved over.
+- Stripe, Square and Mailgun keys (`guarded`) need the admin's password again (`checkPassword`, its
+  failures counted as failed sign-ins), and every connect or disconnect is emailed to every admin.
 
 Files need an R2 bucket (`npx wrangler r2 bucket create`, its name in `wrangler.jsonc`; Media). Accounts need `AUTH_SECRET` (a long random value; changing it signs everyone out
 and breaks links already sent) and links in emails use the request's address (`SITE_URL` for Better

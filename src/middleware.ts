@@ -4,6 +4,7 @@ import { defineMiddleware } from 'astro:middleware';
 import { sessionDb, siteDb } from './lib/db/site';
 import { isSessionCookie, refreshedCookies, sessionUser } from './lib/auth';
 import { refreshSiteTimezone } from './lib/site/timezone';
+import { refreshSavedKeys } from './lib/site-keys';
 import { changesPages, PAGE_CACHE_TAG } from './lib/cache';
 import { AUTOSAVE } from './lib/admin/revisions';
 import { env } from './lib/env';
@@ -11,7 +12,7 @@ import { env } from './lib/env';
 import './lib/mailing/page-data';
 
 const PUBLIC_ADMIN = ['/admin/login/', '/admin/set-password/', '/api/auth/login', '/api/auth/logout'];
-const ADMIN_ONLY = ['/admin/settings', '/admin/users', '/admin/members', '/api/admin/redirects', '/api/admin/settings', '/api/admin/sync', '/api/admin/users', '/api/admin/members', '/api/admin/mailing/contacts', '/api/admin/mailing/lists'];
+const ADMIN_ONLY = ['/admin/settings', '/api/admin/connections', '/admin/users', '/admin/members', '/api/admin/redirects', '/api/admin/settings', '/api/admin/sync', '/api/admin/users', '/api/admin/members', '/api/admin/mailing/contacts', '/api/admin/mailing/lists'];
 
 // Astro's own same-site check (security.checkOrigin) is off in astro.config.mjs and done here instead, the
 // same way, so that these routes can be posted to from elsewhere: mail apps' one-click unsubscribe
@@ -106,6 +107,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
     return new Response(`Cross-site ${context.request.method} form submissions are forbidden`, { status: 403 });
   }
   await refreshSiteTimezone();
+  await refreshSavedKeys();
   // The other copy's queries during a sync (signed; the route checks them) clear the pages as edits do.
   if (pathname === '/api/sync/remote') return purgeAfter(context, next);
   const isAdmin = pathname.startsWith('/admin') || pathname.startsWith('/api/admin');

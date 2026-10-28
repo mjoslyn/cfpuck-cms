@@ -82,10 +82,30 @@ The Worker does the background work itself (`src/worker.ts`):
 | Mailing: scheduled campaigns, weekly digest issues, issues not approved in time | Every 5 minutes |
 | Mailing: Mailgun's bounces, complaints and unsubscribes; pruning | Nightly at 06:20 UTC |
 
+## Connections
+
+Claude, Stripe, Square and Mailgun can be set up by an admin on the deployed site, under **Settings >
+Connections**, with no environment variables: paste the service's key and click **Connect**. The site
+checks the key with the service and sets the rest up itself:
+
+- **Stripe**: makes its webhook at `/api/payments/stripe` and keeps its signing secret.
+- **Square**: finds whether the token is for production or the sandbox and which location takes
+  payments (asking when there are several), and makes its webhook subscription.
+- **Mailgun**: finds the account's region and sending domain (asking when there are several), adds its
+  webhooks and reads its signing key.
+
+Webhooks need the site's public address, so connect on the live site (`SITE_URL`), not a local copy.
+
+Keys are encrypted in the database with a key made from `AUTH_SECRET`, readable by no admin or editor,
+and never synced or backed up. Admins see only their last 4 characters. Payment and Mailgun keys ask for
+the admin's password again, and every change is emailed to all admins. Changing `AUTH_SECRET` makes
+saved keys unreadable: enter them again. A key set as an environment variable wins and can't be changed
+on the screen, for a site whose keys should stay with the Cloudflare account.
+
 ## Payments
 
-To take payments on forms or tickets, set one provider's keys and add its webhook. One endpoint per
-provider serves both:
+To take payments on forms or tickets, connect one provider under Settings > Connections (above), or set
+its keys and add its webhook by hand. One endpoint per provider serves both:
 
 - **Stripe**: `https://<your-domain>/api/payments/stripe`, with the `checkout.session.*`,
   `charge.refunded` and `charge.refund.updated` events; its signing secret is
@@ -100,7 +120,9 @@ Free tickets need no provider. See [Tickets](../../features/tickets/) and
 
 ## Mailing
 
-To send [Mailing](../../features/mailing/) campaigns and digests, set up Mailgun:
+To send [Mailing](../../features/mailing/) campaigns and digests, set up Mailgun (its key, domain,
+region and webhooks can be connected under Settings > Connections, above, in place of the last two
+points' webhook and variables):
 
 - Add a **sending domain for marketing**, a subdomain such as `news.<your-domain>`, separate from
   the domain the site's other mail uses, so its reputation stays its own.
@@ -138,13 +160,13 @@ Admins invite editors from `/admin/users/`. See [Editor and roles](../../feature
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE` or `SMTP_URL` | Outgoing mail over SMTP, when the Worker has no `EMAIL` binding (Cloudflare Email Service) |
 | `MAIL_FROM` | Sender, overriding the config's `mailFrom` |
 | `FORMS_ADMIN_EMAIL` | Where form notifications go when a form doesn't say |
-| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Stripe payments |
-| `SQUARE_ACCESS_TOKEN`, `SQUARE_LOCATION_ID`, `SQUARE_ENVIRONMENT`, `SQUARE_WEBHOOK_SIGNATURE_KEY`, `SQUARE_WEBHOOK_URL` | Square payments |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Stripe payments (or Settings > Connections) |
+| `SQUARE_ACCESS_TOKEN`, `SQUARE_LOCATION_ID`, `SQUARE_ENVIRONMENT`, `SQUARE_WEBHOOK_SIGNATURE_KEY`, `SQUARE_WEBHOOK_URL` | Square payments (or Settings > Connections) |
 | `TICKETS_NOTIFY_EMAIL` | Where the copy of each ticket order goes (default `FORMS_ADMIN_EMAIL`, then `adminEmail`) |
 | `SITE_URL` | The site's address for links in emails (default the request's address). Required for Mailing: campaigns and digests are sent without a request |
 | `SITE_NOINDEX` | `1` or `true` on a demo or preview copy: every answer, static files included, tells search engines to stay away (`X-Robots-Tag: noindex`). Set it in `wrangler.jsonc` `vars`, which the build reads for static files. After changing it, save anything in the admin to clear the cached pages |
-| `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | Compose (`ANTHROPIC_MODEL` overrides the default model, `claude-sonnet-5-5`) |
+| `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | Compose and Write with Claude (the key, or Settings > Connections; `ANTHROPIC_MODEL` overrides the default model, `claude-sonnet-5-5`) |
 | `ANTHROPIC_SEO_MODEL` | SEO text generation (default Haiku 4.5) |
-| `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `MAILGUN_REGION`, `MAILGUN_WEBHOOK_SIGNING_KEY`, `MAILGUN_TEST_MODE` | Mailing through Mailgun |
+| `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `MAILGUN_REGION`, `MAILGUN_WEBHOOK_SIGNING_KEY`, `MAILGUN_TEST_MODE` | Mailing through Mailgun (or Settings > Connections, but for test mode) |
 | `MAIL_LINK_SECRET` | The key for signed links in mailing emails (default: one made from `AUTH_SECRET`) |
 | `LOCAL_ADMIN_EMAIL`, `LOCAL_ADMIN_PASSWORD` | The admin the e2e scripts sign in as |

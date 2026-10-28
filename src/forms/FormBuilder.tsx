@@ -924,7 +924,7 @@ export default function FormBuilder({ formId }: { formId: number }) {
               {payment && ready.length === 1 && <p className="mb-3 text-xs text-admin-muted">Payments go through {providerLabel(ready[0])}.</p>}
               {payment && providers && !ready.length && (
                 <p className="mb-3 rounded bg-[#fef3f2] p-2 text-xs text-[#b42318]">
-                  No payment provider is set up: Stripe needs {providers.stripe.missing.join(' and ')}, Square needs {providers.square.missing.join(' and ')} in the site's environment. Until then the form refuses submissions that have something to pay.
+                  No payment provider is set up: an admin connects Stripe or Square under Settings &gt; Connections. Until then the form refuses submissions that have something to pay.
                 </p>
               )}
               {payment && (

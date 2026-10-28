@@ -1,6 +1,6 @@
 // Site settings island, in tabs: General (name, tagline, front page), Types (the templates for
 // each type's pages and listing), Search (the types it covers), Social (profile links, default share
-// image), Events (on or off, the default time zone), Tickets (payments and ticket emails; while events are on), Members, Mailing (lists, sender, tracking), Accessibility (checking pages before they are published), Admin (the admin's colors and logo), Redirects (saved as they are added, with the Not found log), Sync (with another copy of the
+// image), Events (on or off, the default time zone), Tickets (payments and ticket emails; while events are on), Members, Mailing (lists, sender, tracking), Accessibility (checking pages before they are published), Admin (the admin's colors and logo), Connections (keys for Claude, Stripe, Square and Mailgun, src/admin/Connections.tsx), Redirects (saved as they are added, with the Not found log), Sync (with another copy of the
 // site), Backups (snapshots and sync backups) and the site's own options. One Save for all;
 // the tab is in the URL (#search), and leaving with unsaved changes asks first.
 import type { PaymentProvider, ProviderStatus } from '../lib/payments';
@@ -13,6 +13,7 @@ import { FieldGroup, MediaPicker, Row, Select, Text, Toggle, inputClass } from '
 import { NETWORKS } from '../lib/social/icons';
 import Redirects, { type NotFound } from '../admin/Redirects';
 import Sync from '../admin/Sync';
+import Connections from '../admin/Connections';
 import BackupsTab from '../admin/Backups';
 import TicketSettingsPanel from '../admin/TicketSettings';
 import MemberSettingsPanel from '../admin/MemberSettings';
@@ -276,6 +277,7 @@ export default function SiteSettings({ site: initialSite, options: initialOption
       label: 'Admin',
       panel: <AdminThemePanel value={site.admin_theme ?? {}} onChange={(t) => setSite((s) => ({ ...s, admin_theme: Object.keys(t).length ? t : undefined }))} />,
     },
+    { id: 'connections', label: 'Connections', panel: <Connections /> },
     { id: 'redirects', label: 'Redirects', panel: <Redirects initial={redirects} notFound={notFound} /> },
     { id: 'sync', label: 'Sync', panel: <Sync /> },
     { id: 'backups', label: 'Backups', panel: <BackupsTab /> },
@@ -328,8 +330,8 @@ export default function SiteSettings({ site: initialSite, options: initialOption
           <p className="text-xs text-admin-muted" role="status">
             {status || (dirty ? 'Unsaved changes' : '')}
           </p>
-          {/* Redirects, Sync and Backups save as they go; Save covers the other tabs. */}
-          {(!['redirects', 'sync', 'backups'].includes(current.id) || dirty) && (
+          {/* Connections, Redirects, Sync and Backups save as they go; Save covers the other tabs. */}
+          {(!['connections', 'redirects', 'sync', 'backups'].includes(current.id) || dirty) && (
             <button type="button" onClick={save} className="rounded-sm bg-admin-ink px-4 py-2 text-xs font-semibold tracking-wider text-white uppercase hover:bg-admin-accent">
               Save settings
             </button>
@@ -337,7 +339,7 @@ export default function SiteSettings({ site: initialSite, options: initialOption
         </div>
       </div>
       {tabs.map((t) => (
-        <section key={t.id} role="tabpanel" id={`settings-panel-${t.id}`} aria-labelledby={`settings-tab-${t.id}`} tabIndex={0} hidden={t.id !== current.id} className={['redirects', 'sync', 'backups'].includes(t.id) ? 'max-w-5xl' : t.id === 'site' || t.id === 'types' || t.id === 'tickets' ? 'max-w-3xl' : 'max-w-md'}>
+        <section key={t.id} role="tabpanel" id={`settings-panel-${t.id}`} aria-labelledby={`settings-tab-${t.id}`} tabIndex={0} hidden={t.id !== current.id} className={['redirects', 'sync', 'backups'].includes(t.id) ? 'max-w-5xl' : t.id === 'site' || t.id === 'types' || t.id === 'tickets' || t.id === 'connections' ? 'max-w-3xl' : 'max-w-md'}>
           {t.panel}
         </section>
       ))}

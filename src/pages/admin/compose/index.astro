@@ -21,7 +21,7 @@ const lastAsk = (turns: any[]) => [...(turns ?? [])].reverse().find((t) => t.rol
       <p class="mt-1 mb-4 text-sm text-admin-muted">
         Describe the page and add what it should draw on. Claude builds a draft in the site's style; keep talking to it here or in the page editor to change it.
       </p>
-      {!configured && <p class="mb-4 rounded bg-[#c4592a]/10 px-3 py-2 text-sm text-[#c4592a]">Add your Anthropic API key to .env (ANTHROPIC_API_KEY=...) and restart the dev server to compose pages.</p>}
+      {!configured && <p class="mb-4 rounded bg-admin-soft px-3 py-2 text-sm text-admin-ink">Claude isn't connected yet: an admin adds its key under <a class="underline" href="/admin/settings/#connections">Settings &gt; Connections</a>.</p>}
       <div class="h-[70vh] min-h-[480px] overflow-hidden rounded-lg border border-admin-ink/10 bg-white">
         <Composer client:only="react" />
       </div>

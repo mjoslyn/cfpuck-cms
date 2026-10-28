@@ -145,8 +145,11 @@ payment's status, items and payment id, and the CSV export has payment columns.
 
 ### Setting up the providers
 
-Keys are environment variables, never settings, so a local copy can't charge with production's keys.
-Forms and tickets share them, and one webhook per provider serves both.
+An admin connects Stripe or Square under **Settings > Connections** by pasting the secret key or access
+token: the site checks it, makes its own webhook and keeps the signing secret (see
+[Hosting](../../start/hosting/#connections)). The keys can also be environment variables, which win.
+Either way they are never settings, so a local copy can't charge with production's keys. Forms and
+tickets share them, and one webhook per provider serves both.
 
 | Variable | |
 | --- | --- |

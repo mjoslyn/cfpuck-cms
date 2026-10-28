@@ -36,7 +36,7 @@ export default function TicketSettingsPanel({ value, providers, onChange }: { va
       {ready.length === 1 && <p className="mb-3 text-xs text-admin-muted">Payments go through {label(ready[0])}.</p>}
       {!ready.length && (
         <p className="mb-3 rounded bg-admin-soft p-2 text-xs text-admin-muted">
-          To sell paid tickets, set up Stripe ({providers.stripe.missing.join(' and ')}) or Square ({providers.square.missing.join(' and ')}) in the site's environment.
+          To sell paid tickets, connect Stripe or Square under <a className="underline" href="/admin/settings/#connections">Settings &gt; Connections</a>.
         </p>
       )}
       {provider && (

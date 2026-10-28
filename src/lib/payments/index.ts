@@ -1,7 +1,7 @@
 // Payments for forms (src/lib/forms/checkout.ts) and tickets (src/lib/tickets/orders.ts): Stripe Checkout
 // and Square payment links. Both are hosted checkouts: the visitor pays on the provider's page and comes
 // back, so no card details reach the site. One webhook address per provider serves both
-// (/api/payments/<provider>). Keys are environment variables (.env.example), never settings: settings are
+// (/api/payments/<provider>). Keys are saved under Settings > Connections or set as environment variables (src/lib/site-keys.ts), never settings: settings are
 // synced between copies of the site, and a local copy must not charge with production's keys.
 import { env, type Provider } from './common';
 import * as stripe from './stripe';

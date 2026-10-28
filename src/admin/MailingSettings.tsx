@@ -45,7 +45,7 @@ export default function MailingSettingsPanel({ value, mailgun, lists, membersOn,
               Sending through Mailgun from <strong>{mailgun.domain}</strong> ({mailgun.region.toUpperCase()}){mailgun.testMode ? ', in test mode: Mailgun accepts emails and delivers none' : ''}.
             </p>
           ) : (
-            <p className="mb-3 rounded bg-admin-soft p-2 text-xs text-admin-muted">Mailgun isn't set up, so nothing goes out (locally, emails go to the mail catcher). Set {mailgun.missing.filter((k) => k !== 'MAILGUN_WEBHOOK_SIGNING_KEY').join(' and ')} in the site's environment.</p>
+            <p className="mb-3 rounded bg-admin-soft p-2 text-xs text-admin-muted">Mailgun isn't set up, so nothing goes out (locally, emails go to the mail catcher). Connect it under <a className="underline" href="/admin/settings/#connections">Settings &gt; Connections</a>.</p>
           )}
           {mailgun.configured && !mailgun.webhooks && <p className="mb-3 rounded bg-admin-soft p-2 text-xs text-admin-muted">Without MAILGUN_WEBHOOK_SIGNING_KEY, deliveries, opens, bounces and complaints aren't recorded.</p>}
           <p className="-mt-1 mb-3 text-xs text-admin-muted">

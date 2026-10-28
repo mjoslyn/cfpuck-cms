@@ -7,7 +7,7 @@ import { env as readEnv } from '../env';
 export const env = (k: string) => (readEnv(k) || '').trim();
 
 /** The message when no key is set. */
-export const NO_KEY = 'ANTHROPIC_API_KEY is not set on the server.';
+export const NO_KEY = 'Claude isn’t connected: an admin adds its key under Settings > Connections.';
 
 /** A client with the site's key, or null without one. */
 export function claudeClient(): Anthropic | null {

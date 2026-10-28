@@ -262,7 +262,23 @@ export async function changePassword(request: Request, current: string, password
   return { ok: true };
 }
 
-/** Delete an account: its sessions, sign-in methods, profile and membership go with it. */
+/**
+ * The signed-in person's password, asked again before something sensitive (Settings > Connections): its
+ * failures count as failed sign-ins.
+ */
+export async function checkPassword(request: Request, password: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const s = hasSession(request) ? await auth().api.getSession({ headers: request.headers }).catch(() => null) : null;
+  if (!s?.user) return { ok: false, error: 'Sign in again first.' };
+  if (await overLimit('sign-in', s.user.email, request)) return { ok: false, error: TOO_MANY };
+  const account = await (await context()).internalAdapter.findCredentialAccount(s.user.id);
+  if (!account?.password || !(await (await context()).password.verify({ hash: account.password, password }))) {
+    await recordAttempt('sign-in', s.user.email, request);
+    return { ok: false, error: 'That password isn’t right.' };
+  }
+  return { ok: true };
+}
+
+/** Delete an account:  its sessions, sign-in methods, profile and membership go with it. */
 export async function deleteUser(id: string): Promise<void> {
   const ctx = await context();
   await ctx.internalAdapter.deleteUser(id);

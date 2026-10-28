@@ -14,7 +14,7 @@ using it shares; builds add or replace its sections and a selected block or sect
 place, kept with **Save & apply**. A template's conversation is kept with it
 (`compose_sessions.template`), never creates a draft page, and has no field updates.
 
-Needs `ANTHROPIC_API_KEY`. `ANTHROPIC_MODEL` overrides the model (default `claude-sonnet-5-5`).
+Needs Claude connected under Settings > Connections, or `ANTHROPIC_API_KEY`. `ANTHROPIC_MODEL` overrides the model (default `claude-sonnet-5-5`).
 
 ## Conversations
 

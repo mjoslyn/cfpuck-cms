@@ -65,8 +65,8 @@ Wrangler (Cloudflare's CLI) is a dev dependency, so `npx wrangler` needs no inst
 
 ### Compose
 
-Set `ANTHROPIC_API_KEY`, and optionally `ANTHROPIC_MODEL` (default `claude-sonnet-5-5`). Restart the
-dev server after setting it. See [Compose](../../features/compose/).
+Connect Claude under Settings > Connections, or set `ANTHROPIC_API_KEY` (and optionally
+`ANTHROPIC_MODEL`, default `claude-sonnet-5-5`) and restart the dev server. See [Compose](../../features/compose/).
 
 ### Email
 

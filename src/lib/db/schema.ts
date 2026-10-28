@@ -255,6 +255,14 @@ export const SCHEMA: Record<string, TableSchema> = {
     defaults: {},
     touch: true,
   },
+  site_keys: {
+    pk: ["name"],
+    columns: {"name":"text","value":"text","hint":"text","updated_by":"text","updated_at":"timestamptz"},
+    generated: [],
+    fks: [],
+    defaults: {"hint":""},
+    touch: true,
+  },
   sync_nonces: {
     pk: ["nonce"],
     columns: {"nonce":"text","at":"int8"},
