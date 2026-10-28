@@ -1,4 +1,5 @@
 import type { APIRoute } from 'astro';
+import type { Db } from '../../../lib/db/query';
 import { duplicateTemplate, entryFromTemplate } from '../../../lib/admin/duplicate';
 import { uniqueAreas } from '../../../lib/content/areas';
 import { slugify } from '../../../lib/slug';
@@ -12,6 +13,17 @@ import { deleteTemplate, restoreTemplate, templateUses, trashTemplate } from '..
  * action=make-page { type, title, keep }, make a draft entry of its blocks and open that; with
  * action=restore or delete, take it out of the trash or delete it for good.
  */
+
+/** The first address of a kind no template has (trashed ones included), from a name. */
+async function freeSlug(db: Db, kind: string, title: string): Promise<string> {
+  const base = slugify(title) || kind;
+  const { data: same } = await db.from('templates').select('slug').eq('kind', kind).like('slug', `${base}%`);
+  const used = new Set((same ?? []).map((r) => r.slug));
+  let slug = base;
+  for (let n = 2; used.has(slug); n++) slug = `${base}-${n}`;
+  return slug;
+}
+
 export const POST: APIRoute = async ({ request, locals, redirect }) => {
   // JSON from the editor and the templates list.
   if (request.headers.get('content-type')?.includes('application/json')) {
@@ -38,14 +50,18 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
         return new Response((e as Error).message, { status: 400 });
       }
     }
-    // Save as pattern: { action: 'create-pattern', title, linked, content } -> { slug }.
     const title = String(body.title ?? '').trim().slice(0, 120);
+    // An empty template, part or pattern, to build with Compose: { action: 'create', kind, title } -> { slug }.
+    if (body.action === 'create') {
+      if (!['template', 'part', 'pattern'].includes(body.kind) || !title) return new Response('Bad request', { status: 400 });
+      const slug = await freeSlug(locals.db, body.kind, title);
+      const { error } = await locals.db.from('templates').insert({ kind: body.kind, slug, title, content: { root: { props: {} }, content: [], zones: {} } });
+      if (error) return new Response(error.message, { status: 400 });
+      return Response.json({ slug });
+    }
+    // Save as pattern: { action: 'create-pattern', title, linked, content } -> { slug }.
     if (body.action !== 'create-pattern' || !title || !Array.isArray(body.content) || !body.content.length) return new Response('Bad request', { status: 400 });
-    const base = slugify(title) || 'pattern';
-    const { data: same } = await locals.db.from('templates').select('slug').eq('kind', 'pattern').like('slug', `${base}%`);
-    const used = new Set((same ?? []).map((r) => r.slug));
-    let slug = base;
-    for (let n = 2; used.has(slug); n++) slug = `${base}-${n}`;
+    const slug = await freeSlug(locals.db, 'pattern', title);
     const content = { root: { props: body.linked ? { linked: true } : {} }, content: body.content, zones: {} };
     const { error } = await locals.db.from('templates').insert({ kind: 'pattern', slug, title, content });
     if (error) return new Response(error.message, { status: 400 });

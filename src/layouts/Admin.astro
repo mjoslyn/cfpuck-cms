@@ -1,5 +1,5 @@
 ---
-import { CONTENT_TYPES, SITE_TZ, site } from '../lib/site';
+import { COMPOSABLE_TYPES, CONTENT_TYPES, SITE_TZ, site } from '../lib/site';
 import AdminTheme from './AdminTheme.astro';
 import { loadAdminTheme } from '../lib/admin-theme';
 import { siteDb } from '../lib/db/site';
@@ -27,7 +27,8 @@ const membersOn = isAdmin && memberSettings(siteSettings).enabled;
 const ticketsOn = eventsOn(siteSettings);
 const mailOn = mailingOn(siteSettings);
 const types = CONTENT_TYPES.filter((c) => showsType(c.type, ticketsOn)).map((c) => ({ type: c.type, label: c.label }));
-const nav = adminNav({ isAdmin, ticketsOn, mailOn, membersOn, types });
+const composable = COMPOSABLE_TYPES.filter((c) => showsType(c.type, ticketsOn)).map((c) => ({ type: c.type, singular: c.singular }));
+const nav = adminNav({ isAdmin, ticketsOn, mailOn, membersOn, types, composable });
 const url = Astro.url;
 const inSettings = path.startsWith('/admin/settings');
 const link = (on: boolean) => (on ? 'bg-admin-on-bar/15 text-admin-on-bar' : 'text-admin-on-bar/65 hover:bg-admin-on-bar/10 hover:text-admin-on-bar');

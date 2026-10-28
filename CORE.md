@@ -1118,7 +1118,11 @@ screens' "Invited" rows and Resend invitation.
 
 The admin bar (`src/layouts/Admin.astro`, its items from `adminNav` in `src/lib/admin/nav.ts`): a **Content**
 dropdown (each type shown, its list at `/admin/?type=<type>`, then Taxonomies, then Templates in a section
-of its own, `section`; the content list has no tabs of its own for the types), Media, a **Forms** dropdown (Forms, Submissions) and a **People** dropdown (Users and Members
+of its own, `section`; the content list has no tabs of its own for the types), a **Compose** dropdown
+(each type with a page, at `/admin/compose/?type=<type>`; then Form; then Template, Template part and
+Pattern, which `/admin/compose/new/?kind=` names and makes empty, a form through `/api/admin/forms` and the
+others with `/api/admin/templates` `action: 'create'`, opening the form builder or the editor with `?compose`
+so Compose opens at once), Media, a **Forms** dropdown (Forms, Submissions) and a **People** dropdown (Users and Members
 for admins, Mailing Lists and Tickets, each while its feature is on; a group of one shows as its link),
 then a gear for Settings (admins), **?**, View site and the account menu. Below 1024px it all sits behind
 one menu button, the groups as headings. The dropdowns are `details[data-menu]`: one open at a time, closed

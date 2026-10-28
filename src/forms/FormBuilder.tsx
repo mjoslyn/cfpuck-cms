@@ -571,6 +571,13 @@ export default function FormBuilder({ formId }: { formId: number }) {
       r.notifications = r.notifications ?? [];
       setRow(r);
       setSaved(JSON.stringify(r));
+      // Opened from the admin bar's Compose menu (?compose): Compose opens on the whole form.
+      const url = new URL(location.href);
+      if (url.searchParams.has('compose')) {
+        setComposing(r.definition.fields.length ? ['fields'] : ['fields', 'confirmation', 'notifications']);
+        url.searchParams.delete('compose');
+        history.replaceState(null, '', url);
+      }
       const [{ data: p }, { count }] = await Promise.all([
         db.from('entries').select('id, title, status').eq('type', 'page').in('status', ['publish', 'draft']).order('title'),
         db.from('form_submissions').select('id', { count: 'exact', head: true }).eq('form_id', formId),

@@ -7,6 +7,11 @@ sidebar:
 
 Compose writes pages with Claude from the documents, images and links an editor adds. It is at
 `/admin/compose/` and in the page editor as a panel docked beside the canvas (pin keeps it open).
+The admin bar's **Compose** menu lists everything it makes: each type with a page
+(`/admin/compose/?type=<type>`), and a form, template, template part or pattern
+(`/admin/compose/new/?kind=<kind>`: named, made empty, then opened in the form builder or the editor
+with Compose open). The same name is on every Claude button: a term's, a taxonomy's or listing's SEO,
+an excerpt, an entry's SEO, an image's alt text and the form builder's.
 
 The panel is also there for layouts: a page edited in layout mode (its template is what it shows) and
 a template, part or pattern edited on its own. Claude is told it is working on a layout every page

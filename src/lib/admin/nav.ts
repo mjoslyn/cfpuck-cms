@@ -22,9 +22,11 @@ export const contentHref = (type: string) => `/admin/?type=${type}`;
 
 /**
  * What the bar offers this person: Content's types (those shown, `types`), Taxonomies and, in a section
- * of its own, Templates; optional features only while they are on; admin screens to admins.
+ * of its own, Templates; Compose, for each thing it makes (an entry of a type with a page, `composable`,
+ * then a form, then a template, part or pattern); optional features only while they are on; admin
+ * screens to admins.
  */
-export function adminNav(o: { isAdmin: boolean; ticketsOn: boolean; mailOn: boolean; membersOn: boolean; types: { type: string; label: string }[] }): NavItem[] {
+export function adminNav(o: { isAdmin: boolean; ticketsOn: boolean; mailOn: boolean; membersOn: boolean; types: { type: string; label: string }[]; composable: { type: string; singular: string }[] }): NavItem[] {
   const people: NavLink[] = [
     ...(o.isAdmin ? [{ href: '/admin/users/', label: 'Users' }] : []),
     ...(o.isAdmin && o.membersOn ? [{ href: '/admin/members/', label: 'Members' }] : []),
@@ -36,21 +38,30 @@ export function adminNav(o: { isAdmin: boolean; ticketsOn: boolean; mailOn: bool
     { label: 'People', items: people },
   ];
   return [
-    { label: 'Content', items: [...o.types.map((t) => ({ href: contentHref(t.type), label: t.label })), { href: contentHref('terms'), label: 'Taxonomies' }, { href: '/admin/templates/', label: 'Templates', section: true }], also: ['/admin/content', '/admin/compose', '/admin/edit'] },
+    { label: 'Content', items: [...o.types.map((t) => ({ href: contentHref(t.type), label: t.label })), { href: contentHref('terms'), label: 'Taxonomies' }, { href: '/admin/templates/', label: 'Templates', section: true }], also: ['/admin/content', '/admin/edit'] },
+    {
+      label: 'Compose',
+      items: [
+        ...o.composable.map((t) => ({ href: `/admin/compose/?type=${t.type}`, label: t.singular })),
+        { href: '/admin/compose/new/?kind=form', label: 'Form', section: true },
+        { href: '/admin/compose/new/?kind=template', label: 'Template', section: true },
+        { href: '/admin/compose/new/?kind=part', label: 'Template part' },
+        { href: '/admin/compose/new/?kind=pattern', label: 'Pattern' },
+      ],
+    },
     { href: '/admin/media/', label: 'Media' },
     // A group of one is just its link.
     ...groups.filter((g) => g.items.length).map((g) => (g.items.length === 1 ? g.items[0] : g)),
   ];
 }
 
-/** Whether the screen at `url` is the link's (a content list by its type; `page` when none is named). */
+/** Whether the screen at `url` is the link's: a link with a query matches its address and query (a type
+ * `page` when none is named, as the content list and Compose take it). */
 export function navActive(n: NavItem, url: URL): boolean {
   const path = url.pathname;
   if (isGroup(n)) return n.items.some((i) => navActive(i, url)) || !!n.also?.some((p) => path.startsWith(p));
   const href = new URL(n.href, url);
-  if (n.href.startsWith('/admin/?')) {
-    const type = (t: string | null) => (t === 'tags' ? 'terms' : t || 'page');
-    return path === '/admin/' && type(url.searchParams.get('type')) === type(href.searchParams.get('type'));
-  }
-  return path.startsWith(href.pathname);
+  if (!href.search) return path.startsWith(href.pathname);
+  const value = (k: string, v: string | null) => (k === 'type' ? (v === 'tags' ? 'terms' : v || 'page') : v);
+  return path === href.pathname && [...href.searchParams].every(([k, v]) => value(k, url.searchParams.get(k)) === value(k, v));
 }

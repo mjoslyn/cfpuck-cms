@@ -11,19 +11,27 @@ plain words, as you would ask a colleague. Nothing goes on your site until you p
 
 ## Starting a new page
 
-1. Click **Content**, then the tab for what you want (for example **Posts**).
-2. Click **Compose** (beside the **New** button).
-3. Add your material:
+1. Click **Compose** in the top bar, then what you want to make (for example **Post**). Or click
+   **Compose** beside the **New** button on any list in **Content**.
+2. Add your material:
    - **Files**: documents (PDF, Word, text) and images or videos from your computer.
    - **Media library**: images already on the site.
    - **Link**: a web address to read, or a YouTube or Vimeo video.
-4. In the box, say what you want, for example: "A post announcing the farmers market opening on
+3. In the box, say what you want, for example: "A post announcing the farmers market opening on
    May 4th, from the attached flyer. Keep it short and friendly."
-5. Check **Create as** shows the right kind of content, then click **Send**.
+4. Check **Create as** shows the right kind of content, then click **Send**.
 
 ![Starting a page with Compose](../../../assets/guide/compose.png)
 
 It takes a minute or two. When it is done, the new page opens as a draft in the editor.
+
+## Forms, templates and patterns
+
+The **Compose** menu also makes a **Form**, a **Template**, a **Template part** (such as a header or
+footer) or a **Pattern**. Choose one, give it a name and click **Start**: it opens with Compose ready.
+Say what it is for (for example "A volunteer sign-up form with availability by weekday") and click
+**Send**. A form's questions, thank-you message and emails are written for you to check and **Save**;
+a template, part or pattern is built in the editor, kept with **Save & apply**.
 
 ## Asking for changes
 

@@ -1,0 +1,49 @@
+---
+// The admin bar's Compose menu, for what isn't an entry: name a new form, template, template part or
+// pattern; it is made empty and opens with Compose (the form builder's, or the editor's panel).
+import Admin from '../../../layouts/Admin.astro';
+import { env } from '../../../lib/compose/claude';
+
+const KINDS: Record<string, { label: string; note: string; placeholder: string }> = {
+  form: { label: 'form', note: 'Say what the form is for and Compose writes its questions, thank-you message and emails.', placeholder: 'Volunteer sign-up' },
+  template: { label: 'template', note: 'A page layout. Compose builds it in the editor; choose it for pages under Settings > Types or on a page.', placeholder: 'Event with sidebar' },
+  part: { label: 'template part', note: 'A shared section such as a header or footer, placed in templates with the Part block.', placeholder: 'Holiday banner' },
+  pattern: { label: 'pattern', note: 'A reusable group of blocks, inserted from the Patterns tab in the editor.', placeholder: 'Team members grid' },
+};
+const kind = Astro.url.searchParams.get('kind') ?? '';
+const k = KINDS[kind];
+if (!k) return Astro.redirect('/admin/compose/');
+const configured = !!env('ANTHROPIC_API_KEY');
+---
+<Admin title={`Compose a ${k.label}`}>
+  <h1 class="text-3xl font-normal">Compose a {k.label}</h1>
+  <p class="mt-1 mb-6 max-w-xl text-sm text-admin-muted">{k.note}</p>
+  {!configured && <p class="mb-4 max-w-xl rounded bg-admin-soft px-3 py-2 text-sm text-admin-ink">Claude isn't connected yet: an admin adds its key under <a class="underline" href="/admin/settings/connections/">Settings &gt; Connections</a>.</p>}
+  <form id="compose-new" data-kind={kind} class="flex max-w-xl items-end gap-2">
+    <label class="flex-1">
+      <span class="mb-1 block text-xs font-medium text-admin-muted">Name</span>
+      <input name="title" required maxlength="120" placeholder={k.placeholder} class="w-full rounded border border-admin-ink/15 bg-white px-3 py-2 text-sm outline-none focus:border-admin-accent" />
+    </label>
+    <button class="rounded-sm bg-admin-ink px-4 py-2.5 text-xs font-semibold tracking-wider text-white uppercase hover:bg-admin-accent">Start</button>
+  </form>
+  <p id="compose-new-error" class="mt-3 text-sm text-[#b3261e]" role="alert"></p>
+</Admin>
+
+<script>
+  const form = document.getElementById('compose-new') as HTMLFormElement;
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const kind = form.dataset.kind!;
+    const title = String(new FormData(form).get('title') ?? '').trim();
+    const button = form.querySelector('button')!;
+    button.disabled = true;
+    const say = (t: string) => ((document.getElementById('compose-new-error')!.textContent = t), (button.disabled = false));
+    const res =
+      kind === 'form'
+        ? await fetch('/api/admin/forms/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }) })
+        : await fetch('/api/admin/templates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'create', kind, title }) });
+    if (!res.ok) return say(`It couldn't be made: ${await res.text()}`);
+    const out = await res.json();
+    location.href = kind === 'form' ? `/admin/forms/${out.id}/?compose=1` : `/admin/templates/${kind}/${out.slug}/?compose=1`;
+  });
+</script>

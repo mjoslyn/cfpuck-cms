@@ -36,12 +36,13 @@ The dark bar across the top of every admin screen takes you to each part of the 
 | Menu item | What it is for |
 | --- | --- |
 | **Content** ▾ | Your pages, posts and anything else the site lists, such as events, each kind on its own list; **Taxonomies** (categories and tags); and, below a line, **Templates**, the shared layouts every page uses, such as the header and footer. |
+| **Compose** ▾ | Have Claude build something new from your material: a page or post (or any kind of content with a page), a form, a template, a template part or a pattern. See [Writing with Claude](/cfpuck-cms/guide/writing-with-claude/). |
 | **Media** | Your photos, images, videos and documents. |
 | **Forms** ▾ | **Forms** (contact forms, sign-up forms and the like) and **Submissions** (what people sent through them). |
 | **People** ▾ | **Users** (who can sign in to look after the site; admins only), **Members**, **Mailing Lists** and **Tickets** (each only when your site uses it). |
 | ⚙ (the gear) | **Settings**: site-wide settings, such as the menu. Admins only. |
 
-Click **Content**, **Forms** or **People** to open its list, then the screen you want. On a phone or a narrow
+Click **Content**, **Compose**, **Forms** or **People** to open its list, then the screen you want. On a phone or a narrow
 window, the whole menu is behind the ☰ button at the top right.
 
 **View site** (in the ☰ menu on a phone) opens your public website in a new tab, so you can see your changes as visitors will.
