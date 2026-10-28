@@ -65,9 +65,11 @@ export const POST: APIRoute = async ({ request, locals, url }) => {
     if (done.choose) return Response.json({ choose: done.choose, notes: done.notes });
     // A setting the host sets stays the host's (connect has checked they agree).
     const changed = await saveKeys(db, Object.fromEntries(Object.entries(done.values).filter(([k]) => !hostEnv(k))), who);
+    // The webhooks the saved ones replace go only now: had the save failed, they would still be in use.
+    const later = done.after ? await done.after().catch((e) => [`The old webhooks couldn’t be deleted (${(e as Error).message}): delete them in ${def.label}.`]) : [];
     // Admins hear of changes only, so the email stays worth reading.
     if (changed.length) await tellAdmins(url.origin, who, `${def.label} was connected`);
-    return Response.json({ keys: await keyStatus(db, false), notes: done.notes });
+    return Response.json({ keys: await keyStatus(db, false), notes: [...done.notes, ...later] });
   } catch (e) {
     return new Response((e as Error).message, { status: e instanceof ConnectError ? 400 : 502 });
   }

@@ -13,11 +13,14 @@ export interface Connected {
   notes: string[];
   /** Several to choose from (a Square location, a Mailgun domain): nothing is saved until one is. */
   choose?: { name: string; label: string; options: [string, string][] };
+  /** What to do once the values are saved (deleting the webhooks they replace), so a save that fails
+   * leaves the old ones, whose secrets are still the saved ones. Answers notes. */
+  after?: () => Promise<string[]>;
 }
 
 export class ConnectError extends Error {}
 
-export const STRIPE_EVENTS = ['checkout.session.completed', 'checkout.session.async_payment_succeeded', 'checkout.session.async_payment_failed', 'checkout.session.expired', 'charge.refunded', 'charge.refund.updated'];
+export const STRIPE_EVENTS = ['checkout.session.completed', 'checkout.session.async_payment_succeeded', 'checkout.session.async_payment_failed', 'checkout.session.expired', 'charge.refunded', 'charge.refund.updated', 'refund.updated', 'refund.failed'];
 export const SQUARE_EVENTS = ['payment.created', 'payment.updated', 'refund.created', 'refund.updated'];
 export const MAILGUN_EVENTS = ['delivered', 'opened', 'permanent_fail', 'complained', 'unsubscribed'];
 
@@ -31,10 +34,12 @@ export function publicOrigin(origin: string): boolean {
   }
 }
 
-/** A setting the host sets must match what the key needs, since the host's wins over a saved one. */
+/** A setting the host sets must match what the key needs, since the host's wins over a saved one (as the
+ * code reads it: trimmed, and a region or environment in any case). */
 function pin(name: string, detected: string) {
-  const host = hostEnv(name);
-  if (host && host !== detected) throw new ConnectError(`The server sets ${name} to ${host}, but this key needs ${detected}. Change or remove it on the server first.`);
+  const host = hostEnv(name)?.trim();
+  const fold = (v: string) => (/_(REGION|ENVIRONMENT)$/.test(name) ? v.toLowerCase() : v);
+  if (host && fold(host) !== fold(detected)) throw new ConnectError(`The server sets ${name} to ${host}, but this key needs ${detected}. Change or remove it on the server first.`);
 }
 
 const LOCAL = 'Webhooks weren’t set up: this copy of the site isn’t at a public address. Connect again on the live site.';
@@ -77,6 +82,9 @@ export async function connect(service: Service, input: Record<string, string>, c
       const sameKey = key === (current('STRIPE_SECRET_KEY') ?? '') && !!current('STRIPE_WEBHOOK_SECRET');
       const list = await stripe('GET', '/webhook_endpoints?limit=100');
       if (list.status === 401) throw new ConnectError('Stripe didn’t accept that key.');
+      // A 403 is a restricted key that can't manage webhooks (it is a key Stripe knows); anything else
+      // leaves the key unchecked, so nothing is saved.
+      if (!list.ok && list.status !== 403) throw new ConnectError(`Stripe answered ${list.status}, so the key couldn’t be checked. Try again.`);
       const notes = [`Stripe is connected, in ${mode}.`];
       if (typed || hostEnv('STRIPE_WEBHOOK_SECRET')) return { values, notes };
       if (!hooks) return { values, notes: [...notes, LOCAL] };
@@ -97,9 +105,12 @@ export async function connect(service: Service, input: Record<string, string>, c
       const made = await stripe('POST', '/webhook_endpoints', body);
       const ep = await json(made);
       if (!made.ok || !ep.secret) throw new ConnectError(`Stripe refused the webhook: ${ep?.error?.message ?? made.status}.`);
-      for (const e of old) if (e.id !== ep.id) await stripe('DELETE', `/webhook_endpoints/${e.id}`);
       values.STRIPE_WEBHOOK_SECRET = ep.secret;
-      return { values, notes: [...notes, `Stripe sends payment updates to ${url}.`] };
+      const after = async () => {
+        for (const e of old) if (e.id !== ep.id && !(await stripe('DELETE', `/webhook_endpoints/${e.id}`)).ok) return [`Stripe’s old endpoint ${e.id} couldn’t be deleted: delete it in Stripe.`];
+        return [];
+      };
+      return { values, notes: [...notes, `Stripe sends payment updates to ${url}.`], after };
     }
 
     case 'square': {
@@ -133,7 +144,9 @@ export async function connect(service: Service, input: Record<string, string>, c
       const url = `${site}/api/payments/square`;
       pin('SQUARE_WEBHOOK_URL', url);
       const subs = await square(environment, 'GET', '/webhooks/subscriptions');
-      const old: { id: string }[] = (subs.ok ? ((await json(subs)).subscriptions ?? []) : []).filter((x: { notification_url: string }) => x.notification_url === url);
+      // Without the list, the old subscriptions can't be found to replace, and a new one would add to them.
+      if (!subs.ok) throw new ConnectError(`Square answered ${subs.status} for its webhooks. Try again.`);
+      const old: { id: string }[] = ((await json(subs)).subscriptions ?? []).filter((x: { notification_url: string }) => x.notification_url === url);
       const sameToken = token === (current('SQUARE_ACCESS_TOKEN') ?? '') && environment === current('SQUARE_ENVIRONMENT') && !!current('SQUARE_WEBHOOK_SIGNATURE_KEY');
       const done = (key: string) => ({ values: { ...values, SQUARE_WEBHOOK_SIGNATURE_KEY: key, SQUARE_WEBHOOK_URL: url }, notes: [...notes, `Square sends payment updates to ${url}.`] });
       // Unchanged token and key: the subscription stays, so its signature key does too.
@@ -148,8 +161,11 @@ export async function connect(service: Service, input: Record<string, string>, c
         if (old.length) throw new ConnectError(`Square refused the webhook (${made.status}); the one it has stays. Try again.`);
         return { values, notes: [...notes, `Square refused the webhook. In Square, subscribe ${url} to ${SQUARE_EVENTS.join(', ')}.`] };
       }
-      for (const x of old) if (x.id !== sub.id) await square(environment, 'DELETE', `/webhooks/subscriptions/${x.id}`);
-      return done(sub.signature_key);
+      const after = async () => {
+        for (const x of old) if (x.id !== sub.id && !(await square(environment, 'DELETE', `/webhooks/subscriptions/${x.id}`)).ok) return [`Square’s old webhook ${x.id} couldn’t be deleted: delete it in Square.`];
+        return [];
+      };
+      return { ...done(sub.signature_key), after };
     }
 
     case 'mailgun': {
@@ -190,11 +206,19 @@ export async function connect(service: Service, input: Record<string, string>, c
       if (!hooks) return { values, notes: [...notes, LOCAL] };
       const url = `${site}/api/mailgun/webhook`;
       const path = `/v3/domains/${encodeURIComponent(domain)}/webhooks`;
+      // A webhook goes to up to 3 addresses: this site's is added beside any there (another copy of the
+      // site, an old domain), never in place of them.
+      const listed = await mailgun(region, 'GET', path);
+      if (!listed.ok) throw new ConnectError(`Mailgun answered ${listed.status} for its webhooks. Try again.`);
+      const have: Record<string, { urls?: string[]; url?: string }> = (await json(listed)).webhooks ?? {};
       const failed: string[] = [];
       for (const id of MAILGUN_EVENTS) {
-        const made = await mailgun(region, 'POST', path, new URLSearchParams({ id, url }));
-        // One that exists gets this site's address instead.
-        if (!made.ok && !(await mailgun(region, 'PUT', `${path}/${id}`, new URLSearchParams({ url }))).ok) failed.push(id);
+        const urls = have[id]?.urls ?? (have[id]?.url ? [have[id].url!] : []);
+        if (urls.includes(url)) continue;
+        const body = new URLSearchParams();
+        for (const u of [...urls, url]) body.append('url', u);
+        const ok = urls.length >= 3 ? false : urls.length ? (await mailgun(region, 'PUT', `${path}/${id}`, body)).ok : (await mailgun(region, 'POST', path, new URLSearchParams({ id, url }))).ok;
+        if (!ok) failed.push(id);
       }
       notes.push(failed.length ? `Mailgun refused the webhooks for ${failed.join(', ')}: add them in Mailgun at ${url}.` : `Mailgun sends deliveries, opens, bounces, complaints and unsubscribes to ${url}.`);
       return { values, notes };

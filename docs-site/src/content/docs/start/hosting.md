@@ -95,8 +95,10 @@ checks the key with the service and sets the rest up itself:
   webhooks and reads its signing key.
 
 Webhooks need the site's public address, so connect on the live site (`SITE_URL`), not a local copy.
-Connecting again with the same key keeps the webhook and its secret; with a new key, the new webhook is
-made before the old one is deleted. A setting the server sets that the key doesn't fit (say
+Connecting again with the same key keeps the webhook and its secret; with a new key, the old webhook is
+deleted only once the new one is made and its secret saved. Mailgun's webhooks get the site's address
+beside any already there, so a staging copy connected to the same domain doesn't take them from the live
+site. A setting the server sets that the key doesn't fit (say
 `MAILGUN_REGION=eu` with a US key) stops the connection until it is changed on the server.
 
 Keys are encrypted in the database with a key made from `AUTH_SECRET`, readable by no admin or editor,
@@ -111,7 +113,7 @@ To take payments on forms or tickets, connect one provider under Settings > Conn
 its keys and add its webhook by hand. One endpoint per provider serves both:
 
 - **Stripe**: `https://<your-domain>/api/payments/stripe`, with the `checkout.session.*`,
-  `charge.refunded` and `charge.refund.updated` events; its signing secret is
+  `charge.refunded`, `charge.refund.updated`, `refund.updated` and `refund.failed` events; its signing secret is
   `STRIPE_WEBHOOK_SECRET`.
 - **Square**: `https://<your-domain>/api/payments/square`, with `payment.created`,
   `payment.updated`, `refund.created` and `refund.updated`; its signature key is

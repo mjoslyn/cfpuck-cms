@@ -154,7 +154,7 @@ tickets share them, and one webhook per provider serves both.
 | Variable | |
 | --- | --- |
 | `STRIPE_SECRET_KEY` | A secret key; `sk_test_...` for test mode |
-| `STRIPE_WEBHOOK_SECRET` | The signing secret of a webhook endpoint at `<site>/api/payments/stripe` for `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, `checkout.session.expired`, `charge.refunded` and `charge.refund.updated` |
+| `STRIPE_WEBHOOK_SECRET` | The signing secret of a webhook endpoint at `<site>/api/payments/stripe` for `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, `checkout.session.expired`, `charge.refunded`, `charge.refund.updated`, `refund.updated` and `refund.failed` |
 | `SQUARE_ACCESS_TOKEN`, `SQUARE_LOCATION_ID` | The account's access token and the location payments go to |
 | `SQUARE_ENVIRONMENT` | `sandbox` to test; production otherwise |
 | `SQUARE_WEBHOOK_SIGNATURE_KEY`, `SQUARE_WEBHOOK_URL` | A webhook subscription to `payment.created`, `payment.updated`, `refund.created` and `refund.updated` at `<site>/api/payments/square`: its signature key, and that exact address (when the site sees another) |

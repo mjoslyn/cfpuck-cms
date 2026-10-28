@@ -277,7 +277,8 @@ export default function SiteSettings({ site: initialSite, options: initialOption
       label: 'Admin',
       panel: <AdminThemePanel value={site.admin_theme ?? {}} onChange={(t) => setSite((s) => ({ ...s, admin_theme: Object.keys(t).length ? t : undefined }))} />,
     },
-    { id: 'connections', label: 'Connections', panel: <Connections /> },
+    // Mounted only while shown: it reads (and decrypts) the saved keys as it opens.
+    { id: 'connections', label: 'Connections', panel: tab === 'connections' ? <Connections /> : null },
     { id: 'redirects', label: 'Redirects', panel: <Redirects initial={redirects} notFound={notFound} /> },
     { id: 'sync', label: 'Sync', panel: <Sync /> },
     { id: 'backups', label: 'Backups', panel: <BackupsTab /> },

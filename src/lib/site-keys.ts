@@ -62,7 +62,9 @@ export async function unseal(name: string, stored: string): Promise<string | nul
 let loaded = 0;
 let unreadable: string[] = [];
 let rows: { name: string; hint: string | null; updated_at: string | null; updated_by: string | null }[] = [];
-let pending: Promise<void> | null = null;
+/** Loads run one after another, so the last one started is the last to finish (and holds the newest keys). */
+let chain: Promise<void> = Promise.resolve();
+let running = 0;
 
 async function load(db: Db): Promise<void> {
   const { data, error } = await db.from('site_keys').select('name, value, hint, updated_at, updated_by');
@@ -82,19 +84,19 @@ async function load(db: Db): Promise<void> {
 
 /**
  * Load the saved keys into env() (at most once a minute unless `force`). Requests that arrive while a
- * load is running wait for it, so none runs without the keys; a failure leaves the last ones.
+ * load is running wait for it, so none runs without the keys, and a forced load starts after any
+ * running one; a failure leaves the last keys.
  */
 export async function refreshSavedKeys(db: Db = siteDb(), force = false): Promise<void> {
-  if (pending) {
-    await pending;
-    if (!force) return;
+  if (!force) {
+    if (running) return chain;
+    if (Date.now() - loaded < 60_000) return;
   }
-  if (!force && Date.now() - loaded < 60_000) return;
   loaded = Date.now();
-  pending = load(db).finally(() => {
-    pending = null;
-  });
-  await pending;
+  running++;
+  const next = chain.then(() => load(db)).finally(() => running--);
+  chain = next.catch(() => {});
+  return next;
 }
 
 const hintOf = (name: string, value: string) => (isSecretName(name) ? value.slice(-4) : value);
@@ -123,8 +125,10 @@ export async function saveKeys(db: Db, values: Record<string, string>, by: strin
     const v = value.trim();
     const had = rows.some((r) => r.name === name);
     if (v) {
+      // Only a new value is written: one saved before keeps who saved it, and when.
+      if (env(name) === v && !unreadable.includes(name)) continue;
       write.push({ name, value: await seal(name, v), hint: hintOf(name, v), updated_by: by, updated_at: now });
-      if (env(name) !== v || unreadable.includes(name)) changed.push(name);
+      changed.push(name);
     } else if (had) {
       remove.push(name);
       changed.push(name);

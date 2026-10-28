@@ -7,6 +7,7 @@ const sent = vi.hoisted(() => [] as { to: string[]; subject: string }[]);
 vi.mock('../src/lib/forms/mail', async (actual) => ({ ...(await actual<object>()), sendMail: async (m: { to: string[]; subject: string }) => (sent.push(m), true) }));
 import { sessionDb, siteDb } from '../src/lib/db/site';
 import { env } from '../src/lib/env';
+import * as siteKeys from '../src/lib/site-keys';
 import { keyStatus, refreshSavedKeys, saveKeys, seal, unseal } from '../src/lib/site-keys';
 import { POST as connectRoute } from '../src/pages/api/admin/connections';
 import { connect, ConnectError, MAILGUN_EVENTS, publicOrigin, STRIPE_EVENTS } from '../src/lib/connections';
@@ -118,7 +119,12 @@ describe('connecting a service', () => {
     const out = await connect('stripe', { STRIPE_SECRET_KEY: 'sk_test_1' }, none, 'https://town.example.org/');
     expect(out.values).toEqual({ STRIPE_SECRET_KEY: 'sk_test_1', STRIPE_WEBHOOK_SECRET: 'whsec_abc' });
     expect(out.notes[0]).toMatch(/test mode/);
+    // The old endpoint goes only once the new secret is saved.
+    expect(calls).not.toContain('DELETE api.stripe.com/v1/webhook_endpoints/we_old');
+    expect(await out.after!()).toEqual([]);
+    expect(calls).toContain('DELETE api.stripe.com/v1/webhook_endpoints/we_old');
     expect(calls).not.toContain('DELETE api.stripe.com/v1/webhook_endpoints/we_other');
+    expect(STRIPE_EVENTS).toEqual(expect.arrayContaining(['refund.updated', 'refund.failed']));
     const sent = new URLSearchParams(made);
     expect(sent.get('url')).toBe('https://town.example.org/api/payments/stripe');
     expect(STRIPE_EVENTS.map((_, i) => sent.get(`enabled_events[${i}]`))).toEqual(STRIPE_EVENTS);
@@ -145,20 +151,26 @@ describe('connecting a service', () => {
     await expect(connect('square', { SQUARE_ACCESS_TOKEN: 'bad' }, none, 'https://x.org')).rejects.toThrow(/didn’t accept/);
   });
 
-  it('finds Mailgun’s region and domain, sets its webhooks and reads its signing key', async () => {
+  it('finds Mailgun’s region and domain, adds its webhooks beside any there and reads its signing key', async () => {
     const posted: string[] = [];
+    let put = '';
+    const ours = 'https://town.example.org/api/mailgun/webhook';
     const calls = stub({
       'GET api.mailgun.net/v3/domains': () => [401, {}],
       'GET api.eu.mailgun.net/v3/domains': () => [200, { items: [{ name: 'mg.town.org', state: 'active' }] }],
       'GET api.eu.mailgun.net/v5/accounts/http_signing_key': () => [200, { http_signing_key: 'sign' }],
-      'POST api.eu.mailgun.net/v3/domains/mg.town.org/webhooks': (b) => (posted.push(b), new URLSearchParams(b).get('id') === 'opened' ? [400, { message: 'exists' }] : [200, {}]),
-      'PUT api.eu.mailgun.net/v3/domains/mg.town.org/webhooks/opened': () => [200, {}],
+      // Another copy of the site has "opened"; "delivered" already comes here.
+      'GET api.eu.mailgun.net/v3/domains/mg.town.org/webhooks': () => [200, { webhooks: { opened: { urls: ['https://live.example.org/api/mailgun/webhook'] }, delivered: { urls: [ours] } } }],
+      'POST api.eu.mailgun.net/v3/domains/mg.town.org/webhooks': (b) => (posted.push(b), [200, {}]),
+      'PUT api.eu.mailgun.net/v3/domains/mg.town.org/webhooks/opened': (b) => ((put = b), [200, {}]),
     });
     const out = await connect('mailgun', { MAILGUN_API_KEY: 'key-1' }, none, 'https://town.example.org');
     expect(out.values).toEqual({ MAILGUN_API_KEY: 'key-1', MAILGUN_DOMAIN: 'mg.town.org', MAILGUN_REGION: 'eu', MAILGUN_WEBHOOK_SIGNING_KEY: 'sign' });
-    expect(posted.map((b) => new URLSearchParams(b).get('id'))).toEqual(MAILGUN_EVENTS);
-    expect(new URLSearchParams(posted[0]).get('url')).toBe('https://town.example.org/api/mailgun/webhook');
-    expect(calls).toContain('PUT api.eu.mailgun.net/v3/domains/mg.town.org/webhooks/opened');
+    expect(posted.map((b) => new URLSearchParams(b).get('id'))).toEqual(MAILGUN_EVENTS.filter((e) => e !== 'opened' && e !== 'delivered'));
+    expect(new URLSearchParams(posted[0]).get('url')).toBe(ours);
+    // The other copy keeps its address.
+    expect(new URLSearchParams(put).getAll('url')).toEqual(['https://live.example.org/api/mailgun/webhook', ours]);
+    expect(calls.filter((c) => c.includes('/webhooks/delivered'))).toEqual([]);
     expect(out.notes.at(-1)).toMatch(/sends deliveries/);
   });
 });
@@ -248,5 +260,71 @@ describe('the fixes from review', () => {
     expect(sent[1].subject).toMatch(/disconnected/);
     expect((await route({ service: 'anthropic', remove: true })).status).toBe(200);
     expect(sent).toHaveLength(2);
+  });
+});
+
+describe('the second review’s fixes', () => {
+  const route = (body: unknown) =>
+    connectRoute({ request: new Request('https://town.example.org/api/admin/connections', { method: 'POST', body: JSON.stringify(body) }), locals: { user: { role: 'admin', email: 'admin@example.org' } }, url: new URL('https://town.example.org/api/admin/connections') } as any) as Promise<Response>;
+
+  it('keeps the old Stripe endpoint when the new secret can’t be saved', async () => {
+    const calls = stub({
+      'GET api.stripe.com/v1/webhook_endpoints': () => [200, { data: [{ id: 'we_old', url: 'https://town.example.org/api/payments/stripe' }] }],
+      'POST api.stripe.com/v1/webhook_endpoints': () => [200, { id: 'we_new', secret: 'whsec_new' }],
+    });
+    // The admin's password is checked first; that isn't what this is about.
+    const auth = await import('../src/lib/auth');
+    vi.spyOn(auth, 'checkPassword').mockResolvedValue({ ok: true });
+    const save = vi.spyOn(siteKeys, 'saveKeys').mockRejectedValueOnce(new Error('D1 is busy'));
+    const res = await route({ service: 'stripe', values: { STRIPE_SECRET_KEY: 'sk_test_x' }, password: 'p' });
+    expect(res.status).toBe(502);
+    expect(calls.filter((c) => c.startsWith('DELETE'))).toEqual([]);
+    save.mockRestore();
+    vi.restoreAllMocks();
+  });
+
+  it('saves no Stripe key it couldn’t check', async () => {
+    stub({ 'GET api.stripe.com/v1/webhook_endpoints': () => [500, {}] });
+    await expect(connect('stripe', { STRIPE_SECRET_KEY: 'sk_live_typo' }, none, 'https://town.example.org')).rejects.toThrow(/couldn’t be checked/);
+    // A restricted key without webhook access is still a key Stripe knows.
+    stub({ 'GET api.stripe.com/v1/webhook_endpoints': () => [403, {}] });
+    expect((await connect('stripe', { STRIPE_SECRET_KEY: 'rk_live_ok' }, none, 'https://town.example.org')).notes.join(' ')).toMatch(/by hand|can’t set up webhooks/);
+  });
+
+  it('makes no Square subscription when its list can’t be read', async () => {
+    const calls = stub({
+      'GET connect.squareup.com/v2/locations': () => [200, { locations: [{ id: 'L1', name: 'Main', status: 'ACTIVE' }] }],
+      'GET connect.squareup.com/v2/webhooks/subscriptions': () => [500, {}],
+    });
+    await expect(connect('square', { SQUARE_ACCESS_TOKEN: 't' }, none, 'https://town.example.org')).rejects.toThrow(/Try again/);
+    expect(calls.some((c) => c.startsWith('POST'))).toBe(false);
+  });
+
+  it('accepts a host setting written as the code reads it', async () => {
+    process.env.MAILGUN_REGION = 'EU ';
+    stub({
+      'GET api.mailgun.net/v3/domains': () => [401, {}],
+      'GET api.eu.mailgun.net/v3/domains': () => [200, { items: [{ name: 'mg.town.org', state: 'active' }] }],
+      'GET api.eu.mailgun.net/v5/accounts/http_signing_key': () => [200, { http_signing_key: 's' }],
+    });
+    expect((await connect('mailgun', { MAILGUN_API_KEY: 'k' }, none, 'http://localhost:4321')).values.MAILGUN_REGION).toBe('eu');
+  });
+
+  it('runs one load of the saved keys at a time', async () => {
+    let now = 0;
+    let most = 0;
+    const slow = { from: () => ({ select: () => { now++; most = Math.max(most, now); return new Promise((r) => setTimeout(() => { now--; r({ data: [], error: null }); }, 5)); } }) } as any;
+    await Promise.all([refreshSavedKeys(slow, true), refreshSavedKeys(slow, true), refreshSavedKeys(slow, true), refreshSavedKeys(slow)]);
+    expect(most).toBe(1);
+    await refreshSavedKeys(db, true);
+  });
+
+  it('keeps who saved a key, and when, when it is saved again unchanged', async () => {
+    await saveKeys(db, { ANTHROPIC_API_KEY: 'sk-ant-kept' }, 'first@example.org');
+    const before = (await db.from('site_keys').select('updated_by, updated_at').eq('name', 'ANTHROPIC_API_KEY').single()).data;
+    await new Promise((r) => setTimeout(r, 5));
+    await saveKeys(db, { ANTHROPIC_API_KEY: 'sk-ant-kept' }, 'second@example.org');
+    expect((await db.from('site_keys').select('updated_by, updated_at').eq('name', 'ANTHROPIC_API_KEY').single()).data).toEqual(before);
+    await saveKeys(db, { ANTHROPIC_API_KEY: '' }, 'a');
   });
 });

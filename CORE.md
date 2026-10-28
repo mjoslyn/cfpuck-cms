@@ -749,7 +749,7 @@ in the event's timezone, hidden for past ones), the event's capacity (per date f
 most per order, phone (off, optional, required), address (off, for paid orders, always), the event's own
 questions (asked once per order) and a waitlist (`off`, `auto`, `manual`). Settings > Tickets
 (`settings.site.tickets`, `ticketSettings`, `src/admin/TicketSettings.tsx`): the payment provider (Stripe
-or Square, offered only when both have keys in the environment, `providerStatus`; with one, it is used;
+or Square, offered only when both have keys (Settings > Connections or the environment), `providerStatus`; with one, it is used;
 with neither, only free tickets, and the payment settings are hidden), currency, how long an unpaid order holds its
 tickets (30-120 minutes), and the emails with the reminder's and follow-up's timing.
 
@@ -1267,16 +1267,21 @@ only add; one that switches block types or settings goes out with `npm run deplo
 Settings > Connections (admins; `src/admin/Connections.tsx`, GET and POST `/api/admin/connections`)
 keeps the keys for Claude, Stripe, Square and Mailgun (`SERVICES` in `src/lib/site-keys.ts`), so an admin
 sets a service up by pasting one key. `connect` (`src/lib/connections.ts`) checks it with the service and
-sets the service up: Stripe's webhook endpoint at `/api/payments/stripe` (its signing secret kept),
+sets the service up: Stripe's webhook endpoint at `/api/payments/stripe` (`STRIPE_EVENTS`; its signing
+secret kept; a key Stripe can't be asked about is refused, and a restricted key without webhook access is
+saved with a note to set the webhook up by hand),
 Square's environment found from the token, its location (chosen when there are several) and a webhook
 subscription (signature key and address kept), Mailgun's region found from the key, its sending domain
-(chosen when there are several), its webhooks (`MAILGUN_EVENTS`, an existing one moved to this site) and
-signing key. With the key unchanged and its secret saved, Stripe's endpoint and Square's subscription
-stay as they are (their secrets with them); otherwise a new one is made first and the site's old ones
-deleted only once it exists, so a failure leaves the working one. Webhooks need the site's public
+(chosen when there are several), its webhooks (`MAILGUN_EVENTS`, this site's address added beside any
+already there, up to Mailgun's 3, so another copy of the site keeps its own) and signing key. With the key
+unchanged and its secret saved, Stripe's endpoint and Square's subscription stay as they are (their
+secrets with them); otherwise a new one is made, and the site's old ones are deleted only once the new
+secret is saved (`Connected.after`), so a failure at either step leaves the working one; a list of them
+that can't be read stops the connection rather than add another. Webhooks need the site's public
 address (`SITE_URL`, else the request's; `publicOrigin`): a local copy saves the keys and says so.
 Stripe's and Mailgun's signing secrets can be entered by hand. A setting the host sets that the key
-doesn't fit (a region, environment, location, domain or webhook address) refuses the connection before
+doesn't fit (a region, environment, location, domain or webhook address, compared as the code reads
+them: trimmed, a region or environment in any case) refuses the connection before
 anything is changed (`pin`), and so does a copy that couldn't save keys (`cannotSave`: no `AUTH_SECRET`,
 no table), since a secret made then would be lost.
 
@@ -1285,10 +1290,12 @@ no table), since a secret made then would be lost.
   leaked backup holds nothing usable, and changing `AUTH_SECRET` makes them unreadable (the screen asks
   for them again). The table is in no role's policies, isn't synced, backed up or restored.
 - Write-only: the screen shows a secret's last 4 characters (`hint`) and plain settings (location,
-  domain, region) as they are, with who saved them and when (`keyStatus`), never a secret's value.
+  domain, region) as they are, with who saved them and when (`keyStatus`; a value saved again unchanged
+  keeps both), never a secret's value. The tab reads them only when it is opened.
 - `env()` (`src/lib/env.ts`) reads the environment first (`hostEnv`), then the saved keys, which the
   middleware, scheduled runs and jobs load at most once a minute per instance (`refreshSavedKeys`;
-  requests arriving during a load wait for it); a key the host sets is shown as such and can't be saved
+  loads run one at a time, so the last started holds the newest keys, and requests arriving during a
+  load wait for it); a key the host sets is shown as such and can't be saved
   over, while the service's other settings (a webhook secret) can still be saved and Connect sets it up.
   A save writes its values in one statement (`saveKeys`, which answers the names whose values changed).
 - Stripe, Square and Mailgun keys (`guarded`) need the admin's password again (`checkPassword`, its
