@@ -83,7 +83,7 @@ with `events` (fields added, replaced or left out, labels, URLs), see
 | `archive` | The type's listing page (`/directory/`) |
 | `record` | Data only, with no page; edited with a plain form (venues) |
 | `pageless` | No public page (globals) |
-| `hidden` | Left out of the admin's type tabs |
+| `hidden` | Left out of the admin's Content menu |
 | `category` | The type's main taxonomy: card labels, and the first offered to filter by |
 | `taxonomies` | Its other taxonomies. Each gets a term picker in an entry's settings; collections, filters and bulk actions offer them. Tags apply to every type |
 | `fields` | The type's own fields, shown in the editor's Details |

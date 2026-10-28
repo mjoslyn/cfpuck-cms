@@ -5,15 +5,15 @@ sidebar:
   order: 1
 ---
 
-Everything on your site lives under **Content** in the top bar. Across the top of that screen is a
-tab for each kind of content your site has, such as **Pages**, **Posts** or **Events**. The number
-beside each tab is how many there are.
+Everything on your site lives under **Content** in the top bar. Click it to see each kind of content
+your site has, such as **Pages**, **Posts** or **Events**, then pick one to see its list. The number
+under the heading is how many there are.
 
 ![The Content screen, showing posts](../../../assets/guide/content-list.png)
 
 ## Adding a new page or post
 
-1. Click **Content**, then the tab for the kind of thing you want to add (for example **Pages**).
+1. Click **Content**, then the kind of thing you want to add (for example **Pages**).
 2. Click the **New** button in the top right (it says **New Page**, **New Post** and so on).
 3. The page editor opens with an empty page. Type a title in the **Title** box on the right.
 4. Add what you want on the page (see [Using the page editor](/cfpuck-cms/guide/page-editor/)).
@@ -69,8 +69,7 @@ Categories and tags group related content, so visitors can find everything on on
 - Add tags to a page in the editor's right-hand panel: type a tag and press Enter. New tags are
   made for you.
 - Pick categories in the same panel.
-- To rename, rearrange or describe them, go to **Content** and click the **Taxonomies** tab on the
-  right. Drag a category by its handle to move it, or onto another to put it underneath.
+- To rename, rearrange or describe them, click **Content**, then **Taxonomies**. Drag a category by its handle to move it, or onto another to put it underneath.
 
 ## Page addresses
 

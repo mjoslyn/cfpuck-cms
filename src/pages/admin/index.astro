@@ -63,13 +63,12 @@ const listUrl = (patch: Record<string, string | null>) => {
   return `${u.pathname}${u.search}`;
 };
 
+// The types are chosen from the admin bar's Content menu (src/lib/admin/nav.ts); this one's total.
 const counts = new Map<string, number>();
-await Promise.all(
-  CONTENT_TYPES.map(async (c) => {
-    const { count } = await db.from('entries').select('id', { count: 'exact', head: true }).eq('type', c.type).neq('status', 'trash');
-    counts.set(c.type, count ?? 0);
-  }),
-);
+if (!tagsView) {
+  const { count } = await db.from('entries').select('id', { count: 'exact', head: true }).eq('type', type).neq('status', 'trash');
+  counts.set(type, count ?? 0);
+}
 // This type's entries by status, for the switcher.
 const statusCounts = new Map<string, number>();
 if (!tagsView) {
@@ -111,17 +110,6 @@ const decode = (s: string) => s.replace(/&#8217;/g, '’').replace(/&#038;|&amp;
     )}
   </div>
 
-  <nav class="mt-6 flex flex-wrap gap-1 border-b border-admin-ink/10 text-sm">
-    {CONTENT_TYPES.filter((c) => showsType(c.type, eventsAreOn) || c.type === type).map((c) => (
-      <a href={`/admin/?type=${c.type}`} class:list={['-mb-px border-b-2 px-3 py-2', c.type === type ? 'border-admin-accent text-admin-ink' : 'border-transparent text-admin-muted hover:text-admin-ink']}>
-        {c.label} <span class="text-xs text-admin-muted">{counts.get(c.type)}</span>
-      </a>
-    ))}
-    <a href="/admin/?type=terms" class:list={['-mb-px ml-auto border-b-2 px-3 py-2', tagsView ? 'border-admin-accent text-admin-ink' : 'border-transparent text-admin-muted hover:text-admin-ink']}>
-      Taxonomies
-    </a>
-  </nav>
-
   {!showsType(type, eventsAreOn) && !tagsView && (
     <p class="mt-4 rounded bg-admin-soft px-4 py-3 text-sm">
       Events are off: the site shows no events, calendar or ticket sales, and these are hidden from Content until they are on.
@@ -134,7 +122,7 @@ const decode = (s: string) => s.replace(/&#8217;/g, '’').replace(/&#038;|&amp;
   ) : (
   <>
 
-  <nav class="mt-4 flex gap-1 border-b border-admin-ink/10 text-sm" aria-label="Status">
+  <nav class="mt-6 flex gap-1 border-b border-admin-ink/10 text-sm" aria-label="Status">
     {STATUS_TABS.map(([s, label]) => (
       <a href={listUrl({ status: s === 'all' ? null : s, notice: null })} aria-current={s === status ? 'page' : undefined} class:list={['-mb-px border-b-2 px-3 py-2', s === status ? 'border-admin-accent text-admin-ink' : 'border-transparent text-admin-muted hover:text-admin-ink']}>
         {label} <span class="text-xs text-admin-muted">({s === 'all' ? (statusCounts.get('publish') ?? 0) + (statusCounts.get('draft') ?? 0) : (statusCounts.get(s) ?? 0)})</span>

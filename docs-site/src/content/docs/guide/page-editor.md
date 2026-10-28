@@ -121,7 +121,7 @@ Events and other kinds of content have their own extra settings here too, such a
 ## The header, footer and templates
 
 The parts that appear on every page, such as the header, menu and footer, aren't part of each page.
-They are in **Templates**. When you hover over them in the editor, admins see a link to edit them.
+They are in **Content**, **Templates**. When you hover over them in the editor, admins see a link to edit them.
 
 :::caution
 A change to a template or the header changes every page that uses it, straight away. Take care, and

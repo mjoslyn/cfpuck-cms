@@ -5,8 +5,8 @@ sidebar:
   order: 8
 ---
 
-If your site lists events, they appear under **Content**, on the **Events** tab, and on your site's
-calendar at `/events/`. (If you don't see an **Events** tab, events are turned off; an admin can turn
+If your site lists events, they appear under **Content**, **Events**, and on your site's
+calendar at `/events/`. (If you don't see **Events** under **Content**, events are turned off; an admin can turn
 them on under **Settings**, **Events**.)
 
 ## Adding an event

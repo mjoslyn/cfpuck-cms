@@ -709,7 +709,7 @@ take any type option plus `fields`, added to the core's or replacing one by key,
 to replace one whole (the calendar views stay under `/events/`). The core reads these field keys: on events `venue`, `cost`,
 `website` and `schedule`; on venues `address`, `city`, `state`, `zip`, `country`, `phone` and `website`.
 
-Off, nothing is deleted, but the admin hides events, venues and event categories (Content's tabs,
+Off, nothing is deleted, but the admin hides events, venues and event categories (Content's menu,
 Taxonomies, Settings > Types and Search; `showsType`, `showsTaxonomy`) and the site shows none:
 `resolve` answers Not found for the event listing, calendar views, event pages and occurrences and the
 term pages of taxonomies that list events; the feeds, ticket checkout, waitlist and availability
@@ -1116,8 +1116,9 @@ it makes the one-time password token.
 `awaitingPassword` lists accounts with an open invitation, or invited with no password, for the
 screens' "Invited" rows and Resend invitation.
 
-The admin bar (`src/layouts/Admin.astro`, its items from `adminNav` in `src/lib/admin/nav.ts`): Content,
-Templates and Media, a **Forms** dropdown (Forms, Submissions) and a **People** dropdown (Users and Members
+The admin bar (`src/layouts/Admin.astro`, its items from `adminNav` in `src/lib/admin/nav.ts`): a **Content**
+dropdown (each type shown, its list at `/admin/?type=<type>`, then Taxonomies, then Templates in a section
+of its own, `section`; the content list has no tabs of its own for the types), Media, a **Forms** dropdown (Forms, Submissions) and a **People** dropdown (Users and Members
 for admins, Mailing Lists and Tickets, each while its feature is on; a group of one shows as its link),
 then a gear for Settings (admins), **?**, View site and the account menu. Below 1024px it all sits behind
 one menu button, the groups as headings. The dropdowns are `details[data-menu]`: one open at a time, closed

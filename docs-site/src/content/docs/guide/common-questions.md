@@ -13,7 +13,7 @@ sidebar:
 
 ### I can't find a page I made.
 
-Look in **Content**, on the right tab (Pages, Posts...), and try the **Drafts** and **Trash** tabs.
+Look in **Content**, under the right kind (Pages, Posts...), and try the **Drafts** and **Trash** tabs.
 Use the search box with a word from its title.
 
 ### I deleted something by mistake.
