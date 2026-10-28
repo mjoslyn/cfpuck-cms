@@ -159,9 +159,14 @@ export class Loader {
 
   private renamed(): Promise<Map<string, string>> {
     this.formerSlugs ??= (async () => {
-      const { data, error } = await this.db.from('templates').select('kind, slug, former_slugs');
-      if (error) throw error;
       const map = new Map<string, string>();
+      const { data, error } = await this.db.from('templates').select('kind, slug, former_slugs');
+      // The fallback is a convenience: a database without the column yet (code deployed before its
+      // migration) renders as before.
+      if (error) {
+        console.error('Former template addresses:', error.message);
+        return map;
+      }
       for (const t of data ?? []) for (const f of (t.former_slugs as string[] | null) ?? []) map.set(`${t.kind}:${f}`, t.slug);
       return map;
     })();
