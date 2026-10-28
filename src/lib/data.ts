@@ -95,6 +95,8 @@ export class Loader {
   private termsLoaded = false;
   private settingsCache?: Record<string, any>;
   private templates = new Map<string, Data | null>();
+  /** Former addresses of renamed templates (`kind:slug` -> slug now), read once on the first miss. */
+  private formerSlugs?: Promise<Map<string, string>>;
   private recurring?: Promise<boolean>;
   private formsCache?: Promise<FormRow[]>;
   private hiddenCache?: Promise<Set<number>>;
@@ -142,12 +144,28 @@ export class Loader {
     if (!this.templates.has(key)) {
       const { data, error } = await this.db.from('templates').select('content').eq('kind', kind).eq('slug', slug).maybeSingle();
       if (error) throw error;
-      let doc = (data?.content as Data) ?? null;
+      let doc: Data | null = (data?.content as Data) ?? null;
+      // None at that address: one renamed from it, if any (a template at the address itself comes first).
+      if (!data) {
+        const now = (await this.renamed()).get(key);
+        if (now) doc = await this.template(kind, now);
+      }
       // Each Page content block shows its own area, even in a template saved before that was enforced.
       if (doc && kind === 'template' && Array.isArray(doc.content)) doc = { ...doc, content: uniqueAreas(doc.content as any[]) as Data['content'] };
       this.templates.set(key, doc);
     }
     return this.templates.get(key)!;
+  }
+
+  private renamed(): Promise<Map<string, string>> {
+    this.formerSlugs ??= (async () => {
+      const { data, error } = await this.db.from('templates').select('kind, slug, former_slugs');
+      if (error) throw error;
+      const map = new Map<string, string>();
+      for (const t of data ?? []) for (const f of (t.former_slugs as string[] | null) ?? []) map.set(`${t.kind}:${f}`, t.slug);
+      return map;
+    })();
+    return this.formerSlugs;
   }
 
   private remember(rows: any[]) {

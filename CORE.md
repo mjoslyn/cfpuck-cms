@@ -262,9 +262,16 @@ header; `src/admin/MakePage.tsx`, POST `/api/admin/templates` with `action=make-
 copy of a template's, part's or pattern's blocks under new ids, leaving out template parts and Page
 content blocks (the entry's own template supplies them) unless **Keep** is ticked, and opens it.
 **Rename** (the templates list and a template's editor header; `src/admin/RenameTemplate.tsx`, POST
-`/api/admin/templates` with `action: 'rename'`, `renameTemplate`) changes a template's, part's or pattern's
-name (`title`); the slug, which pages, settings and placed parts and patterns refer to, stays, and so does
-`updated_at`, so an editor open on it isn't asked about a newer version.
+`/api/admin/templates` with `action: 'rename'`, `renameTemplate` in `src/lib/admin/rename-template.ts`)
+changes a template's, part's or pattern's name (`title`) and address (slug, following the name until
+edited), keeping `updated_at`. A new address is written, with the server's access, wherever the site names
+the old one (placed parts and patterns in entries, their unpublished changes and templates, `renameInDoc`,
+a header or footer part keeping its role as `attrs.area`; entries' chosen template, Settings > Types,
+terms' `fields.template`; Compose conversations), those rows keeping their `updated_at`. The old address
+goes into `templates.former_slugs` (migration `*_templates_former_slugs.sql`, synced with the row), which
+`Loader.template` falls back to when no template has that address, so the template hierarchy's names,
+revisions, site code and unsynced copies still find it; the old editor address redirects, and a template
+save to an address that has gone answers 404. The Part block lists the site's parts.
 
 ## Redirects
 

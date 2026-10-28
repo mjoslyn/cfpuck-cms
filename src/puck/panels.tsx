@@ -593,7 +593,7 @@ Object.assign(CONTENT_PANELS, {
       <StyleControls a={a} set={set} parts={{ typography: true, width: false }} />
     </>
   ),
-  part: (a: Attrs, set: SetFn) => <Select title="Part" value={a.slug} options={[['header', 'Header'], ['footer', 'Footer']]} onChange={(v) => set({ slug: v })} />,
+  part: (a: Attrs, set: SetFn) => <PartPicker value={a.slug} onChange={(v) => set({ slug: v })} />,
   pattern: (a: Attrs, set: SetFn) => <Text title="Pattern" value={a.slug} onChange={(v) => set({ slug: v })} />,
   video: (a: Attrs, set: SetFn) => (
     <>
@@ -770,6 +770,15 @@ function GalleryPanel({ a, set, video }: { a: Attrs; set: SetFn; video?: boolean
       {!video && display === 'slider' && <Toggle title="Advance automatically" value={a.autoplay} onChange={(v) => set({ autoplay: v || undefined })} />}
     </>
   );
+}
+
+/** Which template part to show: the site's parts (Templates), under their names. */
+function PartPicker({ value, onChange }: { value: unknown; onChange: (slug: string | undefined) => void }) {
+  const [parts, setParts] = useState<[string, string][]>([['header', 'Header'], ['footer', 'Footer']]);
+  useEffect(() => {
+    browserClient().from('templates').select('slug, title').eq('kind', 'part').order('title').then(({ data }) => data?.length && setParts(data.map((p) => [p.slug, p.title || p.slug])));
+  }, []);
+  return <Select title="Part" value={value} options={parts} onChange={onChange} />;
 }
 
 /** Which global to show: content kept once (Globals in the admin) and placed on many pages. */

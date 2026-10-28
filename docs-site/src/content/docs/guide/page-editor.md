@@ -138,8 +138,10 @@ the page**. You get a new draft with a copy of the template's blocks to change f
 never changes the template.
 
 To change the name of a template, part or pattern, click **Rename** beside it in **Templates** (or at
-the top of the editor while editing it), type the new name and click **Rename**. Pages using it keep
-using it.
+the top of the editor while editing it) and type the new name. Its **Address** follows the name; change
+it if you want another. Click **Rename**. Pages, settings and other templates using it switch to the new
+address, and anything still using the old one keeps working. Save your changes before giving a template
+you're editing a new address.
 
 The menu's links are changed under **Settings**, not in the header itself. See
 [Menu and settings](/cfpuck-cms/guide/menu-and-settings/).

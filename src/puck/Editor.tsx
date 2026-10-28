@@ -649,7 +649,7 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
       <h1 className="truncate text-lg">{titleText}</h1>
       {entry && <span className="truncate font-mono text-xs text-admin-muted">{viewUrl}</span>}
       {template && templateTitle && templateTitle !== template.slug && <span className="truncate font-mono text-xs text-admin-muted">{template.slug}</span>}
-      {template && <RenameTemplate kind={template.kind} slug={template.slug} title={templateName} onRenamed={setTemplateTitle} />}
+      {template && <RenameTemplate kind={template.kind} slug={template.slug} title={templateName} dirty={dirty} onRenamed={setTemplateTitle} />}
     </div>
     <div className="cms-editor-frame relative min-h-0 flex-1">
     <EnvContext.Provider value={env}>

@@ -4,6 +4,7 @@ import { uniqueAreas } from '../../../lib/content/areas';
 import { slugify } from '../../../lib/slug';
 import { isStale, STALE } from '../../../lib/admin/save';
 import { renameTemplate } from '../../../lib/admin/rename-template';
+import { serviceClient } from '../../../lib/db/site';
 
 /**
  * Duplicate a template, part or pattern (form post { kind, slug } from the list), then open the copy; or,
@@ -13,11 +14,12 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
   // JSON from the editor and the templates list.
   if (request.headers.get('content-type')?.includes('application/json')) {
     const body = await request.json().catch(() => ({}));
-    // Rename: { action: 'rename', kind, slug, title } -> { title }.
+    // Rename: { action: 'rename', kind, slug, title, newSlug? } -> { title, slug, updated, failed }. The
+    // server's access writes the new address where the site names the old one (Settings > Types too).
     if (body.action === 'rename') {
       if (!['template', 'part', 'pattern'].includes(body.kind) || !body.slug) return new Response('Bad request', { status: 400 });
       try {
-        return Response.json({ title: await renameTemplate(locals.db, body.kind, String(body.slug), String(body.title ?? '')) });
+        return Response.json(await renameTemplate(locals.db, body.kind, String(body.slug), { title: String(body.title ?? ''), slug: typeof body.newSlug === 'string' ? body.newSlug : undefined }, serviceClient()));
       } catch (e) {
         return new Response((e as Error).message, { status: 400 });
       }
@@ -67,5 +69,7 @@ export const PUT: APIRoute = async ({ request, locals }) => {
   if (Array.isArray(content?.content)) content.content = uniqueAreas(content.content);
   const { data, error } = await locals.db.from('templates').update({ content }).eq('kind', kind).eq('slug', slug).select('updated_at').maybeSingle();
   if (error) return new Response(error.message, { status: 400 });
+  // Gone, or renamed since the editor opened it: nothing was saved.
+  if (!data) return new Response('This template is no longer at this address (it may have been renamed). Copy your changes, then open it again from Templates.', { status: 404 });
   return Response.json({ ok: true, updated_at: data?.updated_at });
 };

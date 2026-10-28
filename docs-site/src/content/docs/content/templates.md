@@ -26,11 +26,22 @@ Templates and layout mode have no drafts: **Save & apply** changes every page th
 ## Renaming
 
 **Rename** (the templates list and a template's, part's or pattern's editor header;
-`src/admin/RenameTemplate.tsx`, POST `/api/admin/templates` with `{ action: 'rename', kind, slug, title }`,
-`renameTemplate` in `src/lib/admin/rename-template.ts`) changes its name (`templates.title`, up to 120
-characters), shown in the lists and pickers. The slug stays: the template hierarchy, entries, terms,
-Settings > Types and placed parts and patterns refer to it. The rename keeps the row's `updated_at`, so
-an editor open on it saves without a stale-version warning.
+`src/admin/RenameTemplate.tsx`, POST `/api/admin/templates` with `{ action: 'rename', kind, slug, title,
+newSlug }`, `renameTemplate` in `src/lib/admin/rename-template.ts`) changes its name (`templates.title`, up
+to 120 characters) and its address (slug; the dialog's Address follows the name until it is edited). The
+row keeps its `updated_at`, so an editor open on it isn't asked about a newer version.
+
+A new address is written, with the server's access, wherever the site names the old one: the part or
+pattern blocks placing it in entries, their unpublished changes and other templates (`renameInDoc`; a
+`header` or `footer` part keeps its role as `attrs.area`, which the part renderer reads before its slug),
+or for a template the entries that chose it, their unpublished changes, Settings > Types
+(`settings.site.templates`, `taxonomy_templates`) and terms (`fields.template`); and Compose
+conversations about it. Those rows keep their `updated_at` too. The old address goes into
+`templates.former_slugs`, and `Loader.template` falls back to it when no template has that address: so a
+template the hierarchy found by its name (`single-post`, `archive`) still serves those pages, and
+revisions, a site's code and copies that haven't synced still find it. A template given a former address
+takes it over. The old editor address redirects to the new one; a save to an address that has gone answers
+404 rather than saving nothing. Sync carries `former_slugs` with the row.
 
 ## Content areas
 

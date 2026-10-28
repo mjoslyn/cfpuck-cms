@@ -438,8 +438,8 @@ const templateKey = (t: { kind: string; slug: string }) => `${t.kind}/${t.slug}`
 
 const planTemplates: Planner = async (ctx) => {
   const [src, tgt] = await Promise.all([
-    must(ctx.source.from('templates').select('kind, slug, title, content').order('id'), 'templates'),
-    must(ctx.target.from('templates').select('kind, slug, title, content').order('id'), 'templates'),
+    must(ctx.source.from('templates').select('kind, slug, title, content, former_slugs').order('id'), 'templates'),
+    must(ctx.target.from('templates').select('kind, slug, title, content, former_slugs').order('id'), 'templates'),
   ]);
   const there = new Map(tgt.map((t) => [templateKey(t), t]));
   const out = { added: [] as SyncItem[], changed: [] as SyncItem[], same: 0, conflicts: [] as SyncConflict[], warnings: [] as string[] };
@@ -459,7 +459,7 @@ const applyTemplates: Applier = async (ctx, _group, keys) => {
   for (const key of keys) {
     const [kind, ...rest] = key.split('/');
     const slug = rest.join('/');
-    const { data, error } = await ctx.source.from('templates').select('kind, slug, title, content').eq('kind', kind).eq('slug', slug).maybeSingle();
+    const { data, error } = await ctx.source.from('templates').select('kind, slug, title, content, former_slugs').eq('kind', kind).eq('slug', slug).maybeSingle();
     const { error: e2 } = error || !data ? { error: error ?? { message: 'gone from the source' } } : await ctx.target.from('templates').upsert(data, { onConflict: 'kind,slug' });
     if (e2) skipped.push({ key, label: key, reason: e2.message });
     else written++;
@@ -594,7 +594,7 @@ async function record(db: Db, kind: string, group: string, key: string): Promise
     }
     case 'templates': {
       const [kindName, ...rest] = key.split('/');
-      const t = await one(db.from('templates').select('kind, slug, title, content').eq('kind', kindName).eq('slug', rest.join('/')));
+      const t = await one(db.from('templates').select('kind, slug, title, content, former_slugs').eq('kind', kindName).eq('slug', rest.join('/')));
       return t && { ...t, content: typeof t.content === 'string' ? JSON.parse(t.content) : t.content };
     }
     case 'forms': {

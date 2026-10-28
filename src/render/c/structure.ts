@@ -11,7 +11,9 @@ const PART_TAGS = new Set(['div', 'section', 'header', 'footer', 'aside', 'nav',
 export const part: Renderer = (b, env) => {
   const items = env.ctx.docs.get(`part:${b.attrs.slug}`);
   if (!items) return '';
-  const area = b.attrs.slug === 'header' || b.attrs.slug === 'footer' ? b.attrs.slug : 'other';
+  // Its role: a header or footer part by its address, or by `area` once renamed.
+  const role = b.attrs.area ?? b.attrs.slug;
+  const area = role === 'header' || role === 'footer' ? role : 'other';
   const tag = PART_TAGS.has(b.attrs.tag) ? b.attrs.tag : AREA_TAGS[area] || 'div';
   // Header images load eagerly; the rest of the part is lazy (see optimizeImages()).
   const inner = markImages(renderItems(items, { ...env, parentLayout: null, imgCtx: `part-${area}` }), `part-${area}`);
