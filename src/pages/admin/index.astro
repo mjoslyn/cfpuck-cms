@@ -125,7 +125,7 @@ const decode = (s: string) => s.replace(/&#8217;/g, '’').replace(/&#038;|&amp;
   {!showsType(type, eventsAreOn) && !tagsView && (
     <p class="mt-4 rounded bg-admin-soft px-4 py-3 text-sm">
       Events are off: the site shows no events, calendar or ticket sales, and these are hidden from Content until they are on.
-      {isAdmin ? <> Turn them on under <a class="underline" href="/admin/settings/#events">Settings &gt; Events</a>.</> : ' An admin can turn them on under Settings.'}
+      {isAdmin ? <> Turn them on under <a class="underline" href="/admin/settings/events/">Settings &gt; Events</a>.</> : ' An admin can turn them on under Settings.'}
     </p>
   )}
 

@@ -117,6 +117,6 @@ A restore runs as a job (on the Worker's jobs queue, up to 15 minutes), so a lar
 
 ## Protecting a site
 
-**Protect this site from syncs** (on each copy's own Sync tab, `settings.site.sync_protected`) makes
+**Protect this site from syncs** (in each copy's own Settings > Sync, `settings.site.sync_protected`) makes
 that copy refuse every sync into it, whichever copy starts it. Syncing settings never changes the
 target's protection.

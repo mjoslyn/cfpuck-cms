@@ -53,7 +53,7 @@ const nav = [
       user && (
         <header class="border-b border-admin-ink/10 bg-admin-bar text-admin-on-bar">
           <div class="mx-auto flex h-14 max-w-[1280px] items-center gap-6 px-6">
-            {/* The logo from Settings > Admin, else (or beside it) the site name; the settings screen previews changes here. */}
+            {/* The logo from Settings > Appearance, else (or beside it) the site name; the settings screen previews changes here. */}
             <a href="/admin/" id="admin-brand" class="flex shrink-0 items-center gap-2.5 whitespace-nowrap text-lg font-semibold">
               {theme?.logo_url && <img src={theme.logo_url} alt={theme.logo_name ? '' : site.name} class="block h-8 w-auto max-w-[120px] object-contain sm:max-w-[180px]" />}
               {(!theme?.logo_url || theme.logo_name) && <span class:list={[theme?.logo_url && 'max-sm:hidden']}>{site.name}</span>}

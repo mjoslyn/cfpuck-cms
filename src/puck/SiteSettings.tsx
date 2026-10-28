@@ -1,10 +1,17 @@
-// Site settings island, in tabs: General (name, tagline, front page), Types (the templates for
-// each type's pages and listing), Search (the types it covers), Social (profile links, default share
-// image), Events (on or off, the default time zone), Tickets (payments and ticket emails; while events are on), Members, Mailing (lists, sender, tracking), Accessibility (checking pages before they are published), Admin (the admin's colors and logo), Connections (keys for Claude, Stripe, Square and Mailgun, src/admin/Connections.tsx), Redirects (saved as they are added, with the Not found log), Sync (with another copy of the
-// site), Backups (snapshots and sync backups) and the site's own options. One Save for all;
-// the tab is in the URL (#search), and leaving with unsaved changes asks first.
+// Site settings island: a side menu of sections in groups (src/lib/admin/settings-sections.ts), each at
+// its own address (/admin/settings/<section>/; moving between them stays on the page, so unsaved changes
+// carry over). Site: General (name, tagline, front page), Menu, Social (profile links, default share
+// image), Search (the types it covers), Types (the templates for each type's pages and listing) and the
+// site's own options. Features, marked On or Off: Events (on or off, the default time zone), Tickets
+// (payments and ticket emails; while events are on), Members, Mailing Lists. Services: Connections (keys
+// for Claude, Stripe, Square and Mailgun, src/admin/Connections.tsx). Admin: Accessibility (checking
+// pages before they are published), Appearance (the admin's colors and logo). Upkeep: Redirects (saved
+// as they are added, with the Not found log), Sync (with another copy of the site), Backups. One Save
+// for all, beside the section's title while there are unsaved changes; leaving with some asks first.
+// On phones the menu is a Section dropdown.
 import type { PaymentProvider, ProviderStatus } from '../lib/payments';
-import { Fragment, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { Fragment, useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
+import { SAVES_AS_IT_GOES, SETTINGS_GROUPS, sectionOf, settingsPath } from '../lib/admin/settings-sections';
 import { FieldsForm } from './entry-fields';
 import { SITE_EDITOR } from '../lib/site/editor';
 import { ARCHIVE_PATHS, CONTENT_TYPES, PAGELESS_TYPES, SEARCHABLE_TYPES, TYPE_BASES, site as config, taxonomiesOf, taxonomyLabel, typeDef } from '../lib/site';
@@ -18,7 +25,7 @@ import BackupsTab from '../admin/Backups';
 import TicketSettingsPanel from '../admin/TicketSettings';
 import MemberSettingsPanel from '../admin/MemberSettings';
 import MailingSettingsPanel, { type MailgunInfo } from '../admin/MailingSettings';
-import type { MailList, MailingSettings } from '../lib/mailing/config';
+import { mailingOn, type MailList, type MailingSettings } from '../lib/mailing/config';
 import type { MemberSettings } from '../lib/members/config';
 import { eventsOn, showsTaxonomy, showsType } from '../lib/events/on';
 import type { TicketSettings } from '../lib/tickets/config';
@@ -28,6 +35,8 @@ import type { TaxonomyMeta } from '../lib/page-meta';
 import { ADMIN_THEME_DEFAULTS, ADMIN_THEME_FIELDS, adminThemeVars, contrast, type AdminTheme } from '../lib/admin-theme';
 
 interface Props {
+  /** The section the address names. */
+  section: string;
   site: { name?: string; description?: string; front_page_id?: number | null; not_found_page_id?: number | null; timezone?: string; search_types?: string[]; social?: { network: string; url: string }[]; share_image?: number; share_image_url?: string; templates?: TemplateMap; taxonomy_templates?: Record<string, string>; taxonomy_pages_off?: string[]; taxonomy_meta?: Record<string, TaxonomyMeta>; listing_meta?: Record<string, TaxonomyMeta>; listings_off?: string[]; icons?: Record<string, string>; icon_media_id?: number | null; icon_preview?: string; admin_theme?: AdminTheme; tickets?: TicketSettings; members?: Partial<MemberSettings>; mailing?: MailingSettings; events?: { enabled?: boolean }; a11y?: { block_publish?: boolean } };
   options: Record<string, any>;
   pages: { id: number; title: string }[];
@@ -47,22 +56,24 @@ const OFF = '__off__';
 /** Every IANA timezone the browser knows. */
 const TIMEZONES: string[] = (Intl as any).supportedValuesOf?.('timeZone') ?? [config.timezone];
 
-export default function SiteSettings({ site: initialSite, options: initialOptions, pages, templates, redirects, notFound, ticketProviders, mailgun, mailLists }: Props) {
+export default function SiteSettings({ section, site: initialSite, options: initialOptions, pages, templates, redirects, notFound, ticketProviders, mailgun, mailLists }: Props) {
   const [site, setSite] = useState(initialSite);
   const [options, setOptions] = useState(initialOptions);
   const [status, setStatus] = useState('');
-  const [tab, setTab] = useState('general');
+  const [tab, setTab] = useState(section);
   const [saved, setSaved] = useState(() => JSON.stringify({ site: initialSite, options: initialOptions }));
   const dirty = JSON.stringify({ site, options }) !== saved;
-  // The tab named in the URL (after hydration, so the server and browser render the same first).
+  // A link from before sections had addresses (/admin/settings/#tickets) goes to the section's; Back
+  // and Forward move between sections.
   useEffect(() => {
-    const fromHash = () => {
-      const id = location.hash.slice(1);
-      if (id) setTab(id);
-    };
-    fromHash();
-    window.addEventListener('hashchange', fromHash);
-    return () => window.removeEventListener('hashchange', fromHash);
+    const id = sectionOf(location.pathname, location.hash);
+    if (location.hash && id) {
+      setTab(id);
+      history.replaceState(null, '', settingsPath(id));
+    }
+    const onPop = () => setTab(sectionOf(location.pathname, location.hash) || 'general');
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
   }, []);
   useEffect(() => {
     if (!dirty) return;
@@ -110,7 +121,7 @@ export default function SiteSettings({ site: initialSite, options: initialOption
     setSaved(JSON.stringify({ site, options }));
     setStatus(`Saved ${new Date().toLocaleTimeString()}${moved ? `; ${moved} event${moved === 1 ? '' : 's'} moved to the new timezone` : ''}`);
   };
-  const tabs: { id: string; label: string; panel: ReactNode }[] = [
+  const tabs: { id: string; label: string; panel: ReactNode; on?: boolean }[] = [
     {
       id: 'general',
       label: 'General',
@@ -227,6 +238,7 @@ export default function SiteSettings({ site: initialSite, options: initialOption
     {
       id: 'events',
       label: 'Events',
+      on: eventsOn(site),
       panel: (
         <>
           <Toggle title="Events on" value={eventsOn(site)} onChange={(on) => setSite((s) => ({ ...s, events: { enabled: on } }))} />
@@ -253,11 +265,13 @@ export default function SiteSettings({ site: initialSite, options: initialOption
     {
       id: 'members',
       label: 'Members',
+      on: !!site.members?.enabled,
       panel: <MemberSettingsPanel value={site.members ?? {}} onChange={(members) => setSite((s) => ({ ...s, members }))} />,
     },
     {
       id: 'mailing-lists',
       label: 'Mailing Lists',
+      on: mailingOn(site),
       panel: <MailingSettingsPanel value={site.mailing ?? {}} mailgun={mailgun} lists={mailLists} membersOn={!!site.members?.enabled} onChange={(mailing) => setSite((s) => ({ ...s, mailing }))} />,
     },
     {
@@ -273,8 +287,8 @@ export default function SiteSettings({ site: initialSite, options: initialOption
       ),
     },
     {
-      id: 'admin',
-      label: 'Admin',
+      id: 'appearance',
+      label: 'Appearance',
       panel: <AdminThemePanel value={site.admin_theme ?? {}} onChange={(t) => setSite((s) => ({ ...s, admin_theme: Object.keys(t).length ? t : undefined }))} />,
     },
     // Mounted only while shown: it reads (and decrypts) the saved keys as it opens.
@@ -287,63 +301,87 @@ export default function SiteSettings({ site: initialSite, options: initialOption
       : []),
   ];
   const current = tabs.find((t) => t.id === tab) ?? tabs[0];
-  const refs = useRef<Record<string, HTMLButtonElement | null>>({});
-  const choose = (id: string, focus = false) => {
+  const groups = SETTINGS_GROUPS.map((g) => ({ label: g.label, sections: g.sections.flatMap((x) => tabs.filter((t) => t.id === x.id)) })).filter((g) => g.sections.length);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const choose = (id: string) => {
+    if (id === current.id) return;
     setTab(id);
-    history.replaceState(null, '', `#${id}`);
-    if (focus) refs.current[id]?.focus();
+    history.pushState(null, '', settingsPath(id));
+    heading.current?.focus();
   };
-  const onKey = (e: KeyboardEvent) => {
-    const i = tabs.findIndex((t) => t.id === current.id);
-    const to = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 }[e.key];
-    if (to === undefined) return;
+  // Links work as links (a new tab, a copied address); a plain click moves in place.
+  const follow = (e: MouseEvent, id: string) => {
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     e.preventDefault();
-    choose(tabs[(to + tabs.length) % tabs.length].id, true);
+    choose(id);
   };
+  const mark = (on?: boolean) => (on === undefined ? null : <span className={`ml-auto rounded px-1.5 text-[10px] font-semibold uppercase tracking-wider ${on ? 'bg-admin-accent/15 text-admin-accent' : 'text-admin-muted'}`}>{on ? 'On' : 'Off'}</span>);
 
   return (
-    <div>
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-3 border-b border-admin-ink/10">
-        <div role="tablist" aria-label="Settings" className="flex gap-1" onKeyDown={onKey}>
-          {tabs.map((t) => {
-            const selected = t.id === current.id;
-            return (
-              <button
-                key={t.id}
-                ref={(el) => {
-                  refs.current[t.id] = el;
-                }}
-                type="button"
-                role="tab"
-                id={`settings-tab-${t.id}`}
-                aria-selected={selected}
-                aria-controls={`settings-panel-${t.id}`}
-                tabIndex={selected ? 0 : -1}
-                onClick={() => choose(t.id)}
-                className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${selected ? 'border-admin-accent text-admin-ink' : 'border-transparent text-admin-muted hover:text-admin-ink'}`}
-              >
-                {t.label}
+    <div className="md:flex md:items-start md:gap-8">
+      <label className="mb-6 block md:hidden">
+        <span className="mb-1 block text-xs font-medium text-admin-muted">Section</span>
+        <select className={inputClass} value={current.id} onChange={(e) => choose(e.target.value)}>
+          {groups.map((g) => (
+            <optgroup key={g.label} label={g.label}>
+              {g.sections.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.label}
+                  {t.on === undefined ? '' : t.on ? ' (on)' : ' (off)'}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+      </label>
+      <nav aria-label="Settings" className="sticky top-4 hidden w-48 shrink-0 md:block">
+        {groups.map((g) => (
+          <div key={g.label} className="mb-5">
+            <h2 className="mb-1 px-3 text-[11px] font-semibold tracking-wider text-admin-muted uppercase">{g.label}</h2>
+            <ul className="m-0 list-none p-0">
+              {g.sections.map((t) => {
+                const selected = t.id === current.id;
+                return (
+                  <li key={t.id}>
+                    <a
+                      href={settingsPath(t.id)}
+                      aria-current={selected ? 'page' : undefined}
+                      onClick={(e) => follow(e, t.id)}
+                      className={`flex items-center gap-2 rounded-sm border-l-2 px-3 py-1.5 text-sm ${selected ? 'border-admin-accent bg-white font-medium text-admin-ink' : 'border-transparent text-admin-muted hover:text-admin-ink'}`}
+                    >
+                      {t.label}
+                      {mark(t.on)}
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
+      </nav>
+      <div className="min-w-0 flex-1">
+        <div className="mb-6 flex min-h-10 flex-wrap items-center justify-between gap-3 border-b border-admin-ink/10 pb-3">
+          <h2 ref={heading} tabIndex={-1} className="text-xl font-normal outline-none">
+            {current.label}
+          </h2>
+          <div className="flex items-center gap-3">
+            <p className="text-xs text-admin-muted" role="status">
+              {status || (dirty ? (SAVES_AS_IT_GOES.has(current.id) ? 'Unsaved changes in other sections' : 'Unsaved changes') : '')}
+            </p>
+            {/* One Save for every section's form, shown while there is something to save. */}
+            {dirty && (
+              <button type="button" onClick={save} className="rounded-sm bg-admin-ink px-4 py-2 text-xs font-semibold tracking-wider text-white uppercase hover:bg-admin-accent">
+                Save settings
               </button>
-            );
-          })}
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-3 pb-2">
-          <p className="text-xs text-admin-muted" role="status">
-            {status || (dirty ? 'Unsaved changes' : '')}
-          </p>
-          {/* Connections, Redirects, Sync and Backups save as they go; Save covers the other tabs. */}
-          {(!['connections', 'redirects', 'sync', 'backups'].includes(current.id) || dirty) && (
-            <button type="button" onClick={save} className="rounded-sm bg-admin-ink px-4 py-2 text-xs font-semibold tracking-wider text-white uppercase hover:bg-admin-accent">
-              Save settings
-            </button>
-          )}
-        </div>
+        {tabs.map((t) => (
+          <section key={t.id} aria-label={t.label} hidden={t.id !== current.id} className={['redirects', 'sync', 'backups'].includes(t.id) ? 'max-w-5xl' : t.id === 'site' || t.id === 'types' || t.id === 'tickets' || t.id === 'connections' ? 'max-w-3xl' : 'max-w-md'}>
+            {t.panel}
+          </section>
+        ))}
       </div>
-      {tabs.map((t) => (
-        <section key={t.id} role="tabpanel" id={`settings-panel-${t.id}`} aria-labelledby={`settings-tab-${t.id}`} tabIndex={0} hidden={t.id !== current.id} className={['redirects', 'sync', 'backups'].includes(t.id) ? 'max-w-5xl' : t.id === 'site' || t.id === 'types' || t.id === 'tickets' || t.id === 'connections' ? 'max-w-3xl' : 'max-w-md'}>
-          {t.panel}
-        </section>
-      ))}
     </div>
   );
 }

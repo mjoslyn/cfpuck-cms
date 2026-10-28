@@ -377,8 +377,8 @@ at any depth, is refused. Its writes clear its page cache.
   cut off, naming its before-restore backup.
 - Mailing's contacts, campaigns, sends and clicks aren't synced or backed up, and a restore leaves
   them alone: a snapshot restore can't subscribe anyone again (see Mailing).
-- A site with **Protect this site from syncs** on (`settings.site.sync_protected`, set on its own Sync
-  tab) refuses every sync into it; settings syncs keep each copy's own protection.
+- A site with **Protect this site from syncs** on (`settings.site.sync_protected`, set in its own Settings > Sync)
+  refuses every sync into it; settings syncs keep each copy's own protection.
 
 ## Search
 
@@ -1116,7 +1116,17 @@ it makes the one-time password token.
 `awaitingPassword` lists accounts with an open invitation, or invited with no password, for the
 screens' "Invited" rows and Resend invitation.
 
-Admin colors and logo (Settings > Admin, `settings.site.admin_theme`, `src/lib/admin-theme.ts`): accent,
+**Settings** (admins; `src/puck/SiteSettings.tsx`, page `src/pages/admin/settings/[...section].astro`): a side
+menu of sections in groups (`SETTINGS_GROUPS`, `src/lib/admin/settings-sections.ts`): Site (General, Menu,
+Social, Search, Types, the site's own options), Features (Events, Tickets, Members, Mailing Lists, marked
+On or Off), Services (Connections), Admin (Accessibility, Appearance) and Upkeep (Redirects, Sync,
+Backups); a Section dropdown on phones. Each section has its own address, `/admin/settings/<section>/`
+(General `/admin/settings/`; `sectionOf`, `settingsPath`); the screen moves between them in place, so
+unsaved changes carry over, and an old `#<section>` link (and `admin`, now `appearance`) forwards to it.
+One **Save settings**, beside the section's title while there are unsaved changes, saves every section's
+form; Connections, Redirects, Sync and Backups save as they go (`SAVES_AS_IT_GOES`).
+
+Admin colors and logo (Settings > Appearance, `settings.site.admin_theme`, `src/lib/admin-theme.ts`): accent,
 text, menu bar and background, and a logo for the menu bar in place of the site name (or beside it,
 `logo_name`; a media id, whose URL the settings API makes from the media row), previewed as they are
 picked. Admin styles use only the role tokens

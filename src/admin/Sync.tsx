@@ -259,7 +259,7 @@ export default function Sync() {
               ))}
 
               {targetProtected || result.protected ? (
-                <p className="rounded-sm border border-[#b3261e]/40 bg-[#b3261e]/5 p-3 text-sm text-[#b3261e]">{cap(result.target)} is protected from syncs. Turn its protection off on its own Sync tab under Settings to sync into it.</p>
+                <p className="rounded-sm border border-[#b3261e]/40 bg-[#b3261e]/5 p-3 text-sm text-[#b3261e]">{cap(result.target)} is protected from syncs. Turn its protection off under its own Settings &gt; Sync to sync into it.</p>
               ) : totals.added + totals.changed === 0 ? (
                 <p className="text-sm text-admin-muted">Nothing to sync.</p>
               ) : (

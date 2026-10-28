@@ -27,7 +27,7 @@ sign-in asks them to wait; password links go out at most 3 an hour per address.
 
 ## Admin colors and logo
 
-**Settings > Admin** sets the admin's colors for everyone who signs in: accent, text, menu bar and
+**Settings > Appearance** sets the admin's colors for everyone who signs in: accent, text, menu bar and
 background (`settings.site.admin_theme`, `src/lib/admin-theme.ts`), and a logo for the menu bar. The
 logo replaces the site name there, or sits beside it with **Show the site name beside it** (on phones
 only the logo shows); it is shown up to 32px tall, so pick one that reads on the menu bar's color. The

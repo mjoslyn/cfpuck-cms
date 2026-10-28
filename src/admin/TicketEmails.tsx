@@ -40,7 +40,7 @@ export default function TicketEmails({ eventId, eventTitle, own, site }: { event
   return (
     <div className="max-w-3xl">
       <p className="mb-4 text-sm text-admin-muted">
-        This event's emails. Each uses the site's email from <a className="underline hover:text-admin-accent" href="/admin/settings/#tickets">Settings &gt; Tickets</a> until you edit it here; then this event sends its own.
+        This event's emails. Each uses the site's email from <a className="underline hover:text-admin-accent" href="/admin/settings/tickets/">Settings &gt; Tickets</a> until you edit it here; then this event sends its own.
       </p>
       {EMAIL_KINDS.map(([kind, label]) => {
         const e = emails[kind] ?? {};

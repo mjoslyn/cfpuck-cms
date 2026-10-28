@@ -28,7 +28,7 @@ async function tellAdmins(origin: string, who: string, what: string) {
   const to = await adminEmails();
   if (!to.length) return;
   const when = new Date().toUTCString();
-  const link = `${env('SITE_URL') || origin}/admin/settings/#connections`;
+  const link = `${env('SITE_URL') || origin}/admin/settings/connections/`;
   await sendMail({
     to,
     subject: `${site.name}: ${what}`,

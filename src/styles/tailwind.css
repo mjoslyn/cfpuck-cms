@@ -19,7 +19,7 @@
   --container-wide: 1280px;
 }
 
-/* The admin's colors and font. Settings > Admin can change the colors: src/lib/admin-theme.ts writes
+/* The admin's colors and font. Settings > Appearance can change the colors: src/lib/admin-theme.ts writes
    them (and the colors made from them) on html:root. Static, so Puck's colors in admin.css
    can use them too. */
 @theme static {

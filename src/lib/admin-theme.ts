@@ -1,4 +1,4 @@
-// The admin's colors and logo (Settings > Admin, settings.site.admin_theme). Each is a role token from
+// The admin's colors and logo (Settings > Appearance, settings.site.admin_theme). Each is a role token from
 // src/styles/tailwind.css (--color-admin-*); the admin pages write the chosen ones, and the colors made
 // from them, after the stylesheet (AdminTheme.astro), and the settings screen sets them on the page as
 // they are picked.

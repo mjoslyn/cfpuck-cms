@@ -4,6 +4,12 @@ import SiteSettings from '../../../puck/SiteSettings';
 import { hasContentBlock } from '../../../lib/templates';
 import { providerStatus } from '../../../lib/payments';
 import { mailgunStatus } from '../../../lib/mailing/mailgun';
+import { sectionOf, settingsPath } from '../../../lib/admin/settings-sections';
+
+// One page for every section (/admin/settings/<section>/); the screen moves between them in place.
+const section = sectionOf(Astro.url.pathname);
+if (section === null) return new Response('Not found', { status: 404 });
+if (section && settingsPath(section) !== Astro.url.pathname) return Astro.redirect(settingsPath(section), 301);
 
 const db = Astro.locals.db;
 const [{ data: settings }, { data: pages }, { data: templates }, { data: redirects }, { data: notFound }] = await Promise.all([
@@ -18,5 +24,5 @@ const byKey = Object.fromEntries((settings ?? []).map((s) => [s.key, s.value]));
 ---
 <Admin title="Settings">
   <h1 class="mb-6 text-3xl font-normal">Settings</h1>
-  <SiteSettings client:load site={byKey.site ?? {}} options={byKey.options ?? {}} pages={pages ?? []} templates={(templates ?? []).map((t) => ({ slug: t.slug, title: t.title, content: hasContentBlock((t.content as any)?.content) }))} redirects={redirects ?? []} notFound={notFound ?? []} ticketProviders={providerStatus()} mailgun={mailgunStatus()} mailLists={mailLists ?? []} />
+  <SiteSettings client:load section={section || 'general'} site={byKey.site ?? {}} options={byKey.options ?? {}} pages={pages ?? []} templates={(templates ?? []).map((t) => ({ slug: t.slug, title: t.title, content: hasContentBlock((t.content as any)?.content) }))} redirects={redirects ?? []} notFound={notFound ?? []} ticketProviders={providerStatus()} mailgun={mailgunStatus()} mailLists={mailLists ?? []} />
 </Admin>

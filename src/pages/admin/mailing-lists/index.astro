@@ -87,7 +87,7 @@ const contactQuery = (patch: Record<string, string>) => `?${new URLSearchParams(
       <h1 class="text-3xl font-normal">Mailing Lists</h1>
       <p class="mt-1 text-sm text-admin-muted">
         {settings.enabled ? 'Campaigns and weekly digests to the people on your mailing lists.' : 'Mailing is off: turn it on under Settings > Mailing Lists.'}
-        {' '}The sender, postal address and tracking are under <a class="underline" href="/admin/settings/#mailing-lists">Settings &gt; Mailing Lists</a>.
+        {' '}The sender, postal address and tracking are under <a class="underline" href="/admin/settings/mailing-lists/">Settings &gt; Mailing Lists</a>.
         {!mailgun.configured && ' Mailgun isn’t set up, so nothing is sent (locally, emails go to the mail catcher).'}
       </p>
     </div>
@@ -103,7 +103,7 @@ const contactQuery = (patch: Record<string, string>) => `?${new URLSearchParams(
       )}
     </div>
   )}
-  {!settings.address && settings.enabled && <p class="mt-4 rounded bg-[#b26a00]/10 px-3 py-2 text-sm text-[#b26a00]">Add the postal address under <a class="underline" href="/admin/settings/#mailing-lists">Settings &gt; Mailing Lists</a>: every email must carry it, so nothing can be sent until it is there.</p>}
+  {!settings.address && settings.enabled && <p class="mt-4 rounded bg-[#b26a00]/10 px-3 py-2 text-sm text-[#b26a00]">Add the postal address under <a class="underline" href="/admin/settings/mailing-lists/">Settings &gt; Mailing Lists</a>: every email must carry it, so nothing can be sent until it is there.</p>}
   {ok && <p class="mt-4 rounded bg-[#6db56d]/15 px-3 py-2 text-sm text-[#3f7a3f]">{ok}</p>}
   {error && <p class="mt-4 rounded bg-[#c4592a]/10 px-3 py-2 text-sm text-[#c4592a]">{error}</p>}
 
