@@ -57,7 +57,7 @@ function closes Square's payment links, which don't expire).
 
 ## The attendee list
 
-**Tickets** in the admin lists the events that sell tickets, with what each has sold. An event's
+**Tickets** in the admin (under People) lists the events that sell tickets, with what each has sold. An event's
 attendee list (`/admin/tickets/<id>/`):
 
 - orders by status, searchable, with a checkbox to check people in at the door

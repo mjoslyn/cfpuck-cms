@@ -7,6 +7,7 @@ import { memberSettings } from '../lib/members/config';
 import { eventsOn } from '../lib/events/on';
 import { mailingOn } from '../lib/mailing/config';
 import { helpUrl } from '../lib/help';
+import { adminNav, isGroup, navActive } from '../lib/admin/nav';
 // Admin chrome. Tailwind only; the public site's CSS never loads here.
 import '../styles/tailwind.css';
 import '../styles/admin.css';
@@ -25,18 +26,9 @@ const siteSettings = (await (Astro.locals.db ?? siteDb()).from('settings').selec
 const membersOn = isAdmin && memberSettings(siteSettings).enabled;
 const ticketsOn = eventsOn(siteSettings);
 const mailOn = mailingOn(siteSettings);
-const nav = [
-  { href: '/admin/', label: 'Content' },
-  { href: '/admin/templates/', label: 'Templates' },
-  { href: '/admin/media/', label: 'Media' },
-  { href: '/admin/forms/', label: 'Forms' },
-  { href: '/admin/submissions/', label: 'Submissions' },
-  ...(ticketsOn ? [{ href: '/admin/tickets/', label: 'Tickets' }] : []),
-  ...(mailOn ? [{ href: '/admin/mailing-lists/', label: 'Mailing Lists' }] : []),
-  { href: '/admin/settings/', label: 'Settings', admin: true },
-  { href: '/admin/users/', label: 'Users', admin: true },
-  ...(membersOn ? [{ href: '/admin/members/', label: 'Members', admin: true }] : []),
-].filter((n) => !n.admin || isAdmin);
+const nav = adminNav({ isAdmin, ticketsOn, mailOn, membersOn });
+const inSettings = path.startsWith('/admin/settings');
+const link = (on: boolean) => (on ? 'bg-admin-on-bar/15 text-admin-on-bar' : 'text-admin-on-bar/65 hover:bg-admin-on-bar/10 hover:text-admin-on-bar');
 ---
 <!doctype html>
 <html lang="en">
@@ -51,28 +43,53 @@ const nav = [
   <body class="min-h-screen bg-admin-bg font-admin text-admin-ink antialiased">
     {
       user && (
-        <header class="border-b border-admin-ink/10 bg-admin-bar text-admin-on-bar">
+        <>
+        <header class="relative border-b border-admin-ink/10 bg-admin-bar text-admin-on-bar">
           <div class="mx-auto flex h-14 max-w-[1280px] items-center gap-6 px-6">
             {/* The logo from Settings > Appearance, else (or beside it) the site name; the settings screen previews changes here. */}
             <a href="/admin/" id="admin-brand" class="flex shrink-0 items-center gap-2.5 whitespace-nowrap text-lg font-semibold">
               {theme?.logo_url && <img src={theme.logo_url} alt={theme.logo_name ? '' : site.name} class="block h-8 w-auto max-w-[120px] object-contain sm:max-w-[180px]" />}
               {(!theme?.logo_url || theme.logo_name) && <span class:list={[theme?.logo_url && 'max-sm:hidden']}>{site.name}</span>}
             </a>
-            {/* One line: items never wrap; when space runs out the menu scrolls sideways. */}
-            <nav class="admin-nav -my-2 flex min-w-0 flex-1 gap-1 overflow-x-auto py-2 text-sm" aria-label="Admin">
-              {nav.map((n) => (
-                <a href={n.href} class:list={['shrink-0 whitespace-nowrap rounded px-3 py-1.5 transition-colors', (n.href === '/admin/' ? path === '/admin/' || path.startsWith('/admin/content') || path.startsWith('/admin/compose') : path.startsWith(n.href)) ? 'bg-admin-on-bar/15' : 'text-admin-on-bar/65 hover:bg-admin-on-bar/10 hover:text-admin-on-bar']}>
-                  {n.label}
-                </a>
-              ))}
+            {/* Wide screens: a few links and the Forms and People dropdowns (src/lib/admin/nav.ts). */}
+            <nav class="hidden min-w-0 flex-1 items-center gap-1 text-sm lg:flex" aria-label="Admin">
+              {nav.map((n) =>
+                isGroup(n) ? (
+                  <details class="relative" data-menu>
+                    <summary class:list={['flex cursor-pointer list-none items-center gap-1 rounded px-3 py-1.5 whitespace-nowrap transition-colors [&::-webkit-details-marker]:hidden', link(navActive(n, path))]}>
+                      {n.label}
+                      <svg aria-hidden="true" viewBox="0 0 12 12" class="h-3 w-3"><path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.5" /></svg>
+                    </summary>
+                    <ul class="absolute left-0 z-50 m-0 mt-2 min-w-44 list-none rounded-lg border border-admin-ink/10 bg-white p-1 shadow-lg">
+                      {n.items.map((i) => (
+                        <li>
+                          <a href={i.href} aria-current={navActive(i, path) ? 'page' : undefined} class:list={['block rounded px-3 py-1.5 hover:bg-admin-soft', navActive(i, path) ? 'font-medium text-admin-accent' : 'text-admin-ink']}>
+                            {i.label}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                ) : (
+                  <a href={n.href} aria-current={navActive(n, path) ? 'page' : undefined} class:list={['rounded px-3 py-1.5 whitespace-nowrap transition-colors', link(navActive(n, path))]}>
+                    {n.label}
+                  </a>
+                ),
+              )}
             </nav>
+            <div class="flex-1 lg:hidden" />
             <div class="flex shrink-0 items-center gap-4 text-sm text-admin-on-bar/65">
+              {isAdmin && (
+                <a href="/admin/settings/" title="Settings" aria-label="Settings" aria-current={inSettings ? 'page' : undefined} class:list={['hidden h-8 w-8 items-center justify-center rounded-full lg:flex', link(inSettings)]}>
+                  <svg aria-hidden="true" viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
+                </a>
+              )}
               <a href={helpUrl()} target="_blank" rel="noopener" title="Help: the site guide" aria-label="Help: the site guide (opens in a new tab)" class="flex h-7 w-7 items-center justify-center rounded-full border border-admin-on-bar/40 text-sm font-semibold hover:border-admin-on-bar hover:text-admin-on-bar">?</a>
-              <a href="/" target="_blank" class="whitespace-nowrap hover:text-admin-on-bar">View site</a>
-              <details class="relative">
-                <summary class="flex cursor-pointer list-none items-center gap-2 rounded-full py-1 pr-2 pl-1 hover:bg-admin-on-bar/10 [&::-webkit-details-marker]:hidden" aria-label="Account">
+              <a href="/" target="_blank" class="whitespace-nowrap hover:text-admin-on-bar max-sm:hidden">View site</a>
+              <details class="relative" data-menu>
+                <summary class="flex cursor-pointer list-none items-center gap-2 rounded-full py-1 pr-2 pl-1 max-sm:pr-1 hover:bg-admin-on-bar/10 [&::-webkit-details-marker]:hidden" aria-label="Account">
                   <span class="flex h-7 w-7 items-center justify-center rounded-full bg-admin-accent text-xs font-semibold text-white uppercase">{(user.name || user.email).slice(0, 1)}</span>
-                  <span class="max-w-32 truncate text-admin-on-bar">{user.name || user.email.split('@')[0]}</span>
+                  <span class="max-w-32 truncate text-admin-on-bar max-sm:hidden">{user.name || user.email.split('@')[0]}</span>
                 </summary>
                 <div class="absolute right-0 z-50 mt-2 w-64 rounded-lg border border-admin-ink/10 bg-white p-3 text-admin-muted shadow-lg">
                   <div class="truncate font-medium text-admin-ink">{user.email}</div>
@@ -82,9 +99,47 @@ const nav = [
                   </form>
                 </div>
               </details>
+              {/* Narrow screens: every screen behind one menu button, the groups as headings. */}
+              <details class="lg:hidden" data-menu>
+                <summary class="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded hover:bg-admin-on-bar/10 [&::-webkit-details-marker]:hidden" aria-label="Menu">
+                  <svg aria-hidden="true" viewBox="0 0 24 24" class="h-5 w-5 text-admin-on-bar" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+                </summary>
+                <nav aria-label="Admin" class="absolute inset-x-0 top-14 z-50 max-h-[calc(100vh-3.5rem)] overflow-y-auto border-b border-admin-ink/10 bg-white px-6 py-4 text-admin-ink shadow-lg">
+                  <ul class="m-0 list-none p-0 sm:columns-2">
+                    {[...nav, ...(isAdmin ? [{ href: '/admin/settings/', label: 'Settings' }] : []), { href: '/', label: 'View site' }].map((n) =>
+                      isGroup(n) ? (
+                        <li class="mb-2 break-inside-avoid">
+                          <span class="block px-3 pt-2 pb-1 text-[11px] font-semibold tracking-wider text-admin-muted uppercase">{n.label}</span>
+                          <ul class="m-0 list-none p-0">
+                            {n.items.map((i) => (
+                              <li><a href={i.href} aria-current={navActive(i, path) ? 'page' : undefined} class:list={['block rounded px-3 py-2 hover:bg-admin-soft', navActive(i, path) && 'font-medium text-admin-accent']}>{i.label}</a></li>
+                            ))}
+                          </ul>
+                        </li>
+                      ) : (
+                        <li class="break-inside-avoid"><a href={n.href} aria-current={n.href !== '/' && navActive(n, path) ? 'page' : undefined} class:list={['block rounded px-3 py-2 hover:bg-admin-soft', n.href !== '/' && navActive(n, path) && 'font-medium text-admin-accent']}>{n.label}</a></li>
+                      ),
+                    )}
+                  </ul>
+                </nav>
+              </details>
             </div>
           </div>
         </header>
+        <script is:inline>
+          // One menu open at a time; a click elsewhere or Escape closes it.
+          document.addEventListener('click', (e) => {
+            for (const d of document.querySelectorAll('details[data-menu][open]')) if (!d.contains(e.target)) d.open = false;
+          });
+          document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape') return;
+            for (const d of document.querySelectorAll('details[data-menu][open]')) {
+              d.open = false;
+              d.querySelector('summary')?.focus();
+            }
+          });
+        </script>
+        </>
       )
     }
     <main class:list={[wide ? '' : 'mx-auto max-w-[1280px] px-6 py-8']}>

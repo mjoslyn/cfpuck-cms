@@ -49,7 +49,7 @@ Paid tickets need card payments set up for your site; ask your admin. Free ticke
 
 ## Who is coming
 
-Click **Tickets** in the top bar to see every event taking bookings, with tickets sold and takings.
+Click **People**, then **Tickets**, in the top bar to see every event taking bookings, with tickets sold and takings.
 Click an event to see its **Orders**:
 
 - **Checked in**: tick people off at the door. **Print** gives you a paper list.

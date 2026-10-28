@@ -31,7 +31,7 @@ settings.
 
 ## Managing members
 
-**Members** in the admin (admins only) lists everyone with a membership, with tabs by status (waiting
+**Members** in the admin (under People, admins only) lists everyone with a membership, with tabs by status (waiting
 for approval, active, expired, suspended) and a search. For each: name, level, status, expiry date
 (empty: never) and notes, saved with **Save**; **Approve** for sign-ups; **Resend invitation** (invited, no password set yet); **Send password link**; and
 **Remove**, which ends the membership and deletes the account unless the person also edits the site.

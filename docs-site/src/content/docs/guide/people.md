@@ -5,7 +5,7 @@ sidebar:
   order: 10
 ---
 
-**Users** (in the top bar, admins only) lists everyone who can sign in to look after the site.
+**Users** (under **People** in the top bar, admins only) lists everyone who can sign in to look after the site.
 
 ![The Users screen](../../../assets/guide/users.png)
 
@@ -37,5 +37,5 @@ They can reset it themselves: on the sign-in screen, **Forgot your password?** s
 
 ## Members
 
-If your site has members-only content, members are managed separately under **Members** in the top
-bar. Members can sign in to see members-only pages, but can't get into these admin screens.
+If your site has members-only content, members are managed separately under **People**, **Members**
+in the top bar. Members can sign in to see members-only pages, but can't get into these admin screens.

@@ -1116,6 +1116,13 @@ it makes the one-time password token.
 `awaitingPassword` lists accounts with an open invitation, or invited with no password, for the
 screens' "Invited" rows and Resend invitation.
 
+The admin bar (`src/layouts/Admin.astro`, its items from `adminNav` in `src/lib/admin/nav.ts`): Content,
+Templates and Media, a **Forms** dropdown (Forms, Submissions) and a **People** dropdown (Users and Members
+for admins, Mailing Lists and Tickets, each while its feature is on; a group of one shows as its link),
+then a gear for Settings (admins), **?**, View site and the account menu. Below 1024px it all sits behind
+one menu button, the groups as headings. The dropdowns are `details[data-menu]`: one open at a time, closed
+by a click elsewhere or Escape.
+
 **Settings** (admins; `src/puck/SiteSettings.tsx`, page `src/pages/admin/settings/[...section].astro`): a side
 menu of sections in groups (`SETTINGS_GROUPS`, `src/lib/admin/settings-sections.ts`): Site (General, Menu,
 Social, Search, Types, the site's own options), Features (Events, Tickets, Members, Mailing Lists, marked

@@ -10,7 +10,7 @@ it on any page.
 
 ## Making a form
 
-1. Click **Forms** in the top bar, then **New form**.
+1. Click **Forms** in the top bar, then **Forms** and **New form**.
 2. Give it a title.
 3. On the **Fields** tab, add the questions you want to ask. Click a field type on the left to add it,
    or drag it into the form. Drag fields in the form to change their order.
@@ -88,7 +88,7 @@ The same form can be on several pages.
 
 ## Reading what people sent
 
-Click **Submissions** in the top bar. The newest are at the top; pick a form from **All forms** to see
+Click **Forms**, then **Submissions**, in the top bar. The newest are at the top; pick a form from **All forms** to see
 only that form's. Click one to read it in full.
 
 ![The Submissions screen](../../../assets/guide/submissions.png)

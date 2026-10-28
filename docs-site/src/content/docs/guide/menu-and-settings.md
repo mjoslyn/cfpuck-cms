@@ -5,7 +5,7 @@ sidebar:
   order: 9
 ---
 
-**Settings** (in the top bar, admins only) holds everything that applies to the whole site. The menu
+**Settings** (the gear ⚙ in the top bar, admins only) holds everything that applies to the whole site. The menu
 on the left lists its sections in groups: **Site**, **Features** (each marked **On** or **Off**),
 **Services**, **Admin** and **Upkeep**. On a phone, pick a section from the **Section** list at the top.
 

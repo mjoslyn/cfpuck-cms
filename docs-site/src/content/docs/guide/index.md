@@ -38,14 +38,14 @@ The dark bar across the top of every admin screen takes you to each part of the 
 | **Content** | Your pages, posts and anything else the site lists, such as events. |
 | **Templates** | The shared layouts every page uses, such as the header and footer. |
 | **Media** | Your photos, images, videos and documents. |
-| **Forms** | Contact forms, sign-up forms and the like. |
-| **Submissions** | What people sent through your forms. |
-| **Tickets** | Ticket sales and sign-ups for events (only when events are turned on). |
-| **Mailing Lists** | Email newsletters (only when mailing lists are turned on). |
-| **Settings** | Site-wide settings, such as the menu. Admins only. |
-| **Users** | Who can sign in to look after the site. Admins only. |
+| **Forms** ▾ | **Forms** (contact forms, sign-up forms and the like) and **Submissions** (what people sent through them). |
+| **People** ▾ | **Users** (who can sign in to look after the site; admins only), **Members**, **Mailing Lists** and **Tickets** (each only when your site uses it). |
+| ⚙ (the gear) | **Settings**: site-wide settings, such as the menu. Admins only. |
 
-**View site** opens your public website in a new tab, so you can see your changes as visitors will.
+Click **Forms** or **People** to open its list, then the screen you want. On a phone or a narrow
+window, the whole menu is behind the ☰ button at the top right.
+
+**View site** (in the ☰ menu on a phone) opens your public website in a new tab, so you can see your changes as visitors will.
 
 ## Editors and admins
 

@@ -27,7 +27,7 @@ Under **Settings > Mailing Lists** (admins):
 
 ## Lists and signing up
 
-Add lists on the **Mailing Lists** screen (in the admin menu once Mailing is on), **Lists** tab: name,
+Add lists on the **Mailing Lists** screen (under People in the admin menu once Mailing is on), **Lists** tab: name,
 description and Public, then **Add list**. Lists are for anyone, members or not. **View subscribers**
 on each list shows who is on it. **Public** lists are offered by sign-up forms and on
 the email preferences page; the others are for people you add yourself.
