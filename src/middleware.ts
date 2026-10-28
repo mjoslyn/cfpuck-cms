@@ -106,8 +106,8 @@ export const onRequest = defineMiddleware(async (context, next) => {
   if (crossSite(context.request, context.url) && !CROSS_SITE_POSTS.includes(pathname)) {
     return new Response(`Cross-site ${context.request.method} form submissions are forbidden`, { status: 403 });
   }
-  await refreshSiteTimezone();
-  await refreshSavedKeys();
+  // Independent reads: at most once a minute each, together.
+  await Promise.all([refreshSiteTimezone(), refreshSavedKeys()]);
   // The other copy's queries during a sync (signed; the route checks them) clear the pages as edits do.
   if (pathname === '/api/sync/remote') return purgeAfter(context, next);
   const isAdmin = pathname.startsWith('/admin') || pathname.startsWith('/api/admin');

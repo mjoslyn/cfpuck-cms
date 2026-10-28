@@ -31,6 +31,12 @@ export function publicOrigin(origin: string): boolean {
   }
 }
 
+/** A setting the host sets must match what the key needs, since the host's wins over a saved one. */
+function pin(name: string, detected: string) {
+  const host = hostEnv(name);
+  if (host && host !== detected) throw new ConnectError(`The server sets ${name} to ${host}, but this key needs ${detected}. Change or remove it on the server first.`);
+}
+
 const LOCAL = 'Webhooks weren’t set up: this copy of the site isn’t at a public address. Connect again on the live site.';
 
 async function json(res: Response) {
@@ -67,20 +73,31 @@ export async function connect(service: Service, input: Record<string, string>, c
         if (!typed.startsWith('whsec_')) throw new ConnectError('The webhook signing secret starts whsec_.');
         values.STRIPE_WEBHOOK_SECRET = typed;
       }
+      // The key the site has now: its webhook can stay as it is when the key hasn't changed.
+      const sameKey = key === (current('STRIPE_SECRET_KEY') ?? '') && !!current('STRIPE_WEBHOOK_SECRET');
       const list = await stripe('GET', '/webhook_endpoints?limit=100');
       if (list.status === 401) throw new ConnectError('Stripe didn’t accept that key.');
       const notes = [`Stripe is connected, in ${mode}.`];
       if (typed || hostEnv('STRIPE_WEBHOOK_SECRET')) return { values, notes };
       if (!hooks) return { values, notes: [...notes, LOCAL] };
       if (!list.ok) return { values, notes: [...notes, `This key can’t set up webhooks. In Stripe, add an endpoint at ${site}/api/payments/stripe and paste its signing secret here.`] };
-      // The site's own endpoint, made afresh (a secret can only be read when an endpoint is made).
       const url = `${site}/api/payments/stripe`;
-      for (const e of (await json(list)).data ?? []) if (e.url === url) await stripe('DELETE', `/webhook_endpoints/${e.id}`);
+      const events = new URLSearchParams();
+      STRIPE_EVENTS.forEach((ev, i) => events.set(`enabled_events[${i}]`, ev));
+      const old: { id: string }[] = ((await json(list)).data ?? []).filter((e: { url: string }) => e.url === url);
+      // Unchanged key and secret: the endpoint stays (its events brought up to date), so its secret does too.
+      if (sameKey && old.length === 1) {
+        await stripe('POST', `/webhook_endpoints/${old[0].id}`, events);
+        return { values: { ...values, STRIPE_WEBHOOK_SECRET: current('STRIPE_WEBHOOK_SECRET')! }, notes: [...notes, `Stripe sends payment updates to ${url}.`] };
+      }
+      // A new endpoint (a secret can only be read when one is made), then the old ones go: if making it
+      // fails, the endpoint that works stays.
       const body = new URLSearchParams({ url, description: 'Payments for this site (set up by Settings > Connections)' });
-      STRIPE_EVENTS.forEach((ev, i) => body.set(`enabled_events[${i}]`, ev));
+      for (const [k, v] of events) body.set(k, v);
       const made = await stripe('POST', '/webhook_endpoints', body);
       const ep = await json(made);
       if (!made.ok || !ep.secret) throw new ConnectError(`Stripe refused the webhook: ${ep?.error?.message ?? made.status}.`);
+      for (const e of old) if (e.id !== ep.id) await stripe('DELETE', `/webhook_endpoints/${e.id}`);
       values.STRIPE_WEBHOOK_SECRET = ep.secret;
       return { values, notes: [...notes, `Stripe sends payment updates to ${url}.`] };
     }
@@ -107,20 +124,32 @@ export async function connect(service: Service, input: Record<string, string>, c
       const wanted = val('SQUARE_LOCATION_ID');
       const location = locations.find((l) => l.id === wanted) ?? (locations.length === 1 ? locations[0] : undefined);
       if (!location) return { values: {}, notes: [], choose: { name: 'SQUARE_LOCATION_ID', label: 'Location payments go to', options: locations.map((l) => [l.id, l.name]) } };
+      pin('SQUARE_ENVIRONMENT', environment);
+      pin('SQUARE_LOCATION_ID', location.id);
       const values: Record<string, string> = { SQUARE_ACCESS_TOKEN: token, SQUARE_LOCATION_ID: location.id, SQUARE_ENVIRONMENT: environment };
       const notes = [`Square is connected${environment === 'sandbox' ? ', in its sandbox' : ''}, taking payments at ${location.name}.`];
       if (hostEnv('SQUARE_WEBHOOK_SIGNATURE_KEY')) return { values, notes };
       if (!hooks) return { values, notes: [...notes, LOCAL] };
       const url = `${site}/api/payments/square`;
+      pin('SQUARE_WEBHOOK_URL', url);
       const subs = await square(environment, 'GET', '/webhooks/subscriptions');
-      for (const s of subs.ok ? ((await json(subs)).subscriptions ?? []) : []) if (s.notification_url === url) await square(environment, 'DELETE', `/webhooks/subscriptions/${s.id}`);
+      const old: { id: string }[] = (subs.ok ? ((await json(subs)).subscriptions ?? []) : []).filter((x: { notification_url: string }) => x.notification_url === url);
+      const sameToken = token === (current('SQUARE_ACCESS_TOKEN') ?? '') && environment === current('SQUARE_ENVIRONMENT') && !!current('SQUARE_WEBHOOK_SIGNATURE_KEY');
+      const done = (key: string) => ({ values: { ...values, SQUARE_WEBHOOK_SIGNATURE_KEY: key, SQUARE_WEBHOOK_URL: url }, notes: [...notes, `Square sends payment updates to ${url}.`] });
+      // Unchanged token and key: the subscription stays, so its signature key does too.
+      if (sameToken && old.length === 1) return done(current('SQUARE_WEBHOOK_SIGNATURE_KEY')!);
+      // A new subscription, then the old ones go: if making it fails, the one that works stays.
       const made = await square(environment, 'POST', '/webhooks/subscriptions', {
         idempotency_key: crypto.randomUUID(),
         subscription: { name: 'This site’s payments', enabled: true, event_types: SQUARE_EVENTS, notification_url: url },
       });
       const sub = (await json(made)).subscription;
-      if (!made.ok || !sub?.signature_key) return { values, notes: [...notes, `Square refused the webhook. In Square, subscribe ${url} to ${SQUARE_EVENTS.join(', ')}.`] };
-      return { values: { ...values, SQUARE_WEBHOOK_SIGNATURE_KEY: sub.signature_key, SQUARE_WEBHOOK_URL: url }, notes: [...notes, `Square sends payment updates to ${url}.`] };
+      if (!made.ok || !sub?.signature_key) {
+        if (old.length) throw new ConnectError(`Square refused the webhook (${made.status}); the one it has stays. Try again.`);
+        return { values, notes: [...notes, `Square refused the webhook. In Square, subscribe ${url} to ${SQUARE_EVENTS.join(', ')}.`] };
+      }
+      for (const x of old) if (x.id !== sub.id) await square(environment, 'DELETE', `/webhooks/subscriptions/${x.id}`);
+      return done(sub.signature_key);
     }
 
     case 'mailgun': {
@@ -146,6 +175,8 @@ export async function connect(service: Service, input: Record<string, string>, c
       const wanted = val('MAILGUN_DOMAIN');
       const domain = domains.includes(wanted) ? wanted : domains.length === 1 ? domains[0] : undefined;
       if (!domain) return { values: {}, notes: [], choose: { name: 'MAILGUN_DOMAIN', label: 'Sending domain', options: domains.map((d) => [d, d]) } };
+      pin('MAILGUN_REGION', region);
+      pin('MAILGUN_DOMAIN', domain);
       const values: Record<string, string> = { MAILGUN_API_KEY: key, MAILGUN_DOMAIN: domain, MAILGUN_REGION: region };
       const notes = [`Mailgun is connected, sending from ${domain}.`];
       const typed = (input.MAILGUN_WEBHOOK_SIGNING_KEY ?? '').trim();

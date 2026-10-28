@@ -5,7 +5,7 @@
 import type { APIRoute } from 'astro';
 import { serviceClient } from '../../../lib/db/site';
 import { env, hostEnv } from '../../../lib/env';
-import { keyStatus, namesOf, saveKeys, SERVICES, type Service } from '../../../lib/site-keys';
+import { cannotSave, keyStatus, namesOf, saveKeys, SERVICES, type Service } from '../../../lib/site-keys';
 import { connect, ConnectError } from '../../../lib/connections';
 import { checkPassword } from '../../../lib/auth';
 import { sendMail } from '../../../lib/forms/mail';
@@ -51,19 +51,23 @@ export const POST: APIRoute = async ({ request, locals, url }) => {
   }
   const db = serviceClient();
   const who = locals.user.email;
+  // Before any service is changed (webhooks made, secrets rotated): keys made then must be savable.
+  const why = await cannotSave(db);
+  if (why) return new Response(why, { status: 503 });
   try {
     if (body.remove) {
-      await saveKeys(db, Object.fromEntries(namesOf(service).filter((n) => !hostEnv(n)).map((n) => [n, ''])), who);
-      await tellAdmins(url.origin, who, `${def.label} was disconnected`);
-      return Response.json({ keys: await keyStatus(db), notes: [`${def.label}’s saved keys were removed. Its webhooks stay in ${def.label}’s dashboard until you delete them there.`] });
+      const changed = await saveKeys(db, Object.fromEntries(namesOf(service).filter((n) => !hostEnv(n)).map((n) => [n, ''])), who);
+      if (changed.length) await tellAdmins(url.origin, who, `${def.label} was disconnected`);
+      return Response.json({ keys: await keyStatus(db, false), notes: [changed.length ? `${def.label}’s saved keys were removed. Its webhooks stay in ${def.label}’s dashboard until you delete them there.` : 'Nothing was saved here to remove.'] });
     }
     const input = Object.fromEntries(Object.entries((body.values ?? {}) as Record<string, unknown>).filter(([k]) => namesOf(service).includes(k)).map(([k, v]) => [k, String(v ?? '')]));
     const done = await connect(service, input, env, env('SITE_URL') || url.origin);
     if (done.choose) return Response.json({ choose: done.choose, notes: done.notes });
-    // A setting the host sets stays the host's.
-    await saveKeys(db, Object.fromEntries(Object.entries(done.values).filter(([k]) => !hostEnv(k))), who);
-    await tellAdmins(url.origin, who, `${def.label} was connected`);
-    return Response.json({ keys: await keyStatus(db), notes: done.notes });
+    // A setting the host sets stays the host's (connect has checked they agree).
+    const changed = await saveKeys(db, Object.fromEntries(Object.entries(done.values).filter(([k]) => !hostEnv(k))), who);
+    // Admins hear of changes only, so the email stays worth reading.
+    if (changed.length) await tellAdmins(url.origin, who, `${def.label} was connected`);
+    return Response.json({ keys: await keyStatus(db, false), notes: done.notes });
   } catch (e) {
     return new Response((e as Error).message, { status: e instanceof ConnectError ? 400 : 502 });
   }

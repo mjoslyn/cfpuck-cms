@@ -2,9 +2,13 @@
 // a key made from AUTH_SECRET and bound to their names, readable by no role, never synced, behind the
 // environment; and each service checked and set up (webhooks, a location or domain) before saving.
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+
+const sent = vi.hoisted(() => [] as { to: string[]; subject: string }[]);
+vi.mock('../src/lib/forms/mail', async (actual) => ({ ...(await actual<object>()), sendMail: async (m: { to: string[]; subject: string }) => (sent.push(m), true) }));
 import { sessionDb, siteDb } from '../src/lib/db/site';
 import { env } from '../src/lib/env';
 import { keyStatus, refreshSavedKeys, saveKeys, seal, unseal } from '../src/lib/site-keys';
+import { POST as connectRoute } from '../src/pages/api/admin/connections';
 import { connect, ConnectError, MAILGUN_EVENTS, publicOrigin, STRIPE_EVENTS } from '../src/lib/connections';
 import { SYNC_TABLES } from '../src/lib/sync-remote';
 import { changesPages } from '../src/lib/cache';
@@ -15,7 +19,7 @@ beforeAll(() => {
 });
 afterEach(() => {
   vi.unstubAllGlobals();
-  delete process.env.MAILGUN_REGION;
+  for (const k of ['MAILGUN_REGION', 'SQUARE_ENVIRONMENT', 'ANTHROPIC_API_KEY']) delete process.env[k];
 });
 
 describe('saved keys', () => {
@@ -156,5 +160,93 @@ describe('connecting a service', () => {
     expect(new URLSearchParams(posted[0]).get('url')).toBe('https://town.example.org/api/mailgun/webhook');
     expect(calls).toContain('PUT api.eu.mailgun.net/v3/domains/mg.town.org/webhooks/opened');
     expect(out.notes.at(-1)).toMatch(/sends deliveries/);
+  });
+});
+
+describe('the fixes from review', () => {
+  it('makes requests that arrive during a load wait for the keys', async () => {
+    await db.from('site_keys').insert({ name: 'ANTHROPIC_API_KEY', value: await seal('ANTHROPIC_API_KEY', 'sk-ant-race'), hint: 'race' });
+    const first = refreshSavedKeys(db, true);
+    // A second request while the first is loading: it must not run without the key.
+    await refreshSavedKeys(db);
+    expect(env('ANTHROPIC_API_KEY')).toBe('sk-ant-race');
+    await first;
+    await saveKeys(db, { ANTHROPIC_API_KEY: '' }, 'a');
+  });
+
+  it('reports only the settings whose values changed', async () => {
+    expect(await saveKeys(db, { ANTHROPIC_API_KEY: 'sk-ant-1' }, 'a')).toEqual(['ANTHROPIC_API_KEY']);
+    expect(await saveKeys(db, { ANTHROPIC_API_KEY: 'sk-ant-1' }, 'a')).toEqual([]);
+    expect(await saveKeys(db, { ANTHROPIC_API_KEY: '', MAILGUN_DOMAIN: '' }, 'a')).toEqual(['ANTHROPIC_API_KEY']);
+  });
+
+  it('keeps Stripe’s working endpoint when making a new one fails', async () => {
+    const calls = stub({
+      'GET api.stripe.com/v1/webhook_endpoints': () => [200, { data: [{ id: 'we_old', url: 'https://town.example.org/api/payments/stripe' }] }],
+      'POST api.stripe.com/v1/webhook_endpoints': () => [500, { error: { message: 'busy' } }],
+    });
+    await expect(connect('stripe', { STRIPE_SECRET_KEY: 'sk_test_new' }, none, 'https://town.example.org')).rejects.toThrow(/refused the webhook/);
+    expect(calls.filter((c) => c.startsWith('DELETE'))).toEqual([]);
+  });
+
+  it('keeps the webhook and its secret when the key hasn’t changed', async () => {
+    const saved: Record<string, string> = { STRIPE_SECRET_KEY: 'sk_live_same', STRIPE_WEBHOOK_SECRET: 'whsec_keep' };
+    const calls = stub({
+      'GET api.stripe.com/v1/webhook_endpoints': () => [200, { data: [{ id: 'we_1', url: 'https://town.example.org/api/payments/stripe' }] }],
+      'POST api.stripe.com/v1/webhook_endpoints/we_1': () => [200, { id: 'we_1' }],
+    });
+    const out = await connect('stripe', {}, (n) => saved[n], 'https://town.example.org');
+    expect(out.values.STRIPE_WEBHOOK_SECRET).toBe('whsec_keep');
+    expect(calls).toEqual(['GET api.stripe.com/v1/webhook_endpoints', 'POST api.stripe.com/v1/webhook_endpoints/we_1']);
+    const square: Record<string, string> = { SQUARE_ACCESS_TOKEN: 'tok', SQUARE_ENVIRONMENT: 'production', SQUARE_LOCATION_ID: 'L1', SQUARE_WEBHOOK_SIGNATURE_KEY: 'sig-keep' };
+    const sq = stub({
+      'GET connect.squareup.com/v2/locations': () => [200, { locations: [{ id: 'L1', name: 'Main', status: 'ACTIVE' }] }],
+      'GET connect.squareup.com/v2/webhooks/subscriptions': () => [200, { subscriptions: [{ id: 's1', notification_url: 'https://town.example.org/api/payments/square' }] }],
+    });
+    expect((await connect('square', {}, (n) => square[n], 'https://town.example.org')).values.SQUARE_WEBHOOK_SIGNATURE_KEY).toBe('sig-keep');
+    expect(sq.some((c) => c.startsWith('POST') || c.startsWith('DELETE'))).toBe(false);
+  });
+
+  it('refuses a key whose region or environment the server sets otherwise, before any webhook', async () => {
+    process.env.MAILGUN_REGION = 'eu';
+    const calls = stub({ 'GET api.mailgun.net/v3/domains': () => [200, { items: [{ name: 'mg.town.org', state: 'active' }] }] });
+    await expect(connect('mailgun', { MAILGUN_API_KEY: 'k' }, none, 'https://town.example.org')).rejects.toThrow(/sets MAILGUN_REGION to eu, but this key needs us/);
+    expect(calls.some((c) => c.includes('webhooks'))).toBe(false);
+    process.env.SQUARE_ENVIRONMENT = 'production';
+    stub({ 'GET connect.squareup.com/v2/locations': () => [401, {}], 'GET connect.squareupsandbox.com/v2/locations': () => [200, { locations: [{ id: 'L1', name: 'Main', status: 'ACTIVE' }] }] });
+    await expect(connect('square', { SQUARE_ACCESS_TOKEN: 't' }, none, 'https://town.example.org')).rejects.toThrow(/SQUARE_ENVIRONMENT/);
+  });
+
+  const route = (body: unknown) =>
+    connectRoute({ request: new Request('https://town.example.org/api/admin/connections', { method: 'POST', body: JSON.stringify(body) }), locals: { user: { role: 'admin', email: 'admin@example.org' } }, url: new URL('https://town.example.org/api/admin/connections') } as any) as Promise<Response>;
+
+  it('touches no service when keys couldn’t be saved', async () => {
+    const calls = stub({ 'GET api.anthropic.com/v1/models': () => [200, {}] });
+    const secret = process.env.AUTH_SECRET;
+    delete process.env.AUTH_SECRET;
+    const res = await route({ service: 'anthropic', values: { ANTHROPIC_API_KEY: 'k' } });
+    process.env.AUTH_SECRET = secret;
+    expect(res.status).toBe(503);
+    expect(calls).toEqual([]);
+  });
+
+  it('emails the admins only when a key changed', async () => {
+    const id = '00000000-0000-4000-8000-0000000000c1';
+    await db.from('users').insert({ id, email: 'boss@example.org', name: 'Boss' });
+    await db.from('profiles').upsert({ id, role: 'admin' }, { onConflict: 'id' });
+    stub({ 'GET api.anthropic.com/v1/models': () => [200, {}] });
+    sent.length = 0;
+    expect((await route({ service: 'anthropic', values: { ANTHROPIC_API_KEY: 'sk-ant-mail' } })).status).toBe(200);
+    expect(sent.map((m) => m.to)).toEqual([['boss@example.org']]);
+    // The same key again, a key the host sets, and removing nothing: no email.
+    await route({ service: 'anthropic', values: {} });
+    process.env.ANTHROPIC_API_KEY = 'host-key';
+    await route({ service: 'anthropic', values: {} });
+    delete process.env.ANTHROPIC_API_KEY;
+    await route({ service: 'anthropic', remove: true });
+    expect(sent).toHaveLength(2);
+    expect(sent[1].subject).toMatch(/disconnected/);
+    expect((await route({ service: 'anthropic', remove: true })).status).toBe(200);
+    expect(sent).toHaveLength(2);
   });
 });

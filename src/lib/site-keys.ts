@@ -6,7 +6,7 @@
 // Loaded at most once a minute per server instance (refreshSavedKeys), as the site timezone is.
 import type { Db } from './db/query';
 import { siteDb } from './db/site';
-import { hostEnv, useSavedKeys } from './env';
+import { env, hostEnv, useSavedKeys } from './env';
 
 export type Service = 'anthropic' | 'stripe' | 'square' | 'mailgun';
 
@@ -61,12 +61,11 @@ export async function unseal(name: string, stored: string): Promise<string | nul
 
 let loaded = 0;
 let unreadable: string[] = [];
+let rows: { name: string; hint: string | null; updated_at: string | null; updated_by: string | null }[] = [];
+let pending: Promise<void> | null = null;
 
-/** Load the saved keys into env() (at most once a minute unless `force`). A failure leaves the last ones. */
-export async function refreshSavedKeys(db: Db = siteDb(), force = false): Promise<void> {
-  if (!force && Date.now() - loaded < 60_000) return;
-  loaded = Date.now();
-  const { data, error } = await db.from('site_keys').select('name, value');
+async function load(db: Db): Promise<void> {
+  const { data, error } = await db.from('site_keys').select('name, value, hint, updated_at, updated_by');
   if (error) return; // A database without the table yet: keys come from the environment only.
   const keys: Record<string, string> = {};
   const bad: string[] = [];
@@ -77,24 +76,70 @@ export async function refreshSavedKeys(db: Db = siteDb(), force = false): Promis
     else keys[r.name] = v;
   }
   unreadable = bad;
+  rows = (data ?? []).map(({ name, hint, updated_at, updated_by }) => ({ name, hint, updated_at, updated_by }));
   useSavedKeys(keys);
+}
+
+/**
+ * Load the saved keys into env() (at most once a minute unless `force`). Requests that arrive while a
+ * load is running wait for it, so none runs without the keys; a failure leaves the last ones.
+ */
+export async function refreshSavedKeys(db: Db = siteDb(), force = false): Promise<void> {
+  if (pending) {
+    await pending;
+    if (!force) return;
+  }
+  if (!force && Date.now() - loaded < 60_000) return;
+  loaded = Date.now();
+  pending = load(db).finally(() => {
+    pending = null;
+  });
+  await pending;
 }
 
 const hintOf = (name: string, value: string) => (isSecretName(name) ? value.slice(-4) : value);
 const isSecretName = (name: string) => (Object.values(SERVICES) as { secret: string[] }[]).some((s) => s.secret.includes(name));
 
-/** Save some of a service's settings (names it doesn't have are refused; '' removes one). */
-export async function saveKeys(db: Db, values: Record<string, string>, by: string): Promise<void> {
+/** Why keys can't be saved here (no AUTH_SECRET, or no table yet), or null when they can. */
+export async function cannotSave(db: Db): Promise<string | null> {
+  if (!hostEnv('AUTH_SECRET')) return 'AUTH_SECRET is not set on the server, so keys can’t be saved here.';
+  const { error } = await db.from('site_keys').select('name').limit(1);
+  return error ? 'The database has no table for keys yet: apply the migrations first.' : null;
+}
+
+/**
+ * Save some of a service's settings (names it doesn't have are refused; '' removes one), all values
+ * written in one statement and the removals in another. Answers the names whose value changed.
+ */
+export async function saveKeys(db: Db, values: Record<string, string>, by: string): Promise<string[]> {
+  await refreshSavedKeys(db, true);
+  const now = new Date().toISOString();
+  const write: Record<string, unknown>[] = [];
+  const remove: string[] = [];
+  const changed: string[] = [];
   for (const [name, value] of Object.entries(values)) {
     if (!isKeyName(name)) throw new Error(`Unknown setting ${name}.`);
     if (hostEnv(name)) throw new Error(`${name} is set by the host, so it can’t be changed here.`);
     const v = value.trim();
-    const { error } = v
-      ? await db.from('site_keys').upsert({ name, value: await seal(name, v), hint: hintOf(name, v), updated_by: by, updated_at: new Date().toISOString() }, { onConflict: 'name' })
-      : await db.from('site_keys').delete().eq('name', name);
+    const had = rows.some((r) => r.name === name);
+    if (v) {
+      write.push({ name, value: await seal(name, v), hint: hintOf(name, v), updated_by: by, updated_at: now });
+      if (env(name) !== v || unreadable.includes(name)) changed.push(name);
+    } else if (had) {
+      remove.push(name);
+      changed.push(name);
+    }
+  }
+  if (write.length) {
+    const { error } = await db.from('site_keys').upsert(write, { onConflict: 'name' });
+    if (error) throw new Error(error.message);
+  }
+  if (remove.length) {
+    const { error } = await db.from('site_keys').delete().in('name', remove);
     if (error) throw new Error(error.message);
   }
   await refreshSavedKeys(db, true);
+  return changed;
 }
 
 export interface KeyStatus {
@@ -107,15 +152,15 @@ export interface KeyStatus {
   updatedBy?: string;
 }
 
-/** Where each of a service's settings comes from, for the screen (never a secret's value). */
-export async function keyStatus(db: Db): Promise<Record<string, KeyStatus>> {
-  const { data } = await db.from('site_keys').select('name, hint, updated_at, updated_by');
-  const rows = new Map((data ?? []).map((r) => [r.name as string, r]));
-  await refreshSavedKeys(db, true);
+/** Where each of a service's settings comes from, for the screen (never a secret's value). `fresh`
+ * false: the keys were just loaded (by saveKeys). */
+export async function keyStatus(db: Db, fresh = true): Promise<Record<string, KeyStatus>> {
+  if (fresh) await refreshSavedKeys(db, true);
+  const byName = new Map(rows.map((r) => [r.name, r]));
   const out: Record<string, KeyStatus> = {};
   for (const name of ALL) {
     const host = hostEnv(name);
-    const row = rows.get(name);
+    const row = byName.get(name);
     if (host) out[name] = { source: 'host', hint: hintOf(name, host) };
     else if (row) out[name] = { source: unreadable.includes(name) ? 'unreadable' : 'saved', hint: row.hint ?? '', updatedAt: row.updated_at ?? undefined, updatedBy: row.updated_by ?? undefined };
     else out[name] = { source: null, hint: '' };

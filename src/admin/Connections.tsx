@@ -68,7 +68,8 @@ function Card({ service, info, onKeys }: { service: Service; info: Info; onKeys:
     onKeys(out.keys);
   };
   const disconnect = () => window.confirm(`Remove ${def.label}’s saved keys? What uses them stops working until it is connected again.`) && send({ remove: true });
-  const ready = !busy && (!def.guarded || password) && (values[main]?.trim() || connected || choose);
+  // A choice on screen needs an answer before Save.
+  const ready = !busy && (!def.guarded || password) && (choose ? !!values[choose.name] : values[main]?.trim() || connected);
   return (
     <section className="mb-5 rounded border border-admin-ink/10 bg-white p-4" aria-labelledby={`conn-${service}`}>
       <div className="mb-1 flex items-center justify-between gap-3">
@@ -93,71 +94,70 @@ function Card({ service, info, onKeys }: { service: Service; info: Info; onKeys:
           ];
         })}
       </dl>
-      {host ? (
-        <p className="text-xs text-admin-muted">The host sets this key (an environment variable on the server), so it is changed there, not here.</p>
-      ) : (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (ready) send({ values });
-          }}
-        >
+      {host && <p className="mb-2 text-xs text-admin-muted">The host sets this key (an environment variable on the server), so it is changed there, not here. Connect sets up the rest with it.</p>}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (ready) send({ values });
+        }}
+      >
+        {!host && (
           <label className="mb-2 block">
             <span className="mb-1 block text-xs font-medium text-admin-muted">{connected ? `${NAMES[main]}: paste a new one to replace it, or leave this empty` : NAMES[main]}</span>
             <input className={input} type="password" autoComplete="off" spellCheck={false} value={values[main] ?? ''} onChange={(e) => setValues({ ...values, [main]: e.target.value })} />
           </label>
-          {choose && (
-            <label className="mb-2 block">
-              <span className="mb-1 block text-xs font-medium text-admin-muted">{choose.label}</span>
-              <select className={input} value={values[choose.name] ?? ''} onChange={(e) => setValues({ ...values, [choose.name]: e.target.value })}>
-                <option value="">Choose…</option>
-                {choose.options.map(([v, l]) => (
-                  <option key={v} value={v}>
-                    {l}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-          {ADVANCED[service] && (
-            <details className="mb-2 text-xs">
-              <summary className="cursor-pointer text-admin-muted">Set up the webhook by hand</summary>
-              <label className="mt-2 block">
-                <span className="mb-1 block font-medium text-admin-muted">{NAMES[ADVANCED[service]!]}</span>
-                <input className={input} type="password" autoComplete="off" spellCheck={false} value={values[ADVANCED[service]!] ?? ''} onChange={(e) => setValues({ ...values, [ADVANCED[service]!]: e.target.value })} />
-              </label>
-            </details>
-          )}
-          {def.guarded && (
-            <label className="mb-2 block">
-              <span className="mb-1 block text-xs font-medium text-admin-muted">Your password (to confirm it’s you)</span>
-              <input className={input} type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
-            </label>
-          )}
-          {error && (
-            <p className="mb-2 rounded bg-admin-soft px-2 py-1.5 text-xs text-admin-ink" role="alert">
-              {error}
-            </p>
-          )}
-          {notes.length > 0 && (
-            <ul className="mb-2 list-disc pl-5 text-xs text-admin-muted" role="status">
-              {notes.map((n) => (
-                <li key={n}>{n}</li>
+        )}
+        {choose && (
+          <label className="mb-2 block">
+            <span className="mb-1 block text-xs font-medium text-admin-muted">{choose.label}</span>
+            <select className={input} value={values[choose.name] ?? ''} onChange={(e) => setValues({ ...values, [choose.name]: e.target.value })}>
+              <option value="">Choose…</option>
+              {choose.options.map(([v, l]) => (
+                <option key={v} value={v}>
+                  {l}
+                </option>
               ))}
-            </ul>
-          )}
-          <div className="flex items-center gap-3">
-            <button type="submit" className="rounded bg-admin-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-admin-accent-dark disabled:opacity-40" disabled={!ready}>
-              {busy ? 'Checking…' : choose ? 'Save' : connected && !values[main]?.trim() ? 'Check and set up again' : 'Connect'}
+            </select>
+          </label>
+        )}
+        {ADVANCED[service] && status(ADVANCED[service]!).source !== 'host' && (
+          <details className="mb-2 text-xs">
+            <summary className="cursor-pointer text-admin-muted">Set up the webhook by hand</summary>
+            <label className="mt-2 block">
+              <span className="mb-1 block font-medium text-admin-muted">{NAMES[ADVANCED[service]!]}</span>
+              <input className={input} type="password" autoComplete="off" spellCheck={false} value={values[ADVANCED[service]!] ?? ''} onChange={(e) => setValues({ ...values, [ADVANCED[service]!]: e.target.value })} />
+            </label>
+          </details>
+        )}
+        {def.guarded && (
+          <label className="mb-2 block">
+            <span className="mb-1 block text-xs font-medium text-admin-muted">Your password (to confirm it’s you)</span>
+            <input className={input} type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          </label>
+        )}
+        {error && (
+          <p className="mb-2 rounded bg-admin-soft px-2 py-1.5 text-xs text-admin-ink" role="alert">
+            {error}
+          </p>
+        )}
+        {notes.length > 0 && (
+          <ul className="mb-2 list-disc pl-5 text-xs text-admin-muted" role="status">
+            {notes.map((n) => (
+              <li key={n}>{n}</li>
+            ))}
+          </ul>
+        )}
+        <div className="flex items-center gap-3">
+          <button type="submit" className="rounded bg-admin-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-admin-accent-dark disabled:opacity-40" disabled={!ready}>
+            {busy ? 'Checking…' : choose ? 'Save' : connected && !values[main]?.trim() ? 'Check and set up again' : 'Connect'}
+          </button>
+          {saved && (
+            <button type="button" className={btn} disabled={busy || (def.guarded && !password)} onClick={disconnect}>
+              Disconnect
             </button>
-            {saved && (
-              <button type="button" className={btn} disabled={busy || (def.guarded && !password)} onClick={disconnect}>
-                Disconnect
-              </button>
-            )}
-          </div>
-        </form>
-      )}
+          )}
+        </div>
+      </form>
     </section>
   );
 }

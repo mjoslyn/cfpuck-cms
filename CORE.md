@@ -1267,13 +1267,18 @@ only add; one that switches block types or settings goes out with `npm run deplo
 Settings > Connections (admins; `src/admin/Connections.tsx`, GET and POST `/api/admin/connections`)
 keeps the keys for Claude, Stripe, Square and Mailgun (`SERVICES` in `src/lib/site-keys.ts`), so an admin
 sets a service up by pasting one key. `connect` (`src/lib/connections.ts`) checks it with the service and
-sets the service up: Stripe's webhook endpoint made afresh at `/api/payments/stripe` (an old one at that
-address deleted; its signing secret kept), Square's environment found from the token, its location
-(chosen when there are several) and a webhook subscription (signature key and address kept), Mailgun's
-region found from the key, its sending domain (chosen when there are several), its webhooks
-(`MAILGUN_EVENTS`, an existing one moved to this site) and signing key. Webhooks need the site's public
+sets the service up: Stripe's webhook endpoint at `/api/payments/stripe` (its signing secret kept),
+Square's environment found from the token, its location (chosen when there are several) and a webhook
+subscription (signature key and address kept), Mailgun's region found from the key, its sending domain
+(chosen when there are several), its webhooks (`MAILGUN_EVENTS`, an existing one moved to this site) and
+signing key. With the key unchanged and its secret saved, Stripe's endpoint and Square's subscription
+stay as they are (their secrets with them); otherwise a new one is made first and the site's old ones
+deleted only once it exists, so a failure leaves the working one. Webhooks need the site's public
 address (`SITE_URL`, else the request's; `publicOrigin`): a local copy saves the keys and says so.
-Stripe's and Mailgun's signing secrets can be entered by hand.
+Stripe's and Mailgun's signing secrets can be entered by hand. A setting the host sets that the key
+doesn't fit (a region, environment, location, domain or webhook address) refuses the connection before
+anything is changed (`pin`), and so does a copy that couldn't save keys (`cannotSave`: no `AUTH_SECRET`,
+no table), since a secret made then would be lost.
 
 - Kept in `site_keys` (migration `*_site_keys.sql`), each value AES-GCM encrypted with its name as
   associated data, under a key made from `AUTH_SECRET` by HKDF (`seal`, `unseal`): a database export or
@@ -1282,10 +1287,13 @@ Stripe's and Mailgun's signing secrets can be entered by hand.
 - Write-only: the screen shows a secret's last 4 characters (`hint`) and plain settings (location,
   domain, region) as they are, with who saved them and when (`keyStatus`), never a secret's value.
 - `env()` (`src/lib/env.ts`) reads the environment first (`hostEnv`), then the saved keys, which the
-  middleware, scheduled runs and jobs load at most once a minute per instance (`refreshSavedKeys`); a
-  key the host sets is shown as such and can't be saved over.
+  middleware, scheduled runs and jobs load at most once a minute per instance (`refreshSavedKeys`;
+  requests arriving during a load wait for it); a key the host sets is shown as such and can't be saved
+  over, while the service's other settings (a webhook secret) can still be saved and Connect sets it up.
+  A save writes its values in one statement (`saveKeys`, which answers the names whose values changed).
 - Stripe, Square and Mailgun keys (`guarded`) need the admin's password again (`checkPassword`, its
-  failures counted as failed sign-ins), and every connect or disconnect is emailed to every admin.
+  failures counted as failed sign-ins), and every connect or disconnect that changed a saved value is
+  emailed to every admin.
 
 Files need an R2 bucket (`npx wrangler r2 bucket create`, its name in `wrangler.jsonc`; Media). Accounts need `AUTH_SECRET` (a long random value; changing it signs everyone out
 and breaks links already sent) and links in emails use the request's address (`SITE_URL` for Better

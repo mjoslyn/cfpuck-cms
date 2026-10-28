@@ -95,10 +95,13 @@ checks the key with the service and sets the rest up itself:
   webhooks and reads its signing key.
 
 Webhooks need the site's public address, so connect on the live site (`SITE_URL`), not a local copy.
+Connecting again with the same key keeps the webhook and its secret; with a new key, the new webhook is
+made before the old one is deleted. A setting the server sets that the key doesn't fit (say
+`MAILGUN_REGION=eu` with a US key) stops the connection until it is changed on the server.
 
 Keys are encrypted in the database with a key made from `AUTH_SECRET`, readable by no admin or editor,
 and never synced or backed up. Admins see only their last 4 characters. Payment and Mailgun keys ask for
-the admin's password again, and every change is emailed to all admins. Changing `AUTH_SECRET` makes
+the admin's password again, and every change (not a check that changed nothing) is emailed to all admins. Changing `AUTH_SECRET` makes
 saved keys unreadable: enter them again. A key set as an environment variable wins and can't be changed
 on the screen, for a site whose keys should stay with the Cloudflare account.
 
