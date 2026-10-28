@@ -48,4 +48,5 @@ block's name, and your request only changes that block (or its whole section, if
   every page.
 - **Write with Claude** buttons elsewhere (for example under the excerpt, or **Generate** in the SEO
   settings, or **Generate** beside an image's alt text in **Media**) write just that one piece of
-  text.
+  text. In the form builder, **Write with Claude** writes a form's questions, its thank-you message or
+  page and its emails (see [Forms](../forms/)).

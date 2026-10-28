@@ -19,6 +19,26 @@ it on any page.
 
 ![The form builder, with field types on the left](../../../assets/guide/form-builder.png)
 
+### Having Claude write it
+
+Click **Write with Claude** at the top of the form builder and say what the form is for, for example:
+"Volunteer sign-up for the fall festival: name, email, phone, which shifts, T-shirt size. Tell them
+we'll email the schedule a week before." Tick what Claude should write:
+
+- **Fields**: the questions. If the form already has some, Claude rewrites the list; questions it
+  keeps keep their answers.
+- **Confirmation**: the thank-you message, or a thank-you page. The page is made as a draft: open it
+  with **Edit the page** on the Confirmation tab, check it and publish it. Until then, people see the
+  message.
+- **Notification emails**: the email to you, and a "thanks, we got it" email to the visitor when the
+  form asks for their email address.
+
+Click **Write**. It takes up to a minute. Read what Claude wrote, change anything you like, then click
+**Save**. Nothing is saved until you do. The Confirmation and Notifications tabs also have **Write
+with Claude**, for just that part.
+
+![Write with Claude in the form builder](../../../assets/guide/form-compose.png)
+
 ### Field types
 
 | Field | Use it for |

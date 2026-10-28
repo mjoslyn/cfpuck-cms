@@ -209,7 +209,7 @@ social profiles as `sameAs`. Compose includes `seo` in every `build_page` and wr
 `generated`) on each build until someone edits it by hand. The entry settings' SEO section
 (`src/puck/SeoForm.tsx`) shows lengths and a search result preview, and Generate asks Claude
 (`POST /api/admin/seo`, `ANTHROPIC_SEO_MODEL`, default Haiku 4.5) for the page as it is in the editor.
-These quick calls (`quickAsk`, `src/lib/compose/quick.ts`: SEO, excerpts, term texts, alt text) get their
+These quick calls (`quickAsk`, `src/lib/compose/quick.ts`: SEO, excerpts, term texts, alt text, forms) get their
 answer as JSON in a fixed schema through structured outputs (`output_config.format`, `outputSchema`), not a
 forced tool call, which Claude Sonnet 5.5, Opus 5.5 and Fable 5.1 refuse; a refusal or a cut-off answer is
 reported as such (`quickAnswer`).
@@ -623,6 +623,17 @@ to save the email as, save over, start from (Use) or delete. A template can be t
 of email (`default_for`, unique; `TEMPLATE_DEFAULTS`): new campaigns, digests, forms and form
 notifications start from theirs (`defaultTemplate`), and a ticket email nobody designed is sent from
 its kind's (`ticket:<kind>`). Not synced or backed up.
+**Write with Claude** (the form builder's header, and the Confirmation and Notifications tabs;
+`src/forms/ComposeForm.tsx`, POST `/api/admin/forms/compose`, `src/lib/forms/compose.ts`): from what the
+editor says the form is for and the form as it is (`formOutline`), Claude (`quickAsk` with
+`ANTHROPIC_MODEL`, structured outputs, `composeSchema` for the parts ticked) writes its fields, its
+confirmation (a message, or a thank-you page in the house style through `buildPage`, made as a draft
+page hidden from search engines and the site's search and chosen as the confirmation; the message
+shows until it is published) and its notification emails (heading, text, the answers, a button). Its
+`{key}` tags become the form's (`{Label:f3}`, unknown ones dropped); fields it keeps by id keep their id,
+answers and settings, Product fields stay as they are, and a rewritten email keeps the addresses,
+reply-to and sender of the one it replaces and its design's look (else the default form template's).
+`applyComposed` turns the answer into the builder's state; nothing is saved until the form is.
 Notifications from before the builder send their message as before until opened there. Mail goes out through
 Cloudflare Email Service when the Worker has its `EMAIL` binding (`"send_email": [{ "name": "EMAIL" }]` in
 `wrangler.jsonc`; the sender's domain onboarded under Email Sending), else over SMTP

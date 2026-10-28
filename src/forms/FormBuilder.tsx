@@ -12,10 +12,11 @@ import { MAX_QUANTITY, productsOf } from '../lib/forms/payment';
 import { CURRENCIES } from '../lib/payments/money';
 import type { ProviderStatus } from '../lib/payments';
 import siteCss from '../styles/site.css?url';
-import { site } from '../lib/site';
+import { site, typeDef } from '../lib/site';
 import { MergeTags, mergeTagOptions } from './rich-message';
 import EmailBuilder from './EmailBuilder';
 import { formEmailKit } from './form-email';
+import ComposeForm, { type ComposeAsk, type Composed } from './ComposeForm';
 import { defaultEmail, emailFromMessage, type EmailDoc } from '../lib/forms/email';
 
 const input = 'w-full rounded border border-admin-ink/15 bg-white px-2 py-1.5 text-sm outline-none focus:border-admin-accent';
@@ -549,7 +550,10 @@ export default function FormBuilder({ formId }: { formId: number }) {
   const [emailFor, setEmailFor] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [status, setStatus] = useState<{ kind: 'ok' | 'error' | 'busy'; text: string } | null>(null);
-  const [pages, setPages] = useState<{ id: number; title: string }[]>([]);
+  const [pages, setPages] = useState<{ id: number; title: string; status: string }[]>([]);
+  // Write with Claude: what it opens with, and what the last answer couldn't do.
+  const [composing, setComposing] = useState<ComposeAsk[] | null>(null);
+  const [composeNotes, setComposeNotes] = useState<string[]>([]);
   const [submissions, setSubmissions] = useState<number | null>(null);
   const [providers, setProviders] = useState<Providers | null>(null);
   // The default template for form notifications (the email builder's Templates), which new ones start from.
@@ -568,7 +572,7 @@ export default function FormBuilder({ formId }: { formId: number }) {
       setRow(r);
       setSaved(JSON.stringify(r));
       const [{ data: p }, { count }] = await Promise.all([
-        db.from('entries').select('id, title').eq('type', 'page').eq('status', 'publish').order('title'),
+        db.from('entries').select('id, title, status').eq('type', 'page').in('status', ['publish', 'draft']).order('title'),
         db.from('form_submissions').select('id', { count: 'exact', head: true }).eq('form_id', formId),
       ]);
       setPages(p ?? []);
@@ -716,9 +720,20 @@ export default function FormBuilder({ formId }: { formId: number }) {
     ['notifications', `Notifications (${row.notifications.length})`],
   ];
 
+  const composed = (c: Composed) => {
+    setRow((r) => r && { ...r, definition: { ...r.definition, ...c.definition }, notifications: c.notifications ?? r.notifications });
+    if (c.page) setPages((p) => [...p, { ...c.page!, status: 'draft' }]);
+    setComposeNotes(c.notes);
+    setTab(c.definition.fields ? 'build' : c.definition.confirmation ? 'confirmation' : 'notifications');
+    if (c.definition.fields) setSelected(null);
+    setComposing(null);
+  };
+  const confirmPage = confirmation.type === 'page' ? pages.find((p) => p.id === confirmation.pageId) : undefined;
+
   const emailIndex = emailFor ? row.notifications.findIndex((n) => n.id === emailFor) : -1;
   return (
     <div className="flex h-[calc(100vh-3.5rem)] flex-col">
+      {composing && <ComposeForm form={form} notifications={row.notifications} ask={composing} canPage={!!typeDef('page')} onDone={composed} onClose={() => setComposing(null)} />}
       {emailIndex >= 0 && (
         <EmailBuilder
           title={`${row.notifications[emailIndex].name || 'Notification'}: email`}
@@ -743,6 +758,9 @@ export default function FormBuilder({ formId }: { formId: number }) {
             </button>
           ))}
         </nav>
+        <button type="button" className={btn} onClick={() => setComposing(form.fields.length ? ['fields'] : ['fields', 'confirmation', 'notifications'])}>
+          Write with Claude
+        </button>
         <a href={`/admin/submissions/?form=${row.id}`} className="text-sm text-admin-muted hover:text-admin-accent">
           Submissions{submissions != null ? ` (${submissions})` : ''}
         </a>
@@ -799,6 +817,16 @@ export default function FormBuilder({ formId }: { formId: number }) {
         </main>
 
         <aside className="w-[340px] shrink-0 overflow-y-auto border-l border-admin-ink/10 bg-white p-4">
+          {composeNotes.length > 0 && (
+            <div className="mb-3 rounded bg-admin-soft p-2 text-xs text-admin-ink" role="status">
+              {composeNotes.map((n) => (
+                <p key={n}>{n}</p>
+              ))}
+              <button type="button" className="mt-1 underline" onClick={() => setComposeNotes([])}>
+                Dismiss
+              </button>
+            </div>
+          )}
           {tab === 'build' &&
             (field ? (
               <>
@@ -839,6 +867,9 @@ export default function FormBuilder({ formId }: { formId: number }) {
 
           {tab === 'confirmation' && (
             <>
+              <button type="button" className={`${btn} mb-3`} onClick={() => setComposing(['confirmation'])}>
+                Write with Claude
+              </button>
               <Pick label="After someone submits" value={confirmation.type} options={[['message', 'Show a message'], ['page', 'Go to a page'], ['redirect', 'Go to a web address']]} onChange={(v) => setConfirmation({ type: v })} />
               {confirmation.type === 'message' && (
                 <>
@@ -853,11 +884,21 @@ export default function FormBuilder({ formId }: { formId: number }) {
                     {pages.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.title}
+                        {p.status === 'draft' ? ' (draft)' : ''}
                       </option>
                     ))}
                   </select>
                 </Labelled>
               )}
+              {confirmPage && (
+                <p className="mb-3 text-xs text-admin-muted">
+                  {confirmPage.status === 'draft' ? 'This page is a draft: until it is published, people see the message below instead. ' : ''}
+                  <a className="underline hover:text-admin-accent" href={`/admin/edit/${confirmPage.id}/`} target="_blank" rel="noopener">
+                    Edit the page
+                  </a>
+                </p>
+              )}
+              {confirmation.type === 'page' && confirmPage?.status === 'draft' && <Area label="Message (until the page is published)" value={confirmation.message} rows={4} onChange={(v) => setConfirmation({ message: v })} />}
               {confirmation.type === 'redirect' && <TextIn label="Web address" value={confirmation.url} placeholder="https://" onChange={(v) => setConfirmation({ url: v })} />}
             </>
           )}
@@ -917,6 +958,9 @@ export default function FormBuilder({ formId }: { formId: number }) {
           {tab === 'notifications' && (
             <>
               <p className="mb-3 text-xs text-admin-muted">{payment ? 'Emails sent when the form is submitted and paid for.' : 'Emails sent when the form is submitted.'}</p>
+              <button type="button" className={`${btn} mb-3`} onClick={() => setComposing(['notifications'])}>
+                Write with Claude
+              </button>
               {row.notifications.map((n, i) => (
                 <details key={n.id} open={row.notifications.length === 1} className="mb-3 rounded border border-admin-ink/10 p-3">
                   <summary className="cursor-pointer text-sm font-medium">

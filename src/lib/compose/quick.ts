@@ -41,15 +41,19 @@ export function quickAnswer<T>(res: Pick<Anthropic.Message, 'content' | 'stop_re
   }
 }
 
-/** Ask for an answer in `shape`'s schema, given a task (system text after the site's brief) and the page. */
-export async function quickAsk<T>(task: string, shape: { name: string; description: string; input_schema: Record<string, any> }, page: string | Anthropic.ContentBlockParam[], maxTokens = 500): Promise<T> {
+/**
+ * Ask for an answer in `shape`'s schema, given a task (system text after the site's brief) and the page.
+ * `opts.model`: another model (a bigger task); `opts.facts`: the closing rule on facts, in place of
+ * keeping to the page's.
+ */
+export async function quickAsk<T>(task: string, shape: { name: string; description: string; input_schema: Record<string, any> }, page: string | Anthropic.ContentBlockParam[], maxTokens = 500, opts: { model?: string; facts?: string } = {}): Promise<T> {
   const client = claudeClient();
   if (!client) throw new QuickError(NO_KEY, 503);
   const res = await client.messages.create({
-    model: env('ANTHROPIC_SEO_MODEL') || 'claude-haiku-4-5-20251001',
+    model: opts.model || env('ANTHROPIC_SEO_MODEL') || 'claude-haiku-4-5-20251001',
     // Models that think first (on by default on the newest ones) need room for it before the answer.
     max_tokens: Math.max(maxTokens, 8000),
-    system: `You write for "${site.name}", the ${site.organization} site. ${site.brief}\n${task} Answer with ${shape.description.charAt(0).toLowerCase()}${shape.description.slice(1).replace(/\.$/, '')}. Use only facts in the page. American English.`,
+    system: `You write for "${site.name}", the ${site.organization} site. ${site.brief}\n${task} Answer with ${shape.description.charAt(0).toLowerCase()}${shape.description.slice(1).replace(/\.$/, '')}. ${opts.facts ?? 'Use only facts in the page.'} American English.`,
     output_config: { format: { type: 'json_schema', schema: outputSchema(shape.input_schema) as Record<string, unknown> } },
     messages: [{ role: 'user', content: page }],
   });

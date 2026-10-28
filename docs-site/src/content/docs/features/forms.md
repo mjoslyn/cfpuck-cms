@@ -17,6 +17,26 @@ The form builder is at `/admin/forms/` (`src/forms/FormBuilder.tsx`). Forms live
 
 Place a form on a page with the `form` block.
 
+### Write with Claude
+
+**Write with Claude** in the builder's header (and on the Confirmation and Notifications tabs) asks
+for what the form is for, then writes the parts ticked (`POST /api/admin/forms/compose`,
+`src/lib/forms/compose.ts`), with the Compose model (`ANTHROPIC_MODEL`):
+
+- **Fields**: the whole field list, with widths, choices, help text and conditions on earlier fields.
+  A field Claude keeps (it is shown each field's id) keeps its id, answers and other settings; Product
+  fields stay as they are.
+- **Confirmation**: a message, or a thank-you page built in the house style (as Compose builds pages),
+  made as a draft, hidden from search engines and the site's search, and chosen as the confirmation.
+  Until the page is published, the form shows the message.
+- **Notification emails**: usually one to the site and one to the visitor (when the form has an email
+  field), each a heading, text, optionally every answer, and a button. A rewritten email keeps the
+  addresses, reply-to and sender of the one it replaces, and its colours.
+
+Claude's `{key}` tags become the form's merge tags (`{Email:f2}`, `{Name:f1.first}`); tags for fields
+that don't exist are dropped. The answer fills the builder for review: nothing is saved until **Save**
+(apart from the draft page).
+
 ## Rendering
 
 The markup comes from `src/render/forms/form.ts`, styled by `src/styles/forms.css`.
