@@ -3,15 +3,26 @@ import { duplicateTemplate, entryFromTemplate } from '../../../lib/admin/duplica
 import { uniqueAreas } from '../../../lib/content/areas';
 import { slugify } from '../../../lib/slug';
 import { isStale, STALE } from '../../../lib/admin/save';
+import { renameTemplate } from '../../../lib/admin/rename-template';
 
 /**
  * Duplicate a template, part or pattern (form post { kind, slug } from the list), then open the copy; or,
  * with action=make-page { type, title, keep }, make a draft entry of its blocks and open that.
  */
 export const POST: APIRoute = async ({ request, locals, redirect }) => {
-  // Save as pattern (JSON from the editor): { action: 'create-pattern', title, linked, content } -> { slug }.
+  // JSON from the editor and the templates list.
   if (request.headers.get('content-type')?.includes('application/json')) {
     const body = await request.json().catch(() => ({}));
+    // Rename: { action: 'rename', kind, slug, title } -> { title }.
+    if (body.action === 'rename') {
+      if (!['template', 'part', 'pattern'].includes(body.kind) || !body.slug) return new Response('Bad request', { status: 400 });
+      try {
+        return Response.json({ title: await renameTemplate(locals.db, body.kind, String(body.slug), String(body.title ?? '')) });
+      } catch (e) {
+        return new Response((e as Error).message, { status: 400 });
+      }
+    }
+    // Save as pattern: { action: 'create-pattern', title, linked, content } -> { slug }.
     const title = String(body.title ?? '').trim().slice(0, 120);
     if (body.action !== 'create-pattern' || !title || !Array.isArray(body.content) || !body.content.length) return new Response('Bad request', { status: 400 });
     const base = slugify(title) || 'pattern';

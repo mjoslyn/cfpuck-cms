@@ -137,5 +137,9 @@ at the top of the editor while editing it). Give the page a title, choose its ty
 the page**. You get a new draft with a copy of the template's blocks to change freely: editing it
 never changes the template.
 
+To change the name of a template, part or pattern, click **Rename** beside it in **Templates** (or at
+the top of the editor while editing it), type the new name and click **Rename**. Pages using it keep
+using it.
+
 The menu's links are changed under **Settings**, not in the header itself. See
 [Menu and settings](/cfpuck-cms/guide/menu-and-settings/).

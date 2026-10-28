@@ -23,6 +23,15 @@ that address, if any, or 404. For events, the calendar views go too.
 
 Templates and layout mode have no drafts: **Save & apply** changes every page that uses them.
 
+## Renaming
+
+**Rename** (the templates list and a template's, part's or pattern's editor header;
+`src/admin/RenameTemplate.tsx`, POST `/api/admin/templates` with `{ action: 'rename', kind, slug, title }`,
+`renameTemplate` in `src/lib/admin/rename-template.ts`) changes its name (`templates.title`, up to 120
+characters), shown in the lists and pickers. The slug stays: the template hierarchy, entries, terms,
+Settings > Types and placed parts and patterns refer to it. The rename keeps the row's `updated_at`, so
+an editor open on it saves without a stale-version warning.
+
 ## Content areas
 
 A template can have several Page content blocks, each naming a content area (`attrs.area`). `main`,

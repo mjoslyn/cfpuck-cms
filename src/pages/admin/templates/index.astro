@@ -1,6 +1,7 @@
 ---
 import Admin from '../../../layouts/Admin.astro';
 import MakePage from '../../../admin/MakePage';
+import RenameTemplate from '../../../admin/RenameTemplate';
 import { eventsOn } from '../../../lib/events/on';
 const { data: siteRow } = await Astro.locals.db.from('settings').select('value').eq('key', 'site').maybeSingle();
 const events = eventsOn(siteRow?.value as Record<string, any> | undefined);
@@ -32,6 +33,7 @@ const groups = [
                 <input type="hidden" name="slug" value={t.slug} />
                 <button class="text-xs text-admin-muted hover:text-admin-accent" aria-label={`Duplicate ${t.title || t.slug}`}>Duplicate</button>
               </form>
+              <RenameTemplate client:idle kind={t.kind} slug={t.slug} title={t.title || t.slug} />
               <MakePage client:idle kind={t.kind} slug={t.slug} title={t.title || t.slug} events={events} />
             </div>
           </li>

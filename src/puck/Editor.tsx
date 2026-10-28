@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { Puck, blocksPlugin, createUsePuck, outlinePlugin, useGetPuck, type Data } from '@puckeditor/core';
 import Composer, { type LivePage, type Selection } from '../admin/Composer';
 import MakePage from '../admin/MakePage';
+import RenameTemplate from '../admin/RenameTemplate';
 import { eventsOn } from '../lib/events/on';
 import { isComposed } from '../lib/compose/outline';
 import { locateInDoc, replaceInDoc } from '../lib/puck/tree';
@@ -110,6 +111,8 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
   const [held, setHeld] = useState<Held | null>(null);
   const publishNote = useRef<string | null>(null);
   const [error, setError] = useState<string>('');
+  // A template's name (its title), shown in the header and changed with Rename.
+  const [templateTitle, setTemplateTitle] = useState('');
   const dataRef = useRef<Data | null>(null);
   const settingsRef = useRef<Record<string, any>>({});
 
@@ -124,7 +127,9 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
 
       if (template) {
         const doc = await loader.template(template.kind, template.slug);
-        baseRef.current = (await db.from('templates').select('updated_at').eq('kind', template.kind).eq('slug', template.slug).maybeSingle()).data?.updated_at;
+        const { data: row } = await db.from('templates').select('title, updated_at').eq('kind', template.kind).eq('slug', template.slug).maybeSingle();
+        baseRef.current = row?.updated_at;
+        setTemplateTitle(row?.title || '');
         const raw = (doc as Data) ?? { root: { props: {} }, content: [] };
         const data = { ...raw, content: (await inlinePatterns(raw.content as PuckItem[], loader)) as Data['content'] };
         setMode('layout');
@@ -631,7 +636,8 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
   if (!initial || !env) return <p className="p-8 text-admin-muted">Loading editor…</p>;
 
   const viewUrl = entry && settingsRef.current.site?.front_page_id !== entry.id ? permalink(entry) : '/';
-  const titleText = entry ? state?.title || '(untitled)' : `${template?.kind === 'part' ? 'Template part' : template?.kind === 'pattern' ? 'Pattern' : 'Template'}: ${template?.slug}`;
+  const templateName = templateTitle || template?.slug || '';
+  const titleText = entry ? state?.title || '(untitled)' : `${template?.kind === 'part' ? 'Template part' : template?.kind === 'pattern' ? 'Pattern' : 'Template'}: ${templateName}`;
   return (
     <div className="flex h-screen">
     <div className="flex min-w-0 flex-1 flex-col">
@@ -642,6 +648,8 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
       </a>
       <h1 className="truncate text-lg">{titleText}</h1>
       {entry && <span className="truncate font-mono text-xs text-admin-muted">{viewUrl}</span>}
+      {template && templateTitle && templateTitle !== template.slug && <span className="truncate font-mono text-xs text-admin-muted">{template.slug}</span>}
+      {template && <RenameTemplate kind={template.kind} slug={template.slug} title={templateName} onRenamed={setTemplateTitle} />}
     </div>
     <div className="cms-editor-frame relative min-h-0 flex-1">
     <EnvContext.Provider value={env}>
@@ -712,7 +720,7 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
                   </button>
                 </form>
               )}
-              {template && <MakePage kind={template.kind} slug={template.slug} title={template.slug.replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase())} events={eventsOn(settingsRef.current.site)} dirty={dirty} className="whitespace-nowrap text-sm text-admin-muted hover:text-admin-accent" />}
+              {template && <MakePage kind={template.kind} slug={template.slug} title={templateTitle || template.slug.replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase())} events={eventsOn(settingsRef.current.site)} dirty={dirty} className="whitespace-nowrap text-sm text-admin-muted hover:text-admin-accent" />}
               {entry && mode === 'content' ? (
                 <>
                   <button type="button" disabled={saving} onClick={() => save('draft')} className="whitespace-nowrap rounded border border-admin-ink/20 px-3 py-1.5 text-sm hover:border-admin-accent hover:text-admin-accent disabled:opacity-50" title={liveStatus === 'publish' ? 'Keep your changes without changing the live page' : 'Save without publishing'}>

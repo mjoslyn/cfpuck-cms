@@ -261,6 +261,10 @@ header; `src/admin/MakePage.tsx`, POST `/api/admin/templates` with `action=make-
 `entryFromTemplate`) makes a draft entry of a chosen type with a page (title, type) whose content is a
 copy of a template's, part's or pattern's blocks under new ids, leaving out template parts and Page
 content blocks (the entry's own template supplies them) unless **Keep** is ticked, and opens it.
+**Rename** (the templates list and a template's editor header; `src/admin/RenameTemplate.tsx`, POST
+`/api/admin/templates` with `action: 'rename'`, `renameTemplate`) changes a template's, part's or pattern's
+name (`title`); the slug, which pages, settings and placed parts and patterns refer to, stays, and so does
+`updated_at`, so an editor open on it isn't asked about a newer version.
 
 ## Redirects
 
