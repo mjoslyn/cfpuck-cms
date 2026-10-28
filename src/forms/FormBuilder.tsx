@@ -551,7 +551,7 @@ export default function FormBuilder({ formId }: { formId: number }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [status, setStatus] = useState<{ kind: 'ok' | 'error' | 'busy'; text: string } | null>(null);
   const [pages, setPages] = useState<{ id: number; title: string; status: string }[]>([]);
-  // Write with Claude: what it opens with, and what the last answer couldn't do.
+  // Compose: what it opens with, and what the last answer couldn't do.
   const [composing, setComposing] = useState<ComposeAsk[] | null>(null);
   const [composeNotes, setComposeNotes] = useState<string[]>([]);
   const [submissions, setSubmissions] = useState<number | null>(null);
@@ -759,7 +759,7 @@ export default function FormBuilder({ formId }: { formId: number }) {
           ))}
         </nav>
         <button type="button" className={btn} onClick={() => setComposing(form.fields.length ? ['fields'] : ['fields', 'confirmation', 'notifications'])}>
-          Write with Claude
+          Compose
         </button>
         <a href={`/admin/submissions/?form=${row.id}`} className="text-sm text-admin-muted hover:text-admin-accent">
           Submissions{submissions != null ? ` (${submissions})` : ''}
@@ -868,7 +868,7 @@ export default function FormBuilder({ formId }: { formId: number }) {
           {tab === 'confirmation' && (
             <>
               <button type="button" className={`${btn} mb-3`} onClick={() => setComposing(['confirmation'])}>
-                Write with Claude
+                Compose
               </button>
               <Pick label="After someone submits" value={confirmation.type} options={[['message', 'Show a message'], ['page', 'Go to a page'], ['redirect', 'Go to a web address']]} onChange={(v) => setConfirmation({ type: v })} />
               {confirmation.type === 'message' && (
@@ -959,7 +959,7 @@ export default function FormBuilder({ formId }: { formId: number }) {
             <>
               <p className="mb-3 text-xs text-admin-muted">{payment ? 'Emails sent when the form is submitted and paid for.' : 'Emails sent when the form is submitted.'}</p>
               <button type="button" className={`${btn} mb-3`} onClick={() => setComposing(['notifications'])}>
-                Write with Claude
+                Compose
               </button>
               {row.notifications.map((n, i) => (
                 <details key={n.id} open={row.notifications.length === 1} className="mb-3 rounded border border-admin-ink/10 p-3">

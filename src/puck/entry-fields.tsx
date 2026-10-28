@@ -338,7 +338,7 @@ const toLocal = (v: string | null, tz: string = SITE_TZ) => {
 /** Every IANA timezone the browser knows. */
 const TIMEZONES: string[] = (Intl as any).supportedValuesOf?.('timeZone') ?? [SITE_TZ];
 
-/** Write with Claude under the Excerpt: a suggestion from the page as it is in the editor. */
+/** Compose under the Excerpt: a suggestion from the page as it is in the editor. */
 function ExcerptWriter({ type, title, pageItems, onWrite }: { type: string; title: string; pageItems?: () => any[]; onWrite: (excerpt: string) => void }) {
   const [status, setStatus] = useState('');
   const write = async () => {
@@ -351,7 +351,7 @@ function ExcerptWriter({ type, title, pageItems, onWrite }: { type: string; titl
   return (
     <div className="-mt-2 mb-3">
       <button type="button" onClick={write} disabled={status === 'Writing…'} className="rounded-sm border border-admin-ink/20 px-3 py-1.5 text-xs font-semibold hover:border-admin-ink/50 disabled:opacity-50">
-        Write with Claude
+        Compose
       </button>
       {status && (
         <p className="mt-1 text-xs text-admin-muted" role="status">

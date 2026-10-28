@@ -49,7 +49,7 @@ An item can also open a larger drop-down panel: add **Links** under a **Links he
 
 Admins connect the services the site uses in the **Connections** section:
 
-- **Claude (Anthropic)**, for Compose and **Write with Claude**;
+- **Claude (Anthropic)**, for **Compose**;
 - **Stripe** or **Square**, for card payments on forms and tickets;
 - **Mailgun**, for mailing lists.
 

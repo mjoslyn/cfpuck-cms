@@ -1,4 +1,4 @@
-// Write with Claude for forms (the form builder's Write with Claude, POST /api/admin/forms/compose):
+// Compose for forms (the form builder's Compose, POST /api/admin/forms/compose):
 // from what the editor says the form is for, Claude writes its fields, its confirmation (a message, or a
 // thank-you page made in the house style) and its notification emails. This file holds the answer's
 // shape and turns an answer into the form's settings; nothing is saved until the editor saves the form

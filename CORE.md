@@ -175,7 +175,7 @@ as an entry's). `template`, `image` and `seo` are reserved keys. A taxonomy's fe
 (Settings > Types, `settings.site.taxonomy_meta`) are the defaults for its term pages; `{term}` in its
 search title and description is the term's name (`src/lib/page-meta.ts`). On a term page, Featured
 image, Title, Excerpt and Field blocks outside a collection show the term: its featured image (else
-the taxonomy's), name (linking to its page), description and fields. **Write with Claude** (POST
+the taxonomy's), name (linking to its page), description and fields. **Compose** (POST
 `/api/admin/meta-compose`, `quickAsk`, `ANTHROPIC_SEO_MODEL`) fills a term's description, search title,
 meta description and the taxonomy's fields with a `compose` hint, from its name, its parent, what it
 has now, the entries filed under it and optional notes; for a taxonomy (Settings > Types) it writes the
@@ -207,7 +207,7 @@ tags: description, canonical, robots, Open Graph and Twitter card, falling back 
 featured image and the site's default share image; the home page also gets Organization data with the
 social profiles as `sameAs`. Compose includes `seo` in every `build_page` and writes it (marked
 `generated`) on each build until someone edits it by hand. The entry settings' SEO section
-(`src/puck/SeoForm.tsx`) shows lengths and a search result preview, and Generate asks Claude
+(`src/puck/SeoForm.tsx`) shows lengths and a search result preview, and **Compose** asks Claude
 (`POST /api/admin/seo`, `ANTHROPIC_SEO_MODEL`, default Haiku 4.5) for the page as it is in the editor.
 These quick calls (`quickAsk`, `src/lib/compose/quick.ts`: SEO, excerpts, term texts, alt text, forms) get their
 answer as JSON in a fixed schema through structured outputs (`output_config.format`, `outputSchema`), not a
@@ -220,7 +220,7 @@ from either. A type's listing page has its own featured image and SEO (Settings 
 `settings.site.listing_meta`, `listingSeo`): the title (over the calendar's own) and description on
 the listing's address only, not on views under it (calendar months and days) or searches in it; the
 image and noindex on all of them. A Featured image block on a listing page, outside a collection,
-shows its image. Write with Claude (`/api/admin/meta-compose`) writes the title and description from
+shows its image. Compose (`/api/admin/meta-compose`) writes the title and description from
 what it lists.
 
 Settings > Social keeps the site's profiles (`settings.site.social`: network and URL;
@@ -552,7 +552,7 @@ point), and every file gets AVIF and WebP copies next to it. An SVG is stored as
 `/media/` is the site's own address, so every `/media/` answer carries `Content-Security-Policy:
 sandbox` and `X-Content-Type-Options: nosniff` (`MEDIA_HEADERS`): a
 file opened on its own can't run script, and images in pages are unaffected. An image's alt text has
-**Generate** in the media library (`POST /api/admin/media/describe`, `describeImage` in
+**Compose** in the media library (`POST /api/admin/media/describe`, `describeImage` in
 `src/lib/media/describe.ts`): Claude (`quickAsk`, `ANTHROPIC_SEO_MODEL`) looks at the image as a JPEG
 (`imageForClaude`) with its file name, title, caption and current alt text (`altContext`) and writes one
 sentence into the form, saved with Save; raster images only (`describable`). `media.focal_point` ({x, y} in 0..1) is set
@@ -624,7 +624,7 @@ to save the email as, save over, start from (Use) or delete. A template can be t
 of email (`default_for`, unique; `TEMPLATE_DEFAULTS`): new campaigns, digests, forms and form
 notifications start from theirs (`defaultTemplate`), and a ticket email nobody designed is sent from
 its kind's (`ticket:<kind>`). Not synced or backed up.
-**Write with Claude** (the form builder's header, and the Confirmation and Notifications tabs;
+**Compose** (the form builder's header, and the Confirmation and Notifications tabs;
 `src/forms/ComposeForm.tsx`, POST `/api/admin/forms/compose`, `src/lib/forms/compose.ts`): from what the
 editor says the form is for and the form as it is (`formOutline`), Claude (`quickAsk` with
 `ANTHROPIC_MODEL`, structured outputs, `composeSchema` for the parts ticked) writes its fields, its

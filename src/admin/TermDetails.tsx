@@ -1,5 +1,5 @@
 // Content > Taxonomies: a term's details, opened by its Details button: description, featured image,
-// the taxonomy's own fields (site config) and SEO. Write with Claude (/api/admin/meta-compose) fills the
+// the taxonomy's own fields (site config) and SEO. Compose (/api/admin/meta-compose) fills the
 // description, SEO and the fields with a `compose` hint for review. Saved with PUT /api/admin/terms.
 import { useEffect, useRef, useState } from 'react';
 import { FieldsForm } from '../puck/entry-fields';
@@ -115,12 +115,12 @@ export default function TermDetails({ taxonomy }: { taxonomy: string }) {
         <div className="space-y-5 p-5 text-sm">
           <section className="rounded-sm border border-admin-ink/10 bg-[#f8fafc] p-3">
             <label className="mb-1 block text-xs font-semibold tracking-wider text-admin-muted uppercase" htmlFor="term-notes">
-              Write with Claude
+              Compose
             </label>
             <textarea id="term-notes" rows={2} className={inputClass} placeholder="Anything Claude should know (optional)" value={notes} onChange={(e) => setNotes(e.target.value)} />
             <div className="mt-2 flex items-center gap-3">
               <button type="button" disabled={writing} onClick={write} className="shrink-0 rounded-sm border border-admin-ink/20 bg-white px-3 py-1.5 text-xs font-semibold whitespace-nowrap hover:border-admin-ink/50 disabled:opacity-40">
-                {writing ? 'Writing…' : 'Write with Claude'}
+                {writing ? 'Writing…' : 'Compose'}
               </button>
               <span className="text-xs text-admin-muted">Fills in the description, search title, meta description{defs.some((d) => 'compose' in d && d.compose) ? ' and fields' : ''} from the {taxonomySingular(taxonomy).toLowerCase()}'s name and what is filed under it. Nothing is saved until you Save.</span>
             </div>

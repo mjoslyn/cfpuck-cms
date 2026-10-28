@@ -1,5 +1,5 @@
 // The SEO section of an entry's settings: search title and description (with lengths and a search
-// result preview), share image, noindex, and Generate (a suggestion from Claude for the page as it
+// result preview), share image, noindex, and Compose (a suggestion from Claude for the page as it
 // is now). Stored in fields.seo; editing it by hand stops Compose rewriting it (src/lib/seo.ts).
 import { useState } from 'react';
 import { MediaPicker, Row, Toggle, inputClass } from './fields';
@@ -54,7 +54,7 @@ export function SeoForm({ type, title, excerpt, fields, path, pageItems, entry =
         <Count n={(seo.description ?? '').length} max={SEO_LIMITS.description} />
       </Row>
       <button type="button" onClick={generate} className="mb-2 rounded-sm border border-admin-ink/20 px-3 py-1.5 text-xs font-semibold hover:border-admin-ink/50">
-        Generate with Claude
+        Compose
       </button>
       {status && <p className="mb-2 text-xs text-admin-muted" role="status">{status}</p>}
       {seo.generated && <p className="mb-2 text-xs text-admin-muted">Written by Compose; it updates when Compose rebuilds the page until you edit it.</p>}

@@ -50,9 +50,9 @@ Each term's **Details** button opens:
   shown by the Field block on its page.
 - **SEO**: search title, meta description, share image and noindex, as an entry's.
 
-### Write with Claude
+### Compose
 
-At the top of a term's Details, **Write with Claude** (with optional notes) fills in its description,
+At the top of a term's Details, **Compose** (with optional notes) fills in its description,
 search title and meta description, and the taxonomy's fields that have a `compose` hint (as a type's
 fields do for Compose). It works from the term's name, the term above it, its current description and
 the entries filed under it. Nothing is saved until you click Save. A taxonomy's **Featured image and

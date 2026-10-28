@@ -1,4 +1,4 @@
-// Suggest an entry's excerpt (the Excerpt's Write with Claude): POST { type, title, text } with the
+// Suggest an entry's excerpt (the Excerpt's Compose): POST { type, title, text } with the
 // page's current text; answers { excerpt }. The excerpt is the summary listings and search results show.
 import type { APIRoute } from 'astro';
 import { typeLabel } from '../../../lib/site';

@@ -46,7 +46,6 @@ block's name, and your request only changes that block (or its whole section, if
 - Each page keeps its conversation, so you can come back to it another day.
 - Compose can also work on templates and the header or footer; the panel says when a change affects
   every page.
-- **Write with Claude** buttons elsewhere (for example under the excerpt, or **Generate** in the SEO
-  settings, or **Generate** beside an image's alt text in **Media**) write just that one piece of
-  text. In the form builder, **Write with Claude** writes a form's questions, its thank-you message or
+- **Compose** buttons elsewhere (for example under the excerpt, in the SEO settings, or beside an
+  image's alt text in **Media**) write just that one piece of text. In the form builder, **Compose** writes a form's questions, its thank-you message or
   page and its emails (see [Forms](../forms/)).

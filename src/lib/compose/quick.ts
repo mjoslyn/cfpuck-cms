@@ -1,5 +1,5 @@
 // One short Claude call that answers in a fixed shape: the SEO section's Generate, the excerpt's Write
-// with Claude, a term's or taxonomy's Write with Claude, and an image's alt text (Generate in the media
+// with Claude, a term's or taxonomy's Compose, and an image's alt text (Generate in the media
 // library, with the image). ANTHROPIC_SEO_MODEL (default Haiku 4.5, which is quick). The answer comes as
 // JSON in the shape's schema (structured outputs, output_config.format), not a forced tool call: newer
 // models (Claude Sonnet 5.5, Opus 5.5, Fable 5.1) refuse tool_choice "tool".

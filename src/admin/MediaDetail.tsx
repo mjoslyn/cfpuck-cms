@@ -252,7 +252,7 @@ export default function MediaDetail() {
               </label>
               {describable(m) && (
                 <button type="button" onClick={generateAlt} disabled={writing} className="shrink-0 rounded border border-admin-ink/15 bg-white px-2 py-0.5 text-xs hover:border-admin-accent hover:text-admin-accent disabled:opacity-50" title="Claude looks at the image and writes a description">
-                  {writing ? 'Writing…' : 'Generate'}
+                  {writing ? 'Writing…' : 'Compose'}
                 </button>
               )}
             </div>

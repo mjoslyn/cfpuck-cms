@@ -33,9 +33,9 @@ Worker's `IMAGES` binding; locally Miniflare's, which centres crops):
 
 ## Alt text
 
-The media library's detail panel has **Generate** beside an image's alt text
+The media library's detail panel has **Compose** beside an image's alt text
 (`POST /api/admin/media/describe`, `src/lib/media/describe.ts`): Claude (`ANTHROPIC_SEO_MODEL`, the
-quick model the SEO Generate uses) looks at the image, with its file name, title, caption and any
+quick model the SEO section's Compose uses) looks at the image, with its file name, title, caption and any
 current alt text, and writes one plain sentence into the form. Nothing is saved until Save. It is
 offered for raster images (JPEG, PNG, GIF, WebP, AVIF), not SVGs or videos, and needs Claude
 connected (Settings > Connections, or `ANTHROPIC_API_KEY`).

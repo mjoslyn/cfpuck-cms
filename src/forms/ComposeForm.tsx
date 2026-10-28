@@ -1,4 +1,4 @@
-// Write with Claude in the form builder (POST /api/admin/forms/compose): the editor says what the form
+// Compose in the form builder (POST /api/admin/forms/compose): the editor says what the form
 // is for and picks what to write (fields, the confirmation as a message or a thank-you page, the
 // emails); the answer goes into the builder for review, saved with Save. A thank-you page is made as a
 // draft.
@@ -38,8 +38,8 @@ export default function ComposeForm({ form, notifications, ask, canPage, onDone,
   };
   return (
     <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-admin-ink/40 p-4" onClick={() => !busy && onClose()}>
-      <div className="w-[480px] max-w-full rounded bg-white p-5 text-left text-sm shadow-xl" role="dialog" aria-modal="true" aria-label="Write with Claude" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.key === 'Escape' && !busy && onClose()}>
-        <h2 className="mb-1 text-base font-medium">Write with Claude</h2>
+      <div className="w-[480px] max-w-full rounded bg-white p-5 text-left text-sm shadow-xl" role="dialog" aria-modal="true" aria-label="Compose" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.key === 'Escape' && !busy && onClose()}>
+        <h2 className="mb-1 text-base font-medium">Compose</h2>
         <p className="mb-3 text-xs text-admin-muted">Claude writes what you tick from what you say here and the form as it is. You can change everything before you save.</p>
         <label className="mb-3 block">
           <span className="mb-1 block text-xs font-medium text-admin-muted">What is the form for?</span>

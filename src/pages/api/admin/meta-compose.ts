@@ -1,4 +1,4 @@
-// Write with Claude for terms, taxonomies and type listing pages (nothing is saved: the screen fills
+// Compose for terms, taxonomies and type listing pages (nothing is saved: the screen fills
 // its form for review).
 // POST { taxonomy, id, notes? }: a term's description, search title and meta description, and the
 //   taxonomy's fields that have a `compose` hint, from the term's name, its parent, what it has now and

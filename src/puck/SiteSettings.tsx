@@ -541,7 +541,7 @@ function PageDefaults({ kind, name, label, path, value, onChange }: { kind: 'tax
       </Row>
       <div className="mb-3 flex items-center gap-3">
         <button type="button" onClick={write} className="rounded-sm border border-admin-ink/20 bg-white px-3 py-1.5 text-xs font-semibold hover:border-admin-ink/50">
-          Write with Claude
+          Compose
         </button>
         {writing && (
           <span className="text-xs text-admin-muted" role="status">

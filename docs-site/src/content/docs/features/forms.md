@@ -17,9 +17,9 @@ The form builder is at `/admin/forms/` (`src/forms/FormBuilder.tsx`). Forms live
 
 Place a form on a page with the `form` block.
 
-### Write with Claude
+### Compose
 
-**Write with Claude** in the builder's header (and on the Confirmation and Notifications tabs) asks
+**Compose** in the builder's header (and on the Confirmation and Notifications tabs) asks
 for what the form is for, then writes the parts ticked (`POST /api/admin/forms/compose`,
 `src/lib/forms/compose.ts`), with the Compose model (`ANTHROPIC_MODEL`):
 

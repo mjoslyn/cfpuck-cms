@@ -1,4 +1,4 @@
-// Write with Claude for a form (the form builder): POST { brief, parts, definition, notifications } ->
+// Compose for a form (the form builder): POST { brief, parts, definition, notifications } ->
 // { definition, notifications?, page?, notes }. `parts`: fields, confirmation (a message) or page (a
 // thank-you page), notifications. The builder applies the answer for review; nothing is saved but a
 // thank-you page, made as a draft (hidden from search engines and the site's search).

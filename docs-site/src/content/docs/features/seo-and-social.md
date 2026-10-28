@@ -23,7 +23,7 @@ An entry's SEO settings live in `fields.seo` (`src/lib/seo.ts`; `seo` is a reser
   unaffected (noindex is for those).
 
 The entry settings' SEO section (`src/puck/SeoForm.tsx`) shows lengths and a search result preview.
-**Generate** asks Claude (`POST /api/admin/seo`, `ANTHROPIC_SEO_MODEL`, default Haiku 4.5) for text
+**Compose** asks Claude (`POST /api/admin/seo`, `ANTHROPIC_SEO_MODEL`, default Haiku 4.5) for text
 from the page as it is in the editor.
 
 Compose includes `seo` in every `build_page` and writes it, marked `generated`, on each build until
@@ -48,7 +48,7 @@ description becomes the term's name. A term page uses:
 Each type's listing page (`/directory/`, `/events/`, `/news/`...) has its featured image and SEO under
 Settings > Types: the **SEO** button beside its listing template's Edit opens them: a search title, a meta description, noindex and a featured
 image, which is its share image and shows in a Featured image block on the page (outside a collection).
-**Write with Claude** writes the title and description from what the page lists.
+**Compose** writes the title and description from what the page lists.
 
 The title and description apply on the listing's own address. Views under it, such as the event
 calendar's months and days, and searches in it keep their own titles and descriptions; they get the

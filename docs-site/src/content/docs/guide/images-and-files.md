@@ -36,7 +36,7 @@ Click an image in **Media** to open its details.
 if the picture doesn't load. Write what someone would need to know, for example "Children planting
 flowers at the community garden". Leave it empty only for pictures that are purely decoration.
 
-**Not sure what to write?** Click **Generate** beside the box. Claude looks at the picture and writes
+**Not sure what to write?** Click **Compose** beside the box. Claude looks at the picture and writes
 a description for you. Read it and change anything that isn't right (it can't know people's names
 unless the title or caption says them), then click **Save**. Adding a title or caption first gives it
 more to go on.

@@ -1,4 +1,4 @@
-// Write with Claude for forms (applyComposed): Claude's answer becomes the form's fields, confirmation,
+// Compose for forms (applyComposed): Claude's answer becomes the form's fields, confirmation,
 // thank-you page plan and emails. Fields it keeps keep their ids (and answers), products stay, tags name
 // the form's fields, and emails keep the addresses of the ones they replace.
 import { describe, expect, it, vi } from 'vitest';
