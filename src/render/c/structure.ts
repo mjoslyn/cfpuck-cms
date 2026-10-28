@@ -10,7 +10,8 @@ const PART_TAGS = new Set(['div', 'section', 'header', 'footer', 'aside', 'nav',
 
 export const part: Renderer = (b, env) => {
   const items = env.ctx.docs.get(`part:${b.attrs.slug}`);
-  if (!items) return '';
+  // A part that isn't there (or is in the trash) or has no blocks leaves no empty element behind.
+  if (!items?.length) return '';
   // Its role: a header or footer part by its address, or by `area` once renamed.
   const role = b.attrs.area ?? b.attrs.slug;
   const area = role === 'header' || role === 'footer' ? role : 'other';

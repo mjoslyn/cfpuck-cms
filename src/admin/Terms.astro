@@ -31,7 +31,7 @@ const { data, error: readErr } = await db.from('terms').select('id, name, slug, 
 if (readErr) throw readErr;
 const terms = (data ?? []).map((t: any) => ({ id: t.id as number, name: t.name as string, slug: t.slug as string, parent: (t.parent_id as number | null) ?? 0, count: (t.entry_terms?.[0]?.count ?? 0) as number, template: (t.fields?.template as string | undefined) ?? '' }));
 const byId = new Map((data ?? []).map((t: any) => [t.id as number, { parent_id: t.parent_id as number | null, fields: t.fields }]));
-const { data: tpls } = await db.from('templates').select('slug, title').eq('kind', 'template').order('slug');
+const { data: tpls } = await db.from('templates').select('slug, title').eq('kind', 'template').is('trashed_at', null).order('slug');
 const templates = (tpls ?? []) as { slug: string; title: string }[];
 const { data: siteRow } = await db.from('settings').select('value').eq('key', 'site').maybeSingle();
 // Term pages exist (a URL base) and are on (Settings > Types).

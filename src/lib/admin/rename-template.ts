@@ -76,8 +76,8 @@ export async function renameTemplate(db: Db, kind: Kind, slug: string, input: { 
   const { data: t } = await db.from('templates').select('updated_at, former_slugs').eq('kind', kind).eq('slug', slug).maybeSingle();
   if (!t) throw new Error('That template no longer exists.');
   if (next !== slug) {
-    const { data: taken } = await db.from('templates').select('id').eq('kind', kind).eq('slug', next).maybeSingle();
-    if (taken) throw new Error(`Another ${kind === 'template' ? 'template' : kind} has the address ${next}.`);
+    const { data: taken } = await db.from('templates').select('id, trashed_at').eq('kind', kind).eq('slug', next).maybeSingle();
+    if (taken) throw new Error(`Another ${kind} has the address ${next}${taken.trashed_at ? ' (in the trash: delete it there first)' : ''}.`);
   }
   // Its former addresses, the one it leaves included, never the one it takes.
   const former = [...new Set([...((t.former_slugs as string[] | null) ?? []), ...(next !== slug ? [slug] : [])])].filter((s) => s !== next);

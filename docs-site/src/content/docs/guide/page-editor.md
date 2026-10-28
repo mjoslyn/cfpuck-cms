@@ -143,5 +143,11 @@ it if you want another. Click **Rename**. Pages, settings and other templates us
 address, and anything still using the old one keeps working. Save your changes before giving a template
 you're editing a new address.
 
+To remove a template, part or pattern you no longer need, click **Trash** beside it in **Templates**. A
+box tells you which pages use it first: while it's in the trash, those pages show the next template in
+line, or leave the part or pattern out. Click **Move to the trash** to go ahead. The **Trash** at the
+bottom of **Templates** lists what's there: **Restore** brings one back as it was, and **Delete
+permanently** removes it for good.
+
 The menu's links are changed under **Settings**, not in the header itself. See
 [Menu and settings](/cfpuck-cms/guide/menu-and-settings/).

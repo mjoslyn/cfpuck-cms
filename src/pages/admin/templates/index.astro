@@ -2,11 +2,15 @@
 import Admin from '../../../layouts/Admin.astro';
 import MakePage from '../../../admin/MakePage';
 import RenameTemplate from '../../../admin/RenameTemplate';
+import TrashTemplate from '../../../admin/TrashTemplate';
 import { eventsOn } from '../../../lib/events/on';
 const { data: siteRow } = await Astro.locals.db.from('settings').select('value').eq('key', 'site').maybeSingle();
 const events = eventsOn(siteRow?.value as Record<string, any> | undefined);
-const { data, error } = await Astro.locals.db.from('templates').select('kind, slug, title, updated_at, linked:content->root->props->linked').in('kind', ['template', 'part', 'pattern']).order('kind').order('slug');
+const { data, error } = await Astro.locals.db.from('templates').select('kind, slug, title, updated_at, trashed_at, linked:content->root->props->linked').in('kind', ['template', 'part', 'pattern']).order('kind').order('slug');
 if (error) throw error;
+const live = (data ?? []).filter((t) => !t.trashed_at);
+const trashed = (data ?? []).filter((t) => t.trashed_at).sort((a, b) => String(b.trashed_at).localeCompare(String(a.trashed_at)));
+const KIND: Record<string, string> = { template: 'Template', part: 'Template part', pattern: 'Pattern' };
 const groups = [
   { kind: 'part', label: 'Template parts', note: 'Shared sections such as the header and footer.' },
   { kind: 'template', label: 'Templates', note: 'Page layouts chosen by the template hierarchy or per page.' },
@@ -20,7 +24,7 @@ const groups = [
       <h2 class="text-sm font-semibold tracking-wider text-admin-muted uppercase">{g.label}</h2>
       <p class="text-sm text-admin-muted">{g.note}</p>
       <ul class="mt-3 grid list-none grid-cols-3 gap-3 p-0">
-        {(data ?? []).filter((t) => t.kind === g.kind).map((t) => (
+        {live.filter((t) => t.kind === g.kind).map((t) => (
           <li class="relative">
             <a href={`/admin/templates/${t.kind}/${t.slug}/`} class="block h-full rounded bg-white p-4 pb-10 shadow-[0_0_0_1px_rgba(26,26,46,0.08)] hover:shadow-[0_0_0_2px_var(--color-admin-accent)]">
               <span class="font-medium">{t.title || t.slug}</span>
@@ -35,10 +39,33 @@ const groups = [
               </form>
               <RenameTemplate client:idle kind={t.kind} slug={t.slug} title={t.title || t.slug} />
               <MakePage client:idle kind={t.kind} slug={t.slug} title={t.title || t.slug} events={events} />
+              <TrashTemplate client:idle kind={t.kind} slug={t.slug} title={t.title || t.slug} />
             </div>
           </li>
         ))}
       </ul>
     </section>
   ))}
+  {trashed.length > 0 && (
+    <details id="trash" class="mt-10">
+      <summary class="cursor-pointer text-sm font-semibold tracking-wider text-admin-muted uppercase">Trash ({trashed.length})</summary>
+      <p class="mt-2 text-sm text-admin-muted">Templates, parts and patterns in the trash don't show on the site or in the editor. Restore one to use it again.</p>
+      <ul class="mt-3 list-none divide-y divide-admin-ink/10 rounded bg-white p-0 shadow-[0_0_0_1px_rgba(26,26,46,0.08)]">
+        {trashed.map((t) => (
+          <li class="flex items-center gap-4 px-4 py-2.5 text-sm">
+            <span class="min-w-0 flex-1"><span class="font-medium">{t.title || t.slug}</span> <span class="text-xs text-admin-muted">{KIND[t.kind]} · {t.slug}</span></span>
+            <form method="post" action="/api/admin/templates">
+              <input type="hidden" name="action" value="restore" /><input type="hidden" name="kind" value={t.kind} /><input type="hidden" name="slug" value={t.slug} />
+              <button class="text-xs text-admin-muted hover:text-admin-accent">Restore</button>
+            </form>
+            <form method="post" action="/api/admin/templates" onsubmit="return confirm('Delete this for good? It can\'t be restored.')">
+              <input type="hidden" name="action" value="delete" /><input type="hidden" name="kind" value={t.kind} /><input type="hidden" name="slug" value={t.slug} />
+              <button class="text-xs text-admin-muted hover:text-admin-accent">Delete permanently</button>
+            </form>
+          </li>
+        ))}
+      </ul>
+    </details>
+  )}
+  <script is:inline>if (location.hash === '#trash') document.getElementById('trash')?.setAttribute('open', '');</script>
 </Admin>

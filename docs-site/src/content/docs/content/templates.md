@@ -43,6 +43,19 @@ revisions, a site's code and copies that haven't synced still find it. A templat
 takes it over. The old editor address redirects to the new one; a save to an address that has gone answers
 404 rather than saving nothing. Sync carries `former_slugs` with the row.
 
+## Trash
+
+**Trash** (the templates list; `src/admin/TrashTemplate.tsx`, POST `/api/admin/templates` with
+`{ action: 'uses' }` then `{ action: 'trash' }`; `src/lib/admin/template-trash.ts`) first shows what uses it
+(`templateUses`: entries that place or chose it, templates that place it, Settings > Types, terms), then
+sets `templates.trashed_at`. A trashed template, part or pattern keeps its address, content and
+`updated_at`; `Loader.template` treats it (and its former addresses) as missing, so pages use the next
+template in line or leave the part or pattern out, and the pickers leave it out. Its editor address opens
+the Trash at the bottom of the list, whose **Restore** clears `trashed_at` and **Delete permanently**
+removes the row (form posts with `action=restore` or `delete`; deleting only works from the trash). Its
+address stays taken while it's in the trash. A part that is missing or has no blocks renders nothing
+(no empty `<header>`). Sync carries `trashed_at` with the row.
+
 ## Content areas
 
 A template can have several Page content blocks, each naming a content area (`attrs.area`). `main`,

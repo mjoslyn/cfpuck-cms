@@ -272,6 +272,14 @@ goes into `templates.former_slugs` (migration `*_templates_former_slugs.sql`, sy
 `Loader.template` falls back to when no template has that address, so the template hierarchy's names,
 revisions, site code and unsynced copies still find it; the old editor address redirects, and a template
 save to an address that has gone answers 404. The Part block lists the site's parts.
+**Trash** (the templates list; `src/admin/TrashTemplate.tsx`, `src/lib/admin/template-trash.ts`, migration
+`*_templates_trash.sql`) sets `templates.trashed_at` after a dialog listing what uses it (`templateUses`:
+entries placing or choosing it, templates placing it, Settings > Types, terms). A trashed one keeps its
+address, content and `updated_at` but `Loader.template` treats it as missing (its former addresses too), so
+pages fall back to the next template in line or leave a part or pattern out, and pickers (Settings > Types,
+terms, an entry's template, the Patterns tab, the Part block) leave it out; its editor address opens the
+list's Trash, which restores it or deletes it for good (only from the trash). A part that is missing or has
+no blocks renders nothing. Sync carries `trashed_at` with the row.
 
 ## Redirects
 

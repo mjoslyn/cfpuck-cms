@@ -142,8 +142,13 @@ export class Loader {
   async template(kind: 'template' | 'part' | 'pattern' | 'navigation', slug: string): Promise<Data | null> {
     const key = `${kind}:${slug}`;
     if (!this.templates.has(key)) {
-      const { data, error } = await this.db.from('templates').select('content').eq('kind', kind).eq('slug', slug).maybeSingle();
-      if (error) throw error;
+      const at = () => this.db.from('templates').select('content, trashed_at').eq('kind', kind).eq('slug', slug).maybeSingle();
+      let res = await at();
+      // A database without the trash column yet (code deployed before its migration) reads as before.
+      if (res.error) res = (await this.db.from('templates').select('content').eq('kind', kind).eq('slug', slug).maybeSingle()) as typeof res;
+      if (res.error) throw res.error;
+      // One in the trash isn't there.
+      const data = res.data && !res.data.trashed_at ? res.data : null;
       let doc: Data | null = (data?.content as Data) ?? null;
       // None at that address: one renamed from it, if any (a template at the address itself comes first).
       if (!data) {
@@ -160,7 +165,7 @@ export class Loader {
   private renamed(): Promise<Map<string, string>> {
     this.formerSlugs ??= (async () => {
       const map = new Map<string, string>();
-      const { data, error } = await this.db.from('templates').select('kind, slug, former_slugs');
+      const { data, error } = await this.db.from('templates').select('kind, slug, former_slugs').is('trashed_at', null);
       // The fallback is a convenience: a database without the column yet (code deployed before its
       // migration) renders as before.
       if (error) {

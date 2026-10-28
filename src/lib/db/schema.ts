@@ -265,7 +265,7 @@ export const SCHEMA: Record<string, TableSchema> = {
   },
   templates: {
     pk: ["id"],
-    columns: {"id":"int8","kind":"text","slug":"text","title":"text","content":"jsonb","updated_at":"timestamptz","former_slugs":"_text"},
+    columns: {"id":"int8","kind":"text","slug":"text","title":"text","content":"jsonb","updated_at":"timestamptz","former_slugs":"_text","trashed_at":"timestamptz"},
     generated: [],
     fks: [],
     defaults: {"title":"","former_slugs":[]},

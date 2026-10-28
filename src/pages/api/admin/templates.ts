@@ -5,10 +5,12 @@ import { slugify } from '../../../lib/slug';
 import { isStale, STALE } from '../../../lib/admin/save';
 import { renameTemplate } from '../../../lib/admin/rename-template';
 import { serviceClient } from '../../../lib/db/site';
+import { deleteTemplate, restoreTemplate, templateUses, trashTemplate } from '../../../lib/admin/template-trash';
 
 /**
- * Duplicate a template, part or pattern (form post { kind, slug } from the list), then open the copy; or,
- * with action=make-page { type, title, keep }, make a draft entry of its blocks and open that.
+ * Duplicate a template, part or pattern (form post { kind, slug } from the list), then open the copy; with
+ * action=make-page { type, title, keep }, make a draft entry of its blocks and open that; with
+ * action=restore or delete, take it out of the trash or delete it for good.
  */
 export const POST: APIRoute = async ({ request, locals, redirect }) => {
   // JSON from the editor and the templates list.
@@ -20,6 +22,18 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
       if (!['template', 'part', 'pattern'].includes(body.kind) || !body.slug) return new Response('Bad request', { status: 400 });
       try {
         return Response.json(await renameTemplate(locals.db, body.kind, String(body.slug), { title: String(body.title ?? ''), slug: typeof body.newSlug === 'string' ? body.newSlug : undefined }, serviceClient()));
+      } catch (e) {
+        return new Response((e as Error).message, { status: 400 });
+      }
+    }
+    // What uses it, before it goes to the trash: { action: 'uses', kind, slug } -> TemplateUses; then
+    // { action: 'trash', kind, slug }.
+    if (body.action === 'uses' || body.action === 'trash') {
+      if (!['template', 'part', 'pattern'].includes(body.kind) || !body.slug) return new Response('Bad request', { status: 400 });
+      try {
+        if (body.action === 'uses') return Response.json(await templateUses(locals.db, body.kind, String(body.slug)));
+        await trashTemplate(locals.db, body.kind, String(body.slug));
+        return Response.json({ ok: true });
       } catch (e) {
         return new Response((e as Error).message, { status: 400 });
       }
@@ -41,6 +55,15 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
   const kind = String(form.get('kind') ?? '');
   const slug = String(form.get('slug') ?? '');
   if (!['template', 'part', 'pattern'].includes(kind) || !slug) return new Response('Bad request', { status: 400 });
+  // From the list's Trash: Restore, or Delete permanently.
+  if (form.get('action') === 'restore' || form.get('action') === 'delete') {
+    try {
+      await (form.get('action') === 'restore' ? restoreTemplate : deleteTemplate)(locals.db, kind as 'template', slug);
+      return redirect(form.get('action') === 'restore' ? '/admin/templates/' : '/admin/templates/#trash', 303);
+    } catch (e) {
+      return new Response((e as Error).message, { status: 400 });
+    }
+  }
   if (form.get('action') === 'make-page') {
     try {
       const id = await entryFromTemplate(locals.db, kind, slug, String(form.get('type') ?? ''), String(form.get('title') ?? ''), form.get('keep') !== 'on');

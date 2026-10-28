@@ -776,7 +776,7 @@ function GalleryPanel({ a, set, video }: { a: Attrs; set: SetFn; video?: boolean
 function PartPicker({ value, onChange }: { value: unknown; onChange: (slug: string | undefined) => void }) {
   const [parts, setParts] = useState<[string, string][]>([['header', 'Header'], ['footer', 'Footer']]);
   useEffect(() => {
-    browserClient().from('templates').select('slug, title').eq('kind', 'part').order('title').then(({ data }) => data?.length && setParts(data.map((p) => [p.slug, p.title || p.slug])));
+    browserClient().from('templates').select('slug, title').eq('kind', 'part').is('trashed_at', null).order('title').then(({ data }) => data?.length && setParts(data.map((p) => [p.slug, p.title || p.slug])));
   }, []);
   return <Select title="Part" value={value} options={parts} onChange={onChange} />;
 }

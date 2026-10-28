@@ -8,7 +8,9 @@ import Editor from '../../../../puck/Editor';
 const kind = (['part', 'pattern'].includes(Astro.params.kind!) ? Astro.params.kind : 'template') as 'template' | 'part' | 'pattern';
 const slug = Astro.params.slug!;
 // An address it had before it was renamed opens it at its address now.
-const { data: here } = await Astro.locals.db.from('templates').select('id').eq('kind', kind).eq('slug', slug).maybeSingle();
+const { data: here } = await Astro.locals.db.from('templates').select('id, trashed_at').eq('kind', kind).eq('slug', slug).maybeSingle();
+// One in the trash is restored from the list first.
+if (here?.trashed_at) return Astro.redirect('/admin/templates/#trash');
 if (!here) {
   const { data: all } = await Astro.locals.db.from('templates').select('slug, former_slugs').eq('kind', kind);
   const moved = (all ?? []).find((t) => ((t.former_slugs as string[] | null) ?? []).includes(slug));

@@ -81,6 +81,7 @@ export function PatternsPanel() {
       .from('templates')
       .select('slug, title, content')
       .eq('kind', 'pattern')
+      .is('trashed_at', null)
       .order('title')
       .then(({ data }) => setRows(((data ?? []) as PatternRow[]).filter((r) => r.content?.content?.length)));
   }, []);

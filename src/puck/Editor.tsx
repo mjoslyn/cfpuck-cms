@@ -122,7 +122,7 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
       const loader = new Loader(db);
       const settings = await loader.settings();
       settingsRef.current = settings;
-      const { data: tpls } = await db.from('templates').select('slug, title, content').eq('kind', 'template').order('slug');
+      const { data: tpls } = await db.from('templates').select('slug, title, content').eq('kind', 'template').is('trashed_at', null).order('slug');
       setTemplates((tpls ?? []).map((t) => ({ slug: t.slug, title: t.title, content: hasContentBlock((t.content as any)?.content) })));
 
       if (template) {

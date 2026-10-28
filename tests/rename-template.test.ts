@@ -92,7 +92,7 @@ describe('renaming a template', () => {
     const moved = renameInDoc(doc([block('part', 'hd', { slug: 'header' })]), 'part', 'header', 'site-header')!;
     expect((moved.content as any)[0].props.attrs).toEqual({ slug: 'site-header', area: 'header' });
     expect(renameInDoc(doc([block('part', 'hd', { slug: 'header' })]), 'part', 'footer', 'x')).toBeNull();
-    const env = { ctx: { docs: new Map([['part:site-header', []]]) } } as any;
+    const env = { ctx: { docs: new Map([['part:site-header', [{ type: 'spacer', props: { id: 's', attrs: {} } }]]]), rendered: [] } } as any;
     expect(part({ type: 'part', id: 'hd', attrs: { slug: 'site-header', area: 'header' } } as any, env, (() => '') as any)).toMatch(/^<header class="c-part is-header">/);
   });
 });

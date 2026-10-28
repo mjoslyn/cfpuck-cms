@@ -26,7 +26,7 @@ describe('rendering', () => {
   });
 
   it('takes a part’s tag from a list and escapes its class', () => {
-    const env = { ctx: { docs: new Map([['part:header', []]]) }, post: null } as any;
+    const env = { ctx: { docs: new Map([['part:header', [{ type: 'spacer', props: { id: 's', attrs: {} } }]]]), rendered: [] }, post: null } as any;
     const html = part(block('part', { slug: 'header', tag: 'img src=x onerror=alert(1)', className: 'x" onmouseover="alert(1)' }), env, inner);
     expect(html.startsWith('<header class="c-part is-header x&quot; onmouseover=&quot;alert(1)"')).toBe(true);
   });
