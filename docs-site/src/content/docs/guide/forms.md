@@ -21,7 +21,8 @@ it on any page.
 
 ### Having Claude write it
 
-Click **Compose** at the top of the form builder and say what the form is for, for example:
+Click **Compose** at the top of the form builder and say what the form is for (or start a new form
+this way: **Compose** in the top bar, then **Form**; name it and click **Start**), for example:
 "Volunteer sign-up for the fall festival: name, email, phone, which shifts, T-shirt size. Tell them
 we'll email the schedule a week before." Tick what Claude should write:
 
@@ -34,8 +35,8 @@ we'll email the schedule a week before." Tick what Claude should write:
   form asks for their email address.
 
 Click **Write**. It takes up to a minute. Read what Claude wrote, change anything you like, then click
-**Save**. Nothing is saved until you do. The Confirmation and Notifications tabs also have **Write
-with Claude**, for just that part.
+**Save**. Nothing is saved until you do. The Confirmation and Notifications tabs also have
+**Compose**, for just that part.
 
 ![Compose in the form builder](../../../assets/guide/form-compose.png)
 

@@ -132,7 +132,7 @@ Some pages are made entirely from their template (a home page, often). When you 
 the editor's toolbar says **Editing this page's template**, and the button says **Save & apply**:
 changes go to every page using that template.
 
-To start a new page from a template or a pattern, click **Make a page** beside it in **Templates** (or
+To start a new page from a template or a pattern, click **Make a page** beside it in **Content**, **Templates** (or
 at the top of the editor while editing it). Give the page a title, choose its type and click **Make
 the page**. You get a new draft with a copy of the template's blocks to change freely: editing it
 never changes the template.
@@ -149,5 +149,9 @@ line, or leave the part or pattern out. Click **Move to the trash** to go ahead.
 bottom of **Templates** lists what's there: **Restore** brings one back as it was, and **Delete
 permanently** removes it for good.
 
-The menu's links are changed under **Settings**, not in the header itself. See
+To have Claude build a new template, header, footer or pattern, click **Compose** in the top bar, then
+**Template**, **Template part** or **Pattern**, name it and click **Start**; the editor opens with
+Compose ready (see [Writing with Claude](/cfpuck-cms/guide/writing-with-claude/)).
+
+The menu's links are changed under **Settings**, **Menu**, not in the header itself. See
 [Menu and settings](/cfpuck-cms/guide/menu-and-settings/).
