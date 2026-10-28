@@ -194,7 +194,7 @@ export function markdownHtml(md: string): string {
 }
 
 /** A link a button may take: a web, mail or phone address, or a path on the site. */
-const safeUrl = (u: unknown) => {
+export const safeUrl = (u: unknown) => {
   const s = String(u ?? '').trim();
   return /^(https?:\/\/|mailto:|tel:|\/(?!\/))/i.test(s) ? s : '';
 };

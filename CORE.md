@@ -983,7 +983,14 @@ never subscribes anyone again); the settings are, with the others. Migration `*_
   types and terms, members-only ones left out, `src/lib/mailing/entries.ts`; and Events). Editors save
   and send tests (to themselves and 5 more, marked [Test], links untracked); admins send, schedule (a
   time in the site's time zone), pause, resume, cancel and approve, after a confirmation that counts
-  who it goes to now. Writes there don't clear the page cache; lists' do.
+  who it goes to now. Writes there don't clear the page cache; lists' do. **Compose** (the editor's
+  header, and Compose > Campaign; `src/admin/ComposeCampaign.tsx`, POST
+  `/api/admin/mailing/campaigns/compose`, `src/lib/mailing/compose.ts`): from what the editor says the email
+  is about and the campaign as it is (`campaignOutline`), Claude (`quickAsk` with `ANTHROPIC_MODEL`,
+  `campaignSchema`) writes its name, subject, preview line and email: a heading, sections of Markdown text
+  with merge tags, each with an optional button (web, mail or site addresses only), and optionally an
+  Entries block of the site's types and, while Events is on, an Events block (`applyCampaign`, keeping the
+  design's look, else the default campaign template's). Nothing is saved until the campaign is.
 - **Rendering** (`src/lib/mailing/render.ts`): the email builder's renderer, each tag a Mailgun
   recipient variable (`%recipient.v1%`, escaped for HTML as `v1_h`, plain in the subject and text;
   values escaped once, by the site), and a footer under the design that it can't remove: why they get
@@ -1119,14 +1126,21 @@ screens' "Invited" rows and Resend invitation.
 The admin bar (`src/layouts/Admin.astro`, its items from `adminNav` in `src/lib/admin/nav.ts`): a **Content**
 dropdown (each type shown, its list at `/admin/?type=<type>`, then Taxonomies, then Templates in a section
 of its own, `section`; the content list has no tabs of its own for the types), a **Compose** dropdown
-(each type with a page, at `/admin/compose/?type=<type>`; then Form; then Template, Template part and
-Pattern, which `/admin/compose/new/?kind=` names and makes empty, a form through `/api/admin/forms` and the
-others with `/api/admin/templates` `action: 'create'`, opening the form builder or the editor with `?compose`
-so Compose opens at once), Media, a **Forms** dropdown (Forms, Submissions) and a **People** dropdown (Users and Members
+(each type with a page, at `/admin/compose/?type=<type>`; then Form and, while Mailing is on, Campaign;
+then Template, Template part and Pattern), Media, a **Forms** dropdown (Forms, Submissions) and a **People** dropdown (Users and Members
 for admins, Mailing Lists and Tickets, each while its feature is on; a group of one shows as its link),
 then a gear for Settings (admins), **?**, View site and the account menu. Below 1024px it all sits behind
 one menu button, the groups as headings. The dropdowns are `details[data-menu]`: one open at a time, closed
 by a click elsewhere or Escape.
+
+**Compose's start page** (`/admin/compose/new/?kind=form|campaign|template|part|pattern`,
+`src/admin/ComposeStart.tsx`), laid out as Compose for a page with the latest of the kind beside it: a
+name (none for a campaign, whose Compose names it), what it is for and, for a form, what to write. Send
+makes it (`/api/admin/forms`, `/api/admin/mailing/campaigns` `action: 'create'`, `/api/admin/templates`
+`action: 'create'`, an empty one at a free address), keeps the brief in the browser's `sessionStorage`
+(`keepStart`, `takeStart` in `src/lib/compose/start.ts`, keyed `form:<id>`, `campaign:<id>` or the
+template's `<kind>:<slug>`) and opens its editor with `?compose`, where Compose writes it at once: the form
+builder's and campaign editor's Compose dialogs, or the editor's panel, whose conversation it starts.
 
 **Settings** (admins; `src/puck/SiteSettings.tsx`, page `src/pages/admin/settings/[...section].astro`): a side
 menu of sections in groups (`SETTINGS_GROUPS`, `src/lib/admin/settings-sections.ts`): Site (General, Menu,

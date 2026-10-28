@@ -22,7 +22,7 @@ it on any page.
 ### Having Claude write it
 
 Click **Compose** at the top of the form builder and say what the form is for (or start a new form
-this way: **Compose** in the top bar, then **Form**; name it and click **Start**), for example:
+this way: **Compose** in the top bar, then **Form**; name it, describe it and click **Send**), for example:
 "Volunteer sign-up for the fall festival: name, email, phone, which shifts, T-shirt size. Tell them
 we'll email the schedule a week before." Tick what Claude should write:
 

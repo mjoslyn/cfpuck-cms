@@ -36,7 +36,7 @@ The dark bar across the top of every admin screen takes you to each part of the 
 | Menu item | What it is for |
 | --- | --- |
 | **Content** ▾ | Your pages, posts and anything else the site lists, such as events, each kind on its own list; **Taxonomies** (categories and tags); and, below a line, **Templates**, the shared layouts every page uses, such as the header and footer. |
-| **Compose** ▾ | Have Claude build something new from your material: a page or post (or any kind of content with a page), a form, a template, a template part or a pattern. See [Writing with Claude](/cfpuck-cms/guide/writing-with-claude/). |
+| **Compose** ▾ | Have Claude build something new from your material: a page or post (or any kind of content with a page), a form, an email campaign (with mailing lists), a template, a template part or a pattern. See [Writing with Claude](/cfpuck-cms/guide/writing-with-claude/). |
 | **Media** | Your photos, images, videos and documents. |
 | **Forms** ▾ | **Forms** (contact forms, sign-up forms and the like) and **Submissions** (what people sent through them). |
 | **People** ▾ | **Users** (who can sign in to look after the site; admins only), **Members**, **Mailing Lists** and **Tickets** (each only when your site uses it). |

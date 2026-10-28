@@ -1,9 +1,12 @@
 // A campaign (or a digest's issue): its settings, its email (designed in the email builder), a test send,
 // and, for admins, scheduling, sending, pausing and approving. Once it has gone out: its numbers, and each
-// link's clicks told apart into people's and machines' (src/lib/mailing/clicks.ts). Saves with
+// link's clicks told apart into people's and machines' (src/lib/mailing/clicks.ts). Compose writes its
+// name, subject and email for review (src/admin/ComposeCampaign.tsx). Saves with
 // POST /api/admin/mailing/campaigns.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import EmailBuilder from '../forms/EmailBuilder';
+import ComposeCampaign, { type ComposedCampaign } from './ComposeCampaign';
+import { takeStart, type ComposeStart } from '../lib/compose/start';
 import { mailingEmailKit } from './mailing-email';
 import { CAMPAIGN_STATUS, rate, type Audience, type Campaign, type CampaignStats, type ContactField, type MailList } from '../lib/mailing/config';
 import type { MemberLevel } from '../lib/members/config';
@@ -68,6 +71,10 @@ export default function CampaignEditor({ campaign, lists, levels, stats, links, 
   const [at, setAt] = useState(() => localNow(tz));
   const [confirming, setConfirming] = useState<null | { action: 'send' | 'schedule' | 'approve'; count: number | null; ticked: boolean }>(null);
   const [showMachine, setShowMachine] = useState(false);
+  // Compose: open, with what Compose > Campaign asked for (?compose).
+  const [composing, setComposing] = useState(false);
+  const [composeStart, setComposeStart] = useState<ComposeStart | undefined>();
+  const [composeNotes, setComposeNotes] = useState<string[]>([]);
   const latest = useRef(c);
   latest.current = c;
   const dirty = JSON.stringify(c) !== saved;
@@ -82,6 +89,21 @@ export default function CampaignEditor({ campaign, lists, levels, stats, links, 
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
   }, [dirty]);
+  useEffect(() => {
+    const url = new URL(location.href);
+    if (!url.searchParams.has('compose')) return;
+    setComposeStart(takeStart(`campaign:${campaign.id}`));
+    setComposing(true);
+    url.searchParams.delete('compose');
+    history.replaceState(null, '', url);
+  }, []);
+  const composed = (out: ComposedCampaign) => {
+    set({ name: out.name || latest.current.name, subject: out.subject || latest.current.subject, design: out.design });
+    setComposeNotes(out.notes);
+    setComposing(false);
+    setComposeStart(undefined);
+    setStatus('Written by Compose: check the email, then Save.');
+  };
   // While it sends, the numbers refresh.
   useEffect(() => {
     if (c.status !== 'sending' || dirty) return;
@@ -129,6 +151,7 @@ export default function CampaignEditor({ campaign, lists, levels, stats, links, 
 
   return (
     <div className="max-w-5xl">
+      {composing && editable && <ComposeCampaign campaign={c} start={composeStart} onDone={composed} onClose={() => (setComposing(false), setComposeStart(undefined))} />}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm text-admin-muted">
@@ -147,6 +170,11 @@ export default function CampaignEditor({ campaign, lists, levels, stats, links, 
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span role="status" className="text-xs text-admin-muted">{status || (dirty ? 'Unsaved changes' : '')}</span>
+          {editable && (
+            <button type="button" className={secondary} disabled={busy} onClick={() => setComposing(true)}>
+              Compose
+            </button>
+          )}
           {editable && (
             <button type="button" className={primary} disabled={busy || !dirty} onClick={save}>
               Save
@@ -184,6 +212,13 @@ export default function CampaignEditor({ campaign, lists, levels, stats, links, 
                   Edit the email
                 </button>
               </div>
+              {composeNotes.length > 0 && (
+                <ul className="mb-2 list-disc pl-5 text-xs text-admin-muted" role="status">
+                  {composeNotes.map((n) => (
+                    <li key={n}>{n}</li>
+                  ))}
+                </ul>
+              )}
               <p className="text-xs text-admin-muted">
                 {(c.design?.content ?? []).length} block{(c.design?.content ?? []).length === 1 ? '' : 's'}{c.text ? ', with its own plain text' : ''}. Every email ends with the sender, the postal address and unsubscribe and preferences links, added when it is sent.
               </p>

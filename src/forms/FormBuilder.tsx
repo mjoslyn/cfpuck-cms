@@ -17,6 +17,7 @@ import { MergeTags, mergeTagOptions } from './rich-message';
 import EmailBuilder from './EmailBuilder';
 import { formEmailKit } from './form-email';
 import ComposeForm, { type ComposeAsk, type Composed } from './ComposeForm';
+import { takeStart, type ComposeStart } from '../lib/compose/start';
 import { defaultEmail, emailFromMessage, type EmailDoc } from '../lib/forms/email';
 
 const input = 'w-full rounded border border-admin-ink/15 bg-white px-2 py-1.5 text-sm outline-none focus:border-admin-accent';
@@ -553,6 +554,7 @@ export default function FormBuilder({ formId }: { formId: number }) {
   const [pages, setPages] = useState<{ id: number; title: string; status: string }[]>([]);
   // Compose: what it opens with, and what the last answer couldn't do.
   const [composing, setComposing] = useState<ComposeAsk[] | null>(null);
+  const [composeStart, setComposeStart] = useState<ComposeStart | undefined>();
   const [composeNotes, setComposeNotes] = useState<string[]>([]);
   const [submissions, setSubmissions] = useState<number | null>(null);
   const [providers, setProviders] = useState<Providers | null>(null);
@@ -571,10 +573,12 @@ export default function FormBuilder({ formId }: { formId: number }) {
       r.notifications = r.notifications ?? [];
       setRow(r);
       setSaved(JSON.stringify(r));
-      // Opened from the admin bar's Compose menu (?compose): Compose opens on the whole form.
+      // Opened from the admin bar's Compose > Form (?compose): Compose writes what that page asked for.
       const url = new URL(location.href);
       if (url.searchParams.has('compose')) {
-        setComposing(r.definition.fields.length ? ['fields'] : ['fields', 'confirmation', 'notifications']);
+        const start = takeStart(`form:${formId}`);
+        setComposeStart(start);
+        setComposing((start?.parts as ComposeAsk[] | undefined) ?? (r.definition.fields.length ? ['fields'] : ['fields', 'confirmation', 'notifications']));
         url.searchParams.delete('compose');
         history.replaceState(null, '', url);
       }
@@ -734,13 +738,14 @@ export default function FormBuilder({ formId }: { formId: number }) {
     setTab(c.definition.fields ? 'build' : c.definition.confirmation ? 'confirmation' : 'notifications');
     if (c.definition.fields) setSelected(null);
     setComposing(null);
+    setComposeStart(undefined);
   };
   const confirmPage = confirmation.type === 'page' ? pages.find((p) => p.id === confirmation.pageId) : undefined;
 
   const emailIndex = emailFor ? row.notifications.findIndex((n) => n.id === emailFor) : -1;
   return (
     <div className="flex h-[calc(100vh-3.5rem)] flex-col">
-      {composing && <ComposeForm form={form} notifications={row.notifications} ask={composing} canPage={!!typeDef('page')} onDone={composed} onClose={() => setComposing(null)} />}
+      {composing && <ComposeForm form={form} notifications={row.notifications} ask={composing} canPage={!!typeDef('page')} start={composeStart} onDone={composed} onClose={() => (setComposing(null), setComposeStart(undefined))} />}
       {emailIndex >= 0 && (
         <EmailBuilder
           title={`${row.notifications[emailIndex].name || 'Notification'}: email`}

@@ -8,7 +8,7 @@ const at = (path: string) => new URL(path, 'http://site.test');
 
 describe('admin nav', () => {
   it('keeps the bar short with every feature on, the content types and Templates under Content', () => {
-    expect(labels({ isAdmin: true, ticketsOn: true, mailOn: true, membersOn: true })).toEqual(['Content: Pages, Posts, Taxonomies, Templates', 'Compose: Page, Post, Form, Template, Template part, Pattern', 'Media', 'Forms: Forms, Submissions', 'People: Users, Members, Mailing Lists, Tickets']);
+    expect(labels({ isAdmin: true, ticketsOn: true, mailOn: true, membersOn: true })).toEqual(['Content: Pages, Posts, Taxonomies, Templates', 'Compose: Page, Post, Form, Campaign, Template, Template part, Pattern', 'Media', 'Forms: Forms, Submissions', 'People: Users, Members, Mailing Lists, Tickets']);
   });
 
   it('gives editors no admin screens, and a group of one as a link', () => {

@@ -150,8 +150,8 @@ bottom of **Templates** lists what's there: **Restore** brings one back as it wa
 permanently** removes it for good.
 
 To have Claude build a new template, header, footer or pattern, click **Compose** in the top bar, then
-**Template**, **Template part** or **Pattern**, name it and click **Start**; the editor opens with
-Compose ready (see [Writing with Claude](/cfpuck-cms/guide/writing-with-claude/)).
+**Template**, **Template part** or **Pattern**, name it, say what it is for and click **Send**; the
+editor opens and Claude builds it (see [Writing with Claude](/cfpuck-cms/guide/writing-with-claude/)).
 
 The menu's links are changed under **Settings**, **Menu**, not in the header itself. See
 [Menu and settings](/cfpuck-cms/guide/menu-and-settings/).

@@ -23,8 +23,8 @@ export const contentHref = (type: string) => `/admin/?type=${type}`;
 /**
  * What the bar offers this person: Content's types (those shown, `types`), Taxonomies and, in a section
  * of its own, Templates; Compose, for each thing it makes (an entry of a type with a page, `composable`,
- * then a form, then a template, part or pattern); optional features only while they are on; admin
- * screens to admins.
+ * then a form and, while Mailing is on, a campaign, then a template, part or pattern); optional features
+ * only while they are on; admin screens to admins.
  */
 export function adminNav(o: { isAdmin: boolean; ticketsOn: boolean; mailOn: boolean; membersOn: boolean; types: { type: string; label: string }[]; composable: { type: string; singular: string }[] }): NavItem[] {
   const people: NavLink[] = [
@@ -44,6 +44,7 @@ export function adminNav(o: { isAdmin: boolean; ticketsOn: boolean; mailOn: bool
       items: [
         ...o.composable.map((t) => ({ href: `/admin/compose/?type=${t.type}`, label: t.singular })),
         { href: '/admin/compose/new/?kind=form', label: 'Form', section: true },
+        ...(o.mailOn ? [{ href: '/admin/compose/new/?kind=campaign', label: 'Campaign' }] : []),
         { href: '/admin/compose/new/?kind=template', label: 'Template', section: true },
         { href: '/admin/compose/new/?kind=part', label: 'Template part' },
         { href: '/admin/compose/new/?kind=pattern', label: 'Pattern' },

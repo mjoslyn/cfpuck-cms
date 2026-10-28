@@ -25,13 +25,23 @@ plain words, as you would ask a colleague. Nothing goes on your site until you p
 
 It takes a minute or two. When it is done, the new page opens as a draft in the editor.
 
-## Forms, templates and patterns
+## Forms, emails, templates and patterns
 
-The **Compose** menu also makes a **Form**, a **Template**, a **Template part** (such as a header or
-footer) or a **Pattern**. Choose one, give it a name and click **Start**: it opens with Compose ready.
-Say what it is for (for example "A volunteer sign-up form with availability by weekday") and click
-**Send**. A form's questions, thank-you message and emails are written for you to check and **Save**;
-a template, part or pattern is built in the editor, kept with **Save & apply**.
+The **Compose** menu also makes a **Form**, a **Campaign** (an email to your mailing lists, if your site
+uses them), a **Template**, a **Template part** (such as a header or footer) or a **Pattern**. It opens a
+page like the one for pages:
+
+1. Give it a name (a campaign gets one from Claude).
+2. In the box, say what it is for, for example "A volunteer sign-up form with availability by weekday"
+   or "The October newsletter: the festival on the 18th, volunteers wanted, then our latest news".
+3. Click **Send**.
+
+It is made and opens where you edit it, and Claude writes it straight away. A form's questions,
+thank-you message and emails, or a campaign's subject and email, are filled in for you to check and
+**Save** (a campaign is a draft until you send it). A template, part or pattern is built in the editor,
+kept with **Save & apply**.
+
+A campaign you're already working on has its own **Compose** button at the top of its editor.
 
 ## Asking for changes
 

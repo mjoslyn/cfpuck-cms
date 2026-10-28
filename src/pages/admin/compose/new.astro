@@ -1,49 +1,59 @@
 ---
-// The admin bar's Compose menu, for what isn't an entry: name a new form, template, template part or
-// pattern; it is made empty and opens with Compose (the form builder's, or the editor's panel).
+// The admin bar's Compose menu, for what isn't an entry: a form, a campaign (while Mailing is on), a
+// template, a template part or a pattern. Laid out as Compose for a page (/admin/compose/): describe it
+// (src/admin/ComposeStart.tsx), and it is made and opens in its own editor, where Compose writes it.
 import Admin from '../../../layouts/Admin.astro';
+import ComposeStart, { type StartKind } from '../../../admin/ComposeStart';
 import { env } from '../../../lib/compose/claude';
+import { typeDef, SITE_TZ } from '../../../lib/site';
+import { mailingOn } from '../../../lib/mailing/config';
 
-const KINDS: Record<string, { label: string; note: string; placeholder: string }> = {
-  form: { label: 'form', note: 'Say what the form is for and Compose writes its questions, thank-you message and emails.', placeholder: 'Volunteer sign-up' },
-  template: { label: 'template', note: 'A page layout. Compose builds it in the editor; choose it for pages under Settings > Types or on a page.', placeholder: 'Event with sidebar' },
-  part: { label: 'template part', note: 'A shared section such as a header or footer, placed in templates with the Part block.', placeholder: 'Holiday banner' },
-  pattern: { label: 'pattern', note: 'A reusable group of blocks, inserted from the Patterns tab in the editor.', placeholder: 'Team members grid' },
+const LABELS: Record<StartKind, { title: string; lead: string; recent: string }> = {
+  form: { title: 'Compose a form', lead: "Describe the form and Claude writes it in the form builder: its questions, its thank-you message and its emails. Check them there, then Save.", recent: 'Your forms' },
+  campaign: { title: 'Compose a campaign', lead: 'Describe the email and Claude writes it as a draft campaign in the site\'s email style. Choose its lists, check it, then Save and send.', recent: 'Recent campaigns' },
+  template: { title: 'Compose a template', lead: 'Describe the layout and Claude builds it in the editor. Every page using it shares it.', recent: 'Templates' },
+  part: { title: 'Compose a template part', lead: 'Describe the header, footer or other shared section and Claude builds it in the editor.', recent: 'Template parts' },
+  pattern: { title: 'Compose a pattern', lead: 'Describe the group of blocks and Claude builds it in the editor, ready to insert on any page.', recent: 'Patterns' },
 };
-const kind = Astro.url.searchParams.get('kind') ?? '';
-const k = KINDS[kind];
-if (!k) return Astro.redirect('/admin/compose/');
+const kind = (Astro.url.searchParams.get('kind') ?? '') as StartKind;
+const db = Astro.locals.db;
+const { data: siteRow } = await db.from('settings').select('value').eq('key', 'site').maybeSingle();
+if (!LABELS[kind] || (kind === 'campaign' && !mailingOn(siteRow?.value))) return Astro.redirect('/admin/compose/');
+const l = LABELS[kind];
 const configured = !!env('ANTHROPIC_API_KEY');
+// The latest of the kind beside it, as Compose for a page lists its conversations.
+const recent: { href: string; title: string; when: string }[] =
+  kind === 'form'
+    ? ((await db.from('forms').select('id, title, updated_at').order('updated_at', { ascending: false }).limit(12)).data ?? []).map((f) => ({ href: `/admin/forms/${f.id}/`, title: f.title, when: f.updated_at }))
+    : kind === 'campaign'
+      ? ((await db.from('campaigns').select('id, name, updated_at').is('digest_id', null).order('updated_at', { ascending: false }).limit(12)).data ?? []).map((c) => ({ href: `/admin/mailing-lists/campaigns/${c.id}/`, title: c.name, when: c.updated_at }))
+      : ((await db.from('templates').select('slug, title, updated_at').eq('kind', kind).is('trashed_at', null).order('updated_at', { ascending: false }).limit(12)).data ?? []).map((t) => ({ href: `/admin/templates/${kind}/${t.slug}/`, title: t.title || t.slug, when: t.updated_at }));
+const when = (s: string) => new Date(s).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: SITE_TZ });
 ---
-<Admin title={`Compose a ${k.label}`}>
-  <h1 class="text-3xl font-normal">Compose a {k.label}</h1>
-  <p class="mt-1 mb-6 max-w-xl text-sm text-admin-muted">{k.note}</p>
-  {!configured && <p class="mb-4 max-w-xl rounded bg-admin-soft px-3 py-2 text-sm text-admin-ink">Claude isn't connected yet: an admin adds its key under <a class="underline" href="/admin/settings/connections/">Settings &gt; Connections</a>.</p>}
-  <form id="compose-new" data-kind={kind} class="flex max-w-xl items-end gap-2">
-    <label class="flex-1">
-      <span class="mb-1 block text-xs font-medium text-admin-muted">Name</span>
-      <input name="title" required maxlength="120" placeholder={k.placeholder} class="w-full rounded border border-admin-ink/15 bg-white px-3 py-2 text-sm outline-none focus:border-admin-accent" />
-    </label>
-    <button class="rounded-sm bg-admin-ink px-4 py-2.5 text-xs font-semibold tracking-wider text-white uppercase hover:bg-admin-accent">Start</button>
-  </form>
-  <p id="compose-new-error" class="mt-3 text-sm text-[#b3261e]" role="alert"></p>
+<Admin title={l.title}>
+  <div class="grid gap-8 lg:grid-cols-[minmax(0,1fr)_300px]">
+    <div>
+      <h1 class="text-3xl font-normal">{l.title}</h1>
+      <p class="mt-1 mb-4 text-sm text-admin-muted">{l.lead}</p>
+      {!configured && <p class="mb-4 rounded bg-admin-soft px-3 py-2 text-sm text-admin-ink">Claude isn't connected yet: an admin adds its key under <a class="underline" href="/admin/settings/connections/">Settings &gt; Connections</a>.</p>}
+      <div class="h-[70vh] min-h-[480px] overflow-hidden rounded-lg border border-admin-ink/10 bg-white">
+        <ComposeStart client:load kind={kind} canPage={!!typeDef('page')} />
+      </div>
+    </div>
+    <aside>
+      <h2 class="mb-2 text-xs font-semibold tracking-wider text-admin-muted uppercase">{l.recent}</h2>
+      {recent.length ? (
+        <ul class="m-0 list-none space-y-2 p-0 text-sm">
+          {recent.map((r) => (
+            <li class="rounded border border-admin-ink/10 bg-white p-2">
+              <a href={r.href} class="font-medium hover:text-admin-accent">{r.title || '(untitled)'}</a>
+              <div class="text-xs text-admin-muted">Changed {when(r.when)}</div>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p class="text-sm text-admin-muted">None yet.</p>
+      )}
+    </aside>
+  </div>
 </Admin>
-
-<script>
-  const form = document.getElementById('compose-new') as HTMLFormElement;
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const kind = form.dataset.kind!;
-    const title = String(new FormData(form).get('title') ?? '').trim();
-    const button = form.querySelector('button')!;
-    button.disabled = true;
-    const say = (t: string) => ((document.getElementById('compose-new-error')!.textContent = t), (button.disabled = false));
-    const res =
-      kind === 'form'
-        ? await fetch('/api/admin/forms/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }) })
-        : await fetch('/api/admin/templates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'create', kind, title }) });
-    if (!res.ok) return say(`It couldn't be made: ${await res.text()}`);
-    const out = await res.json();
-    location.href = kind === 'form' ? `/admin/forms/${out.id}/?compose=1` : `/admin/templates/${kind}/${out.slug}/?compose=1`;
-  });
-</script>

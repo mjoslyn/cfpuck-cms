@@ -11,6 +11,7 @@ import { outline, isComposed } from '../lib/compose/outline';
 import { inline } from '../lib/compose/build';
 import { uploadMedia, VIDEO_TYPES } from '../lib/media/upload';
 import { layoutName, type Layout } from '../lib/compose/layout';
+import { takeStart } from '../lib/compose/start';
 
 /** Claude's replies: paragraphs and "- " lists with inline Markdown (escaped first). */
 function Reply({ text }: { text: string }) {
@@ -130,6 +131,15 @@ export default function Composer({ entryId, templateKey, layout, live, selection
   useEffect(() => {
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' });
   }, [turns]);
+  // A template, part or pattern made on Compose's start page: what it asked for is sent at once.
+  const [autoSend, setAutoSend] = useState(false);
+  useEffect(() => {
+    if (!loaded || !templateKey || turns.length) return;
+    const start = takeStart(templateKey);
+    if (!start?.brief.trim()) return;
+    setMessage(start.brief);
+    setAutoSend(true);
+  }, [loaded]);
 
   const upload = async (file: File) => {
     const kind = file.type.startsWith('video/') ? 'video' : 'image';
@@ -170,6 +180,12 @@ export default function Composer({ entryId, templateKey, layout, live, selection
   const first = !turns.some((t) => t.role === 'assistant' && t.built);
   const pageHasContent = !!live && live.content().length > 0;
 
+  useEffect(() => {
+    if (autoSend && message) {
+      setAutoSend(false);
+      send();
+    }
+  }, [autoSend, message]);
   const send = async () => {
     if (!canSend) return;
     const attachments: Attachment[] = [...ready.map((m) => ({ kind: m.kind, label: m.name, src: m.kind === 'image' ? m.url : undefined })), ...docs.map((d) => ({ kind: 'doc', label: d.name })), ...links.map((l) => ({ kind: isVideoLink(l) ? 'video' : 'link', label: l }))];

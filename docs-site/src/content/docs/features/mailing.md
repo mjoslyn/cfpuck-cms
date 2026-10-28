@@ -81,7 +81,11 @@ the people on its lists who match. A segment that a campaign or digest uses can'
 
 ## Campaigns
 
-**New campaign** on the Campaigns tab opens its editor:
+**New campaign** on the Campaigns tab opens its editor (or **Compose** in the admin bar, then
+**Campaign**: say what the email is about, and it is made as a draft and written by Compose). Its
+**Compose** button writes the name, subject and email from a brief: a heading, sections of text with
+buttons, and optionally the latest entries and upcoming events, keeping the email's look, for you to
+check and save:
 
 - name, subject, sender and reply-to (empty: the settings'), the lists, and with Members on, everyone,
   only members (of some levels) or only non-members;

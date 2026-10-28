@@ -1,9 +1,11 @@
 // Compose in the form builder (POST /api/admin/forms/compose): the editor says what the form
 // is for and picks what to write (fields, the confirmation as a message or a thank-you page, the
 // emails); the answer goes into the builder for review, saved with Save. A thank-you page is made as a
-// draft.
-import { useState } from 'react';
+// draft. Started from the admin bar's Compose > Form (src/admin/ComposeStart.tsx), it opens with
+// that page's brief and choices and writes at once (src/lib/compose/start.ts).
+import { useEffect, useState } from 'react';
 import type { FormDef, Notification } from '../lib/forms/types';
+import type { ComposeStart } from '../lib/compose/start';
 
 export type ComposeAsk = 'fields' | 'confirmation' | 'notifications';
 
@@ -14,16 +16,16 @@ export interface Composed {
   notes: string[];
 }
 
-const PARTS: [ComposeAsk, string][] = [
+export const PARTS: [ComposeAsk, string][] = [
   ['fields', 'Fields'],
   ['confirmation', 'Confirmation'],
   ['notifications', 'Notification emails'],
 ];
 
-export default function ComposeForm({ form, notifications, ask, canPage, onDone, onClose }: { form: FormDef; notifications: Notification[]; ask: ComposeAsk[]; canPage: boolean; onDone: (c: Composed) => void; onClose: () => void }) {
-  const [brief, setBrief] = useState('');
-  const [parts, setParts] = useState<Set<ComposeAsk>>(new Set(ask));
-  const [confirm, setConfirm] = useState<'message' | 'page'>(form.confirmation?.type === 'page' && canPage ? 'page' : 'message');
+export default function ComposeForm({ form, notifications, ask, canPage, start, onDone, onClose }: { form: FormDef; notifications: Notification[]; ask: ComposeAsk[]; canPage: boolean; start?: ComposeStart; onDone: (c: Composed) => void; onClose: () => void }) {
+  const [brief, setBrief] = useState(start?.brief ?? '');
+  const [parts, setParts] = useState<Set<ComposeAsk>>(new Set((start?.parts as ComposeAsk[] | undefined) ?? ask));
+  const [confirm, setConfirm] = useState<'message' | 'page'>(start ? (start.confirm === 'page' && canPage ? 'page' : 'message') : form.confirmation?.type === 'page' && canPage ? 'page' : 'message');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const toggle = (p: ComposeAsk, on: boolean) => setParts((s) => new Set([...s].filter((x) => x !== p).concat(on ? [p] : [])));
@@ -36,6 +38,10 @@ export default function ComposeForm({ form, notifications, ask, canPage, onDone,
     if (!res?.ok) return setError((res && (await res.text())) || 'Claude couldn’t be reached. Try again.');
     onDone(await res.json());
   };
+  // Asked for on Compose > Form: write it now.
+  useEffect(() => {
+    if (start?.brief.trim() && parts.size) write();
+  }, []);
   return (
     <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-admin-ink/40 p-4" onClick={() => !busy && onClose()}>
       <div className="w-[480px] max-w-full rounded bg-white p-5 text-left text-sm shadow-xl" role="dialog" aria-modal="true" aria-label="Compose" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.key === 'Escape' && !busy && onClose()}>
