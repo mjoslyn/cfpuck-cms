@@ -26,7 +26,7 @@ export interface ScalarField {
 
 export interface ContentType {
   /** Stored in entries.type. `page`, `post` and `global` are required. `event` and `venue` come with the core's
-   *  Events feature (Settings > Events); a site defines them only to change them. */
+   *  Events feature (Settings > Events), `product` with its Shop (Settings > Shop); a site defines them only to change them. */
   type: string;
   /** Plural, for the admin list and listings ("Members"). */
   label: string;
@@ -128,6 +128,8 @@ export interface SiteConfig {
   taxonomies: Taxonomy[];
   /** Changes to the core's Events feature (Settings > Events): its event and venue types and event categories. */
   events?: EventsConfig;
+  /** Changes to the core's Shop feature (Settings > Shop): its product type and product categories. */
+  shop?: ShopConfig;
 }
 
 /**
@@ -143,6 +145,13 @@ export interface EventsConfig {
   /** The venue type. */
   venue?: TypeExtension;
   /** The event category taxonomy: its options replace the core's (label, singular, base, fields). */
+  category?: Partial<Omit<Taxonomy, 'name'>>;
+}
+
+export interface ShopConfig {
+  /** The product type (src/lib/shop/types.ts). */
+  product?: TypeExtension;
+  /** The product category taxonomy: its options replace the core's. */
   category?: Partial<Omit<Taxonomy, 'name'>>;
 }
 

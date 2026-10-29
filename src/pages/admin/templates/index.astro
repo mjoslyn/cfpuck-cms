@@ -3,9 +3,9 @@ import Admin from '../../../layouts/Admin.astro';
 import MakePage from '../../../admin/MakePage';
 import RenameTemplate from '../../../admin/RenameTemplate';
 import TrashTemplate from '../../../admin/TrashTemplate';
-import { eventsOn } from '../../../lib/events/on';
+import { featuresOf } from '../../../lib/features';
 const { data: siteRow } = await Astro.locals.db.from('settings').select('value').eq('key', 'site').maybeSingle();
-const events = eventsOn(siteRow?.value as Record<string, any> | undefined);
+const features = featuresOf(siteRow?.value as Record<string, any> | undefined);
 const { data, error } = await Astro.locals.db.from('templates').select('kind, slug, title, updated_at, trashed_at, linked:content->root->props->linked').in('kind', ['template', 'part', 'pattern']).order('kind').order('slug');
 if (error) throw error;
 const live = (data ?? []).filter((t) => !t.trashed_at);
@@ -38,7 +38,7 @@ const groups = [
                 <button class="text-xs text-admin-muted hover:text-admin-accent" aria-label={`Duplicate ${t.title || t.slug}`}>Duplicate</button>
               </form>
               <RenameTemplate client:idle kind={t.kind} slug={t.slug} title={t.title || t.slug} />
-              <MakePage client:idle kind={t.kind} slug={t.slug} title={t.title || t.slug} events={events} />
+              <MakePage client:idle kind={t.kind} slug={t.slug} title={t.title || t.slug} features={features} />
               <TrashTemplate client:idle kind={t.kind} slug={t.slug} title={t.title || t.slug} />
             </div>
           </li>

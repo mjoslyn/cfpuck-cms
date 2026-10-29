@@ -3,11 +3,11 @@
 // templates list and the template editor's header.
 import { useState } from 'react';
 import { COMPOSABLE_TYPES } from '../lib/site';
-import { showsType } from '../lib/events/on';
+import { showsType, type Features } from '../lib/features';
 
-export default function MakePage({ kind, slug, title, events, dirty, className }: { kind: string; slug: string; title: string; events: boolean; dirty?: boolean; className?: string }) {
+export default function MakePage({ kind, slug, title, features, dirty, className }: { kind: string; slug: string; title: string; features: Features; dirty?: boolean; className?: string }) {
   const [open, setOpen] = useState(false);
-  const types = COMPOSABLE_TYPES.filter((t) => showsType(t.type, events));
+  const types = COMPOSABLE_TYPES.filter((t) => showsType(t.type, features));
   const field = 'w-full rounded border border-admin-ink/15 bg-white px-2 py-1.5 text-sm outline-none focus:border-admin-accent';
   return (
     <span>

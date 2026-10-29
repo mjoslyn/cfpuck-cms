@@ -63,6 +63,8 @@ export const POLICIES: Record<string, TablePolicy> = {
   templates: all(editors, editors),
   terms: all(editors, editors),
   ticket_emails: all(editors, editors),
+  // Stock counts, set in a product's settings (they save as they change).
+  shop_stock: all(editors, editors),
   contact_lists: all(editors, admins),
   contacts: all(editors, admins),
   mail_lists: all(editors, admins),

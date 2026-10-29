@@ -17,6 +17,8 @@ import { SOCIAL_RENDERERS } from '../c/social';
 import { TICKETS_RENDERERS } from '../c/tickets';
 import { MEMBERS_RENDERERS } from '../c/members';
 import { MAILING_RENDERERS } from '../c/mailing';
+import { SHOP_RENDERERS } from '../c/shop';
+import { SHOP_BLOCKS, shopOn } from '../../lib/shop/config';
 import { embedForm } from '../forms/embed';
 import { formStyleClass, formStyleDecls } from '../forms/style';
 import { attrs } from '../c/style';
@@ -48,6 +50,7 @@ register(
     ...TICKETS_RENDERERS,
     ...MEMBERS_RENDERERS,
     ...MAILING_RENDERERS,
+    ...SHOP_RENDERERS,
     // The site's own blocks (src/site/render.ts).
     ...Object.fromEntries(Object.entries(SITE_BLOCKS).map(([type, def]) => [type, def.render])),
   },
@@ -63,4 +66,10 @@ register({ 'events-calendar': (_b, env) => `<main class="c-cal-page">${renderCal
 for (const type of EVENT_BLOCKS) {
   const render = rendererFor(type);
   register({ [type]: (b, env, inner) => (eventsOn(env.ctx.settings.site) ? render(b, env, inner) : env.ctx.editor ? '<div class="cms-editor-note">Events are off (Settings &gt; Events): this block shows nothing.</div>' : '') });
+}
+
+// Shop blocks while the shop is off (Settings > Shop): nothing on the site, a note in the editor.
+for (const type of SHOP_BLOCKS) {
+  const render = rendererFor(type);
+  register({ [type]: (b, env, inner) => (shopOn(env.ctx.settings.site) ? render(b, env, inner) : env.ctx.editor ? '<div class="cms-editor-note">The shop is off (Settings &gt; Shop): this block shows nothing.</div>' : '') });
 }

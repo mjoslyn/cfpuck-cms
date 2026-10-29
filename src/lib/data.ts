@@ -53,8 +53,8 @@ const ftsQuery = (search?: string) => searchWords(search).map((w) => `"${w.repla
 export interface LoaderScope {
   published: true;
   viewer?: Viewer | null;
-  /** Events are off (Settings > Events): no event entries. */
-  noEvents?: boolean;
+  /** Types whose feature is off (Settings > Events, Settings > Shop: src/lib/features.ts offTypes): no entries of them. */
+  off?: string[];
 }
 
 /** The site's view for anyone: published entries, none of them members-only. */
@@ -70,7 +70,7 @@ export function visibleTo<Q>(query: Q, scope: LoaderScope | undefined): Q {
   if (!scope) return query;
   // Typed loosely: the builder's own types are too deep to pass through a generic helper.
   let q = (query as any).eq('status', 'publish');
-  if (scope.noEvents) q = q.neq('type', 'event');
+  for (const t of scope.off ?? []) q = q.neq('type', t);
   const v = scope.viewer;
   if (v?.editor) return q;
   const open = 'fields->access->>members.is.null,fields->access->>members.neq.true';
@@ -83,7 +83,7 @@ export function visibleTo<Q>(query: Q, scope: LoaderScope | undefined): Q {
 function hiddenFrom<Q>(query: Q, scope: LoaderScope | undefined): Q | null {
   if (!scope || scope.viewer?.editor) return null;
   let q = (query as any).eq('status', 'publish').eq('fields->access->>members', 'true');
-  if (scope.noEvents) q = q.neq('type', 'event');
+  for (const t of scope.off ?? []) q = q.neq('type', t);
   const level = memberLevel(scope.viewer);
   return level ? q.or(`not.or(${forLevel(level)})`) : q;
 }
@@ -411,9 +411,9 @@ export class Loader {
   private async queryRanked(q: any, args: QueryArgs, perPage: number, offset: number): Promise<QueryResult> {
     const fts = ftsQuery(args.search);
     if (!fts) return { ids: [], total: 0, pages: 0 };
-    // Ranked among what this listing can show (published, its types; events while they are on), so the
+    // Ranked among what this listing can show (published, its types; those of features that are on), so the
     // best 1000 aren't spent on drafts and other types; members-only entries are left out after.
-    const types = (Array.isArray(args.postType) ? args.postType : [args.postType]).filter((t) => !(this.scope?.noEvents && t === 'event'));
+    const types = (Array.isArray(args.postType) ? args.postType : [args.postType]).filter((t) => !this.scope?.off?.includes(t));
     if (!types.length) return { ids: [], total: 0, pages: 0 };
     const { data: ranked, error: rankError } = await this.db.rpc('entry_search', { p_query: fts, p_limit: 1000, p_status: 'publish', p_types: types });
     if (rankError) throw rankError;

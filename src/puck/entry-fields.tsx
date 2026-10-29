@@ -9,7 +9,8 @@ import { permalink } from '../lib/permalink';
 import { isPlaceholderSlug, slugify } from '../lib/slug';
 import { SeoForm } from './SeoForm';
 import { TicketsForm } from './TicketsForm';
-import { useMemberSettings } from './member-settings';
+import { useMemberSettings, useShopOn } from './member-settings';
+import { ProductForm } from './ProductForm';
 import { accessOf } from '../lib/members/config';
 import { itemsText } from '../lib/seo';
 import { NO_CONTENT_WARNING, templateLabel, type TemplateInfo } from '../lib/templates';
@@ -362,9 +363,10 @@ function ExcerptWriter({ type, title, pageItems, onWrite }: { type: string; titl
   );
 }
 
-export function EntryForm({ type, value, onChange, templates, pageItems }: { type: string; value: EntryState; onChange: (v: EntryState) => void; templates: TemplateInfo[]; pageItems?: () => any[] }) {
+export function EntryForm({ type, id, value, onChange, templates, pageItems }: { type: string; id?: number | null; value: EntryState; onChange: (v: EntryState) => void; templates: TemplateInfo[]; pageItems?: () => any[] }) {
   const set = (patch: Partial<EntryState>) => onChange({ ...value, ...patch });
   const defs = fieldsFor(type);
+  const shopIsOn = useShopOn() === true;
   // An event's own timezone, else the site's.
   const eventTz: string = value.fields?.timezone || SITE_TZ;
   return (
@@ -440,6 +442,12 @@ export function EntryForm({ type, value, onChange, templates, pageItems }: { typ
         <details open={!!value.fields?.tickets?.types?.length} className="mt-4 border-t border-admin-ink/10 pt-3">
           <summary className="mb-2 cursor-pointer text-xs font-semibold tracking-wider text-admin-muted uppercase">Tickets</summary>
           <TicketsForm fields={value.fields} onChange={(fields) => set({ fields })} />
+        </details>
+      )}
+      {type === 'product' && shopIsOn && (
+        <details open className="mt-4 border-t border-admin-ink/10 pt-3">
+          <summary className="mb-2 cursor-pointer text-xs font-semibold tracking-wider text-admin-muted uppercase">Shop</summary>
+          <ProductForm entryId={id ?? null} fields={value.fields} onChange={(fields) => set({ fields })} />
         </details>
       )}
       {!PAGELESS_TYPES.has(type) && <AccessForm fields={value.fields} onChange={(fields) => set({ fields })} />}

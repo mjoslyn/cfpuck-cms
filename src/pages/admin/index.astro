@@ -4,7 +4,9 @@ import { SITE_TZ } from '../../lib/site';
 import { COMPOSABLE_TYPES, CONTENT_TYPES, PAGELESS_TYPES, RECORD_TYPES, site, taxonomiesOf } from '../../lib/site';
 import Terms from '../../admin/Terms.astro';
 import { permalink } from '../../lib/permalink';
-import { eventsOn, showsType } from '../../lib/events/on';
+import { eventsOn } from '../../lib/events/on';
+import { EVENT_TYPES } from '../../lib/events/types';
+import { featuresOf, showsType } from '../../lib/features';
 
 const db = Astro.locals.db;
 const params = Astro.url.searchParams;
@@ -87,9 +89,10 @@ const record = RECORD_TYPES.has(type);
 const pageless = PAGELESS_TYPES.has(type);
 const tagError = params.get('error');
 const place = (f: Record<string, any> | null) => [f?.address, f?.city, f?.state].filter(Boolean).join(', ');
-// Events on or off (Settings > Events, src/lib/events/on.ts): their types and taxonomies are hidden while off.
+// Events and Shop on or off (src/lib/features.ts): their types and taxonomies are hidden while off.
 const { data: siteRow } = await db.from('settings').select('value').eq('key', 'site').maybeSingle();
 const eventsAreOn = eventsOn(siteRow?.value);
+const features = featuresOf(siteRow?.value);
 const isAdmin = Astro.locals.user?.role === 'admin';
 const decode = (s: string) => s.replace(/&#8217;/g, '’').replace(/&#038;|&amp;/g, '&').replace(/&#8211;/g, '–');
 ---
@@ -110,15 +113,20 @@ const decode = (s: string) => s.replace(/&#8217;/g, '’').replace(/&#038;|&amp;
     )}
   </div>
 
-  {!showsType(type, eventsAreOn) && !tagsView && (
+  {!showsType(type, features) && !tagsView && (EVENT_TYPES.includes(type) ? (
     <p class="mt-4 rounded bg-admin-soft px-4 py-3 text-sm">
       Events are off: the site shows no events, calendar or ticket sales, and these are hidden from Content until they are on.
       {isAdmin ? <> Turn them on under <a class="underline" href="/admin/settings/events/">Settings &gt; Events</a>.</> : ' An admin can turn them on under Settings.'}
     </p>
-  )}
+  ) : (
+    <p class="mt-4 rounded bg-admin-soft px-4 py-3 text-sm">
+      The shop is off: the site shows no products or cart, and they are hidden from Content until it is on.
+      {isAdmin ? <> Turn it on under <a class="underline" href="/admin/settings/shop/">Settings &gt; Shop</a>.</> : ' An admin can turn it on under Settings.'}
+    </p>
+  ))}
 
   {tagsView ? (
-    <Terms taxonomy={taxonomyTab} events={eventsAreOn} error={tagError} notice={params.get('notice')} />
+    <Terms taxonomy={taxonomyTab} features={features} error={tagError} notice={params.get('notice')} />
   ) : (
   <>
 

@@ -11,7 +11,7 @@ import { useMemberSettings } from './member-settings';
 const small = 'rounded-sm border border-admin-ink/20 px-2 py-1 text-xs font-semibold hover:border-admin-ink/50';
 
 /** A price typed as dollars and cents, kept as cents. */
-function PriceInput({ value, onChange, title = 'Price (empty or 0: free)', optional }: { value: number | undefined; onChange: (cents: number | undefined) => void; title?: string; optional?: boolean }) {
+export function PriceInput({ value, onChange, title = 'Price (empty or 0: free)', optional }: { value: number | undefined; onChange: (cents: number | undefined) => void; title?: string; optional?: boolean }) {
   const [text, setText] = useState(value ? (value / 100).toFixed(2) : optional && value === 0 ? '0.00' : '');
   const bad = text.trim() !== '' && parsePrice(text) == null;
   const cents = bad ? null : parsePrice(text);

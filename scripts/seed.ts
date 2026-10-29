@@ -1,7 +1,7 @@
 // Starter content for a new install: the header and footer parts, the base templates (index, page,
 // single, search), a home page set as the front page, and the site settings; with Events on (Settings >
 // Events), the event templates, a sample event and venue, and events on the home page and in the header.
-// Anything that already exists is left alone, so it is safe to run again (after turning Events on, it
+// With the shop on (Settings > Shop), the shop's templates. Anything that already exists is left alone, so it is safe to run again (after turning Events on, it
 // adds the event templates and the sample event) and on a hosted project.
 //   npx tsx --env-file=.env scripts/seed.ts
 import { siteDb } from '../src/lib/db/site';
@@ -11,6 +11,8 @@ import type { PuckItem } from '../src/lib/puck/types';
 import { eventDates } from '../src/lib/admin/save';
 import { SEARCH_TEMPLATE } from '../src/lib/content/search-template';
 import { eventsOn } from '../src/lib/events/on';
+import { shopOn } from '../src/lib/shop/config';
+import { ensureShopTemplates } from '../src/lib/shop/templates';
 
 const sb = siteDb();
 const { data: current } = await sb.from('settings').select('value').eq('key', 'site').maybeSingle();
@@ -110,6 +112,8 @@ const ensurePage = (slug: string, title: string, content: PuckItem[]) => ensureE
 await ensureTemplate('part', 'header', header);
 await ensureTemplate('part', 'footer', footer);
 for (const [slug, content] of Object.entries(templates)) await ensureTemplate('template', slug, content);
+// With the shop on (Settings > Shop): a product's page and the shop's listing.
+if (shopOn(current?.value)) for (const slug of await ensureShopTemplates(sb)) console.log(`template ${slug}: added`);
 const homeId = await ensurePage('home', 'Home', home);
 await ensurePage('about', 'About', buildPage({ title: 'About', sections: [{ kind: 'text', heading: 'About', body: 'Tell visitors about the organisation.' }] } as any, { images: new Map(), videos: new Map(), tags: new Map() }, 'seed-about'));
 

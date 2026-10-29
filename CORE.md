@@ -45,7 +45,8 @@ Everything that differs between sites lives in `src/site/`:
   offer them; `taxonomiesOf`), `fields` with `compose` hints, `describe`,
   `logoField`, default `card`, `order`) and taxonomies (label, URL `base`, the type a term page `lists`,
   its terms' own `fields`; `category` and `tag` are required; `event`, `venue` and `event_category`
-  come with the core's Events feature, extended with `events`, see Events). Core code reads it only through `src/lib/site` (`CONTENT_TYPES`,
+  come with the core's Events feature, extended with `events`, see Events; `product` and `product_category`
+  with its Shop, extended with `shop`, see Shop). Core code reads it only through `src/lib/site` (`CONTENT_TYPES`,
   `COMPOSABLE_TYPES`, `LISTABLE_TYPES`, `RECORD_TYPES`, `PAGELESS_TYPES`, `TYPE_BASES`,
   `ARCHIVE_PATHS`, `TAXONOMY_BASES`, `fieldsFor`, `categoryOf`, `termPageType`, `SITE_TZ`): the
   editor's Details, Compose's fields and prompt, permalinks, URL routing (archives, term pages,
@@ -710,10 +711,11 @@ to replace one whole (the calendar views stay under `/events/`). The core reads 
 `website` and `schedule`; on venues `address`, `city`, `state`, `zip`, `country`, `phone` and `website`.
 
 Off, nothing is deleted, but the admin hides events, venues and event categories (Content's menu,
-Taxonomies, Settings > Types and Search; `showsType`, `showsTaxonomy`) and the site shows none:
+Taxonomies, Settings > Types and Search; `showsType`, `showsTaxonomy` in `src/lib/features.ts`, as for the
+Shop) and the site shows none:
 `resolve` answers Not found for the event listing, calendar views, event pages and occurrences and the
 term pages of taxonomies that list events; the feeds, ticket checkout, waitlist and availability
-endpoints answer 404; the loader's scope leaves event entries out (`noEvents`: collections, search,
+endpoints answer 404; the loader's scope leaves event entries out (`off`, `offTypes`: collections, search,
 menus); `EVENT_BLOCKS` render nothing (a note in the editor) and load nothing; email Events blocks list
 none; and the hourly ticket emails don't run. The editor doesn't offer event and ticket blocks, the
 email Events block or the event type in collections and Compose, and the admin hides Tickets and
@@ -1060,6 +1062,48 @@ never subscribes anyone again); the settings are, with the others. Migration `*_
   clicks and Mailgun's events for the address, keeps the hash, an earlier bounce or complaint staying its
   reason, adds them to Mailgun's unsubscribes) and Export as CSV (formulas guarded).
 
+## Shop (preview)
+
+An optional feature, on under Settings > Shop (`settings.site.shop`: `enabled`, `currency`, `weightUnit`;
+`shopSettings`, `shopOn`, `src/lib/shop/config.ts`), built in phases on a preview branch: phase 1 has
+products, options, variants, stock and the cart; checkout (payments, manual shipping rates and pickup,
+tax, discounts, orders) comes next. Off, nothing is deleted: the admin hides the core's product type and
+product categories (`showsType`, `showsTaxonomy`, `src/lib/features.ts`), the site serves none of them
+(`resolve`, the loader's `off` types), the shop's blocks render nothing (`SHOP_BLOCKS`) and its endpoints
+answer 404.
+
+- **Products**: the core's `product` type (`/product/<slug>/`, listed at `/shop/`) and `product_category`
+  taxonomy (`/shop/category/<slug>/`), added by `withShop` (`src/lib/shop/types.ts`) and changed by the
+  site config's `shop` (`ShopConfig`: `product`, `category`). A site that lists its own `product` type
+  keeps it whole and shown while the shop is off (`SHOP_CORE_TYPES` is then empty); the shop's settings
+  apply to it while the shop is on.
+- **What a product sells** (its fields under the reserved key `shop`, `productOf`; edited in its
+  settings, Shop, `src/puck/ProductForm.tsx`): price and compare-at price in cents (no price: not for
+  sale), SKU, weight, shipped, pickup only, taxed, most per order, count stock, and up to 3 options with
+  their values. Each combination is a variant (`variantsFor`; one `default` variant without options) with
+  a stable id and its own price, compare-at price, SKU, weight and image (media id), or `off` (not sold);
+  changing the options keeps each variant whose values stay. A combination stored without a variant reads
+  with an id made from its values (`comboId`), the same each time.
+- **Stock**: table `shop_stock` (product, variant, on hand; migration `*_shop_stock.sql`), kept apart
+  from the product's fields so a product's save never overwrites a count; the settings save each count
+  as it changes (editors write it). A product that doesn't count stock has no limit; one that does and has
+  no row has none left (`leftOf`, `src/lib/shop/stock.ts`).
+- **Blocks** (`src/render/c/shop.ts`; the editor's Shop category while it is on): **Product price**
+  (`product-price`: its price, or From the lowest; the compare-at price struck through), **Add to cart**
+  (`add-to-cart`: options as choices, quantity, button; the product it names, else the page's or card's),
+  **Cart** (`cart`) and **Cart link** (`cart-link`, the number of items). Collections get a `product`
+  card design unless the site has its own (`card-presets.ts`).
+- **Cart**: kept in the visitor's browser (`localStorage`, `public/assets/js/cart.js`, added by these
+  blocks), so their pages stay cached and shared. The script adds to the cart, asks what's left of the
+  page's products (`GET /api/shop/availability?ids=`, no-store) and fills the Cart block from the server's
+  prices (`POST /api/shop/quote`, `quoteCart` in `src/lib/shop/cart.ts`: lines cleaned by `cleanCart`, at
+  most 50 of up to 99 each; each priced as sold now, cut to what's left (`fewer`), `sold-out` or `gone`;
+  the subtotal in the shop's currency). Both read as the visitor sees the site (`visibleTo`). `/cart/`
+  (`CART_PATH`) is a built-in page with a Cart block unless a page has that address.
+- **Templates**: turning the shop on the first time makes `single-product` and `archive-product`
+  (`SHOP_TEMPLATES`, `ensureShopTemplates`, `src/lib/shop/templates.ts`) when no templates have those
+  addresses; `npm run seed` does the same while it is on.
+
 ## Editor
 
 `/admin/` (a session, see Accounts; `profiles.role`: editor, admin, or viewer = no access). The admin bar's **?**
@@ -1144,8 +1188,8 @@ builder's and campaign editor's Compose dialogs, or the editor's panel, whose co
 
 **Settings** (admins; `src/puck/SiteSettings.tsx`, page `src/pages/admin/settings/[...section].astro`): a side
 menu of sections in groups (`SETTINGS_GROUPS`, `src/lib/admin/settings-sections.ts`): Site (General, Menu,
-Social, Search, Types, the site's own options), Features (Events, Tickets, Members, Mailing Lists, marked
-On or Off), Services (Connections), Admin (Accessibility, Appearance) and Upkeep (Redirects, Sync,
+Social, Search, Types, the site's own options), Features (Events, Tickets, Members, Mailing Lists, Shop,
+marked On or Off), Services (Connections), Admin (Accessibility, Appearance) and Upkeep (Redirects, Sync,
 Backups); a Section dropdown on phones. Each section has its own address, `/admin/settings/<section>/`
 (General `/admin/settings/`; `sectionOf`, `settingsPath`); the screen moves between them in place, so
 unsaved changes carry over, and an old `#<section>` link (and `admin`, now `appearance`) forwards to it.
@@ -1249,7 +1293,7 @@ takes more, so local runs don't show these): a row's `json_object` has 16 column
   Previews render as the editor with no scope.
 - A signed-in person's (`locals.db`, set by the middleware: `sessionDb`) follows the policies in
   `src/lib/db/policies.ts`, the database's row security as it was: editors read every table and write
-  content, media, forms, templates, compose and segments; admins also write settings, redirects, lists,
+  content, media, forms, templates, compose, segments and shop stock; admins also write settings, redirects, lists,
   contacts and members; ticket orders and waitlists change only through the server; editors save
   campaigns only as drafts, change digests only while off and change their
   own profile but not its role; anyone else gets nothing. Reads a role may not make return no rows;

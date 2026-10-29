@@ -8,8 +8,8 @@ import type { EmailEntriesQuery } from '../lib/mailing/entries';
 import { LISTABLE_TYPES, taxonomiesOf, taxonomyLabel, typeDef } from '../lib/site';
 import { Num, Toggle } from '../puck/fields';
 import { TermPicker } from '../puck/CollectionPanel';
-import { useEventsOn } from '../puck/member-settings';
-import { EVENT_TYPES } from '../lib/events/types';
+import { useSite } from '../puck/member-settings';
+import { featuresOf, offTypes } from '../lib/features';
 
 const cache = new Map<string, Promise<EmailEvent[]>>();
 
@@ -38,8 +38,10 @@ export function useEmailEntries(query: EmailEntriesQuery | undefined): { entries
 export function EntriesQueryField({ value, onChange }: { value?: EmailEntriesQuery; onChange: (v: EmailEntriesQuery) => void }) {
   const q = value ?? {};
   const set = (patch: EmailEntriesQuery) => onChange({ ...q, ...patch });
-  const events = useEventsOn() === true;
-  const types = LISTABLE_TYPES.filter((t) => events || !EVENT_TYPES.includes(t));
+  // A feature's types only while it is on (Settings > Events, Shop).
+  const site = useSite();
+  const off = offTypes(featuresOf(site));
+  const types = LISTABLE_TYPES.filter((t) => !off.includes(t));
   const picked = (q.types ?? []).filter((t) => types.includes(t));
   const shown = picked.length ? picked : types.includes('post') ? ['post'] : types.slice(0, 1);
   const taxonomies = [...new Set(shown.flatMap((t) => taxonomiesOf(t)))];

@@ -255,6 +255,14 @@ export const SCHEMA: Record<string, TableSchema> = {
     defaults: {},
     touch: true,
   },
+  shop_stock: {
+    pk: ["product_id","variant"],
+    columns: {"product_id":"int8","variant":"text","on_hand":"int8","updated_at":"timestamptz"},
+    generated: [],
+    fks: [[["product_id"],"entries",["id"]]],
+    defaults: {"on_hand":0},
+    touch: true,
+  },
   site_keys: {
     pk: ["name"],
     columns: {"name":"text","value":"text","hint":"text","updated_by":"text","updated_at":"timestamptz"},

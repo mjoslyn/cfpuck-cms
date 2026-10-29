@@ -23,6 +23,4 @@ export async function eventsOnIn(db: Db): Promise<boolean> {
 /** Taxonomies only events and venues use (event categories): hidden in the admin while events are off. */
 export const EVENT_TAXONOMIES = site.taxonomies.filter((t) => { const types = typesOfTaxonomy(t.name); return types.length > 0 && types.every((x) => EVENT_TYPES.includes(x)); }).map((t) => t.name);
 
-/** Whether the admin shows a content type, or a taxonomy: those of Events only while it is on. */
-export const showsType = (type: string, on: boolean) => on || !EVENT_TYPES.includes(type);
-export const showsTaxonomy = (name: string, on: boolean) => on || !EVENT_TAXONOMIES.includes(name);
+// Whether the admin shows a type or taxonomy: src/lib/features.ts (showsType, showsTaxonomy).

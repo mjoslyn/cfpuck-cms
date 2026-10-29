@@ -6,6 +6,7 @@ import { browserClient } from '../lib/db/browser';
 import { memberSettings, type MemberSettings } from '../lib/members/config';
 import { eventsOn } from '../lib/events/on';
 import { mailingOn } from '../lib/mailing/config';
+import { shopOn } from '../lib/shop/config';
 
 let loading: Promise<Record<string, any> | null> | null = null;
 
@@ -38,4 +39,10 @@ export function useEventsOn(): boolean | null {
 export function useMailingOn(): boolean | null {
   const site = useSite();
   return site === undefined ? null : mailingOn(site);
+}
+
+/** Whether the shop is on (null while loading). */
+export function useShopOn(): boolean | null {
+  const site = useSite();
+  return site === undefined ? null : shopOn(site);
 }

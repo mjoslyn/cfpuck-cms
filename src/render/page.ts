@@ -31,6 +31,8 @@ import './blocks';
 import type { FormResult } from '../lib/forms/types';
 import { ACCOUNT_PATH, memberSettings, type Viewer } from '../lib/members/config';
 import { eventsOn } from '../lib/events/on';
+import { featuresOf, offTypes } from '../lib/features';
+import { CART_PATH, shopOn } from '../lib/shop/config';
 import { PREFERENCES_PATH, SUBSCRIBE_PATH, UNSUBSCRIBE_PATH, mailingOn } from '../lib/mailing/config';
 
 
@@ -53,9 +55,9 @@ async function guess404(url: URL, loader: Loader): Promise<string | null> {
   // The rewrite base (e.g. /event/) sets post_type, which limits the guess to that type.
   const typed = parts.length === 2 ? Object.entries(TYPE_BASES).find(([, base]) => base === parts[0])?.[0] : undefined;
   const settings = await loader.settings();
-  // Types with pages to go to: events have none while Events is off.
-  const events = eventsOn(settings.site);
-  const types = (typed ? [typed] : [...ROOT_TYPES, ...Object.keys(TYPE_BASES)]).filter((t) => !PAGELESS_TYPES.has(t) && (events || t !== 'event'));
+  // Types with pages to go to: a feature's have none while it is off (Settings > Events, Settings > Shop).
+  const off = offTypes(featuresOf(settings.site));
+  const types = (typed ? [typed] : [...ROOT_TYPES, ...Object.keys(TYPE_BASES)]).filter((t) => !PAGELESS_TYPES.has(t) && !off.includes(t));
   if (!types.length) return null;
   const { data } = await loader.db
     .from('entries')
@@ -94,8 +96,9 @@ export async function resolve(url: URL, loader: Loader): Promise<Queried> {
   const parts = path.split('/').filter(Boolean);
   const base: Queried = { kind: '404', page, url };
   const settings = await loader.settings();
-  // Events off (Settings > Events): their listing, calendar views, term pages and pages are Not found.
+  // Events or Shop off: their listings, calendar views, term pages and pages are Not found.
   const events = eventsOn(settings.site);
+  const off = offTypes(featuresOf(settings.site));
 
   if (!parts.length) {
     const id = settings.site?.front_page_id;
@@ -106,21 +109,21 @@ export async function resolve(url: URL, loader: Loader): Promise<Queried> {
   if (parts.length === 1 && parts[0] === 'search') return { ...base, kind: 'search', search: (url.searchParams.get('q') ?? '').trim().slice(0, 200) };
   // Listing pages that are on (Settings > Types); a page may take the address of one that is off.
   const archive = ARCHIVES[`/${parts.join('/')}/`];
-  if (archive && listingOn(settings.site, archive) && (archive !== 'event' || events)) return { ...base, kind: 'archive', postType: archive };
+  if (archive && listingOn(settings.site, archive) && !off.includes(archive)) return { ...base, kind: 'archive', postType: archive };
   // Calendar views: /events/past/, /events/month/[Y-m/], /events/today/, /events/day/Y-m-d/.
   if (parts[0] === EVENTS_BASE && ['past', 'month', 'today', 'day'].includes(parts[1]) && listingOn(settings.site, 'event') && events) {
     return { ...base, kind: 'archive', postType: 'event' };
   }
   // Term pages (/directory/category/<slug>/, /tag/<slug>/...): the entries with the term.
   // A taxonomy whose pages are off: its addresses are treated like any other (a page there, or Not found).
-  const route = TAXONOMY_ROUTES.find((r) => parts.length === r.base.length + 1 && r.base.every((seg, i) => parts[i] === seg) && termPagesOn(settings.site, r.taxonomy) && (events || termPageType(r.taxonomy) !== 'event'));
+  const route = TAXONOMY_ROUTES.find((r) => parts.length === r.base.length + 1 && r.base.every((seg, i) => parts[i] === seg) && termPagesOn(settings.site, r.taxonomy) && !off.includes(termPageType(r.taxonomy)));
   if (route) {
     const term = await loader.termBySlug(route.taxonomy, parts[parts.length - 1]);
     return term ? { ...base, kind: 'taxonomy', term, postType: termPageType(route.taxonomy) } : base;
   }
   // Records (venues) have no page of their own: their URLs serve the front page.
   if (parts.length <= 2 && [...RECORD_TYPES].some((t) => TYPE_BASES[t] === parts[0])) return resolve(new URL('/', url), loader).then((q) => ({ ...q, url }));
-  if (!events && (BASE_TYPES[parts[0]] === 'event')) return base;
+  if (off.includes(BASE_TYPES[parts[0]])) return base;
   if (parts.length === 2 && BASE_TYPES[parts[0]]) {
     const entry = (await loader.entry(BASE_TYPES[parts[0]], parts[1])) ?? (await loader.lockedEntry([BASE_TYPES[parts[0]]], parts[1]));
     // A recurring series has no page of its own; send visitors to the next occurrence.
@@ -151,6 +154,8 @@ export async function resolve(url: URL, loader: Loader): Promise<Queried> {
   // Mailing's pages (signing up, unsubscribing, email preferences), unless a page has the address.
   const mailing = MAILING_PAGES[`/${parts.join('/')}/`];
   if (mailing && mailingOn(settings.site)) return { ...base, kind: 'singular', entry: builtInPage(mailing.slug, mailing.title, mailing.block) };
+  // The shop's cart, unless a page has its address.
+  if (`/${parts.join('/')}/` === CART_PATH && shopOn(settings.site)) return { ...base, kind: 'singular', entry: cartPage() };
   return base;
 }
 
@@ -170,6 +175,19 @@ function builtInPage(slug: string, title: string, block: { type: string; attrs: 
     content: { root: { props: {} }, content: [{ type: block.type, props: { id: block.type, attrs: block.attrs } }] } as any,
     event_start: null, event_end: null, event_all_day: null, published_at: now, updated_at: now, term_ids: [],
   };
+}
+
+/** The cart when no page has its address: a heading and a Cart block, in a padded column. */
+function cartPage(): Entry {
+  const page = builtInPage(CART_PATH.split('/').filter(Boolean).pop()!, 'Your cart', { type: 'cart', attrs: {} });
+  const pad = { top: 'var(--space-70)', right: 'var(--space-50)', bottom: 'var(--space-80)', left: 'var(--space-50)' };
+  (page.content as any).content = [
+    { type: 'section', props: { id: 'cart-page', attrs: { layout: { type: 'constrained', contentSize: '960px' }, style: { padding: pad }, gap: 'var(--space-50)' }, children: [
+      { type: 'heading', props: { id: 'cart-title', attrs: { content: 'Your cart', level: 1 } } },
+      { type: 'cart', props: { id: 'cart', attrs: {} } },
+    ] } },
+  ];
+  return page;
 }
 
 /** The account page when no page has its address: a page holding a Member account block. */
@@ -271,7 +289,7 @@ export async function renderRequest(url: URL, db: Db, form?: FormResult, preview
   const settings = await loader.settings();
   // A member counts as one only while Members is on.
   const who = viewer && !memberSettings(settings.site).enabled ? { ...viewer, member: null } : viewer;
-  if (loader.scope) Object.assign(loader.scope, { viewer: who, noEvents: !eventsOn(settings.site) });
+  if (loader.scope) Object.assign(loader.scope, { viewer: who, off: offTypes(featuresOf(settings.site)) });
   let queried: Queried = preview ? { kind: 'singular', entry: preview.entry, page: 1, url, isFront: settings.site?.front_page_id === preview.entry.id } : await resolve(url, loader);
   if (queried.redirect) return { status: 302, html: '', location: queried.redirect };
   if (queried.kind === '404' && url.pathname !== '/__not-found__/') {

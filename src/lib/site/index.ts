@@ -3,13 +3,20 @@
 import siteConfig from '../../site/config';
 import movedPaths from '../../site/moved-paths.json';
 import presets from '../../site/presets.json';
-import type { ContentType, EventsConfig, FieldDef, SiteConfig, Taxonomy, TypeExtension } from './types';
+import type { ContentType, EventsConfig, FieldDef, ShopConfig, SiteConfig, Taxonomy, TypeExtension } from './types';
 import { withEvents } from '../events/types';
+import { withShop } from '../shop/types';
 
-export type { ContentType, EventsConfig, FieldDef, SiteConfig, Taxonomy, TypeExtension };
+export type { ContentType, EventsConfig, FieldDef, ShopConfig, SiteConfig, Taxonomy, TypeExtension };
 
-// The site's config with the core's optional features' types added (Events: src/lib/events/types.ts).
-const config: SiteConfig = { ...siteConfig, ...withEvents(siteConfig.types, siteConfig.taxonomies, siteConfig.events) };
+// The site's config with the core's optional features' types added (Events: src/lib/events/types.ts;
+// Shop: src/lib/shop/types.ts).
+const withEv = withEvents(siteConfig.types, siteConfig.taxonomies, siteConfig.events);
+const shop = withShop(withEv.types, withEv.taxonomies, siteConfig.shop);
+const config: SiteConfig = { ...siteConfig, types: shop.types, taxonomies: shop.taxonomies };
+/** The shop's types and taxonomies the core added (none where the site has its own): hidden while the shop is off. */
+export const SHOP_CORE_TYPES: string[] = shop.coreTypes;
+export const SHOP_CORE_TAXONOMIES: string[] = shop.coreTaxonomies;
 
 for (const t of ['page', 'post', 'global']) if (!config.types.some((c) => c.type === t)) throw new Error(`site config: the "${t}" content type is required`);
 for (const t of ['category', 'tag']) if (!config.taxonomies.some((c) => c.name === t)) throw new Error(`site config: the "${t}" taxonomy is required`);

@@ -7,6 +7,7 @@ import { MembersPanel } from './MembersPanel';
 import { NewsletterPanel, SubscribePanel } from './SubscribePanel';
 import { FormStylePanel } from './FormStyle';
 import { EVENT_BLOCKS } from '../lib/events/on';
+import { SHOP_BLOCKS } from '../lib/shop/config';
 import { SITE_BLOCKS } from '../lib/site/render';
 import { taxonomiesOf } from '../lib/site';
 import { SITE_EDITOR } from '../lib/site/editor';
@@ -53,6 +54,33 @@ Object.assign(PANELS, {
     </>
   ),
   members: (a: Attrs, set: (p: Attrs) => void) => <MembersPanel a={a} set={set} />,
+  'product-price': (a: Attrs, set: (p: Attrs) => void) => (
+    <>
+      <EntryField title="Product" entryType="product" value={a.product} onChange={(id) => set({ product: id || undefined })} />
+      <p className="mb-2 text-xs text-admin-muted">Empty: the product whose page or card it is in. Shows its price, or "From" the lowest when its variants differ, with the compare-at price struck through.</p>
+    </>
+  ),
+  'add-to-cart': (a: Attrs, set: (p: Attrs) => void) => (
+    <>
+      <EntryField title="Product" entryType="product" value={a.product} onChange={(id) => set({ product: id || undefined })} />
+      <p className="mb-3 text-xs text-admin-muted">Empty: the product whose page or card it is in.</p>
+      <Text title="Button" value={a.label} placeholder="Add to cart" onChange={(v) => set({ label: v || undefined })} />
+      <Toggle title="Ask how many" value={a.showQuantity !== false} onChange={(v) => set({ showQuantity: v ? undefined : false })} />
+      <p className="mb-2 text-xs text-admin-muted">The product's options (Size, Color...) are offered as choices; what's sold out can't be chosen. Prices, options and stock are in the product's settings, under Shop.</p>
+    </>
+  ),
+  cart: (a: Attrs, set: (p: Attrs) => void) => (
+    <>
+      <Text title="When it is empty" value={a.empty} placeholder="Your cart is empty." onChange={(v) => set({ empty: v || undefined })} />
+      <p className="mb-2 text-xs text-admin-muted">The products a visitor has added, to change or remove, with the subtotal. The site's /cart/ page shows it on its own; a page with that address needs this block.</p>
+    </>
+  ),
+  'cart-link': (a: Attrs, set: (p: Attrs) => void) => (
+    <>
+      <Text title="Label" value={a.label} placeholder="Cart" onChange={(v) => set({ label: v || undefined })} />
+      <p className="mb-2 text-xs text-admin-muted">Links to the cart, with the number of items in it. Pages with it stay cached; the number is set in the visitor's browser.</p>
+    </>
+  ),
   'member-account': () => (
     <p className="mb-2 text-xs text-admin-muted">Signing in, creating an account (when Settings &gt; Members allows it) and resetting a password; signed in, the member's details and Sign out. The site's /account/ page shows it on its own; a page with that address needs this block.</p>
   ),
@@ -161,6 +189,10 @@ const LABELS: Record<string, string> = {
   members: 'Members only',
   'member-account': 'Member account',
   'member-link': 'Member sign-in link',
+  'product-price': 'Product price',
+  'add-to-cart': 'Add to cart',
+  cart: 'Cart',
+  'cart-link': 'Cart link',
   subscribe: 'Subscribe',
   newsletter: 'Newsletter signup',
   'mail-preferences': 'Email preferences',
@@ -203,7 +235,7 @@ const APPLIES_TO: Record<string, string[]> = {
  * The editor's blocks. With `entryType` (editing an entry), the block list leaves out blocks that don't
  * apply to that type; they stay defined, so any already on the page still show and can be edited.
  */
-export function buildConfig(types: string[], entryType?: string, opts: { members?: boolean; events?: boolean; mailing?: boolean } = {}): Config {
+export function buildConfig(types: string[], entryType?: string, opts: { members?: boolean; events?: boolean; mailing?: boolean; shop?: boolean } = {}): Config {
   // Event and ticket blocks are offered while events are on (Settings > Events).
   const applies = (t: string) => (!entryType || !APPLIES_TO[t] || APPLIES_TO[t].includes(entryType)) && (opts.events !== false || !EVENT_BLOCKS.includes(t));
   const offered = (cats: Record<string, { title?: string; components?: string[]; visible?: boolean }>) =>
@@ -245,6 +277,8 @@ export function buildConfig(types: string[], entryType?: string, opts: { members
       ...(opts.members ? { members: { title: 'Members', components: ['members', 'member-account', 'member-link'] } } : {}),
       // Offered while Mailing is on (Settings > Mailing Lists).
       ...(opts.mailing ? { mailing: { title: 'Mailing Lists', components: ['newsletter', 'subscribe', 'mail-preferences'] } } : {}),
+      // Offered while the shop is on (Settings > Shop).
+      ...(opts.shop ? { shop: { title: 'Shop', components: SHOP_BLOCKS } } : {}),
       advanced: { title: 'Advanced', components: withSite('advanced', ['html', 'part', 'entry-content']) },
       // Collection internals (items, empty state, pagination) are managed from the collection's settings.
       other: { visible: false },
@@ -259,6 +293,7 @@ export const EDITABLE_TYPES = [
   'event-date', 'event-details', 'event-schedule', 'tickets', 'events-calendar', 'event-calendar',
   'members', 'member-account', 'member-link',
   'subscribe', 'newsletter', 'mail-preferences',
+  ...SHOP_BLOCKS,
   'entry-field', 'form', 'pattern',
   ...Object.keys(SITE_BLOCKS),
 ];

@@ -7,8 +7,7 @@ import { Loader, PUBLIC_SCOPE } from '../data';
 import { downsize, mediaUrl } from '../media/image';
 import { permalink } from '../permalink';
 import { LISTABLE_TYPES, SITE_TZ } from '../site';
-import { eventsOnIn } from '../events/on';
-import { EVENT_TYPES } from '../events/types';
+import { featuresOf, offTypes, type Features } from '../features';
 import type { EmailDoc, EmailEvent, EmailItem } from '../forms/email';
 
 /** What an Entries block lists (its `query` setting). */
@@ -35,19 +34,20 @@ const words = (s: string, n: number) => {
   return list.length > n ? `${list.slice(0, n).join(' ')}…` : list.join(' ');
 };
 
-/** The types an Entries block may list: those with pages and listings, events only while events are on. */
-export function entryTypes(q: EmailEntriesQuery, events: boolean): string[] {
-  const allowed = LISTABLE_TYPES.filter((t) => events || !EVENT_TYPES.includes(t));
+/** The types an Entries block may list: those with pages and listings, a feature's only while it is on. */
+export function entryTypes(q: EmailEntriesQuery, features: Features): string[] {
+  const off = offTypes(features);
+  const allowed = LISTABLE_TYPES.filter((t) => !off.includes(t));
   const picked = (q.types ?? []).filter((t) => allowed.includes(t));
   return picked.length ? picked : allowed.includes('post') ? ['post'] : allowed.slice(0, 1);
 }
 
-async function load(db: Db, q: EmailEntriesQuery, origin: string, since: string | null, events: boolean): Promise<EmailEvent[]> {
-  const loader = new Loader(db, undefined, { ...PUBLIC_SCOPE, noEvents: !events });
+async function load(db: Db, q: EmailEntriesQuery, origin: string, since: string | null, features: Features): Promise<EmailEvent[]> {
+  const loader = new Loader(db, undefined, { ...PUBLIC_SCOPE, off: offTypes(features) });
   const count = Math.min(MAX_EMAIL_ENTRIES, Math.max(1, Math.round(Number(q.count) || 3)));
   const terms = (q.terms ?? []).map(Number).filter((n) => Number.isInteger(n) && n > 0);
   // The newest first; when only new ones count, a few more are read and those older than the last issue dropped.
-  const result = await loader.query({ postType: entryTypes(q, events), perPage: q.newOnly && since ? 50 : count, orderBy: 'date', order: 'desc', ...(terms.length ? { terms: { any: terms } } : {}) });
+  const result = await loader.query({ postType: entryTypes(q, features), perPage: q.newOnly && since ? 50 : count, orderBy: 'date', order: 'desc', ...(terms.length ? { terms: { any: terms } } : {}) });
   let entries = result.ids.map((id) => loader.entries.get(id)!).filter(Boolean);
   if (q.newOnly && since) entries = entries.filter((e) => e.published_at && e.published_at > since);
   entries = entries.slice(0, count);
@@ -75,10 +75,11 @@ async function load(db: Db, q: EmailEntriesQuery, origin: string, since: string 
 export async function emailEntries(db: Db, doc: EmailDoc | null | undefined, origin: string, since: string | null = null): Promise<Record<string, EmailEvent[]>> {
   const blocks = entryBlocks(doc?.content);
   if (!blocks.length) return {};
-  const events = await eventsOnIn(db);
+  const { data: siteRow } = await db.from('settings').select('value').eq('key', 'site').maybeSingle();
+  const features = featuresOf(siteRow?.value);
   const out: Record<string, EmailEvent[]> = {};
   for (const b of blocks) {
-    out[b.props.id] = await load(db, (b.props.query ?? {}) as EmailEntriesQuery, origin, since, events).catch((e) => (console.error(`email entries: ${e.message}`), []));
+    out[b.props.id] = await load(db, (b.props.query ?? {}) as EmailEntriesQuery, origin, since, features).catch((e) => (console.error(`email entries: ${e.message}`), []));
   }
   return out;
 }

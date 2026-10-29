@@ -8,7 +8,7 @@
 import { BROWSER_CACHE_CONTROL, PAGE_CACHE_TAG } from '../../lib/cache';
 import type { APIRoute } from 'astro';
 import { siteDb } from '../../lib/db/site';
-import { eventsOn } from '../../lib/events/on';
+import { featuresOf, offTypes } from '../../lib/features';
 import { Loader, PUBLIC_SCOPE } from '../../lib/data';
 import { hasSession, siteViewer } from '../../lib/members/viewer';
 import { permalink, termLink } from '../../lib/permalink';
@@ -38,8 +38,8 @@ export const GET: APIRoute = async ({ url, request, cache }) => {
   const none = { q, total: 0, results: [], terms: [] };
   if (q.length < 2) return new Response(JSON.stringify(none), { headers });
   const loader = new Loader(siteDb(), undefined, { ...PUBLIC_SCOPE, viewer: signedIn ? await siteViewer(request) : null });
-  // Events off (Settings > Events): none found.
-  loader.scope!.noEvents = !eventsOn((await loader.settings()).site);
+  // Events or Shop off: none of theirs found.
+  loader.scope!.off = offTypes(featuresOf((await loader.settings()).site));
   const types = asked.length ? asked : searchTypes((await loader.settings()).site);
 
   // Terms of the taxonomy whose names hold the words, in use, by name.

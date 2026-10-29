@@ -39,6 +39,7 @@ An item can also open a larger drop-down panel: add **Links** under a **Links he
 | **Events** | Turn events on or off, and the site's time zone. |
 | **Members** | Members-only pages and member accounts, if your site uses them. |
 | **Mailing Lists** | Newsletter sign-ups and sending, if your site uses them. |
+| **Shop** | The shop on or off, its currency and the unit weights are in (a preview; see [Selling things](/cfpuck-cms/guide/shop/)). |
 | **Accessibility** | Whether publishing waits for the [accessibility check](/cfpuck-cms/guide/accessibility/). |
 | **Appearance** | The colours and logo of these admin screens. |
 | **Connections** | Connecting Claude, card payments (Stripe or Square) and Mailgun (see below). |

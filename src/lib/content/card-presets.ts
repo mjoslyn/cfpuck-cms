@@ -6,7 +6,29 @@ import type { CardPreset, CardTemplate } from '../site/extend';
 import { SITE_RENDER } from '../site/render';
 
 export type { CardPreset };
-export const CARD_PRESETS: CardPreset[] = SITE_RENDER.cards ?? [];
+
+/** The shop's card (Settings > Shop) for a site without its own `product` design: the image, name and price. */
+const PRODUCT_CARD: CardPreset = {
+  id: 'product',
+  label: 'Product: image, name and price',
+  description: 'The product\'s image, its name and its price (the shop).',
+  template: [
+    {
+      type: 'section',
+      props: {
+        attrs: { gap: 'var(--space-20)', layout: { type: 'stack' }, className: 'c-product-card' },
+        children: [
+          { type: 'entry-image', props: { attrs: { link: true, size: 'medium_large', imgWidth: '100%', aspectRatio: '1/1', style: { radius: '6px' } } } },
+          { type: 'entry-title', props: { attrs: { level: 3, link: true } } },
+          { type: 'product-price', props: { attrs: {} } },
+        ],
+      },
+    },
+  ],
+};
+
+const SITE_CARDS = SITE_RENDER.cards ?? [];
+export const CARD_PRESETS: CardPreset[] = SITE_CARDS.some((c) => c.id === PRODUCT_CARD.id) ? SITE_CARDS : [...SITE_CARDS, PRODUCT_CARD];
 /** The design new collections start with. */
 export const DEFAULT_CARD = CARD_PRESETS[0]?.id ?? 'custom';
 export const CARD_IDS = CARD_PRESETS.map((p) => p.id);

@@ -5,7 +5,8 @@ import { QuickError, quickAsk } from '../../../../../lib/compose/quick';
 import { env } from '../../../../../lib/compose/client';
 import { applyCampaign, campaignOutline, campaignSchema, campaignTask, type ComposedCampaign } from '../../../../../lib/mailing/compose';
 import { LISTABLE_TYPES, typeDef } from '../../../../../lib/site';
-import { eventsOn, showsType } from '../../../../../lib/events/on';
+import { eventsOn } from '../../../../../lib/events/on';
+import { featuresOf, showsType } from '../../../../../lib/features';
 import { defaultTemplate } from '../../../../../lib/email-templates';
 
 export const POST: APIRoute = async ({ request, locals }) => {
@@ -15,7 +16,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
   if (!brief) return new Response('Say what the email is about.', { status: 400 });
   const { data: siteRow } = await locals.db.from('settings').select('value').eq('key', 'site').maybeSingle();
   const events = eventsOn(siteRow?.value);
-  const types = LISTABLE_TYPES.filter((t) => showsType(t, events)).map((t) => ({ type: t, label: typeDef(t)?.label ?? t }));
+  const types = LISTABLE_TYPES.filter((t) => showsType(t, featuresOf(siteRow?.value))).map((t) => ({ type: t, label: typeDef(t)?.label ?? t }));
   try {
     const answer = await quickAsk<ComposedCampaign>(
       campaignTask(),

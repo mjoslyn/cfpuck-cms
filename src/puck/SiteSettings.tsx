@@ -27,7 +27,10 @@ import MemberSettingsPanel from '../admin/MemberSettings';
 import MailingSettingsPanel, { type MailgunInfo } from '../admin/MailingSettings';
 import { mailingOn, type MailList, type MailingSettings } from '../lib/mailing/config';
 import type { MemberSettings } from '../lib/members/config';
-import { eventsOn, showsTaxonomy, showsType } from '../lib/events/on';
+import { eventsOn } from '../lib/events/on';
+import { shopOn, shopSettings, WEIGHT_UNITS, type ShopSettings } from '../lib/shop/config';
+import { CURRENCIES } from '../lib/payments/money';
+import { featuresOf, showsTaxonomy, showsType, type Features } from '../lib/features';
 import type { TicketSettings } from '../lib/tickets/config';
 import type { Redirect } from '../lib/redirects';
 import { MENU_FIELDS } from '../lib/navigation';
@@ -37,7 +40,7 @@ import { ADMIN_THEME_DEFAULTS, ADMIN_THEME_FIELDS, adminThemeVars, contrast, typ
 interface Props {
   /** The section the address names. */
   section: string;
-  site: { name?: string; description?: string; front_page_id?: number | null; not_found_page_id?: number | null; timezone?: string; search_types?: string[]; social?: { network: string; url: string }[]; share_image?: number; share_image_url?: string; templates?: TemplateMap; taxonomy_templates?: Record<string, string>; taxonomy_pages_off?: string[]; taxonomy_meta?: Record<string, TaxonomyMeta>; listing_meta?: Record<string, TaxonomyMeta>; listings_off?: string[]; icons?: Record<string, string>; icon_media_id?: number | null; icon_preview?: string; admin_theme?: AdminTheme; tickets?: TicketSettings; members?: Partial<MemberSettings>; mailing?: MailingSettings; events?: { enabled?: boolean }; a11y?: { block_publish?: boolean } };
+  site: { name?: string; description?: string; front_page_id?: number | null; not_found_page_id?: number | null; timezone?: string; search_types?: string[]; social?: { network: string; url: string }[]; share_image?: number; share_image_url?: string; templates?: TemplateMap; taxonomy_templates?: Record<string, string>; taxonomy_pages_off?: string[]; taxonomy_meta?: Record<string, TaxonomyMeta>; listing_meta?: Record<string, TaxonomyMeta>; listings_off?: string[]; icons?: Record<string, string>; icon_media_id?: number | null; icon_preview?: string; admin_theme?: AdminTheme; tickets?: TicketSettings; members?: Partial<MemberSettings>; mailing?: MailingSettings; events?: { enabled?: boolean }; shop?: Partial<ShopSettings>; a11y?: { block_publish?: boolean } };
   options: Record<string, any>;
   pages: { id: number; title: string }[];
   templates: TemplateInfo[];
@@ -140,8 +143,8 @@ export default function SiteSettings({ section, site: initialSite, options: init
       label: 'Types',
       panel: (
         <>
-          <TypeTemplates events={eventsOn(site)} value={site.templates ?? {}} off={site.listings_off ?? []} templates={templates} meta={site.listing_meta ?? {}} onChange={(m) => setSite((s) => ({ ...s, templates: m }))} onListings={(off) => setSite((s) => ({ ...s, listings_off: off }))} onMeta={(m) => setSite((s) => ({ ...s, listing_meta: Object.keys(m).length ? m : undefined }))} />
-          <TaxonomyTemplatesPanel events={eventsOn(site)} value={site.taxonomy_templates ?? {}} off={site.taxonomy_pages_off ?? []} templates={templates} meta={site.taxonomy_meta ?? {}} onChange={(m) => setSite((s) => ({ ...s, taxonomy_templates: Object.keys(m).length ? m : undefined }))} onPages={(off) => setSite((s) => ({ ...s, taxonomy_pages_off: off.length ? off : undefined }))} onMeta={(m) => setSite((s) => ({ ...s, taxonomy_meta: Object.keys(m).length ? m : undefined }))} />
+          <TypeTemplates features={featuresOf(site)} value={site.templates ?? {}} off={site.listings_off ?? []} templates={templates} meta={site.listing_meta ?? {}} onChange={(m) => setSite((s) => ({ ...s, templates: m }))} onListings={(off) => setSite((s) => ({ ...s, listings_off: off }))} onMeta={(m) => setSite((s) => ({ ...s, listing_meta: Object.keys(m).length ? m : undefined }))} />
+          <TaxonomyTemplatesPanel features={featuresOf(site)} value={site.taxonomy_templates ?? {}} off={site.taxonomy_pages_off ?? []} templates={templates} meta={site.taxonomy_meta ?? {}} onChange={(m) => setSite((s) => ({ ...s, taxonomy_templates: Object.keys(m).length ? m : undefined }))} onPages={(off) => setSite((s) => ({ ...s, taxonomy_pages_off: off.length ? off : undefined }))} onMeta={(m) => setSite((s) => ({ ...s, taxonomy_meta: Object.keys(m).length ? m : undefined }))} />
         </>
       ),
     },
@@ -151,7 +154,7 @@ export default function SiteSettings({ section, site: initialSite, options: init
       panel: (
         <>
         <p className="mb-3 text-xs text-admin-muted">What site search and its live results cover.</p>
-        {SEARCHABLE_TYPES.filter((type) => showsType(type, eventsOn(site))).map((type) => {
+        {SEARCHABLE_TYPES.filter((type) => showsType(type, featuresOf(site))).map((type) => {
           const chosen = site.search_types ?? SEARCHABLE_TYPES;
           const on = chosen.includes(type);
           return (
@@ -274,6 +277,13 @@ export default function SiteSettings({ section, site: initialSite, options: init
       on: mailingOn(site),
       panel: <MailingSettingsPanel value={site.mailing ?? {}} mailgun={mailgun} lists={mailLists} membersOn={!!site.members?.enabled} onChange={(mailing) => setSite((s) => ({ ...s, mailing }))} />,
     },
+    // The shop, an optional feature (src/lib/shop/config.ts).
+    {
+      id: 'shop',
+      label: 'Shop',
+      on: shopOn(site),
+      panel: <ShopSettingsPanel value={site.shop ?? {}} onChange={(shop) => setSite((s) => ({ ...s, shop }))} />,
+    },
     {
       id: 'accessibility',
       label: 'Accessibility',
@@ -387,9 +397,9 @@ export default function SiteSettings({ section, site: initialSite, options: init
 }
 
 /** Types with pages of their own, and the template for their entries and their listing page. */
-function TypeTemplates({ events, value, off, templates, meta, onChange, onListings, onMeta }: { events: boolean; value: TemplateMap; off: string[]; templates: TemplateInfo[]; meta: Record<string, TaxonomyMeta>; onChange: (m: TemplateMap) => void; onListings: (off: string[]) => void; onMeta: (m: Record<string, TaxonomyMeta>) => void }) {
+function TypeTemplates({ features, value, off, templates, meta, onChange, onListings, onMeta }: { features: Features; value: TemplateMap; off: string[]; templates: TemplateInfo[]; meta: Record<string, TaxonomyMeta>; onChange: (m: TemplateMap) => void; onListings: (off: string[]) => void; onMeta: (m: Record<string, TaxonomyMeta>) => void }) {
   const have = new Set(templates.map((t) => t.slug));
-  const types = CONTENT_TYPES.filter((t) => !PAGELESS_TYPES.has(t.type) && showsType(t.type, events));
+  const types = CONTENT_TYPES.filter((t) => !PAGELESS_TYPES.has(t.type) && showsType(t.type, features));
   const setMeta = (type: string, m: TaxonomyMeta) => {
     const next = { ...meta };
     if (m.image || (m.seo && Object.keys(m.seo).length)) next[type] = m;
@@ -558,9 +568,9 @@ function PageDefaults({ kind, name, label, path, value, onChange }: { kind: 'tax
 }
 
 /** Settings > Types: the template for each taxonomy's term pages (a term can choose its own), and their default image and SEO. */
-function TaxonomyTemplatesPanel({ events, value, off, templates, meta, onChange, onPages, onMeta }: { events: boolean; value: Record<string, string>; off: string[]; templates: TemplateInfo[]; meta: Record<string, TaxonomyMeta>; onChange: (m: Record<string, string>) => void; onPages: (off: string[]) => void; onMeta: (m: Record<string, TaxonomyMeta>) => void }) {
+function TaxonomyTemplatesPanel({ features, value, off, templates, meta, onChange, onPages, onMeta }: { features: Features; value: Record<string, string>; off: string[]; templates: TemplateInfo[]; meta: Record<string, TaxonomyMeta>; onChange: (m: Record<string, string>) => void; onPages: (off: string[]) => void; onMeta: (m: Record<string, TaxonomyMeta>) => void }) {
   const have = new Set(templates.map((t) => t.slug));
-  const taxonomies = config.taxonomies.filter((t) => t.base && showsTaxonomy(t.name, events));
+  const taxonomies = config.taxonomies.filter((t) => t.base && showsTaxonomy(t.name, features));
   return (
     <>
       <h3 className="mt-8 mb-1 text-sm font-semibold">Taxonomy pages</h3>
@@ -663,6 +673,24 @@ function AdminThemePanel({ value, onChange }: { value: AdminTheme; onChange: (t:
           </FieldGroup>
         );
       })}
+    </>
+  );
+}
+
+/** Settings > Shop: on or off, the currency prices are in and the unit weights are in. */
+function ShopSettingsPanel({ value, onChange }: { value: Partial<ShopSettings>; onChange: (v: Partial<ShopSettings>) => void }) {
+  const s = shopSettings({ shop: value });
+  return (
+    <>
+      <Toggle title="Shop on" value={s.enabled} onChange={(on) => onChange({ ...value, enabled: on })} />
+      <p className="mb-3 text-xs text-admin-muted">
+        {s.enabled
+          ? 'Products under Content, product pages, the shop (/shop/), product categories, the cart (/cart/) and the shop blocks. Checkout comes in the next part of this preview.'
+          : 'Turn on to add products under Content, product pages, a shop (/shop/), product categories, a cart (/cart/) and the shop blocks. Turning it off later deletes nothing: products are hidden until it is on again.'}
+      </p>
+      <Select title="Currency" value={s.currency} options={CURRENCIES} onChange={(v) => onChange({ ...value, currency: v || undefined })} />
+      <Select title="Weights in" value={s.weightUnit} options={WEIGHT_UNITS} onChange={(v) => onChange({ ...value, weightUnit: v || undefined })} />
+      <p className="-mt-2 mb-3 text-xs text-admin-muted">Products' and variants' weights are in this unit; shipping rates by weight will use it.</p>
     </>
   );
 }

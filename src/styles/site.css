@@ -12,6 +12,7 @@
 @import './events.css';
 @import './members.css';
 @import './mailing.css';
+@import './shop.css';
 
 @source '../render';
 @source '../lib/forms';

@@ -11,17 +11,17 @@ import { termLink } from '../lib/permalink';
 import { TAXONOMY_BASES } from '../lib/site';
 import { termPagesOn, termTemplate, templateLabel } from '../lib/templates';
 import TermDetails from './TermDetails';
-import { showsTaxonomy } from '../lib/events/on';
+import { showsTaxonomy, type Features } from '../lib/features';
 
 interface Props {
   taxonomy: string;
-  /** Whether events are on (Settings > Events): event categories are hidden while they're off. */
-  events: boolean;
+  /** Which features are on (Settings > Events, Shop): their taxonomies are hidden while off. */
+  features: Features;
   error?: string | null;
   notice?: string | null;
 }
-const { taxonomy, events, error, notice } = Astro.props;
-const taxonomies = site.taxonomies.filter((t) => showsTaxonomy(t.name, events));
+const { taxonomy, features, error, notice } = Astro.props;
+const taxonomies = site.taxonomies.filter((t) => showsTaxonomy(t.name, features));
 const db = Astro.locals.db;
 const tax = taxonomies.find((t) => t.name === taxonomy) ?? taxonomies[0];
 const flat = tax.name === 'tag';

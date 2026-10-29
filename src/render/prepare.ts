@@ -23,6 +23,9 @@ import { prepareMap } from './c/map';
 import { prepareNavigation } from './c/navigation';
 import { prepareTickets, prepareTicketsBlock } from './c/tickets';
 import { EVENT_BLOCKS, eventsOn } from '../lib/events/on';
+import { SHOP_BLOCKS, productOf, shopOn } from '../lib/shop/config';
+import { loadStock } from '../lib/shop/stock';
+import { CART_SCRIPT, STOCK_KEY } from './c/shop';
 import { LISTS_KEY } from './c/mailing';
 import { renderHooks } from './hooks';
 import { mailingOn } from '../lib/mailing/config';
@@ -133,6 +136,8 @@ async function walk(items: PuckItem[], ctx: RenderCtx, state: WalkState) {
 
     // Events off (Settings > Events): their blocks show nothing, so load nothing for them.
     if (EVENT_BLOCKS.includes(type) && !eventsOn(ctx.settings.site)) continue;
+    // Shop off (Settings > Shop): the same.
+    if (SHOP_BLOCKS.includes(type) && !shopOn(ctx.settings.site)) continue;
     switch (type) {
       case 'part':
         await loadDoc(ctx, `part:${attrs.slug}`, async () => (await ctx.loader.template('part', attrs.slug))?.content as PuckItem[], state);
@@ -278,6 +283,12 @@ async function walk(items: PuckItem[], ctx: RenderCtx, state: WalkState) {
         await loadDoc(ctx, `content:${e.id}`, async () => e.content?.content as PuckItem[], state);
         break;
       }
+      case 'product-price':
+      case 'add-to-cart':
+      case 'cart':
+      case 'cart-link':
+        await prepareShop(ctx, type, attrs);
+        break;
       case 'gallery':
       case 'video-gallery':
         if (attrs.display === 'slider') {
@@ -290,6 +301,25 @@ async function walk(items: PuckItem[], ctx: RenderCtx, state: WalkState) {
 
     if (props.children) await walk(props.children, ctx, state);
   }
+}
+
+/**
+ * A shop block: the cart's script, and for a product's price or Add to cart the product it names (else
+ * the page's own) with, for Add to cart, its stock and its variants' images.
+ */
+async function prepareShop(ctx: RenderCtx, type: string, attrs: Record<string, any>) {
+  ctx.headScripts ??= [];
+  if (!ctx.headScripts.includes(CART_SCRIPT)) ctx.headScripts.push(CART_SCRIPT);
+  if (type !== 'product-price' && type !== 'add-to-cart') return;
+  const named = Number(attrs.product) || 0;
+  if (named) await ctx.loader.entriesByIds([named]);
+  const e = named ? ctx.loader.entries.get(named) : ctx.queried.entry;
+  if (type !== 'add-to-cart' || e?.type !== 'product') return;
+  const stock = (ctx.data.get(STOCK_KEY) as Awaited<ReturnType<typeof loadStock>> | undefined) ?? new Map();
+  if (!stock.has(e.id)) for (const [id, counts] of await loadStock(ctx.loader.db, [e.id])) stock.set(id, counts);
+  ctx.data.set(STOCK_KEY, stock);
+  const images = (productOf(e.fields)?.variants ?? []).map((v) => Number(v.image)).filter((n) => n > 0);
+  if (images.length) await ctx.loader.loadMedia(images);
 }
 
 /** The mailing lists, once per page (Subscribe and Email preferences blocks, the account page). */

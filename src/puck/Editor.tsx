@@ -6,6 +6,7 @@ import Composer, { type LivePage, type Selection } from '../admin/Composer';
 import MakePage from '../admin/MakePage';
 import RenameTemplate from '../admin/RenameTemplate';
 import { eventsOn } from '../lib/events/on';
+import { featuresOf } from '../lib/features';
 import { isComposed } from '../lib/compose/outline';
 import { locateInDoc, replaceInDoc } from '../lib/puck/tree';
 import '@puckeditor/core/no-external.css'; // without its Inter webfont: the admin uses the system font
@@ -28,7 +29,7 @@ import type { Env, RenderCtx } from '../render/env';
 import type { PuckItem } from '../lib/puck/types';
 import type { Entry } from '../lib/types';
 import { buildConfig, EDITABLE_TYPES } from './config';
-import { useEventsOn, useMailingOn, useMemberSettings } from './member-settings';
+import { useEventsOn, useMailingOn, useMemberSettings, useShopOn } from './member-settings';
 import { EnvContext, StaticHtml } from './BlockView';
 import { EntryForm, type EntryState } from './entry-fields';
 import { inlinePatterns } from './patterns';
@@ -292,8 +293,9 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
   const members = useMemberSettings();
   const eventsAreOn = useEventsOn();
   const mailingIsOn = useMailingOn();
+  const shopIsOn = useShopOn();
   const config = useMemo(() => {
-    const c = buildConfig(EDITABLE_TYPES, entryType, { members: !!members?.enabled, events: eventsAreOn === true, mailing: mailingIsOn === true });
+    const c = buildConfig(EDITABLE_TYPES, entryType, { members: !!members?.enabled, events: eventsAreOn === true, mailing: mailingIsOn === true, shop: shopIsOn === true });
     c.root = {
       fields: state
         ? {
@@ -308,7 +310,7 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
       render: ({ children, ...props }: { children: ReactNode } & Record<string, any>) => <ChromeFromContext content={children} slots={props} />,
     } as any;
     return c;
-  }, [state === null, entryType, areaList.join(), !!members?.enabled, eventsAreOn === true, mailingIsOn === true]);
+  }, [state === null, entryType, areaList.join(), !!members?.enabled, eventsAreOn === true, mailingIsOn === true, shopIsOn === true]);
 
   // Compose panel: docked beside the editor; pinned keeps it open (per browser).
   const puckRef = useRef<ReturnType<typeof useGetPuck> | null>(null);
@@ -655,7 +657,7 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
     <EnvContext.Provider value={env}>
       <RevisionsContext.Provider value={{ entryId: entry?.id ?? null, version: revisionsVersion, layout: mode === 'layout' ? templateSlug : null, canRestore: (r) => !!entry && canRestore(r), restore }}>
       <A11yMarksContext.Provider value={{ save: saveA11yMarks, quiet: () => (marksOnly.current = true), gate: gated() }}>
-      <ViewContext.Provider value={{ env, chrome, sources: admin ? templateSlug : null, form: { type: entry?.type ?? '', state, setState: (v) => { stateRef.current = v; setState(v); edited(); }, templates } }}>
+      <ViewContext.Provider value={{ env, chrome, sources: admin ? templateSlug : null, form: { type: entry?.type ?? '', id: entry?.id ?? null, state, setState: (v) => { stateRef.current = v; setState(v); edited(); }, templates } }}>
       <Puck
         config={config}
         data={initial}
@@ -720,7 +722,7 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
                   </button>
                 </form>
               )}
-              {template && <MakePage kind={template.kind} slug={template.slug} title={templateTitle || template.slug.replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase())} events={eventsOn(settingsRef.current.site)} dirty={dirty} className="whitespace-nowrap text-sm text-admin-muted hover:text-admin-accent" />}
+              {template && <MakePage kind={template.kind} slug={template.slug} title={templateTitle || template.slug.replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase())} features={featuresOf(settingsRef.current.site)} dirty={dirty} className="whitespace-nowrap text-sm text-admin-muted hover:text-admin-accent" />}
               {entry && mode === 'content' ? (
                 <>
                   <button type="button" disabled={saving} onClick={() => save('draft')} className="whitespace-nowrap rounded border border-admin-ink/20 px-3 py-1.5 text-sm hover:border-admin-accent hover:text-admin-accent disabled:opacity-50" title={liveStatus === 'publish' ? 'Keep your changes without changing the live page' : 'Save without publishing'}>
@@ -1060,7 +1062,7 @@ interface ViewState {
   chrome: PuckItem[];
   /** The template's slug when the canvas marks where its blocks come from (admins), else null. */
   sources: string | null;
-  form: { type: string; state: EntryState | null; setState: (v: EntryState) => void; templates: TemplateInfo[] };
+  form: { type: string; id: number | null; state: EntryState | null; setState: (v: EntryState) => void; templates: TemplateInfo[] };
 }
 const ViewContext = createContext<ViewState | null>(null);
 
@@ -1074,7 +1076,7 @@ function EntryFormBridge() {
   const view = useContext(ViewContext);
   if (!view?.form.state) return null;
   const f = view.form;
-  return <EntryForm type={f.type} value={f.state!} onChange={f.setState} templates={f.templates} pageItems={() => getPuck().appState.data.content as any[]} />;
+  return <EntryForm type={f.type} id={f.id} value={f.state!} onChange={f.setState} templates={f.templates} pageItems={() => getPuck().appState.data.content as any[]} />;
 }
 
 /** Template around the editable content, rendered statically (header, footer, template sections). */

@@ -25,6 +25,7 @@ export const SETTINGS_GROUPS: { label: string; sections: SettingsSection[] }[] =
       { id: 'tickets', label: 'Tickets' },
       { id: 'members', label: 'Members' },
       { id: 'mailing-lists', label: 'Mailing Lists' },
+      { id: 'shop', label: 'Shop' },
     ],
   },
   { label: 'Services', sections: [{ id: 'connections', label: 'Connections' }] },

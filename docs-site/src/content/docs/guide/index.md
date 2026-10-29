@@ -68,6 +68,7 @@ doesn't use.
 - [Writing with Claude](/cfpuck-cms/guide/writing-with-claude/): having pages drafted for you from your documents.
 - [Accessibility](/cfpuck-cms/guide/accessibility/): making sure everyone can use your pages.
 - [Events and tickets](/cfpuck-cms/guide/events-and-tickets/): listing events and selling tickets.
+- [Selling things](/cfpuck-cms/guide/shop/): products, sizes and colors, stock and the cart (a preview).
 - [Menu and settings](/cfpuck-cms/guide/menu-and-settings/): for admins.
 - [People and access](/cfpuck-cms/guide/people/): for admins.
 - [Common questions](/cfpuck-cms/guide/common-questions/): quick answers when something isn't working.
