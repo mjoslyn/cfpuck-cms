@@ -33,7 +33,7 @@ An item can also open a larger drop-down panel: add **Links** under a **Links he
 | Section | What it's for |
 | --- | --- |
 | **General** | The site's name, tagline, which page is the home page, and which page people see when an address doesn't exist. |
-| **Types** | Which layout (template) each kind of content uses, and under **Featured**, which kinds can be marked featured. Usually set up once. |
+| **Types** | The kinds of content the site has (add your own with **Add a type**), which layout (template) each uses, and under **Featured**, which kinds can be marked featured. Usually set up once. |
 | **Search** | Which kinds of content the site search covers. |
 | **Social** | Your social media profiles (shown as icons) and the picture used when a page without its own image is shared. |
 | **Events** | Turn events on or off, and the site's time zone. |
@@ -94,3 +94,20 @@ Search engines don't list it. To go back to the standard one, set **Not found pa
 The site can back itself up every day (**Backups** section). Each backup can be restored if something
 goes badly wrong. Restoring brings back pages and settings, not images, which are never deleted
 anyway. If you're unsure, ask whoever set up your site before restoring.
+
+## Adding a kind of content
+
+Besides pages and posts, a site can keep other kinds of content, such as recipes, products or staff.
+Admins add them under **Settings**, **Types**:
+
+1. Click **Add a type**.
+2. Give it a name (Recipes) and a name for one of them (Recipe).
+3. Choose whether each has a page, or is data only (kept to show elsewhere, like venues).
+4. For pages, type the address they start with (`recipes` puts Plum cake at `/recipes/plum-cake/`), and
+   if you like a listing page that shows them all (`cookbook`).
+5. Under **Details each one keeps**, click **Add a detail** for each thing to keep, such as Serves (a
+   number) or Course (a choice from a list, one choice a line).
+6. Click **Add type**. It now has its own list under **Content**.
+
+Kinds of content marked **Defined in the site's code** were set up when the site was built. Click
+**View** to see them; they can only be changed by whoever builds the site.

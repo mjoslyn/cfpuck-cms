@@ -21,7 +21,7 @@ export const SEARCH_SCHEMA = {
 } as const;
 
 const plain = (s: unknown) => String(s ?? '').replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&#8217;/g, '’').replace(/&[#\w]+;/g, ' ').replace(/\s+/g, ' ').trim();
-const ALL = [...LISTABLE_TYPES, 'page'];
+const allTypes = () => [...LISTABLE_TYPES, 'page'];
 const byTitle = (types: string[]) => types.every((t) => typeDef(t)?.order === 'title');
 const logoOf = (e: Entry) => {
   const field = typeDef(e.type)?.logoField;
@@ -30,7 +30,7 @@ const logoOf = (e: Entry) => {
 
 export async function searchSite(db: Db, reg: Registry, input: Record<string, any>): Promise<{ results: unknown[]; summary: string }> {
   const loader = new Loader(db);
-  const types = Array.isArray(input.types) && input.types.length ? input.types.filter((t: string) => ALL.includes(t)) : ALL;
+  const types = Array.isArray(input.types) && input.types.length ? input.types.filter((t: string) => allTypes().includes(t)) : allTypes();
   const terms: Record<string, number[]> = {};
   if (input.tag) {
     const tag = (await loader.allTerms()).find((t) => t.taxonomy === 'tag' && t.name.toLowerCase() === String(input.tag).toLowerCase());

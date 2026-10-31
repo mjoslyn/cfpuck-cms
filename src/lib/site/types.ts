@@ -57,6 +57,8 @@ export interface ContentType {
   card?: string;
   /** Default order when listing or searching this type: newest first ("date", default) or by name ("title"). */
   order?: 'date' | 'title';
+  /** Made by an admin (Settings > Types), not the site's code. */
+  made?: boolean;
 }
 
 export interface Taxonomy {

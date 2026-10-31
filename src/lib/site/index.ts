@@ -6,6 +6,7 @@ import presets from '../../site/presets.json';
 import type { ContentType, EventsConfig, FieldDef, SiteConfig, Taxonomy, TypeExtension } from './types';
 import { withEvents } from '../events/types';
 import { madeTaxonomiesFrom, taxonomyTypesFrom, type MadeTaxonomy } from './taxonomy-settings';
+import { asContentType, madeTypesFrom, type MadeType } from './type-settings';
 
 export type { ContentType, EventsConfig, FieldDef, SiteConfig, Taxonomy, TypeExtension };
 
@@ -39,21 +40,50 @@ export function isTimezone(tz: string): boolean {
   }
 }
 
+/** The site's own types (its config, with the core's features'), before any an admin made; these win. */
+export const CODE_TYPES: readonly ContentType[] = [...config.types];
+
 /** Content types in admin order (hidden ones left out). */
-export const CONTENT_TYPES: ContentType[] = config.types.filter((t) => !t.hidden);
+export const CONTENT_TYPES: ContentType[] = [];
 export const typeDef = (type: string): ContentType | undefined => config.types.find((t) => t.type === type);
 export const typeLabel = (type: string) => typeDef(type)?.singular ?? type;
 
 /** Data only, with no page of their own: edited with a plain form, not the page editor. */
-export const RECORD_TYPES = new Set(config.types.filter((t) => t.record).map((t) => t.type));
+export const RECORD_TYPES = new Set<string>();
 /** No public page of their own (no URL or View link in the admin). */
-export const PAGELESS_TYPES = new Set(config.types.filter((t) => t.record || t.pageless).map((t) => t.type));
+export const PAGELESS_TYPES = new Set<string>();
 /** Types Compose can create: those with a page of their own. */
-export const COMPOSABLE_TYPES = CONTENT_TYPES.filter((t) => !PAGELESS_TYPES.has(t.type));
+export const COMPOSABLE_TYPES: ContentType[] = [];
 /** Types a collection, search or random list may show: public types other than plain pages. */
-export const LISTABLE_TYPES = config.types.filter((t) => !PAGELESS_TYPES.has(t.type) && t.type !== 'page').map((t) => t.type);
+export const LISTABLE_TYPES: string[] = [];
 /** Types site search can cover: every type with a page. */
-export const SEARCHABLE_TYPES = ['page', ...LISTABLE_TYPES];
+export const SEARCHABLE_TYPES: string[] = [];
+/** URL segment for single entries of a type (/directory/<slug>/). */
+export const TYPE_BASES: Record<string, string> = {};
+/** Listing page of a type. */
+export const ARCHIVE_PATHS: Record<string, string> = {};
+
+/**
+ * The lists above, from the site's types as they are now (the code's and those an admin made), changed
+ * in place so code holding them sees the change.
+ */
+function deriveTypes() {
+  const fill = <T,>(list: T[], items: T[]) => list.splice(0, list.length, ...items);
+  const reset = (set: Set<string>, items: string[]) => (set.clear(), items.forEach((x) => set.add(x)));
+  const record = (obj: Record<string, string>, entries: [string, string][]) => {
+    for (const k of Object.keys(obj)) delete obj[k];
+    Object.assign(obj, Object.fromEntries(entries));
+  };
+  fill(CONTENT_TYPES, config.types.filter((t) => !t.hidden));
+  reset(RECORD_TYPES, config.types.filter((t) => t.record).map((t) => t.type));
+  reset(PAGELESS_TYPES, config.types.filter((t) => t.record || t.pageless).map((t) => t.type));
+  fill(COMPOSABLE_TYPES, CONTENT_TYPES.filter((t) => !PAGELESS_TYPES.has(t.type)));
+  fill(LISTABLE_TYPES, config.types.filter((t) => !PAGELESS_TYPES.has(t.type) && t.type !== 'page').map((t) => t.type));
+  fill(SEARCHABLE_TYPES, ['page', ...LISTABLE_TYPES]);
+  record(TYPE_BASES, config.types.filter((t) => t.base).map((t) => [t.type, t.base!]));
+  record(ARCHIVE_PATHS, config.types.filter((t) => t.archive).map((t) => [t.type, t.archive!]));
+}
+deriveTypes();
 /** The types search covers: the admin's choice under Settings (settings.site.search_types), else all. */
 export function searchTypes(siteSettings: Record<string, any> | undefined): string[] {
   const chosen = siteSettings?.search_types;
@@ -80,13 +110,9 @@ export const featuredTypesFrom = (v: unknown): string[] | undefined => {
   return out.length ? out : undefined;
 };
 
-/** URL segment for single entries of a type (/directory/<slug>/). */
-export const TYPE_BASES: Record<string, string> = Object.fromEntries(config.types.filter((t) => t.base).map((t) => [t.type, t.base!]));
 /** The types whose entries share `type`'s addresses: every type without a URL base lives at /<slug>/. */
 export const typesSharingAddresses = (type: string): string[] =>
   TYPE_BASES[type] || PAGELESS_TYPES.has(type) ? [type] : config.types.filter((t) => !t.base && !PAGELESS_TYPES.has(t.type)).map((t) => t.type);
-/** Listing page of a type. */
-export const ARCHIVE_PATHS: Record<string, string> = Object.fromEntries(config.types.filter((t) => t.archive).map((t) => [t.type, t.archive!]));
 /** The site's own taxonomies (its config, with the core's features'), before any an admin made. */
 export const CODE_TAXONOMIES: readonly Taxonomy[] = [...config.taxonomies];
 /** URL base of a taxonomy's term pages. */
@@ -97,16 +123,26 @@ let ADDED_TYPES: Record<string, string[]> = {};
 export let MADE_TAXONOMIES: MadeTaxonomy[] = [];
 /** Types an admin added to the site's own taxonomies, as last applied. */
 export let ADDED_TO_CODE: Record<string, string[]> = {};
+/** The content types an admin made (Settings > Types), as last applied. */
+export let MADE_TYPES: MadeType[] = [];
 
 /**
- * Applies the types' settings an admin made: Featured per type (settings.site.featured_types, through
- * fieldsFor and featuredOn), and the taxonomies (settings.site.taxonomies, taxonomy_types), to the site's: the
+ * Applies the types' settings an admin made: the types themselves (settings.site.types, joining
+ * `site.types` and the lists derived from it, the site's code's winning over one of the same name),
+ * Featured per type (settings.site.featured_types, through fieldsFor and featuredOn), and the taxonomies (settings.site.taxonomies, taxonomy_types), to the site's: the
  * made ones join `site.taxonomies` and TAXONOMY_BASES (changed in place, so code holding them sees it),
  * and every one's added types count in taxonomiesOf. A live binding, like SITE_TZ: the server applies it
  * from the settings (src/lib/site/timezone.ts, cached a minute), admin pages hand the browser
  * window.__siteTypes.
  */
 export function applyTypeSettings(siteSettings: Record<string, any> | null | undefined) {
+  MADE_TYPES = madeTypesFrom(siteSettings?.types, CODE_TYPES.map((t) => t.type));
+  // The made ones go before globals, which stay last in the admin.
+  const code = [...CODE_TYPES];
+  const at = code.findIndex((t) => t.type === 'global');
+  code.splice(at < 0 ? code.length : at, 0, ...MADE_TYPES.map(asContentType));
+  config.types.splice(0, config.types.length, ...code);
+  deriveTypes();
   const typeNames = config.types.filter((t) => t.type !== 'global').map((t) => t.type);
   const codeNames = CODE_TAXONOMIES.map((t) => t.name);
   MADE_TAXONOMIES = madeTaxonomiesFrom(siteSettings?.taxonomies, typeNames, codeNames);
@@ -120,7 +156,7 @@ export function applyTypeSettings(siteSettings: Record<string, any> | null | und
   ADDED_TYPES = { ...added, ...Object.fromEntries(MADE_TAXONOMIES.map((t) => [t.name, t.types])) };
 }
 /** What window.__siteTypes carries: the settings applyTypeSettings reads, as applied now. */
-export const appliedTypeSettings = () => ({ taxonomies: MADE_TAXONOMIES, taxonomy_types: ADDED_TO_CODE, featured_types: [...FEATURED_TYPES] });
+export const appliedTypeSettings = () => ({ types: MADE_TYPES, taxonomies: MADE_TAXONOMIES, taxonomy_types: ADDED_TO_CODE, featured_types: [...FEATURED_TYPES] });
 /** Whether a taxonomy's terms are a flat list (tags, and made ones set so), not nested. */
 export const isFlat = (name: string) => name === 'tag' || !!config.taxonomies.find((t) => t.name === name)?.flat;
 /** The types the site's code gives a taxonomy, which an admin can't take away. */

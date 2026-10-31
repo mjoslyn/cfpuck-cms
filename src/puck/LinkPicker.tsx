@@ -9,7 +9,7 @@ import { MediaModal } from './fields';
 import { isExternal, typedAddress } from '../lib/link-address';
 
 /** Types with pages of their own: what a link can lead to. */
-const LINKABLE = site.types.filter((t) => !PAGELESS_TYPES.has(t.type)).map((t) => t.type);
+const linkable = () => site.types.filter((t) => !PAGELESS_TYPES.has(t.type)).map((t) => t.type);
 
 const input = 'w-full rounded border border-admin-ink/15 bg-white px-2 py-1.5 text-sm outline-none focus:border-admin-accent';
 
@@ -51,7 +51,7 @@ export function LinkPicker({ initial = '', initialNewTab, newTabOption = true, a
     const term = q.trim();
     if (typedAddress(term)) return setFound([]);
     const t = setTimeout(async () => {
-      let query = browserClient().from('entries').select('id, title, type, slug, status').in('type', LINKABLE).in('status', ['publish', 'draft', 'future', 'private']).limit(8);
+      let query = browserClient().from('entries').select('id, title, type, slug, status').in('type', linkable()).in('status', ['publish', 'draft', 'future', 'private']).limit(8);
       query = term ? query.ilike('title', `%${term}%`).order('title') : query.order('updated_at', { ascending: false });
       const { data } = await query;
       setFound(((data ?? []) as Found[]).filter((e) => e.slug));

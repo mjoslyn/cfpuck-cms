@@ -12,8 +12,7 @@ import { LISTABLE_TYPES, featuredOn, taxonomiesOf, taxonomyLabel, typeDef } from
 
 type SetFn = (patch: Attrs) => void;
 
-const TYPES: [string, string][] = [...LISTABLE_TYPES, 'page'].map((t) => [t, typeDef(t)?.label ?? t]);
-const PICKABLE = TYPES.map(([t]) => t);
+const typeChoices = (): [string, string][] => [...LISTABLE_TYPES, 'page'].map((t) => [t, typeDef(t)?.label ?? t]);
 
 const ORDERS: [string, string, Attrs][] = [
   ['newest', 'Newest first', { orderBy: 'date', order: 'desc' }],
@@ -112,12 +111,12 @@ export function CollectionPanel({ a, set }: { a: Attrs; set: SetFn }) {
           }}
         />
         {source === 'page' && <Hint>Lists what the page is showing: an archive, a category or tag, or search results.</Hint>}
-        {source === 'picked' && <EntriesField title="Entries, in order" types={PICKABLE.filter((t) => t !== 'event' || eventsAreOn === true)} value={q.include} onChange={(ids) => setQ({ include: ids })} />}
+        {source === 'picked' && <EntriesField title="Entries, in order" types={typeChoices().map(([t]) => t).filter((t) => t !== 'event' || eventsAreOn === true)} value={q.include} onChange={(ids) => setQ({ include: ids })} />}
         {source === 'latest' && (
           <>
             <Field title="Content types">
               <div className="flex flex-wrap gap-x-3 gap-y-1">
-                {TYPES.filter(([t]) => t !== 'event' || eventsAreOn === true).map(([t, l]) => (
+                {typeChoices().filter(([t]) => t !== 'event' || eventsAreOn === true).map(([t, l]) => (
                   <label key={t} className="flex items-center gap-1.5 text-sm">
                     <input
                       type="checkbox"

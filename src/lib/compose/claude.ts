@@ -2,13 +2,13 @@
 // turn they were added in); Claude either answers in text (a question, a note) or calls build_page
 // with the complete revised page plan.
 import Anthropic from '@anthropic-ai/sdk';
-import { PLAN_SCHEMA, UPDATE_FIELDS_SCHEMA, type PagePlan } from './spec';
+import { planSchema, UPDATE_FIELDS_SCHEMA, type PagePlan } from './spec';
 import { EDIT_SCHEMA, COMPONENT_GUIDE } from './edit';
 import { SEARCH_SCHEMA } from './site';
 import { site, typeLabel, ARCHIVE_PATHS, CONTENT_TYPES, LISTABLE_TYPES } from '../site';
 
 /** The listable types, in words ("events, members, posts"). */
-const LISTED = LISTABLE_TYPES.map((t) => CONTENT_TYPES.find((c) => c.type === t)?.label.toLowerCase() ?? t).join(', ');
+const listed = () => LISTABLE_TYPES.map((t) => CONTENT_TYPES.find((c) => c.type === t)?.label.toLowerCase() ?? t).join(', ');
 import { describeEntryType } from './entry-fields';
 import { layoutName, type Layout } from './layout';
 export type { Layout };
@@ -63,10 +63,10 @@ export interface ConverseRequest {
 /** The tools Claude has: no field updates without an entry (a template, part or pattern on its own). */
 export function composeTools(r: ConverseRequest): Anthropic.Messages.Tool[] {
   const tools: Anthropic.Messages.Tool[] = [
-    { name: 'build_page', description: 'Lay out the complete page: title, slug, excerpt and every section from top to bottom.', input_schema: PLAN_SCHEMA as any },
+    { name: 'build_page', description: 'Lay out the complete page: title, slug, excerpt and every section from top to bottom.', input_schema: planSchema() as any },
     { name: 'edit_block', description: 'Replace the selected block with new blocks (same component format as the selected block).', input_schema: EDIT_SCHEMA as any },
     { name: 'update_fields', description: "Change the entry's own fields (contact details, dates...) without rebuilding the page. Send only the changed fields.", input_schema: UPDATE_FIELDS_SCHEMA as any },
-    { name: 'search_site', description: `Search the site's own content (${LISTED}, pages) to feature or link to it.`, input_schema: SEARCH_SCHEMA as any },
+    { name: 'search_site', description: `Search the site's own content (${listed()}, pages) to feature or link to it.`, input_schema: SEARCH_SCHEMA as any },
   ];
   return r.layout && !r.layout.page ? tools.filter((t) => t.name !== 'update_fields') : tools;
 }
@@ -79,7 +79,7 @@ ${r.layout ? `\nYou are working on ${layoutName(r.layout)}${r.layout.page ? ', w
 You are in a conversation with a site editor. They give you a brief and materials (documents, images, videos, links), and later ask for changes.
 - To create the page or change it broadly, call build_page with the COMPLETE page plan (every section, not just the changed ones).
 - When the message comes with a selected block, change just that block: call edit_block with its replacement (same component format as the selected block). Use build_page only if they clearly ask for page-wide changes.
-- To feature or link to the site's own content (${LISTED}, pages), call search_site first and use what it returns: real titles, URLs, dates, contact details, images (by their image ids) and entry ids for listings. Never invent entries.
+- To feature or link to the site's own content (${listed()}, pages), call search_site first and use what it returns: real titles, URLs, dates, contact details, images (by their image ids) and entry ids for listings. Never invent entries.
 - You may add one or two sentences of text saying what you did. If a request is unclear, ask one short question in text instead of calling a tool.
 - Keep what the editor did not ask to change. If the page's current sections (shown with the latest message) differ from your last plan, the editor edited them by hand: keep those edits.
 
@@ -89,7 +89,7 @@ SEO: every build_page includes seo. Write the title and description for people s
 
 Writing: clear, warm, specific American English. Use only facts from the materials or the conversation: never invent prices, dates, phone numbers, addresses, names, statistics or quotes. Short paragraphs, short concrete headings.
 
-Layout: ${r.entryType === 'page' && !r.otherContent ? 'start with a hero (use the most striking image, if any); then' : 'no hero (the page has its own title and content);'} 3 to 8 sections that suit the material: text, media_text (alternate image sides), cards, gallery, video, quote, stats, faq, cta, and listing (a live list of the site's ${LISTED}) when it helps. Alternate light backgrounds (plain, soft, tint); dark at most once or twice. Use provided images and videos by their ids (image-1, video-1...); never invent ids. Link to provided links or the site's paths below; end with a call to action when there is a natural next step.
+Layout: ${r.entryType === 'page' && !r.otherContent ? 'start with a hero (use the most striking image, if any); then' : 'no hero (the page has its own title and content);'} 3 to 8 sections that suit the material: text, media_text (alternate image sides), cards, gallery, video, quote, stats, faq, cta, and listing (a live list of the site's ${listed()}) when it helps. Alternate light backgrounds (plain, soft, tint); dark at most once or twice. Use provided images and videos by their ids (image-1, video-1...); never invent ids. Link to provided links or the site's paths below; end with a call to action when there is a natural next step.
 ${r.otherContent ? `\nThe page also has other content that is not yours to change; your sections go after it:\n${r.otherContent}\n` : ''}
 Site pages you may link to:
 ${r.sitePages.map((p) => `- ${p.title}: ${p.path}`).join('\n')}

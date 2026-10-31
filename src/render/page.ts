@@ -55,7 +55,7 @@ async function guess404(url: URL, loader: Loader): Promise<string | null> {
   const settings = await loader.settings();
   // Types with pages to go to: events have none while Events is off.
   const events = eventsOn(settings.site);
-  const types = (typed ? [typed] : [...ROOT_TYPES, ...Object.keys(TYPE_BASES)]).filter((t) => !PAGELESS_TYPES.has(t) && (events || t !== 'event'));
+  const types = (typed ? [typed] : [...rootTypes(), ...Object.keys(TYPE_BASES)]).filter((t) => !PAGELESS_TYPES.has(t) && (events || t !== 'event'));
   if (!types.length) return null;
   const { data } = await loader.db
     .from('entries')
@@ -71,10 +71,11 @@ async function guess404(url: URL, loader: Loader): Promise<string | null> {
 }
 
 /** Listing pages by path ("/directory/" -> member). */
-const ARCHIVES: Record<string, string> = Object.fromEntries(Object.entries(ARCHIVE_PATHS).map(([type, path]) => [path, type]));
-const BASE_TYPES = Object.fromEntries(Object.entries(TYPE_BASES).map(([type, base]) => [base, type]));
+// Read at the time of use (admins add types and taxonomies: applyTypeSettings).
+const archives = (): Record<string, string> => Object.fromEntries(Object.entries(ARCHIVE_PATHS).map(([type, path]) => [path, type]));
+const baseTypes = (): Record<string, string> => Object.fromEntries(Object.entries(TYPE_BASES).map(([type, base]) => [base, type]));
 /** Types served at the site root (/<slug>/): public types without a URL base, pages first. */
-const ROOT_TYPES = site.types.filter((t) => !t.base && !PAGELESS_TYPES.has(t.type)).map((t) => t.type);
+const rootTypes = () => site.types.filter((t) => !t.base && !PAGELESS_TYPES.has(t.type)).map((t) => t.type);
 /** Term pages, longest base first ("directory/category" before "category"). */
 const taxonomyRoutes = () => Object.entries(TAXONOMY_BASES)
   .map(([taxonomy, b]) => ({ taxonomy, base: b.split('/').filter(Boolean) }))
@@ -105,7 +106,7 @@ export async function resolve(url: URL, loader: Loader): Promise<Queried> {
   // Search results: /search/?q=<terms>.
   if (parts.length === 1 && parts[0] === 'search') return { ...base, kind: 'search', search: (url.searchParams.get('q') ?? '').trim().slice(0, 200) };
   // Listing pages that are on (Settings > Types); a page may take the address of one that is off.
-  const archive = ARCHIVES[`/${parts.join('/')}/`];
+  const archive = archives()[`/${parts.join('/')}/`];
   if (archive && listingOn(settings.site, archive) && (archive !== 'event' || events)) return { ...base, kind: 'archive', postType: archive };
   // Calendar views: /events/past/, /events/month/[Y-m/], /events/today/, /events/day/Y-m-d/.
   if (parts[0] === EVENTS_BASE && ['past', 'month', 'today', 'day'].includes(parts[1]) && listingOn(settings.site, 'event') && events) {
@@ -120,9 +121,9 @@ export async function resolve(url: URL, loader: Loader): Promise<Queried> {
   }
   // Records (venues) have no page of their own: their URLs serve the front page.
   if (parts.length <= 2 && [...RECORD_TYPES].some((t) => TYPE_BASES[t] === parts[0])) return resolve(new URL('/', url), loader).then((q) => ({ ...q, url }));
-  if (!events && (BASE_TYPES[parts[0]] === 'event')) return base;
-  if (parts.length === 2 && BASE_TYPES[parts[0]]) {
-    const entry = (await loader.entry(BASE_TYPES[parts[0]], parts[1])) ?? (await loader.lockedEntry([BASE_TYPES[parts[0]]], parts[1]));
+  if (!events && (baseTypes()[parts[0]] === 'event')) return base;
+  if (parts.length === 2 && baseTypes()[parts[0]]) {
+    const entry = (await loader.entry(baseTypes()[parts[0]], parts[1])) ?? (await loader.lockedEntry([baseTypes()[parts[0]]], parts[1]));
     // A recurring series has no page of its own; send visitors to the next occurrence.
     const occurrences = entry && recurrenceOf(entry) ? expandEntry(entry, defaultHorizon(loader.now)) : null;
     if (occurrences?.length) {
@@ -144,7 +145,7 @@ export async function resolve(url: URL, loader: Loader): Promise<Queried> {
     return { ...base, kind: 'singular', entry: occ };
   }
   const slug = parts[parts.length - 1];
-  const entry = (await loader.entry(ROOT_TYPES, slug)) ?? (await loader.lockedEntry(ROOT_TYPES, slug));
+  const entry = (await loader.entry(rootTypes(), slug)) ?? (await loader.lockedEntry(rootTypes(), slug));
   if (entry) return { ...base, kind: 'singular', entry };
   // The members' account page, unless a page has its address.
   if (`/${parts.join('/')}/` === ACCOUNT_PATH && memberSettings(settings.site).enabled) return { ...base, kind: 'singular', entry: accountPage() };

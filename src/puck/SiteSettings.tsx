@@ -19,6 +19,7 @@ import { NO_CONTENT_WARNING, chosenTemplate, defaultTaxonomyTemplates, defaultTe
 import { FieldGroup, MediaPicker, Row, Select, Text, Toggle, inputClass } from './fields';
 import { NETWORKS } from '../lib/social/icons';
 import Redirects, { type NotFound } from '../admin/Redirects';
+import TypesEditor from '../admin/TypesEditor';
 import Sync from '../admin/Sync';
 import Connections from '../admin/Connections';
 import BackupsTab from '../admin/Backups';
@@ -140,6 +141,7 @@ export default function SiteSettings({ section, site: initialSite, options: init
       label: 'Types',
       panel: (
         <>
+          <TypesEditor events={eventsOn(site)} />
           <TypeTemplates events={eventsOn(site)} value={site.templates ?? {}} off={site.listings_off ?? []} templates={templates} meta={site.listing_meta ?? {}} onChange={(m) => setSite((s) => ({ ...s, templates: m }))} onListings={(off) => setSite((s) => ({ ...s, listings_off: off }))} onMeta={(m) => setSite((s) => ({ ...s, listing_meta: Object.keys(m).length ? m : undefined }))} />
           <FeaturedTypes events={eventsOn(site)} value={site.featured_types ?? []} onChange={(v) => setSite((s) => ({ ...s, featured_types: v.length ? v : undefined }))} />
           <TaxonomyTemplatesPanel events={eventsOn(site)} value={site.taxonomy_templates ?? {}} off={site.taxonomy_pages_off ?? []} templates={templates} meta={site.taxonomy_meta ?? {}} onChange={(m) => setSite((s) => ({ ...s, taxonomy_templates: Object.keys(m).length ? m : undefined }))} onPages={(off) => setSite((s) => ({ ...s, taxonomy_pages_off: off.length ? off : undefined }))} onMeta={(m) => setSite((s) => ({ ...s, taxonomy_meta: Object.keys(m).length ? m : undefined }))} />

@@ -245,7 +245,22 @@ with names.
 
 ## Types in Settings
 
-Settings > Types sets, per type, the template for its entries and its listing page
+**The types editor** (Settings > Types, top; `src/admin/TypesEditor.tsx`, POST `/api/admin/types`, admins
+only, saved at once): every content type with its address, listing page and fields. Types the site's code
+defines (its config, and the core's features') open read-only, with a note that they are changed in
+`src/site/config.ts`. Admins add their own (`settings.site.types`, `MadeType` in
+`src/lib/site/type-settings.ts`): names, pages or data only (`record`), the address its pages start with
+(`base`), a listing page (`archive`), what one is for Compose (`describe`), listing order, and its fields
+(text, longer text, formatted text, web address, email, number, yes or no, image, a choice from a list; each
+may let Compose fill it). The code wins: a made type with a name the code (or the core: `RESERVED_TYPES`)
+uses is left out, as are field keys the core keeps (`RESERVED_FIELD_KEYS`). A made type's name comes from its
+singular name and stays; a changed address or listing page leaves a redirect from the old; it can be deleted
+only once no entry is of it. `applyTypeSettings` joins made types to `site.types` (before globals) and
+refills the lists derived from it in place (`CONTENT_TYPES`, `COMPOSABLE_TYPES`, `LISTABLE_TYPES`,
+`RECORD_TYPES`, `PAGELESS_TYPES`, `SEARCHABLE_TYPES`, `TYPE_BASES`, `ARCHIVE_PATHS`; `deriveTypes`), so code
+reads them at the time of use. Their taxonomies are chosen under Content > Taxonomies.
+
+Settings > Types also sets, per type, the template for its entries and its listing page
 (`settings.site.templates`, `src/lib/templates.ts`), and turns listing pages off
 (`settings.site.listings_off`; the address then serves a page with that address, if any, or 404; for
 events the calendar views go too). An entry's own template (its settings) comes before its type's.

@@ -18,7 +18,7 @@ import { termPagesOn } from '../../lib/templates';
 
 const plain = (html: string) => decodeEntities(String(html ?? '').replace(/<[^>]*>/g, ' ')).replace(/\s+/g, ' ').trim();
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n).replace(/\s+\S*$/, '')}…` : s);
-const PAGE_TYPES = new Set(COMPOSABLE_TYPES.map((t) => t.type));
+const pageTypes = () => new Set(COMPOSABLE_TYPES.map((t) => t.type));
 const TERM_LIMIT = 5;
 
 export const GET: APIRoute = async ({ url, request, cache }) => {
@@ -28,7 +28,7 @@ export const GET: APIRoute = async ({ url, request, cache }) => {
   if (cache.enabled && !signedIn) cache.set({ maxAge: 60, swr: 600, tags: [PAGE_CACHE_TAG] });
   const q = (url.searchParams.get('q') ?? '').trim().slice(0, 200);
   const limit = Math.min(10, Math.max(1, parseInt(url.searchParams.get('limit') ?? '6', 10) || 6));
-  const asked = (url.searchParams.get('types') ?? '').split(',').map((t) => t.trim()).filter((t) => PAGE_TYPES.has(t));
+  const asked = (url.searchParams.get('types') ?? '').split(',').map((t) => t.trim()).filter((t) => pageTypes().has(t));
   const taxonomy = url.searchParams.get('taxonomy') ?? '';
   const headers = {
     'Content-Type': 'application/json',

@@ -3,7 +3,8 @@
 import { LISTABLE_TYPES, typeDef } from '../site';
 import { CARD_IDS } from '../content/card-presets';
 
-const LISTED = LISTABLE_TYPES.map((t) => typeDef(t)?.label.toLowerCase() ?? t).join(', ');
+/** The types a listing can show, as Claude is told (read at the time of use: admins add types). */
+const listed = () => LISTABLE_TYPES.map((t) => typeDef(t)?.label.toLowerCase() ?? t).join(', ');
 
 export type SectionKind = 'hero' | 'text' | 'media_text' | 'cards' | 'gallery' | 'video' | 'quote' | 'cta' | 'faq' | 'stats' | 'listing';
 export type Background = 'plain' | 'tint' | 'soft' | 'dark';
@@ -58,8 +59,8 @@ const FIELDS_SCHEMA = { type: 'object', description: "The entry's own fields, fo
 /** JSON schema of the update_fields tool. */
 export const UPDATE_FIELDS_SCHEMA = { type: 'object', required: ['fields'], properties: { fields: FIELDS_SCHEMA } } as const;
 
-/** JSON schema of the build_page tool. */
-export const PLAN_SCHEMA = {
+/** JSON schema of the build_page tool (a function: the types it names are read when it is sent). */
+export const planSchema = () => ({
   type: 'object',
   required: ['title', 'slug', 'excerpt', 'seo', 'sections'],
   properties: {
@@ -88,7 +89,7 @@ export const PLAN_SCHEMA = {
             type: 'string',
             enum: ['hero', 'text', 'media_text', 'cards', 'gallery', 'video', 'quote', 'cta', 'faq', 'stats', 'listing'],
             description:
-              'hero: big opening (the site\'s Hero block) with eyebrow, heading, one or two sentences of plain text, optional background image and up to two buttons. text: heading and body. media_text: image beside heading/body/buttons. cards: a grid of 2-4 cards (title, body, image, link). gallery: several images. video: one video (video), or several shown as a video gallery (videos), with heading and caption. quote: a pull quote. cta: short call to action with buttons. faq: questions and answers. stats: 2-4 big numbers with labels. listing: live list of the site\'s own ' + LISTED + '.',
+              'hero: big opening (the site\'s Hero block) with eyebrow, heading, one or two sentences of plain text, optional background image and up to two buttons. text: heading and body. media_text: image beside heading/body/buttons. cards: a grid of 2-4 cards (title, body, image, link). gallery: several images. video: one video (video), or several shown as a video gallery (videos), with heading and caption. quote: a pull quote. cta: short call to action with buttons. faq: questions and answers. stats: 2-4 big numbers with labels. listing: live list of the site\'s own ' + listed() + '.',
           },
           background: { type: 'string', enum: ['plain', 'tint', 'soft', 'dark'], description: 'Band color. Alternate the light bands (plain, tint, soft); use dark sparingly for emphasis.' },
           eyebrow: str('Short label above the heading (optional).'),
@@ -131,4 +132,4 @@ export const PLAN_SCHEMA = {
       },
     },
   },
-} as const;
+}) as const;
