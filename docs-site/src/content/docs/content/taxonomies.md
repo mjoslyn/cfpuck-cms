@@ -10,6 +10,24 @@ Taxonomies are declared in the site config. `category` and `tag` are required; a
 lists any others. Each gets a term picker in an entry's settings, and collections, the event
 calendar and bulk actions offer them.
 
+## Taxonomies made in the admin
+
+Admins can also make taxonomies, each for any number of types, and add types to the config's own
+(**Content > Taxonomies**: **Add a taxonomy**, and each tab's settings; `/api/admin/taxonomies`). They
+are kept in the site settings:
+
+- `settings.site.taxonomies`: those made, each `{ name, label, singular?, base?, flat?, types }`. The
+  name comes from the label when it is made and stays. Without a `base` its terms have no pages; a base
+  can't be one of the site's own routes or another type's or taxonomy's (`baseProblem`).
+- `settings.site.taxonomy_types`: types added to a config taxonomy (`{ category: ['page'] }`). The
+  types the config gives it can't be taken away; tags are on every type already.
+
+`applyTaxonomySettings` (`src/lib/site`) joins them to the config's: the made ones to `site.taxonomies`
+and `TAXONOMY_BASES` (changed in place), every one's types to `taxonomiesOf` and `typesOfTaxonomy`. The
+server applies it with the timezone, at most once a minute per instance (`refreshSiteTimezone`), and
+admin pages hand it to the browser as `window.__siteTaxonomies`. Deleting a made taxonomy deletes its
+terms, which entries lose. A taxonomy on more than one type has term pages listing all of them.
+
 ## Tags
 
 Tags are terms of the `tag` taxonomy, on any type. They are edited in each entry's settings (created
@@ -18,8 +36,8 @@ on save, `setEntryTags`), filterable in collections (`query.taxQuery.tag`) and l
 
 ## Managing terms
 
-**Content > Taxonomies** (`src/admin/Terms.astro`, `/api/admin/terms`) has a tab per taxonomy:
-terms nested under their parents (tags stay flat), with name, address and template to change, how
+**Content > Taxonomies** (`src/admin/Terms.astro`, `/api/admin/terms`) has a tab per taxonomy, with
+the types it is used on: terms nested under their parents (tags, and made taxonomies set flat, stay flat), with name, address and template to change, how
 many entries use each, a link to its page, and Delete.
 
 - A term can't sit under itself or its children.

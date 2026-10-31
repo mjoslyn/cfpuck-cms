@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { isTaxonomy, TAXONOMY_BASES } from '../../../lib/site';
+import { isFlat, isTaxonomy, TAXONOMY_BASES } from '../../../lib/site';
 import { slugify } from '../../../lib/slug';
 import { termLink } from '../../../lib/permalink';
 import { redirectMovedEntry } from '../../../lib/redirects';
@@ -25,7 +25,7 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
   const id = Number(form.get('id')) || 0;
   const back = (key: 'error' | 'notice', msg: string) => redirect(`/admin/?type=terms&taxonomy=${encodeURIComponent(taxonomy)}&${key}=${encodeURIComponent(msg)}`, 303);
   if (!isTaxonomy(taxonomy)) return redirect('/admin/?type=terms', 303);
-  const flat = taxonomy === 'tag';
+  const flat = isFlat(taxonomy);
 
   const { data: all, error: readErr } = await db.from('terms').select('id, name, slug, parent_id, fields, sort').eq('taxonomy', taxonomy);
   if (readErr) return back('error', readErr.message);

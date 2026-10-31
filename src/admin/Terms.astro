@@ -1,17 +1,18 @@
 ---
-// Content > Taxonomies: a tab per taxonomy of the site's config, its terms nested under their parents,
+// Content > Taxonomies: a tab per taxonomy (the site config's and those admins made), with the types it
+// belongs to (admins: Add a taxonomy, and each one's settings, through /api/admin/taxonomies); its terms nested under their parents,
 // each with its name, address and template to change, how many entries use it, its page, Details
 // (description, featured image, fields, SEO: src/admin/TermDetails.tsx) and Delete;
 // a form to add one (and where it goes), and a template for the terms ticked. A term moves by dragging
 // its handle: onto the top or bottom edge of another term to go beside it (the order at that level),
 // onto its middle to go under it, or onto Top level; with the keyboard, the handle's menu moves it up,
 // down or under another term. Saves through /api/admin/terms.
-import { site } from '../lib/site';
+import { CONTENT_TYPES, codeTypesOf, isFlat, MADE_TAXONOMIES, site, typesOfTaxonomy } from '../lib/site';
 import { termLink } from '../lib/permalink';
 import { TAXONOMY_BASES } from '../lib/site';
 import { termPagesOn, termTemplate, templateLabel } from '../lib/templates';
 import TermDetails from './TermDetails';
-import { showsTaxonomy } from '../lib/events/on';
+import { showsTaxonomy, showsType } from '../lib/events/on';
 
 interface Props {
   taxonomy: string;
@@ -24,7 +25,14 @@ const { taxonomy, events, error, notice } = Astro.props;
 const taxonomies = site.taxonomies.filter((t) => showsTaxonomy(t.name, events));
 const db = Astro.locals.db;
 const tax = taxonomies.find((t) => t.name === taxonomy) ?? taxonomies[0];
-const flat = tax.name === 'tag';
+const flat = isFlat(tax.name);
+const isAdmin = Astro.locals.user?.role === 'admin';
+// The types a taxonomy can belong to (globals take none), its own now, and those the site's code sets.
+const typeChoices = CONTENT_TYPES.filter((c) => c.type !== 'global' && showsType(c.type, events));
+const made = MADE_TAXONOMIES.find((t) => t.name === tax.name);
+const ownTypes = tax.name === 'tag' ? [] : typesOfTaxonomy(tax.name);
+const codeTypes = made ? [] : codeTypesOf(tax.name);
+const typeNames = (list: string[]) => list.map((t) => CONTENT_TYPES.find((c) => c.type === t)?.label ?? t).join(', ');
 const one = (tax.singular ?? tax.label).toLowerCase();
 
 const { data, error: readErr } = await db.from('terms').select('id, name, slug, parent_id, fields, sort, entry_terms(count)').eq('taxonomy', tax.name).order('sort').order('name');
@@ -66,18 +74,89 @@ await Promise.all(taxonomies.map(async (t) => {
 }));
 const input = 'rounded border border-admin-ink/15 bg-white px-2 py-1 text-sm focus:border-admin-accent focus:outline-none';
 ---
-<nav class="mt-4 flex flex-wrap gap-1 border-b border-admin-ink/10 text-sm" aria-label="Taxonomies">
+<nav class="mt-4 flex flex-wrap items-end gap-1 border-b border-admin-ink/10 text-sm" aria-label="Taxonomies">
   {taxonomies.map((t) => (
     <a href={`/admin/?type=terms&taxonomy=${t.name}`} aria-current={t.name === tax.name ? 'page' : undefined} class:list={['-mb-px border-b-2 px-3 py-2', t.name === tax.name ? 'border-admin-accent text-admin-ink' : 'border-transparent text-admin-muted hover:text-admin-ink']}>
       {t.label} <span class="text-xs text-admin-muted">({counts.get(t.name)})</span>
     </a>
   ))}
+  {isAdmin && <button type="button" data-open-dialog="add-taxonomy" class="mb-1 ml-auto rounded border border-admin-ink/15 bg-white px-3 py-1 text-xs hover:border-admin-accent">Add a taxonomy</button>}
 </nav>
+
+{isAdmin && (
+  <dialog id="add-taxonomy" class="w-[min(32rem,calc(100vw-2rem))] rounded p-0 shadow-xl backdrop:bg-admin-ink/40">
+    <form method="post" action="/api/admin/taxonomies" class="p-5 text-sm">
+      <input type="hidden" name="action" value="create" />
+      <h2 class="text-lg font-semibold">Add a taxonomy</h2>
+      <p class="mt-1 text-xs text-admin-muted">A way to sort entries, such as Colors or Regions. Each entry of the types you tick gets a picker for its terms in its settings.</p>
+      <label class="mt-4 block text-xs text-admin-muted">Name (plural)<input name="label" required placeholder="Colors" class={`${input} mt-1 block w-full`} /></label>
+      <label class="mt-3 block text-xs text-admin-muted">One of them<input name="singular" placeholder="Color" class={`${input} mt-1 block w-full`} /></label>
+      <label class="mt-3 block text-xs text-admin-muted">Address of its pages (optional)<input name="base" placeholder="colors" class={`${input} mt-1 block w-full font-mono`} /><span class="mt-1 block">With one, each term has a page listing its entries, such as /colors/red/. Leave it empty for none.</span></label>
+      <label class="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" name="flat" /> A flat list, like tags (no terms under other terms)</label>
+      <fieldset class="mt-3">
+        <legend class="text-xs text-admin-muted">Used on</legend>
+        <div class="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+          {typeChoices.map((c) => <label class="flex items-center gap-1.5"><input type="checkbox" name="types" value={c.type} /> {c.label}</label>)}
+        </div>
+      </fieldset>
+      <div class="mt-5 flex justify-end gap-2">
+        <button type="button" data-close-dialog class="rounded border border-admin-ink/15 px-3 py-1.5 text-xs">Cancel</button>
+        <button class="rounded-sm bg-admin-ink px-4 py-2 text-xs font-semibold tracking-wider text-white uppercase hover:bg-admin-accent">Add taxonomy</button>
+      </div>
+    </form>
+  </dialog>
+)}
+
+{tax.name !== 'tag' && (
+  <p class="mt-3 text-xs text-admin-muted">
+    Used on: {ownTypes.length ? typeNames(ownTypes) : 'no types yet'}.
+  </p>
+)}
+{tax.name === 'tag' && <p class="mt-3 text-xs text-admin-muted">Tags are used on every type.</p>}
+
+{isAdmin && tax.name !== 'tag' && (
+  <details class="mt-2 rounded bg-white p-3 text-sm shadow-[0_0_0_1px_rgba(26,26,46,0.08)]">
+    <summary class="cursor-pointer text-xs font-semibold tracking-wider text-admin-muted uppercase">{made ? `${tax.label} settings` : `Types using ${tax.label.toLowerCase()}`}</summary>
+    <form method="post" action="/api/admin/taxonomies" class="mt-3">
+      <input type="hidden" name="action" value="update" />
+      <input type="hidden" name="taxonomy" value={tax.name} />
+      {made && (
+        <div class="grid gap-3 sm:grid-cols-3">
+          <label class="text-xs text-admin-muted">Name (plural)<input name="label" required value={made.label} class={`${input} mt-1 block w-full`} /></label>
+          <label class="text-xs text-admin-muted">One of them<input name="singular" value={made.singular ?? ''} class={`${input} mt-1 block w-full`} /></label>
+          <label class="text-xs text-admin-muted">Address of its pages<input name="base" value={made.base ?? ''} placeholder="none" class={`${input} mt-1 block w-full font-mono`} /></label>
+          <label class="flex items-center gap-2 text-sm sm:col-span-3"><input type="checkbox" name="flat" checked={!!made.flat} /> A flat list, like tags</label>
+        </div>
+      )}
+      <fieldset class={made ? 'mt-3' : ''}>
+        <legend class="text-xs text-admin-muted">Used on</legend>
+        <div class="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+          {typeChoices.map((c) => (
+            codeTypes.includes(c.type)
+              ? <label class="flex items-center gap-1.5 text-admin-muted" title="Set by the site's code"><input type="checkbox" checked disabled /> {c.label}<input type="hidden" name="types" value={c.type} /></label>
+              : <label class="flex items-center gap-1.5"><input type="checkbox" name="types" value={c.type} checked={ownTypes.includes(c.type)} /> {c.label}</label>
+          ))}
+        </div>
+        {codeTypes.length > 0 && <p class="mt-1 text-xs text-admin-muted">The greyed types are set by the site's code. Tick others to add {tax.label.toLowerCase()} to them.</p>}
+      </fieldset>
+      <div class="mt-3 flex items-center gap-3">
+        <button class="rounded-sm bg-admin-ink px-4 py-2 text-xs font-semibold tracking-wider text-white uppercase hover:bg-admin-accent">Save</button>
+      </div>
+    </form>
+    {made && (
+      <form method="post" action="/api/admin/taxonomies" class="mt-3 border-t border-admin-ink/10 pt-3" data-confirm={`Delete the taxonomy "${made.label}"?${terms.length ? ` Its ${terms.length} ${terms.length === 1 ? 'term is' : 'terms are'} deleted too, and entries lose them.` : ''}`}>
+        <input type="hidden" name="action" value="delete" />
+        <input type="hidden" name="taxonomy" value={tax.name} />
+        <button class="text-xs text-[#c4592a] hover:underline">Delete this taxonomy</button>
+      </form>
+    )}
+  </details>
+)}
 
 {error && <p class="mt-4 rounded bg-[#c4592a]/10 px-3 py-2 text-sm text-[#a3441c]" role="alert">{error}</p>}
 {notice && <p class="mt-4 rounded bg-[#6db56d]/10 px-3 py-2 text-sm text-admin-ink" role="status">{notice}</p>}
 
-<form method="post" action="/api/admin/terms" class="mt-4 flex flex-wrap items-end gap-2 text-sm">
+<form method="post" action="/api/admin/terms" data-add-term data-flat={flat ? '1' : undefined} class="mt-4 flex flex-wrap items-end gap-2 text-sm">
   <input type="hidden" name="taxonomy" value={tax.name} />
   <input type="hidden" name="action" value="create" />
   <label class="text-xs text-admin-muted">Name<input name="name" required class={`${input} mt-1 block w-56`} /></label>
@@ -204,8 +283,12 @@ const input = 'rounded border border-admin-ink/15 bg-white px-2 py-1 text-sm foc
   // in that order), onto its middle (it goes under it) or onto Top level; with the keyboard (or a
   // click), the handle opens a menu: Move up, Move down, Move under.
   const top = document.querySelector<HTMLElement>('[data-drop-top]');
-  const taxonomy = document.querySelector<HTMLInputElement>('form:has(input[value="create"]) input[name="taxonomy"]')!.value;
-  const flat = taxonomy === 'tag';
+  const addForm = document.querySelector<HTMLFormElement>('form[data-add-term]')!;
+  const taxonomy = addForm.querySelector<HTMLInputElement>('input[name="taxonomy"]')!.value;
+  const flat = addForm.dataset.flat === '1';
+  // Add a taxonomy (admins): a dialog.
+  document.querySelectorAll<HTMLElement>('[data-open-dialog]').forEach((b) => b.addEventListener('click', () => document.querySelector<HTMLDialogElement>(`#${b.dataset.openDialog}`)?.showModal()));
+  document.querySelectorAll<HTMLElement>('[data-close-dialog]').forEach((b) => b.addEventListener('click', () => b.closest('dialog')?.close()));
   const send = (id: string, fields: Record<string, string>) => {
     const f = document.createElement('form');
     f.method = 'post';

@@ -45,7 +45,8 @@ Everything that differs between sites lives in `src/site/`:
   offer them; `taxonomiesOf`), `fields` with `compose` hints, `describe`,
   `logoField`, default `card`, `order`) and taxonomies (label, URL `base`, the type a term page `lists`,
   its terms' own `fields`; `category` and `tag` are required; `event`, `venue` and `event_category`
-  come with the core's Events feature, extended with `events`, see Events). Core code reads it only through `src/lib/site` (`CONTENT_TYPES`,
+  come with the core's Events feature, extended with `events`, see Events; admins add taxonomies and
+  types of their own, see Collections and tags). Core code reads it only through `src/lib/site` (`CONTENT_TYPES`,
   `COMPOSABLE_TYPES`, `LISTABLE_TYPES`, `RECORD_TYPES`, `PAGELESS_TYPES`, `TYPE_BASES`,
   `ARCHIVE_PATHS`, `TAXONOMY_BASES`, `fieldsFor`, `categoryOf`, `termPageType`, `SITE_TZ`): the
   editor's Details, Compose's fields and prompt, permalinks, URL routing (archives, term pages,
@@ -166,8 +167,22 @@ too; a typed address another of those types has is refused on save, and so is pu
 Tags are terms of the `tag` taxonomy on any type: edited in each entry's settings (created on save,
 `setEntryTags`), filterable in collections (`query.taxQuery.tag`), listed at `/tag/<slug>/`.
 
+Admins make taxonomies too, each for any number of types, and add types to the config's own (Content >
+Taxonomies: **Add a taxonomy** and each tab's settings; `/api/admin/taxonomies`,
+`src/lib/site/taxonomy-settings.ts`): `settings.site.taxonomies` (`{ name, label, singular?, base?, flat?,
+types }`, the name made from the label and kept; no `base`, no term pages; a base can't be a route of the
+site's or another type's or taxonomy's, `baseProblem`) and `settings.site.taxonomy_types` (types added to a
+config taxonomy; those the config gives it stay; tags are on every type). `applyTaxonomySettings` in
+`src/lib/site` joins them to the config's (`site.taxonomies` and `TAXONOMY_BASES` changed in place;
+`taxonomiesOf`, `typesOfTaxonomy`, `isFlat`): a live binding like `SITE_TZ`, applied by the server with the
+timezone (`refreshSiteTimezone`, at most once a minute per instance) and handed to the browser as
+`window.__siteTaxonomies`. So core code reads taxonomies through those functions at the time of use, never
+copied at module load. Deleting a made taxonomy deletes its terms. A taxonomy on several types has term
+pages listing them all (`termPageType`).
+
 Content > Taxonomies (`src/admin/Terms.astro`, `/api/admin/terms`) manages every taxonomy's terms, a
-tab each: terms nested under their parents (tags stay flat), with name, address and template to change,
+tab each, with the types it is used on: terms nested under their parents (tags, and made taxonomies set
+flat, stay flat), with name, address and template to change,
 how many entries use each, its page, Details and Delete. **Details** (`src/admin/TermDetails.tsx`; GET
 and PUT `/api/admin/terms`) edits a term's description, featured image (`fields.image`), the taxonomy's
 own fields (its `fields` in the site config, under their keys in `terms.fields`) and SEO (`fields.seo`,

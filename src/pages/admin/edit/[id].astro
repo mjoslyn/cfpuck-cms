@@ -5,7 +5,7 @@ import '../../../styles/admin.css';
 import Editor from '../../../puck/Editor';
 import RecordEditor from '../../../puck/RecordEditor';
 import Admin from '../../../layouts/Admin.astro';
-import { RECORD_TYPES, SITE_TZ, site, typeLabel } from '../../../lib/site';
+import { RECORD_TYPES, SITE_TZ, appliedTaxonomySettings, site, typeLabel } from '../../../lib/site';
 
 const id = Number(Astro.params.id);
 if (!id) return Astro.redirect('/admin/');
@@ -26,7 +26,7 @@ const singular = typeLabel(row.type);
       <meta charset="utf-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1" />
       <meta name="robots" content="noindex" />
-      <script is:inline define:vars={{ siteTz: SITE_TZ }}>window.__siteTz = siteTz;</script>
+      <script is:inline define:vars={{ siteTz: SITE_TZ, siteTaxonomies: appliedTaxonomySettings() }}>window.__siteTz = siteTz; window.__siteTaxonomies = siteTaxonomies;</script>
       <AdminTheme />
       <title>Edit · {site.name} admin</title>
     </head>

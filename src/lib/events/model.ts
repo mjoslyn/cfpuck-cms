@@ -8,7 +8,7 @@ import { SITE_TZ } from '../site';
 import { taxonomiesOf } from '../site';
 
 /** The event type's taxonomies (its categories), from the site config. */
-const EVENT_TAXONOMIES = taxonomiesOf('event');
+const eventTaxonomies = () => taxonomiesOf('event');
 export { SITE_TZ };
 
 export interface CalEvent {
@@ -72,7 +72,7 @@ export function toCalEvent(e: Entry, venues: Map<number, Entry>, media: Map<numb
     featured: truthy(e.fields?.featured),
     venue: venues.get(venueIdOf(e)),
     media: e.featured_media_id ? media.get(e.featured_media_id) : undefined,
-    categories: (e.term_ids ?? []).map((id) => terms.get(id)!).filter((t) => !!t && EVENT_TAXONOMIES.includes(t.taxonomy)),
+    categories: (e.term_ids ?? []).map((id) => terms.get(id)!).filter((t) => !!t && eventTaxonomies().includes(t.taxonomy)),
     text,
   };
 }

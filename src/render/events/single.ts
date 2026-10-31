@@ -15,7 +15,7 @@ import { ticketPriceSummary, ticketsSection } from '../c/tickets';
 import { lockedContent } from '../c/members';
 
 /** The event type's taxonomies (its categories), from the site config. */
-const EVENT_TAXONOMIES = taxonomiesOf('event');
+const eventTaxonomies = () => taxonomiesOf('event');
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 const day = (s: string, o: Intl.DateTimeFormatOptions) => new Date(`${s.slice(0, 10)}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', ...o });
@@ -27,7 +27,7 @@ const time = (s: string) => {
 function categories(env: Env, e: Entry) {
   return (e.term_ids ?? [])
     .map((id) => env.ctx.loader.terms.get(id)!)
-    .filter((t) => !!t && EVENT_TAXONOMIES.includes(t.taxonomy))
+    .filter((t) => !!t && eventTaxonomies().includes(t.taxonomy))
     .sort(byTermOrder);
 }
 

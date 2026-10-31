@@ -1,5 +1,5 @@
 ---
-import { COMPOSABLE_TYPES, CONTENT_TYPES, SITE_TZ, site } from '../lib/site';
+import { COMPOSABLE_TYPES, CONTENT_TYPES, SITE_TZ, appliedTaxonomySettings, site } from '../lib/site';
 import AdminTheme from './AdminTheme.astro';
 import { loadAdminTheme } from '../lib/admin-theme';
 import { siteDb } from '../lib/db/site';
@@ -39,7 +39,7 @@ const link = (on: boolean) => (on ? 'bg-admin-on-bar/15 text-admin-on-bar' : 'te
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex" />
-    <script is:inline define:vars={{ siteTz: SITE_TZ }}>window.__siteTz = siteTz;</script>
+    <script is:inline define:vars={{ siteTz: SITE_TZ, siteTaxonomies: appliedTaxonomySettings() }}>window.__siteTz = siteTz; window.__siteTaxonomies = siteTaxonomies;</script>
     <title>{title} · {site.name} admin</title>
     <AdminTheme theme={theme} />
   </head>

@@ -76,7 +76,7 @@ const BASE_TYPES = Object.fromEntries(Object.entries(TYPE_BASES).map(([type, bas
 /** Types served at the site root (/<slug>/): public types without a URL base, pages first. */
 const ROOT_TYPES = site.types.filter((t) => !t.base && !PAGELESS_TYPES.has(t.type)).map((t) => t.type);
 /** Term pages, longest base first ("directory/category" before "category"). */
-const TAXONOMY_ROUTES = Object.entries(TAXONOMY_BASES)
+const taxonomyRoutes = () => Object.entries(TAXONOMY_BASES)
   .map(([taxonomy, b]) => ({ taxonomy, base: b.split('/').filter(Boolean) }))
   .sort((a, b) => b.base.length - a.base.length);
 const EVENTS_BASE = (ARCHIVE_PATHS.event ?? '/events/').split('/').filter(Boolean)[0];
@@ -113,7 +113,7 @@ export async function resolve(url: URL, loader: Loader): Promise<Queried> {
   }
   // Term pages (/directory/category/<slug>/, /tag/<slug>/...): the entries with the term.
   // A taxonomy whose pages are off: its addresses are treated like any other (a page there, or Not found).
-  const route = TAXONOMY_ROUTES.find((r) => parts.length === r.base.length + 1 && r.base.every((seg, i) => parts[i] === seg) && termPagesOn(settings.site, r.taxonomy) && (events || termPageType(r.taxonomy) !== 'event'));
+  const route = taxonomyRoutes().find((r) => parts.length === r.base.length + 1 && r.base.every((seg, i) => parts[i] === seg) && termPagesOn(settings.site, r.taxonomy) && (events || termPageType(r.taxonomy) !== 'event'));
   if (route) {
     const term = await loader.termBySlug(route.taxonomy, parts[parts.length - 1]);
     return term ? { ...base, kind: 'taxonomy', term, postType: termPageType(route.taxonomy) } : base;

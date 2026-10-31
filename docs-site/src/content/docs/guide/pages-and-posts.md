@@ -71,6 +71,23 @@ Categories and tags group related content, so visitors can find everything on on
 - Pick categories in the same panel.
 - To rename, rearrange or describe them, click **Content**, then **Taxonomies**. Drag a category by its handle to move it, or onto another to put it underneath.
 
+### Your own ways to sort content
+
+Admins can add a taxonomy of their own, such as Colors or Regions, and choose which types of content
+use it.
+
+1. Click **Content**, then **Taxonomies**, then **Add a taxonomy**.
+2. Give it a name (Colors) and a name for one of them (Color).
+3. To give each term a page listing its content, type an address, such as `colors`. Red would then be
+   at `/colors/red/`. Leave it empty for no pages.
+4. Tick **A flat list, like tags** if its terms never sit under each other.
+5. Under **Used on**, tick each type that uses it, then click **Add taxonomy**.
+
+Add its terms on its tab. Each page of a ticked type then has a picker for them in its right-hand
+panel. To change the name, address or types later, open the taxonomy's tab and click its settings.
+The same place adds more types to the site's own taxonomies, such as Category; the types the site
+was built with stay ticked.
+
 ## Page addresses
 
 Each page has an address, shown in the editor beside its title (for example `/about-us/`). It is

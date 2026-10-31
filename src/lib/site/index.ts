@@ -5,6 +5,7 @@ import movedPaths from '../../site/moved-paths.json';
 import presets from '../../site/presets.json';
 import type { ContentType, EventsConfig, FieldDef, SiteConfig, Taxonomy, TypeExtension } from './types';
 import { withEvents } from '../events/types';
+import { madeTaxonomiesFrom, taxonomyTypesFrom, type MadeTaxonomy } from './taxonomy-settings';
 
 export type { ContentType, EventsConfig, FieldDef, SiteConfig, Taxonomy, TypeExtension };
 
@@ -69,8 +70,44 @@ export const typesSharingAddresses = (type: string): string[] =>
   TYPE_BASES[type] || PAGELESS_TYPES.has(type) ? [type] : config.types.filter((t) => !t.base && !PAGELESS_TYPES.has(t.type)).map((t) => t.type);
 /** Listing page of a type. */
 export const ARCHIVE_PATHS: Record<string, string> = Object.fromEntries(config.types.filter((t) => t.archive).map((t) => [t.type, t.archive!]));
+/** The site's own taxonomies (its config, with the core's features'), before any an admin made. */
+export const CODE_TAXONOMIES: readonly Taxonomy[] = [...config.taxonomies];
 /** URL base of a taxonomy's term pages. */
-export const TAXONOMY_BASES: Record<string, string> = Object.fromEntries(config.taxonomies.map((t) => [t.name, t.base]));
+export const TAXONOMY_BASES: Record<string, string> = Object.fromEntries(config.taxonomies.filter((t) => t.base).map((t) => [t.name, t.base]));
+/** Types an admin gave a taxonomy (Content > Taxonomies): all of a made one's, those added to the site's own. */
+let ADDED_TYPES: Record<string, string[]> = {};
+/** The taxonomies an admin made, as last applied. */
+export let MADE_TAXONOMIES: MadeTaxonomy[] = [];
+/** Types an admin added to the site's own taxonomies, as last applied. */
+export let ADDED_TO_CODE: Record<string, string[]> = {};
+
+/**
+ * Applies the taxonomies set in the admin (settings.site.taxonomies, taxonomy_types) to the site's: the
+ * made ones join `site.taxonomies` and TAXONOMY_BASES (changed in place, so code holding them sees it),
+ * and every one's added types count in taxonomiesOf. A live binding, like SITE_TZ: the server applies it
+ * from the settings (src/lib/site/timezone.ts, cached a minute), admin pages hand the browser
+ * window.__siteTaxonomies.
+ */
+export function applyTaxonomySettings(siteSettings: Record<string, any> | null | undefined) {
+  const typeNames = config.types.filter((t) => t.type !== 'global').map((t) => t.type);
+  const codeNames = CODE_TAXONOMIES.map((t) => t.name);
+  MADE_TAXONOMIES = madeTaxonomiesFrom(siteSettings?.taxonomies, typeNames, codeNames);
+  const added = taxonomyTypesFrom(siteSettings?.taxonomy_types, codeNames.filter((n) => n !== 'tag'), typeNames);
+  const made: Taxonomy[] = MADE_TAXONOMIES.map((t) => ({ name: t.name, label: t.label, singular: t.singular, base: t.base ?? '', flat: t.flat, made: true }));
+  config.taxonomies.splice(0, config.taxonomies.length, ...CODE_TAXONOMIES, ...made);
+  for (const k of Object.keys(TAXONOMY_BASES)) delete TAXONOMY_BASES[k];
+  for (const t of config.taxonomies) if (t.base) TAXONOMY_BASES[t.name] = t.base;
+  ADDED_TO_CODE = added;
+  ADDED_TYPES = { ...added, ...Object.fromEntries(MADE_TAXONOMIES.map((t) => [t.name, t.types])) };
+}
+if (typeof window !== 'undefined' && (window as any).__siteTaxonomies) applyTaxonomySettings((window as any).__siteTaxonomies);
+/** What window.__siteTaxonomies carries: the settings applyTaxonomySettings reads, as applied now. */
+export const appliedTaxonomySettings = () => ({ taxonomies: MADE_TAXONOMIES, taxonomy_types: ADDED_TO_CODE });
+/** Whether a taxonomy's terms are a flat list (tags, and made ones set so), not nested. */
+export const isFlat = (name: string) => name === 'tag' || !!config.taxonomies.find((t) => t.name === name)?.flat;
+/** The types the site's code gives a taxonomy, which an admin can't take away. */
+export const codeTypesOf = (taxonomy: string) => config.types.filter((t) => [t.category, ...(t.taxonomies ?? [])].includes(taxonomy)).map((t) => t.type);
+
 export const taxonomyLabel = (name: string) => config.taxonomies.find((t) => t.name === name)?.label ?? name;
 /** One term of a taxonomy, as suggestions and filters name it. */
 export const taxonomySingular = (name: string) => { const t = config.taxonomies.find((x) => x.name === name); return t?.singular ?? t?.label ?? name; };
@@ -89,10 +126,12 @@ export const categoryOf = (type: string): [string, string] | undefined => {
   return tax ? [tax, taxonomyLabel(tax)] : undefined;
 };
 
-/** A type's taxonomies, its main one first (tags, which every type has, aside). */
+/** A type's taxonomies, its main one first (tags, which every type has, aside): the site's code's, then
+ *  those an admin gave it (Content > Taxonomies). */
 export function taxonomiesOf(type: string): string[] {
   const t = typeDef(type);
-  return [...new Set([t?.category, ...(t?.taxonomies ?? [])])].filter((x): x is string => !!x && x !== 'tag' && config.taxonomies.some((c) => c.name === x));
+  const added = Object.entries(ADDED_TYPES).filter(([, types]) => types.includes(type)).map(([tax]) => tax);
+  return [...new Set([t?.category, ...(t?.taxonomies ?? []), ...added])].filter((x): x is string => !!x && x !== 'tag' && config.taxonomies.some((c) => c.name === x));
 }
 
 /** The types a taxonomy belongs to. */

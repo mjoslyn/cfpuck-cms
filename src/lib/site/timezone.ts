@@ -1,19 +1,22 @@
-// The site timezone on the server: the admin setting (settings.site.timezone), else the site config's.
-// Read at most once a minute per server instance, before a request is handled (src/middleware.ts) and
-// before a compose job runs.
+// The site timezone on the server: the admin setting (settings.site.timezone), else the site config's;
+// and the taxonomies set in the admin (applyTaxonomySettings). Read at most once a minute per server
+// instance, before a request is handled (src/middleware.ts) and before a compose job or mailing run.
 import type { Db } from '../db/query';
 import { siteDb } from '../db/site';
 import { localToUtc } from '../recurrence';
 import { allRows } from '../rows';
-import { SITE_TZ, setSiteTimezone } from './index';
+import { SITE_TZ, applyTaxonomySettings, setSiteTimezone } from './index';
 
 let checked = 0;
 
 export async function refreshSiteTimezone(db: Db = siteDb(), force = false): Promise<string> {
   if (!force && Date.now() - checked < 60_000) return SITE_TZ;
   checked = Date.now();
-  const { data } = await db.from('settings').select('value').eq('key', 'site').maybeSingle();
+  const { data, error } = await db.from('settings').select('value').eq('key', 'site').maybeSingle();
+  // A failed read keeps what was applied last, rather than dropping the admin's taxonomies.
+  if (error) return SITE_TZ;
   setSiteTimezone(data?.value?.timezone);
+  applyTaxonomySettings(data?.value);
   return SITE_TZ;
 }
 

@@ -12,7 +12,7 @@ import { env } from './lib/env';
 import './lib/mailing/page-data';
 
 const PUBLIC_ADMIN = ['/admin/login/', '/admin/set-password/', '/api/auth/login', '/api/auth/logout'];
-const ADMIN_ONLY = ['/admin/settings', '/api/admin/connections', '/admin/users', '/admin/members', '/api/admin/redirects', '/api/admin/settings', '/api/admin/sync', '/api/admin/users', '/api/admin/members', '/api/admin/mailing/contacts', '/api/admin/mailing/lists'];
+const ADMIN_ONLY = ['/admin/settings', '/api/admin/connections', '/api/admin/taxonomies', '/admin/users', '/admin/members', '/api/admin/redirects', '/api/admin/settings', '/api/admin/sync', '/api/admin/users', '/api/admin/members', '/api/admin/mailing/contacts', '/api/admin/mailing/lists'];
 
 // Astro's own same-site check (security.checkOrigin) is off in astro.config.mjs and done here instead, the
 // same way, so that these routes can be posted to from elsewhere: mail apps' one-click unsubscribe
