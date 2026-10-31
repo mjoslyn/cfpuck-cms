@@ -13,7 +13,7 @@ import { SITE_EDITOR } from '../lib/site/editor';
 import type { BlockCategory } from '../lib/site/extend';
 import { FormPicker } from './FormPicker';
 import { CONTENT_PANELS, CONTENT_LABELS, CONTENT_DEFAULTS, CONTENT_CONTAINERS } from './panels';
-import { CollectionPanel, TagsPickerFor, TermPicker } from './CollectionPanel';
+import { CollectionPanel, TermPicker } from './CollectionPanel';
 import { cardTemplate, DEFAULT_CARD } from '../lib/content/card-presets';
 import { moveItemsLayout } from '../lib/content/collections';
 import type { PuckItem } from '../lib/puck/types';
@@ -31,7 +31,7 @@ const PANELS: Record<string, Panel> = {
       <Text title="Events in the list" value={a.count} placeholder="6" onChange={(v) => set({ count: Number(v) || undefined })} />
       {/* The event type's taxonomies (none: no category picker). */}
       {taxonomiesOf('event').length > 0 && <TermPicker title="Categories (any of)" taxonomies={taxonomiesOf('event')} value={(a.categories ?? []).map(Number)} onChange={(ids) => set({ categories: ids.length ? ids : undefined })} />}
-      <TagsPickerFor type="event" value={(a.tags ?? []).map(Number)} onChange={(ids) => set({ tags: ids.length ? ids : undefined })} />
+      <TermPicker title="Tagged with (any of)" taxonomies={['tag']} value={(a.tags ?? []).map(Number)} onChange={(ids) => set({ tags: ids.length ? ids : undefined })} />
       <p className="mb-2 text-xs text-admin-muted">Visitors switch between Calendar and List, and page through months, without leaving the page.</p>
     </>
   ),

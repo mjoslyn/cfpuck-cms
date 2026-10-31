@@ -16,12 +16,6 @@ Tags are terms of the `tag` taxonomy, on any type. They are edited in each entry
 on save, `setEntryTags`), filterable in collections (`query.taxQuery.tag`) and listed at
 `/tag/<slug>/`.
 
-Every type takes tags (globals never do) until an admin unticks **Tags** for it under **Settings >
-Types** (`settings.site.tags_off`, `tagsOn` in `src/lib/templates.ts`). Its entries' settings then have
-no Tags field, and the content list, bulk actions, collections and the event calendar don't offer tags
-for it, unless its entries or the block already use some. Tags its entries already have stay, and still
-show, until they are removed (bulk **Remove a term**).
-
 ## Managing terms
 
 **Content > Taxonomies** (`src/admin/Terms.astro`, `/api/admin/terms`) has a tab per taxonomy:

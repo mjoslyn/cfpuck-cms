@@ -15,7 +15,7 @@ import { SAVES_AS_IT_GOES, SETTINGS_GROUPS, sectionOf, settingsPath } from '../l
 import { FieldsForm } from './entry-fields';
 import { SITE_EDITOR } from '../lib/site/editor';
 import { ARCHIVE_PATHS, CONTENT_TYPES, PAGELESS_TYPES, SEARCHABLE_TYPES, TYPE_BASES, site as config, taxonomiesOf, taxonomyLabel, typeDef } from '../lib/site';
-import { NO_CONTENT_WARNING, TAGLESS_TYPES, chosenTemplate, defaultTaxonomyTemplates, defaultTemplates, templateLabel, type TemplateInfo, type TemplateMap } from '../lib/templates';
+import { NO_CONTENT_WARNING, chosenTemplate, defaultTaxonomyTemplates, defaultTemplates, templateLabel, type TemplateInfo, type TemplateMap } from '../lib/templates';
 import { FieldGroup, MediaPicker, Row, Select, Text, Toggle, inputClass } from './fields';
 import { NETWORKS } from '../lib/social/icons';
 import Redirects, { type NotFound } from '../admin/Redirects';
@@ -37,7 +37,7 @@ import { ADMIN_THEME_DEFAULTS, ADMIN_THEME_FIELDS, adminThemeVars, contrast, typ
 interface Props {
   /** The section the address names. */
   section: string;
-  site: { name?: string; description?: string; front_page_id?: number | null; not_found_page_id?: number | null; timezone?: string; search_types?: string[]; social?: { network: string; url: string }[]; share_image?: number; share_image_url?: string; templates?: TemplateMap; taxonomy_templates?: Record<string, string>; taxonomy_pages_off?: string[]; taxonomy_meta?: Record<string, TaxonomyMeta>; listing_meta?: Record<string, TaxonomyMeta>; listings_off?: string[]; tags_off?: string[]; icons?: Record<string, string>; icon_media_id?: number | null; icon_preview?: string; admin_theme?: AdminTheme; tickets?: TicketSettings; members?: Partial<MemberSettings>; mailing?: MailingSettings; events?: { enabled?: boolean }; a11y?: { block_publish?: boolean } };
+  site: { name?: string; description?: string; front_page_id?: number | null; not_found_page_id?: number | null; timezone?: string; search_types?: string[]; social?: { network: string; url: string }[]; share_image?: number; share_image_url?: string; templates?: TemplateMap; taxonomy_templates?: Record<string, string>; taxonomy_pages_off?: string[]; taxonomy_meta?: Record<string, TaxonomyMeta>; listing_meta?: Record<string, TaxonomyMeta>; listings_off?: string[]; icons?: Record<string, string>; icon_media_id?: number | null; icon_preview?: string; admin_theme?: AdminTheme; tickets?: TicketSettings; members?: Partial<MemberSettings>; mailing?: MailingSettings; events?: { enabled?: boolean }; a11y?: { block_publish?: boolean } };
   options: Record<string, any>;
   pages: { id: number; title: string }[];
   templates: TemplateInfo[];
@@ -140,7 +140,7 @@ export default function SiteSettings({ section, site: initialSite, options: init
       label: 'Types',
       panel: (
         <>
-          <TypeTemplates events={eventsOn(site)} value={site.templates ?? {}} off={site.listings_off ?? []} tagsOff={site.tags_off ?? []} onTags={(off) => setSite((s) => ({ ...s, tags_off: off.length ? off : undefined }))} templates={templates} meta={site.listing_meta ?? {}} onChange={(m) => setSite((s) => ({ ...s, templates: m }))} onListings={(off) => setSite((s) => ({ ...s, listings_off: off }))} onMeta={(m) => setSite((s) => ({ ...s, listing_meta: Object.keys(m).length ? m : undefined }))} />
+          <TypeTemplates events={eventsOn(site)} value={site.templates ?? {}} off={site.listings_off ?? []} templates={templates} meta={site.listing_meta ?? {}} onChange={(m) => setSite((s) => ({ ...s, templates: m }))} onListings={(off) => setSite((s) => ({ ...s, listings_off: off }))} onMeta={(m) => setSite((s) => ({ ...s, listing_meta: Object.keys(m).length ? m : undefined }))} />
           <TaxonomyTemplatesPanel events={eventsOn(site)} value={site.taxonomy_templates ?? {}} off={site.taxonomy_pages_off ?? []} templates={templates} meta={site.taxonomy_meta ?? {}} onChange={(m) => setSite((s) => ({ ...s, taxonomy_templates: Object.keys(m).length ? m : undefined }))} onPages={(off) => setSite((s) => ({ ...s, taxonomy_pages_off: off.length ? off : undefined }))} onMeta={(m) => setSite((s) => ({ ...s, taxonomy_meta: Object.keys(m).length ? m : undefined }))} />
         </>
       ),
@@ -387,7 +387,7 @@ export default function SiteSettings({ section, site: initialSite, options: init
 }
 
 /** Types with pages of their own, and the template for their entries and their listing page. */
-function TypeTemplates({ events, value, off, tagsOff, onTags, templates, meta, onChange, onListings, onMeta }: { events: boolean; value: TemplateMap; off: string[]; tagsOff: string[]; onTags: (off: string[]) => void; templates: TemplateInfo[]; meta: Record<string, TaxonomyMeta>; onChange: (m: TemplateMap) => void; onListings: (off: string[]) => void; onMeta: (m: Record<string, TaxonomyMeta>) => void }) {
+function TypeTemplates({ events, value, off, templates, meta, onChange, onListings, onMeta }: { events: boolean; value: TemplateMap; off: string[]; templates: TemplateInfo[]; meta: Record<string, TaxonomyMeta>; onChange: (m: TemplateMap) => void; onListings: (off: string[]) => void; onMeta: (m: Record<string, TaxonomyMeta>) => void }) {
   const have = new Set(templates.map((t) => t.slug));
   const types = CONTENT_TYPES.filter((t) => !PAGELESS_TYPES.has(t.type) && showsType(t.type, events));
   const setMeta = (type: string, m: TaxonomyMeta) => {
@@ -442,7 +442,7 @@ function TypeTemplates({ events, value, off, tagsOff, onTags, templates, meta, o
   };
   return (
     <>
-      <p className="mb-4 text-xs text-admin-muted">The template for each type's pages and for its listing page; choose Off to turn a listing page off. A template chosen on an entry itself (in its settings) comes first. Under each type, its taxonomies (set in the site config; each gets a picker in an entry's settings) and whether its entries take tags: untick Tags to take the Tags field out of its entries' settings (tags they already have stay until removed).</p>
+      <p className="mb-4 text-xs text-admin-muted">The template for each type's pages and for its listing page; choose Off to turn a listing page off. A template chosen on an entry itself (in its settings) comes first. Under each type, its taxonomies (set in the site config; each gets a picker in an entry's settings).</p>
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-xs text-admin-muted">
@@ -458,13 +458,7 @@ function TypeTemplates({ events, value, off, tagsOff, onTags, templates, meta, o
               <th scope="row" className="py-3 pr-4 text-left font-medium">
                 {t.label}
                 <span className="block text-xs font-normal text-admin-muted">{TYPE_BASES[t.type] ? `/${TYPE_BASES[t.type]}/<slug>/` : '/<slug>/'}</span>
-                {taxonomiesOf(t.type).length > 0 && <span className="block text-xs font-normal text-admin-muted">{taxonomiesOf(t.type).map(taxonomyLabel).join(', ')}</span>}
-                {!TAGLESS_TYPES.includes(t.type) && (
-                  <label className="mt-1 flex items-center gap-1.5 text-xs font-normal text-admin-muted">
-                    <input type="checkbox" checked={!tagsOff.includes(t.type)} onChange={(e) => onTags(e.target.checked ? tagsOff.filter((x) => x !== t.type) : [...tagsOff, t.type])} />
-                    Tags
-                  </label>
-                )}
+                <span className="block text-xs font-normal text-admin-muted">{[...taxonomiesOf(t.type).map(taxonomyLabel), ...(t.type !== 'global' ? ['Tags'] : [])].join(', ') || 'No taxonomies'}</span>
               </th>
               <td className="py-3 pr-4">{pick(t.type, 'single')}</td>
               <td className="py-3">

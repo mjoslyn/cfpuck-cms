@@ -62,27 +62,6 @@ export function termPagesOn(siteSettings: Record<string, any> | undefined, taxon
   return !(Array.isArray(off) && off.includes(taxonomy));
 }
 
-/** Types that never take tags (globals: shared blocks, not entries anyone browses). */
-export const TAGLESS_TYPES = ['global'];
-
-/**
- * Whether a type's entries take tags (Settings > Types; settings.site.tags_off lists those turned off).
- * Off, its entries' settings have no Tags field and its pickers don't offer tags; tags its entries
- * already have stay, and still show, until they are removed.
- */
-export function tagsOn(siteSettings: Record<string, any> | null | undefined, type: string): boolean {
-  if (TAGLESS_TYPES.includes(type)) return false;
-  const off = siteSettings?.tags_off;
-  return !(Array.isArray(off) && off.includes(type));
-}
-
-/** The types whose tags are turned off, as saved (known types only), or undefined for none. */
-export function tagsOffFrom(v: unknown, types: string[]): string[] | undefined {
-  if (!Array.isArray(v)) return undefined;
-  const off = types.filter((t) => !TAGLESS_TYPES.includes(t) && v.includes(t));
-  return off.length ? off : undefined;
-}
-
 /** Whether a type's listing page is on (Settings > Types; settings.site.listings_off lists those turned off). */
 export function listingOn(siteSettings: Record<string, any> | undefined, type: string): boolean {
   const off = siteSettings?.listings_off;

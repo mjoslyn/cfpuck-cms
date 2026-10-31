@@ -165,11 +165,6 @@ too; a typed address another of those types has is refused on save, and so is pu
 
 Tags are terms of the `tag` taxonomy on any type: edited in each entry's settings (created on save,
 `setEntryTags`), filterable in collections (`query.taxQuery.tag`), listed at `/tag/<slug>/`.
-Each type takes tags (globals never do) until an admin unticks **Tags** for it under Settings > Types
-(`settings.site.tags_off`, `tagsOn`, `tagsOffFrom` in `src/lib/templates.ts`): its entries' settings then
-have no Tags field, and the content list, bulk actions, collections and the event calendar's settings
-don't offer tags for it (unless its entries, or the block, already use some). Tags its entries already
-have are kept and still show, until removed (bulk Remove a term).
 
 Content > Taxonomies (`src/admin/Terms.astro`, `/api/admin/terms`) manages every taxonomy's terms, a
 tab each: terms nested under their parents (tags stay flat), with name, address and template to change,
