@@ -131,14 +131,16 @@ export default function Composer({ entryId, templateKey, layout, live, selection
   useEffect(() => {
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' });
   }, [turns]);
-  // A template, part or pattern made on Compose's start page: what it asked for is sent at once.
+  // A template, part or pattern made on Compose's start page, or a new page asked for on the admin's home:
+  // what it asked for is sent at once (or only put in the box, to add materials first).
   const [autoSend, setAutoSend] = useState(false);
   useEffect(() => {
-    if (!loaded || !templateKey || turns.length) return;
-    const start = takeStart(templateKey);
+    const what = templateKey ?? (entryId ? null : `new:${type}`);
+    if (!loaded || !what || turns.length) return;
+    const start = takeStart(what);
     if (!start?.brief.trim()) return;
     setMessage(start.brief);
-    setAutoSend(true);
+    if (start.send !== false) setAutoSend(true);
   }, [loaded]);
 
   const upload = async (file: File) => {

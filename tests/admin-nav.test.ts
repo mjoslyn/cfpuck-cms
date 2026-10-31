@@ -22,7 +22,9 @@ describe('admin nav', () => {
     const people = nav.find((n) => n.label === 'People')!;
     const item = (label: string) => (isGroup(content) ? content.items.find((i) => i.label === label)! : content);
     expect(navActive(people, at('/admin/tickets/12/'))).toBe(true);
-    expect(navActive(item('Pages'), at('/admin/'))).toBe(true);
+    // /admin/ on its own is the home (Compose's start), not the Pages list.
+    expect(navActive(item('Pages'), at('/admin/'))).toBe(false);
+    expect(navActive(item('Pages'), at('/admin/?type=page'))).toBe(true);
     expect(navActive(item('Pages'), at('/admin/?type=post'))).toBe(false);
     expect(navActive(item('Posts'), at('/admin/?type=post&status=draft'))).toBe(true);
     expect(navActive(item('Taxonomies'), at('/admin/?type=tags'))).toBe(true);

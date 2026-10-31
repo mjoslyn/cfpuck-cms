@@ -1138,6 +1138,16 @@ then a gear for Settings (admins), **?**, View site and the account menu. Below 
 one menu button, the groups as headings. The dropdowns are `details[data-menu]`: one open at a time, closed
 by a click elsewhere or Escape.
 
+**The admin's home** (`/admin/` with no list asked for: `src/pages/admin/index.astro` rewrites to
+`src/pages/admin/home.astro`; the content lists stay at `/admin/?type=<type>`): **What would you like to
+make?** with one box (`src/admin/ComposeHome.tsx`): a kind (each type with a page shown, then Form,
+Campaign while Mailing is on, Template, Template part, Pattern), a name for the kinds that take one, and the
+brief. A type opens Compose for a page (`/admin/compose/?type=`) with the brief kept as `new:<type>`
+(`keepStart`), which `Composer` sends at once, or only puts in its box (**Add documents, images or links
+first**, `send: false`); the other kinds are made as on Compose's start page (`make`) and open in their
+editors. Below it, the entries edited lately and Compose's latest page conversations. The admin bar's site
+name links here; no menu item is marked on it (`navActive`).
+
 **Compose's start page** (`/admin/compose/new/?kind=form|campaign|template|part|pattern`,
 `src/admin/ComposeStart.tsx`), laid out as Compose for a page with the latest of the kind beside it: a
 name (none for a campaign, whose Compose names it), what it is for and, for a form, what to write. Send

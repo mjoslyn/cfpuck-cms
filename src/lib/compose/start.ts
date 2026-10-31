@@ -1,13 +1,15 @@
-// What the admin bar's Compose > Form, Campaign, Template, Template part or Pattern asked for (the
-// standard start page, src/admin/ComposeStart.tsx), kept in the browser's sessionStorage for the editor it
-// opens, where Compose writes it at once. Browser only. `what`: form:<id>, campaign:<id>, or a template's
-// <kind>:<slug> (its Compose conversation's key).
+// What Compose's start pages asked for (the admin's home, src/admin/ComposeHome.tsx, and the standard start
+// page, src/admin/ComposeStart.tsx), kept in the browser's sessionStorage for the screen they open, where
+// Compose writes it at once. Browser only. `what`: form:<id>, campaign:<id>, a template's <kind>:<slug> (its
+// Compose conversation's key), or new:<type> (a new page, post... on Compose for a page).
 
 export interface ComposeStart {
   brief: string;
   /** A form's: what to write, and the confirmation as a message or a page. */
   parts?: string[];
   confirm?: 'message' | 'page';
+  /** False: put the brief in the message box without sending it (to add documents, images or links first). */
+  send?: boolean;
 }
 
 const key = (what: string) => `compose-start:${what}`;

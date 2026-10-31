@@ -12,7 +12,9 @@ plain words, as you would ask a colleague. Nothing goes on your site until you p
 ## Starting a new page
 
 1. Click **Compose** in the top bar, then what you want to make (for example **Post**). Or click
-   **Compose** beside the **New** button on any list in **Content**.
+   **Compose** beside the **New** button on any list in **Content**. Or start on the home screen (click
+   the site's name at the top left): pick **Post**, describe it and click **Compose post**, or click **Add
+   documents, images or links first** to bring your material along.
 2. Add your material:
    - **Files**: documents (PDF, Word, text) and images or videos from your computer.
    - **Media library**: images already on the site.

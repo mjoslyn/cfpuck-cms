@@ -27,6 +27,18 @@ choose a password. The invitation lasts a week; if it has run out, ask them to s
 
 To sign out, click your name in the top right corner, then **Sign out**.
 
+## The home screen
+
+Signing in takes you to the home screen, which asks **What would you like to make?** Pick what it is
+(**Page**, **Post**, **Form**, **Template**...), say in the box what it's for, and click **Compose**.
+Claude writes it in your site's style and it opens as a draft for you to check; nothing goes live until
+you publish it. See [Writing with Claude](/cfpuck-cms/guide/writing-with-claude/).
+
+![The home screen](../../../assets/guide/home.png)
+
+Below the box are the pages you edited lately and your conversations with Compose, to pick up where you
+left off. The site's name at the top left of every admin screen brings you back here.
+
 ## Finding your way around
 
 The dark bar across the top of every admin screen takes you to each part of the site:

@@ -1,0 +1,73 @@
+---
+// The admin's home (/admin/, rewritten here when no list is asked for): say what to make and Compose makes
+// it (src/admin/ComposeHome.tsx), with what was worked on lately below.
+import Admin from '../../layouts/Admin.astro';
+import ComposeHome, { type HomeKind } from '../../admin/ComposeHome';
+import { COMPOSABLE_TYPES, CONTENT_TYPES, SITE_TZ } from '../../lib/site';
+import { env } from '../../lib/compose/claude';
+import { eventsOn, showsType } from '../../lib/events/on';
+import { mailingOn } from '../../lib/mailing/config';
+
+const db = Astro.locals.db;
+const user = Astro.locals.user;
+const { data: siteRow } = await db.from('settings').select('value').eq('key', 'site').maybeSingle();
+const events = eventsOn(siteRow?.value);
+const kinds: HomeKind[] = [
+  ...COMPOSABLE_TYPES.filter((t) => showsType(t.type, events)).map((t) => ({ id: `type:${t.type}`, label: t.singular })),
+  { id: 'form', label: 'Form', group: true },
+  ...(mailingOn(siteRow?.value) ? [{ id: 'campaign', label: 'Campaign' }] : []),
+  { id: 'template', label: 'Template', group: true },
+  { id: 'part', label: 'Template part' },
+  { id: 'pattern', label: 'Pattern' },
+];
+const shown = CONTENT_TYPES.filter((t) => showsType(t.type, events));
+const typeLabel = (type: string) => shown.find((t) => t.type === type)?.singular ?? type;
+// What was worked on lately: entries of the types shown, and Compose's conversations about pages.
+const { data: edited } = await db.from('entries').select('id, type, title, status, updated_at').in('type', shown.map((t) => t.type)).neq('status', 'trash').order('updated_at', { ascending: false }).limit(8);
+const { data: talks } = await db.from('compose_sessions').select('entry_id, updated_at, turns, entries(title, type)').not('entry_id', 'is', null).order('updated_at', { ascending: false }).limit(6);
+const when = (s: string) => new Date(s).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: SITE_TZ });
+const lastAsk = (turns: any[]) => [...(turns ?? [])].reverse().find((t) => t.role === 'user' && t.text)?.text ?? '';
+const firstName = (user?.name || '').trim().split(/\s+/)[0];
+const STATUS: Record<string, string> = { publish: 'Published', draft: 'Draft', private: 'Private' };
+---
+<Admin title="Home">
+  <div class="mx-auto max-w-4xl">
+    <h1 class="text-3xl font-normal">{firstName ? `What would you like to make, ${firstName}?` : 'What would you like to make?'}</h1>
+    <p class="mt-1 mb-5 text-sm text-admin-muted">Pick what it is, say what it's for, and Compose writes it with Claude in the site's style. Nothing goes live until you publish it.</p>
+    <ComposeHome client:load kinds={kinds} configured={!!env('ANTHROPIC_API_KEY')} admin={user?.role === 'admin'} />
+
+    <div class="mt-10 grid gap-8 md:grid-cols-2">
+      <section>
+        <h2 class="mb-2 text-xs font-semibold tracking-wider text-admin-muted uppercase">Recently edited</h2>
+        {edited?.length ? (
+          <ul class="m-0 list-none divide-y divide-admin-ink/10 rounded border border-admin-ink/10 bg-white p-0 text-sm">
+            {edited.map((e) => (
+              <li class="flex items-baseline gap-3 px-3 py-2">
+                <a href={`/admin/edit/${e.id}/`} class="min-w-0 flex-1 truncate font-medium hover:text-admin-accent">{e.title || '(untitled)'}</a>
+                <span class="shrink-0 text-xs text-admin-muted">{typeLabel(e.type)} · {STATUS[e.status] ?? e.status} · {when(e.updated_at)}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p class="text-sm text-admin-muted">Nothing yet.</p>
+        )}
+      </section>
+      <section>
+        <h2 class="mb-2 text-xs font-semibold tracking-wider text-admin-muted uppercase">Continue with Compose</h2>
+        {talks?.length ? (
+          <ul class="m-0 list-none space-y-2 p-0 text-sm">
+            {talks.map((t: any) => (
+              <li class="rounded border border-admin-ink/10 bg-white px-3 py-2">
+                <a href={`/admin/edit/${t.entry_id}/?compose=1`} class="font-medium hover:text-admin-accent">{t.entries?.title || '(untitled)'}</a>
+                <span class="ml-2 text-xs text-admin-muted">{typeLabel(t.entries?.type ?? '')} · {when(t.updated_at)}</span>
+                {lastAsk(t.turns) && <p class="mt-1 line-clamp-2 text-xs text-admin-muted">“{lastAsk(t.turns)}”</p>}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p class="text-sm text-admin-muted">No conversations yet. Compose something above to start one.</p>
+        )}
+      </section>
+    </div>
+  </div>
+</Admin>

@@ -9,6 +9,8 @@ import { tagsOn } from '../../lib/templates';
 
 const db = Astro.locals.db;
 const params = Astro.url.searchParams;
+// No list asked for: the admin's home, Compose's start (src/pages/admin/home.astro).
+if (!params.has('type')) return Astro.rewrite(`/admin/home/${Astro.url.search}`);
 const type = params.get('type') ?? 'page';
 // Content > Taxonomies (the older ?type=tags is its Tags tab).
 const tagsView = type === 'terms' || type === 'tags';

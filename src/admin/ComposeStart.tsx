@@ -7,14 +7,14 @@ import { keepStart, type ComposeStart as Start } from '../lib/compose/start';
 
 export type StartKind = 'form' | 'campaign' | 'template' | 'part' | 'pattern';
 
-const FORM_PARTS: [string, string][] = [
+export const FORM_PARTS: [string, string][] = [
   ['fields', 'Fields'],
   ['confirmation', 'Confirmation'],
   ['notifications', 'Notification emails'],
 ];
 
 /** What each kind says on the page. */
-const TEXT: Record<StartKind, { what: string; intro: string; name: string; brief: string; untitled: string }> = {
+export const TEXT: Record<StartKind, { what: string; intro: string; name: string; brief: string; untitled: string }> = {
   form: {
     what: 'form',
     intro: 'Say what the form is for and what it should ask. Claude writes what you tick below: its fields, the thank-you message or page, and the emails sent when someone fills it in. The form opens in the builder, where you check it and Save.',
@@ -52,7 +52,8 @@ const TEXT: Record<StartKind, { what: string; intro: string; name: string; brief
   },
 };
 
-async function make(kind: StartKind, title: string): Promise<{ what: string; href: string }> {
+/** Makes an empty form, campaign, template, part or pattern; where its brief is kept and its editor. */
+export async function make(kind: StartKind, title: string): Promise<{ what: string; href: string }> {
   const post = (url: string, body: unknown) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   if (kind === 'form') {
     const res = await post('/api/admin/forms/', { title });
