@@ -55,7 +55,7 @@ last change. You can undo several times.
 | **Section** | Groups blocks, with a background colour or spacing around them. |
 | **Form** | One of your [forms](/cfpuck-cms/guide/forms/). |
 | **File** | A link to a document (a PDF, say) with its type, size and a Download button. |
-| **Collection** | An automatic list of your latest posts, events or other content. Each entry shows as a card; select a block in the first card to change them all. A card's **Featured image** is Medium height (240px) unless you pick another **Height**: Small, Large, Extra large, **Auto** (the picture's own height) or **Custom**. |
+| **Collection** | An automatic list of your latest posts, events or other content. Each entry shows as a card; select a block in the first card to change them all. For content that can be marked featured (an admin turns this on under **Settings**, **Types**), tick **Featured only** to list just those. A card's **Featured image** is Medium height (240px) unless you pick another **Height**: Small, Large, Extra large, **Auto** (the picture's own height) or **Custom**. |
 
 Your site may have extra blocks of its own, made for its design.
 

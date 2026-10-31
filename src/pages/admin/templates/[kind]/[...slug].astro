@@ -1,6 +1,6 @@
 ---
 import AdminTheme from '../../../../layouts/AdminTheme.astro';
-import { SITE_TZ, appliedTaxonomySettings, site } from '../../../../lib/site';
+import { SITE_TZ, appliedTypeSettings, site } from '../../../../lib/site';
 import '../../../../styles/tailwind.css';
 import '../../../../styles/admin.css';
 import Editor from '../../../../puck/Editor';
@@ -23,7 +23,7 @@ if (!here) {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex" />
-    <script is:inline define:vars={{ siteTz: SITE_TZ, siteTaxonomies: appliedTaxonomySettings() }}>window.__siteTz = siteTz; window.__siteTaxonomies = siteTaxonomies;</script>
+    <script is:inline define:vars={{ siteTz: SITE_TZ, siteTypes: appliedTypeSettings() }}>window.__siteTz = siteTz; window.__siteTypes = siteTypes;</script>
     <AdminTheme />
     <title>{slug} · {site.name} admin</title>
   </head>

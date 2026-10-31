@@ -71,6 +71,13 @@ Categories and tags group related content, so visitors can find everything on on
 - Pick categories in the same panel.
 - To rename, rearrange or describe them, click **Content**, then **Taxonomies**. Drag a category by its handle to move it, or onto another to put it underneath.
 
+### Featured content
+
+When an admin has turned on **Featured** for a kind of content (**Settings**, **Types**), each one has a
+**Featured** switch in its settings. In the list of that content, a star marks the featured ones; tick
+**Featured only** and click **Filter** to see just those, or tick several and choose **Mark featured** from
+**Bulk actions**. A Collection block can then show featured content only.
+
 ### Your own ways to sort content
 
 Admins can add a taxonomy of their own, such as Colors or Regions, and choose which types of content

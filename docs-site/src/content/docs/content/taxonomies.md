@@ -22,10 +22,10 @@ are kept in the site settings:
 - `settings.site.taxonomy_types`: types added to a config taxonomy (`{ category: ['page'] }`). The
   types the config gives it can't be taken away; tags are on every type already.
 
-`applyTaxonomySettings` (`src/lib/site`) joins them to the config's: the made ones to `site.taxonomies`
+`applyTypeSettings` (`src/lib/site`) joins them to the config's: the made ones to `site.taxonomies`
 and `TAXONOMY_BASES` (changed in place), every one's types to `taxonomiesOf` and `typesOfTaxonomy`. The
 server applies it with the timezone, at most once a minute per instance (`refreshSiteTimezone`), and
-admin pages hand it to the browser as `window.__siteTaxonomies`. Deleting a made taxonomy deletes its
+admin pages hand it to the browser as `window.__siteTypes`. Deleting a made taxonomy deletes its
 terms, which entries lose. A taxonomy on more than one type has term pages listing all of them.
 
 ## Tags

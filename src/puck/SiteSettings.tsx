@@ -14,7 +14,7 @@ import { Fragment, useEffect, useRef, useState, type MouseEvent, type ReactNode 
 import { SAVES_AS_IT_GOES, SETTINGS_GROUPS, sectionOf, settingsPath } from '../lib/admin/settings-sections';
 import { FieldsForm } from './entry-fields';
 import { SITE_EDITOR } from '../lib/site/editor';
-import { ARCHIVE_PATHS, CONTENT_TYPES, PAGELESS_TYPES, SEARCHABLE_TYPES, TYPE_BASES, site as config, taxonomiesOf, taxonomyLabel, typeDef } from '../lib/site';
+import { ARCHIVE_PATHS, CONTENT_TYPES, PAGELESS_TYPES, SEARCHABLE_TYPES, TYPE_BASES, codeFeatured, site as config, taxonomiesOf, taxonomyLabel, typeDef } from '../lib/site';
 import { NO_CONTENT_WARNING, chosenTemplate, defaultTaxonomyTemplates, defaultTemplates, templateLabel, type TemplateInfo, type TemplateMap } from '../lib/templates';
 import { FieldGroup, MediaPicker, Row, Select, Text, Toggle, inputClass } from './fields';
 import { NETWORKS } from '../lib/social/icons';
@@ -37,7 +37,7 @@ import { ADMIN_THEME_DEFAULTS, ADMIN_THEME_FIELDS, adminThemeVars, contrast, typ
 interface Props {
   /** The section the address names. */
   section: string;
-  site: { name?: string; description?: string; front_page_id?: number | null; not_found_page_id?: number | null; timezone?: string; search_types?: string[]; social?: { network: string; url: string }[]; share_image?: number; share_image_url?: string; templates?: TemplateMap; taxonomy_templates?: Record<string, string>; taxonomy_pages_off?: string[]; taxonomy_meta?: Record<string, TaxonomyMeta>; listing_meta?: Record<string, TaxonomyMeta>; listings_off?: string[]; icons?: Record<string, string>; icon_media_id?: number | null; icon_preview?: string; admin_theme?: AdminTheme; tickets?: TicketSettings; members?: Partial<MemberSettings>; mailing?: MailingSettings; events?: { enabled?: boolean }; a11y?: { block_publish?: boolean } };
+  site: { name?: string; description?: string; front_page_id?: number | null; not_found_page_id?: number | null; timezone?: string; search_types?: string[]; social?: { network: string; url: string }[]; share_image?: number; share_image_url?: string; templates?: TemplateMap; taxonomy_templates?: Record<string, string>; taxonomy_pages_off?: string[]; taxonomy_meta?: Record<string, TaxonomyMeta>; listing_meta?: Record<string, TaxonomyMeta>; listings_off?: string[]; featured_types?: string[]; icons?: Record<string, string>; icon_media_id?: number | null; icon_preview?: string; admin_theme?: AdminTheme; tickets?: TicketSettings; members?: Partial<MemberSettings>; mailing?: MailingSettings; events?: { enabled?: boolean }; a11y?: { block_publish?: boolean } };
   options: Record<string, any>;
   pages: { id: number; title: string }[];
   templates: TemplateInfo[];
@@ -141,6 +141,7 @@ export default function SiteSettings({ section, site: initialSite, options: init
       panel: (
         <>
           <TypeTemplates events={eventsOn(site)} value={site.templates ?? {}} off={site.listings_off ?? []} templates={templates} meta={site.listing_meta ?? {}} onChange={(m) => setSite((s) => ({ ...s, templates: m }))} onListings={(off) => setSite((s) => ({ ...s, listings_off: off }))} onMeta={(m) => setSite((s) => ({ ...s, listing_meta: Object.keys(m).length ? m : undefined }))} />
+          <FeaturedTypes events={eventsOn(site)} value={site.featured_types ?? []} onChange={(v) => setSite((s) => ({ ...s, featured_types: v.length ? v : undefined }))} />
           <TaxonomyTemplatesPanel events={eventsOn(site)} value={site.taxonomy_templates ?? {}} off={site.taxonomy_pages_off ?? []} templates={templates} meta={site.taxonomy_meta ?? {}} onChange={(m) => setSite((s) => ({ ...s, taxonomy_templates: Object.keys(m).length ? m : undefined }))} onPages={(off) => setSite((s) => ({ ...s, taxonomy_pages_off: off.length ? off : undefined }))} onMeta={(m) => setSite((s) => ({ ...s, taxonomy_meta: Object.keys(m).length ? m : undefined }))} />
         </>
       ),
@@ -442,7 +443,7 @@ function TypeTemplates({ events, value, off, templates, meta, onChange, onListin
   };
   return (
     <>
-      <p className="mb-4 text-xs text-admin-muted">The template for each type's pages and for its listing page; choose Off to turn a listing page off. A template chosen on an entry itself (in its settings) comes first. Under each type, its taxonomies (set in the site config; each gets a picker in an entry's settings).</p>
+      <p className="mb-4 text-xs text-admin-muted">The template for each type's pages and for its listing page; choose Off to turn a listing page off. A template chosen on an entry itself (in its settings) comes first. Under each type, its taxonomies (each gets a picker in an entry's settings; add more under Content &gt; Taxonomies).</p>
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-xs text-admin-muted">
@@ -558,6 +559,31 @@ function PageDefaults({ kind, name, label, path, value, onChange }: { kind: 'tax
 }
 
 /** Settings > Types: the template for each taxonomy's term pages (a term can choose its own), and their default image and SEO. */
+/** The types whose entries can be marked Featured (settings.site.featured_types): a Featured switch in their
+ *  settings, which the Collection and Map blocks can list alone. Types whose code has one keep theirs. */
+function FeaturedTypes({ events, value, onChange }: { events: boolean; value: string[]; onChange: (v: string[]) => void }) {
+  const types = CONTENT_TYPES.filter((t) => t.type !== 'global' && showsType(t.type, events));
+  return (
+    <section className="mt-8 border-t border-admin-ink/10 pt-6">
+      <h3 className="text-sm font-semibold">Featured</h3>
+      <p className="mt-1 mb-3 text-xs text-admin-muted">Tick a type to give its entries a Featured switch in their settings. A Collection block can then show featured entries only, and the content list can show and mark them.</p>
+      <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
+        {types.map((t) =>
+          codeFeatured(t.type) ? (
+            <label key={t.type} className="flex items-center gap-1.5 text-admin-muted" title="Set by the site's code">
+              <input type="checkbox" checked disabled /> {t.label}
+            </label>
+          ) : (
+            <label key={t.type} className="flex items-center gap-1.5">
+              <input type="checkbox" checked={value.includes(t.type)} onChange={(e) => onChange(e.target.checked ? [...value, t.type] : value.filter((x) => x !== t.type))} /> {t.label}
+            </label>
+          ),
+        )}
+      </div>
+    </section>
+  );
+}
+
 function TaxonomyTemplatesPanel({ events, value, off, templates, meta, onChange, onPages, onMeta }: { events: boolean; value: Record<string, string>; off: string[]; templates: TemplateInfo[]; meta: Record<string, TaxonomyMeta>; onChange: (m: Record<string, string>) => void; onPages: (off: string[]) => void; onMeta: (m: Record<string, TaxonomyMeta>) => void }) {
   const have = new Set(templates.map((t) => t.slug));
   const taxonomies = config.taxonomies.filter((t) => t.base && showsTaxonomy(t.name, events));

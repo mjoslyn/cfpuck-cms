@@ -1,7 +1,7 @@
 ---
 import Admin from '../../layouts/Admin.astro';
 import { SITE_TZ } from '../../lib/site';
-import { COMPOSABLE_TYPES, CONTENT_TYPES, PAGELESS_TYPES, RECORD_TYPES, site, taxonomiesOf } from '../../lib/site';
+import { COMPOSABLE_TYPES, CONTENT_TYPES, PAGELESS_TYPES, RECORD_TYPES, featuredOn, site, taxonomiesOf } from '../../lib/site';
 import Terms from '../../admin/Terms.astro';
 import { permalink } from '../../lib/permalink';
 import { eventsOn, showsType } from '../../lib/events/on';
@@ -18,6 +18,9 @@ const q = (params.get('q') ?? '').trim();
 const status = ['publish', 'draft', 'trash'].includes(params.get('status') ?? '') ? params.get('status')! : 'all';
 const notice = params.get('notice');
 const tagSlug = params.get('tag') ?? '';
+// Featured (Settings > Types, or a field of the site's own): a star on each row, a filter and bulk marking.
+const featured = featuredOn(type);
+const featuredFilter = featured && params.get('featured') === '1';
 
 // Tags: every tag with how many entries use it.
 const { data: tagRows, error: tagErr } = await db.from('terms').select('id, name, slug, entry_terms(count)').eq('taxonomy', 'tag').order('name');
@@ -29,6 +32,7 @@ let rows: any[] = [];
 if (!tagsView) {
   let query = db.from('entries').select('id, type, slug, title, title_rendered, status, updated_at, event_start, fields, draft_saved_at, entry_terms(term_id)').eq('type', type);
   if (q) query = query.ilike('title', `%${q}%`);
+  if (featuredFilter) query = query.eq('fields->>featured', 'true');
   // All: everything but the trash.
   query = status === 'all' ? query.neq('status', 'trash') : query.eq('status', status);
   if (activeTag) {
@@ -143,6 +147,7 @@ const decode = (s: string) => s.replace(/&#8217;/g, '’').replace(/&#038;|&amp;
         {tags.map((t) => <option value={t.slug} selected={t.slug === tagSlug}>{decode(t.name)}</option>)}
       </select>
     )}
+    {featured && <label class="flex items-center gap-1.5 self-center text-xs"><input type="checkbox" name="featured" value="1" checked={featuredFilter} /> Featured only</label>}
     <button class="rounded border border-admin-ink/15 bg-white px-3 hover:border-admin-accent">Filter</button>
     {activeTag && <a href={listUrl({ tag: null })} class="self-center text-xs text-admin-muted hover:text-admin-accent">Clear tag “{decode(activeTag.name)}”</a>}
   </form>
@@ -162,6 +167,8 @@ const decode = (s: string) => s.replace(/&#8217;/g, '’').replace(/&#038;|&amp;
           <option value="publish">Publish</option>
           <option value="draft">Move to drafts</option>
           <option value="trash">Move to trash</option>
+          {featured && <option value="feature">Mark featured</option>}
+          {featured && <option value="unfeature">Unmark featured</option>}
           {termGroups.length > 0 && <option value="add-term">Add a term…</option>}
           {termGroups.length > 0 && <option value="remove-term">Remove a term…</option>}
         </>
@@ -238,6 +245,7 @@ const decode = (s: string) => s.replace(/&#8217;/g, '’').replace(/&#038;|&amp;
           <td class="py-2.5 pl-4 align-top"><input type="checkbox" name="ids" value={r.id} form="bulk" aria-label={`Select ${decode(r.title_rendered ?? r.title) || 'untitled entry'}`} /></td>
           <td class="px-4 py-2.5">
             <a href={`/admin/edit/${r.id}/`} class="font-medium hover:text-admin-accent">{decode(r.title_rendered ?? r.title) || '(no title)'}</a>
+            {featured && r.fields?.featured === true && <span class="ml-1 text-admin-accent" title="Featured" aria-label="Featured">★</span>}
             <div class="text-xs text-admin-muted">{record ? place(r.fields) : pageless ? '' : permalink(r)}</div>
           </td>
           {type !== 'global' && (

@@ -61,7 +61,24 @@ export function searchTypes(siteSettings: Record<string, any> | undefined): stri
   return SEARCHABLE_TYPES.filter((t) => chosen.includes(t));
 }
 
-export const fieldsFor = (type: string): FieldDef[] => typeDef(type)?.fields ?? [];
+/** A type's fields: the site config's, with Featured when an admin turned it on for the type (Settings > Types). */
+export const fieldsFor = (type: string): FieldDef[] => {
+  const own = typeDef(type)?.fields ?? [];
+  return FEATURED_TYPES.has(type) && !own.some((f) => f.key === 'featured') ? [...own, FEATURED_FIELD] : own;
+};
+/** The Featured toggle an admin can give a type (fields.featured), which collections and the Map can list alone. */
+export const FEATURED_FIELD: FieldDef = { key: 'featured', label: 'Featured', type: 'bool' };
+/** Types an admin gave Featured (settings.site.featured_types), as last applied. */
+let FEATURED_TYPES = new Set<string>();
+/** Whether the site's code gives a type a `featured` field of its own. */
+export const codeFeatured = (type: string) => (typeDef(type)?.fields ?? []).some((f) => f.key === 'featured');
+/** Whether a type's entries can be marked featured: a field of the site's own, or Featured turned on for it. */
+export const featuredOn = (type: string) => codeFeatured(type) || FEATURED_TYPES.has(type);
+/** Featured types as stored: known types other than globals. */
+export const featuredTypesFrom = (v: unknown): string[] | undefined => {
+  const out = Array.isArray(v) ? config.types.filter((t) => t.type !== 'global' && v.includes(t.type)).map((t) => t.type) : [];
+  return out.length ? out : undefined;
+};
 
 /** URL segment for single entries of a type (/directory/<slug>/). */
 export const TYPE_BASES: Record<string, string> = Object.fromEntries(config.types.filter((t) => t.base).map((t) => [t.type, t.base!]));
@@ -82,13 +99,14 @@ export let MADE_TAXONOMIES: MadeTaxonomy[] = [];
 export let ADDED_TO_CODE: Record<string, string[]> = {};
 
 /**
- * Applies the taxonomies set in the admin (settings.site.taxonomies, taxonomy_types) to the site's: the
+ * Applies the types' settings an admin made: Featured per type (settings.site.featured_types, through
+ * fieldsFor and featuredOn), and the taxonomies (settings.site.taxonomies, taxonomy_types), to the site's: the
  * made ones join `site.taxonomies` and TAXONOMY_BASES (changed in place, so code holding them sees it),
  * and every one's added types count in taxonomiesOf. A live binding, like SITE_TZ: the server applies it
  * from the settings (src/lib/site/timezone.ts, cached a minute), admin pages hand the browser
- * window.__siteTaxonomies.
+ * window.__siteTypes.
  */
-export function applyTaxonomySettings(siteSettings: Record<string, any> | null | undefined) {
+export function applyTypeSettings(siteSettings: Record<string, any> | null | undefined) {
   const typeNames = config.types.filter((t) => t.type !== 'global').map((t) => t.type);
   const codeNames = CODE_TAXONOMIES.map((t) => t.name);
   MADE_TAXONOMIES = madeTaxonomiesFrom(siteSettings?.taxonomies, typeNames, codeNames);
@@ -98,11 +116,11 @@ export function applyTaxonomySettings(siteSettings: Record<string, any> | null |
   for (const k of Object.keys(TAXONOMY_BASES)) delete TAXONOMY_BASES[k];
   for (const t of config.taxonomies) if (t.base) TAXONOMY_BASES[t.name] = t.base;
   ADDED_TO_CODE = added;
+  FEATURED_TYPES = new Set(featuredTypesFrom(siteSettings?.featured_types) ?? []);
   ADDED_TYPES = { ...added, ...Object.fromEntries(MADE_TAXONOMIES.map((t) => [t.name, t.types])) };
 }
-if (typeof window !== 'undefined' && (window as any).__siteTaxonomies) applyTaxonomySettings((window as any).__siteTaxonomies);
-/** What window.__siteTaxonomies carries: the settings applyTaxonomySettings reads, as applied now. */
-export const appliedTaxonomySettings = () => ({ taxonomies: MADE_TAXONOMIES, taxonomy_types: ADDED_TO_CODE });
+/** What window.__siteTypes carries: the settings applyTypeSettings reads, as applied now. */
+export const appliedTypeSettings = () => ({ taxonomies: MADE_TAXONOMIES, taxonomy_types: ADDED_TO_CODE, featured_types: [...FEATURED_TYPES] });
 /** Whether a taxonomy's terms are a flat list (tags, and made ones set so), not nested. */
 export const isFlat = (name: string) => name === 'tag' || !!config.taxonomies.find((t) => t.name === name)?.flat;
 /** The types the site's code gives a taxonomy, which an admin can't take away. */
@@ -136,3 +154,6 @@ export function taxonomiesOf(type: string): string[] {
 
 /** The types a taxonomy belongs to. */
 export const typesOfTaxonomy = (taxonomy: string) => config.types.filter((t) => taxonomiesOf(t.type).includes(taxonomy)).map((t) => t.type);
+
+// In the admin's browser: the settings the page was served with.
+if (typeof window !== 'undefined' && (window as any).__siteTypes) applyTypeSettings((window as any).__siteTypes);

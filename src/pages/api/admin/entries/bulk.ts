@@ -22,8 +22,37 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
     back.searchParams.set('notice', notice);
     return redirect(`/admin/${back.search}`, 303);
   };
-  if (!['publish', 'draft', 'trash', 'restore', 'delete', 'add-term', 'remove-term'].includes(action)) return done('Choose an action.');
+  if (!['publish', 'draft', 'trash', 'restore', 'delete', 'add-term', 'remove-term', 'feature', 'unfeature'].includes(action)) return done('Choose an action.');
   if (!ids.length) return done('Select entries first.');
+
+  // Mark featured or not (fields.featured), in unpublished changes kept aside too, so publishing them
+  // doesn't undo it.
+  if (action === 'feature' || action === 'unfeature') {
+    const on = action === 'feature';
+    const { data: rows, error } = await db.from('entries').select('id, fields').in('id', ids);
+    if (error) return new Response(error.message, { status: 400 });
+    let n = 0;
+    for (const r of rows ?? []) {
+      const fields = { ...((r.fields as Record<string, unknown>) ?? {}) };
+      if ((fields.featured === true) === on) continue;
+      if (on) fields.featured = true;
+      else delete fields.featured;
+      const { error: e } = await db.from('entries').update({ fields }).eq('id', r.id);
+      if (e) return new Response(e.message, { status: 400 });
+      n++;
+    }
+    const { data: drafts } = await db.from('entry_drafts').select('entry_id, draft').in('entry_id', ids);
+    for (const d of drafts ?? []) {
+      const entry = (d.draft as any)?.entry;
+      if (!entry?.fields || (entry.fields.featured === true) === on) continue;
+      const fields = { ...entry.fields };
+      if (on) fields.featured = true;
+      else delete fields.featured;
+      const { error: e } = await db.from('entry_drafts').update({ draft: { ...(d.draft as any), entry: { ...entry, fields } } }).eq('entry_id', d.entry_id);
+      if (e) return new Response(e.message, { status: 400 });
+    }
+    return done(`${on ? 'Marked' : 'Unmarked'} ${n} ${n === 1 ? 'entry' : 'entries'} as featured.`);
+  }
 
   if (action === 'add-term' || action === 'remove-term') {
     const termId = Number(form.get('term')) || 0;

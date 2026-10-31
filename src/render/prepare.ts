@@ -71,6 +71,8 @@ async function queryArgs(attrs: Record<string, any>, ctx: RenderCtx, page: numbe
     exclude: q.exclude?.length ? await known(q.exclude) : undefined,
     terms: include.length ? {} : terms,
     upcoming: !include.length && types.length === 1 && types[0] === 'event' && q.upcoming === true,
+    // Featured entries only (fields.featured: Settings > Types, or a field of the site's own).
+    featuredOnly: !include.length && q.featuredOnly === true,
   };
 }
 

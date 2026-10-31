@@ -143,8 +143,8 @@ ordinary, undoable edit. Blocks inside a linked pattern, and the linked pattern 
 ## Collections and tags
 
 A `collection` lists entries with its settings on the block itself (`src/puck/CollectionPanel.tsx`):
-what to show (latest of some types, filtered by category and tags; hand-picked `query.include`; or the
-page's own listing), display (grid with desktop/tablet/phone columns, list, slider), card design
+what to show (latest of some types, filtered by category and tags, and featured only where a type has
+Featured, `query.featuredOnly`; hand-picked `query.include`; or the page's own listing), display (grid with desktop/tablet/phone columns, list, slider), card design
 (the site's `cards`, `src/lib/content/card-presets.ts`; choosing one replaces the item template via
 `resolveCollection` in `config.tsx`; "custom" keeps the blocks), pagination (numbers, previous/next,
 load more: `public/assets/js/collection-more.js` fetches the next page URL and appends that
@@ -172,11 +172,11 @@ Taxonomies: **Add a taxonomy** and each tab's settings; `/api/admin/taxonomies`,
 `src/lib/site/taxonomy-settings.ts`): `settings.site.taxonomies` (`{ name, label, singular?, base?, flat?,
 types }`, the name made from the label and kept; no `base`, no term pages; a base can't be a route of the
 site's or another type's or taxonomy's, `baseProblem`) and `settings.site.taxonomy_types` (types added to a
-config taxonomy; those the config gives it stay; tags are on every type). `applyTaxonomySettings` in
+config taxonomy; those the config gives it stay; tags are on every type). `applyTypeSettings` in
 `src/lib/site` joins them to the config's (`site.taxonomies` and `TAXONOMY_BASES` changed in place;
 `taxonomiesOf`, `typesOfTaxonomy`, `isFlat`): a live binding like `SITE_TZ`, applied by the server with the
 timezone (`refreshSiteTimezone`, at most once a minute per instance) and handed to the browser as
-`window.__siteTaxonomies`. So core code reads taxonomies through those functions at the time of use, never
+`window.__siteTypes`. So core code reads taxonomies through those functions at the time of use, never
 copied at module load. Deleting a made taxonomy deletes its terms. A taxonomy on several types has term
 pages listing them all (`termPageType`).
 
@@ -250,7 +250,12 @@ Settings > Types sets, per type, the template for its entries and its listing pa
 (`settings.site.listings_off`; the address then serves a page with that address, if any, or 404; for
 events the calendar views go too). An entry's own template (its settings) comes before its type's.
 Templates without a Page content block are marked, and choosing one warns that the entry's content
-won't show.
+won't show. **Featured** (`settings.site.featured_types`, `featuredTypesFrom`): the types ticked get a
+Featured switch in their entries' settings (`fields.featured`, added by `fieldsFor` as `FEATURED_FIELD`, a
+live binding applied with the taxonomies, `applyTypeSettings`); a type whose config has a `featured` field
+keeps its own (`codeFeatured`). For those types (`featuredOn`) the Collection block offers **Featured only**
+(`query.featuredOnly`, the loader's `featuredOnly`) and the content list shows a star, a Featured only filter
+and bulk Mark featured / Unmark featured (in unpublished changes kept aside too).
 A template can have several Page content blocks, each naming a content area (`attrs.area`; `main`, the
 default, is the entry's content). Other areas (`sidebar`, `intro`...) are filled in per entry and stored
 as slots on its content's root (`root.props["area-<name>"]`, `src/lib/content/areas.ts`); the editor

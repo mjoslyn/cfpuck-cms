@@ -8,7 +8,7 @@ import { useEventsOn } from './member-settings';
 import { Group, Space, StyleControls } from './panels';
 import { browserClient } from '../lib/db/browser';
 import { CARD_PRESETS } from '../lib/content/card-presets';
-import { LISTABLE_TYPES, taxonomiesOf, taxonomyLabel, typeDef } from '../lib/site';
+import { LISTABLE_TYPES, featuredOn, taxonomiesOf, taxonomyLabel, typeDef } from '../lib/site';
 
 type SetFn = (patch: Attrs) => void;
 
@@ -137,6 +137,7 @@ export function CollectionPanel({ a, set }: { a: Attrs; set: SetFn }) {
             ))}
             <TermPicker title="Tagged with (any of)" taxonomies={['tag']} value={tax.tag ?? []} onChange={(ids) => setTax('tag', ids)} />
             {types.length === 1 && types[0] === 'event' && <Toggle title="Upcoming events only (soonest first)" value={q.upcoming} onChange={(v) => setQ({ upcoming: v || undefined })} />}
+            {(q.featuredOnly || types.some(featuredOn)) && <Toggle title="Featured only" value={q.featuredOnly} onChange={(v) => setQ({ featuredOnly: v || undefined })} />}
             <Select title="Order" value={orderKey(q)} options={ORDERS.map(([k, l]) => [k, l])} onChange={(v) => setQ({ ...(ORDERS.find(([k]) => k === (v ?? 'newest'))![2]) })} />
             <div className="grid grid-cols-2 gap-2">
               <Text title="How many" value={q.perPage} placeholder="10" onChange={(v) => setQ({ perPage: Number(v) || undefined })} />

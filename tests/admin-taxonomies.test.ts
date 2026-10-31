@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { POST } from '../src/pages/api/admin/taxonomies';
 import { sessionDb, siteDb } from '../src/lib/db/site';
-import { applyTaxonomySettings, isFlat, isTaxonomy, site, TAXONOMY_BASES, taxonomiesOf, termPageType, typesOfTaxonomy } from '../src/lib/site';
+import { applyTypeSettings, isFlat, isTaxonomy, site, TAXONOMY_BASES, taxonomiesOf, termPageType, typesOfTaxonomy } from '../src/lib/site';
 import { baseProblem, cleanBase, madeTaxonomiesFrom, taxonomyName, taxonomyTypesFrom } from '../src/lib/site/taxonomy-settings';
 import { renderRequest } from '../src/render/page';
 
@@ -16,7 +16,7 @@ const post = (fields: Record<string, string | string[]>, db = admin) => {
 };
 const siteSettings = async () => ((await siteDb().from('settings').select('value').eq('key', 'site').maybeSingle()).data?.value ?? {}) as Record<string, any>;
 
-afterEach(() => applyTaxonomySettings({}));
+afterEach(() => applyTypeSettings({}));
 
 describe('taxonomy settings', () => {
   it('names a taxonomy from its label and cleans its address', () => {
@@ -42,7 +42,7 @@ describe('taxonomy settings', () => {
   });
 
   it('applies to the site: its taxonomies, their types, addresses and term pages', () => {
-    applyTaxonomySettings({ taxonomies: [{ name: 'color', label: 'Colors', base: 'colors', flat: true, types: ['page', 'post'] }], taxonomy_types: { category: ['page'] } });
+    applyTypeSettings({ taxonomies: [{ name: 'color', label: 'Colors', base: 'colors', flat: true, types: ['page', 'post'] }], taxonomy_types: { category: ['page'] } });
     expect(isTaxonomy('color')).toBe(true);
     expect(site.taxonomies.map((t) => t.name)).toContain('color');
     expect(TAXONOMY_BASES.color).toBe('colors');
@@ -52,7 +52,7 @@ describe('taxonomy settings', () => {
     expect(typesOfTaxonomy('color')).toEqual(['page', 'post']);
     // On more than one type, a term page lists them all.
     expect(termPageType('color')).toBe('any');
-    applyTaxonomySettings({});
+    applyTypeSettings({});
     expect(isTaxonomy('color')).toBe(false);
     expect(TAXONOMY_BASES.color).toBeUndefined();
     expect(taxonomiesOf('page')).toEqual([]);
