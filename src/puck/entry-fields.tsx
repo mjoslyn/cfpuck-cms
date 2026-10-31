@@ -9,7 +9,8 @@ import { permalink } from '../lib/permalink';
 import { isPlaceholderSlug, slugify } from '../lib/slug';
 import { SeoForm } from './SeoForm';
 import { TicketsForm } from './TicketsForm';
-import { useMemberSettings } from './member-settings';
+import { useMemberSettings, useSite } from './member-settings';
+import { tagsOn } from '../lib/templates';
 import { accessOf } from '../lib/members/config';
 import { itemsText } from '../lib/seo';
 import { NO_CONTENT_WARNING, templateLabel, type TemplateInfo } from '../lib/templates';
@@ -365,6 +366,8 @@ function ExcerptWriter({ type, title, pageItems, onWrite }: { type: string; titl
 export function EntryForm({ type, value, onChange, templates, pageItems }: { type: string; value: EntryState; onChange: (v: EntryState) => void; templates: TemplateInfo[]; pageItems?: () => any[] }) {
   const set = (patch: Partial<EntryState>) => onChange({ ...value, ...patch });
   const defs = fieldsFor(type);
+  const site = useSite();
+  const tagsShown = site !== undefined && tagsOn(site, type);
   // An event's own timezone, else the site's.
   const eventTz: string = value.fields?.timezone || SITE_TZ;
   return (
@@ -395,7 +398,8 @@ export function EntryForm({ type, value, onChange, templates, pageItems }: { typ
       {taxonomiesOf(type).map((tax) => (
         <EntryTermsField key={tax} taxonomy={tax} value={value.terms?.[tax] ?? []} onChange={(ids) => set({ terms: { ...(value.terms ?? {}), [tax]: ids } })} />
       ))}
-      {type !== 'global' && <TagsField value={value.tags ?? []} onChange={(tags) => set({ tags })} />}
+      {/* Tags, unless they're off for this type (Settings > Types); tags it already has are kept as they are. */}
+      {tagsShown && <TagsField value={value.tags ?? []} onChange={(tags) => set({ tags })} />}
       {type === 'event' && (
         <>
           <Row title="Starts">

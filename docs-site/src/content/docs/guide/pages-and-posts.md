@@ -69,6 +69,9 @@ Categories and tags group related content, so visitors can find everything on on
 - Add tags to a page in the editor's right-hand panel: type a tag and press Enter. New tags are
   made for you.
 - Pick categories in the same panel.
+- If a kind of content shouldn't have tags (pages, say), an admin can turn them off for it: **Settings**,
+  **Types**, untick **Tags** under it, then **Save settings**. Its Tags box goes away; tags it already
+  has stay until you remove them (tick the pages in the list and choose **Remove a term**).
 - To rename, rearrange or describe them, click **Content**, then **Taxonomies**. Drag a category by its handle to move it, or onto another to put it underneath.
 
 ## Page addresses

@@ -4,7 +4,8 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Row, Select, Text, Toggle, inputClass, type Attrs } from './fields';
 import { EntriesField } from './entry-fields';
-import { useEventsOn } from './member-settings';
+import { useEventsOn, useSite } from './member-settings';
+import { tagsOn } from '../lib/templates';
 import { Group, Space, StyleControls } from './panels';
 import { browserClient } from '../lib/db/browser';
 import { CARD_PRESETS } from '../lib/content/card-presets';
@@ -93,6 +94,9 @@ export function CollectionPanel({ a, set }: { a: Attrs; set: SetFn }) {
     setQ({ taxQuery: next });
   };
   const categoryTax = [...new Set(types.flatMap((t) => taxonomiesOf(t)))];
+  // Tags, while one of the types takes them (Settings > Types) or the collection already filters by them.
+  const site = useSite();
+  const tagsOffered = (site !== undefined && types.some((t) => tagsOn(site, t))) || !!tax.tag?.length;
   // What renders: a grid needs a column count; without one the cards stack as a list.
   const display = a.display === 'slider' || a.variant === 'slider' ? 'slider' : a.display === 'list' || !a.columns ? 'list' : 'grid';
   const card = a.card ?? 'custom';
@@ -135,7 +139,7 @@ export function CollectionPanel({ a, set }: { a: Attrs; set: SetFn }) {
             {categoryTax.map((taxonomy) => (
               <TermPicker key={taxonomy} title={`${taxonomyLabel(taxonomy)} (any of)`} taxonomies={[taxonomy]} value={tax[taxonomy] ?? []} onChange={(ids) => setTax(taxonomy, ids)} />
             ))}
-            <TermPicker title="Tagged with (any of)" taxonomies={['tag']} value={tax.tag ?? []} onChange={(ids) => setTax('tag', ids)} />
+            {tagsOffered && <TermPicker title="Tagged with (any of)" taxonomies={['tag']} value={tax.tag ?? []} onChange={(ids) => setTax('tag', ids)} />}
             {types.length === 1 && types[0] === 'event' && <Toggle title="Upcoming events only (soonest first)" value={q.upcoming} onChange={(v) => setQ({ upcoming: v || undefined })} />}
             <Select title="Order" value={orderKey(q)} options={ORDERS.map(([k, l]) => [k, l])} onChange={(v) => setQ({ ...(ORDERS.find(([k]) => k === (v ?? 'newest'))![2]) })} />
             <div className="grid grid-cols-2 gap-2">
@@ -195,4 +199,11 @@ export function CollectionPanel({ a, set }: { a: Attrs; set: SetFn }) {
       </Group>
     </div>
   );
+}
+
+/** Tags for a type's blocks (the event calendar): offered while its entries take tags, or already chosen. */
+export function TagsPickerFor({ type, value, onChange }: { type: string; value: number[]; onChange: (ids: number[]) => void }) {
+  const site = useSite();
+  if (!value.length && (site === undefined || !tagsOn(site, type))) return null;
+  return <TermPicker title="Tagged with (any of)" taxonomies={['tag']} value={value} onChange={onChange} />;
 }

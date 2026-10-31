@@ -33,7 +33,7 @@ An item can also open a larger drop-down panel: add **Links** under a **Links he
 | Section | What it's for |
 | --- | --- |
 | **General** | The site's name, tagline, which page is the home page, and which page people see when an address doesn't exist. |
-| **Types** | Which layout (template) each kind of content uses. Usually set up once. |
+| **Types** | Which layout (template) each kind of content uses, and whether it has tags. Usually set up once. |
 | **Search** | Which kinds of content the site search covers. |
 | **Social** | Your social media profiles (shown as icons) and the picture used when a page without its own image is shared. |
 | **Events** | Turn events on or off, and the site's time zone. |

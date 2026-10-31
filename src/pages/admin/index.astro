@@ -5,6 +5,7 @@ import { COMPOSABLE_TYPES, CONTENT_TYPES, PAGELESS_TYPES, RECORD_TYPES, site, ta
 import Terms from '../../admin/Terms.astro';
 import { permalink } from '../../lib/permalink';
 import { eventsOn, showsType } from '../../lib/events/on';
+import { tagsOn } from '../../lib/templates';
 
 const db = Astro.locals.db;
 const params = Astro.url.searchParams;
@@ -17,6 +18,8 @@ const status = ['publish', 'draft', 'trash'].includes(params.get('status') ?? ''
 const notice = params.get('notice');
 const tagSlug = params.get('tag') ?? '';
 
+// The site's settings: features on or off (Settings > Events), tags per type (Settings > Types).
+const { data: siteRow } = await db.from('settings').select('value').eq('key', 'site').maybeSingle();
 // Tags: every tag with how many entries use it.
 const { data: tagRows, error: tagErr } = await db.from('terms').select('id, name, slug, entry_terms(count)').eq('taxonomy', 'tag').order('name');
 if (tagErr) throw tagErr;
@@ -39,6 +42,8 @@ if (!tagsView) {
   rows = data ?? [];
 }
 const tagById = new Map(tags.map((t) => [t.id, t]));
+// Tags are offered for this type unless they're off (Settings > Types); a tag filter already set still shows.
+const typeTakesTags = tagsOn(siteRow?.value, type);
 // Terms for bulk add / remove: the type's taxonomies, tags, and any taxonomy its entries use.
 let termGroups: { label: string; terms: { id: number; name: string; depth: number }[] }[] = [];
 if (!tagsView) {
@@ -46,7 +51,7 @@ if (!tagsView) {
   const termRows = (allTerms ?? []) as { id: number; name: string; taxonomy: string; parent_id: number | null; sort: number }[];
   const used = new Set(rows.flatMap((r) => (r.entry_terms ?? []).map((l: { term_id: number }) => termRows.find((t) => t.id === l.term_id)?.taxonomy)).filter(Boolean));
   const own = taxonomiesOf(type);
-  const wanted = site.taxonomies.filter((t) => own.includes(t.name) || t.name === 'tag' || used.has(t.name));
+  const wanted = site.taxonomies.filter((t) => own.includes(t.name) || (t.name === 'tag' && typeTakesTags) || used.has(t.name));
   termGroups = wanted.map((tax) => {
     const mine = termRows.filter((t) => t.taxonomy === tax.name);
     const ids = new Set(mine.map((t) => t.id));
@@ -88,7 +93,6 @@ const pageless = PAGELESS_TYPES.has(type);
 const tagError = params.get('error');
 const place = (f: Record<string, any> | null) => [f?.address, f?.city, f?.state].filter(Boolean).join(', ');
 // Events on or off (Settings > Events, src/lib/events/on.ts): their types and taxonomies are hidden while off.
-const { data: siteRow } = await db.from('settings').select('value').eq('key', 'site').maybeSingle();
 const eventsAreOn = eventsOn(siteRow?.value);
 const isAdmin = Astro.locals.user?.role === 'admin';
 const decode = (s: string) => s.replace(/&#8217;/g, '’').replace(/&#038;|&amp;/g, '&').replace(/&#8211;/g, '–');
@@ -135,7 +139,7 @@ const decode = (s: string) => s.replace(/&#8217;/g, '’').replace(/&#038;|&amp;
     <input type="hidden" name="type" value={type} />
     {status !== 'all' && <input type="hidden" name="status" value={status} />}
     <input name="q" value={q} placeholder={`Search ${current.label.toLowerCase()}`} class="w-72 rounded border border-admin-ink/15 bg-white px-3 py-1.5 outline-none focus:border-admin-accent" />
-    {tags.length > 0 && (
+    {tags.length > 0 && (typeTakesTags || activeTag) && (
       <select name="tag" class="rounded border border-admin-ink/15 bg-white px-2 py-1.5">
         <option value="">All tags</option>
         {tags.map((t) => <option value={t.slug} selected={t.slug === tagSlug}>{decode(t.name)}</option>)}
