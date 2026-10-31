@@ -4,7 +4,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { POST } from '../src/pages/api/admin/types';
 import { sessionDb, siteDb } from '../src/lib/db/site';
-import { applyTypeSettings, ARCHIVE_PATHS, COMPOSABLE_TYPES, CONTENT_TYPES, fieldsFor, LISTABLE_TYPES, PAGELESS_TYPES, RECORD_TYPES, site, TYPE_BASES, typeDef } from '../src/lib/site';
+import { applyTypeSettings, ARCHIVE_PATHS, CODE_TYPES, COMPOSABLE_TYPES, CONTENT_TYPES, fieldsFor, LISTABLE_TYPES, PAGELESS_TYPES, RECORD_TYPES, site, TYPE_BASES, typeDef } from '../src/lib/site';
 import { fieldsFrom, madeTypesFrom } from '../src/lib/site/type-settings';
 import { renderRequest } from '../src/render/page';
 
@@ -43,7 +43,8 @@ describe('type settings', () => {
     const before = site.types.map((t) => t.type);
     applyTypeSettings({ types: [{ type: 'gizmo', label: 'Gizmos', singular: 'Gizmo', base: 'gizmos', archive: 'gizmo-shop', fields: [{ label: 'Price', type: 'number' }] }, { type: 'gizmo_maker', label: 'Gizmo makers', singular: 'Gizmo maker', record: true }, { type: 'post', label: 'Mine' }] });
     expect(site.types.map((t) => t.type)).toEqual([...before.filter((t) => t !== 'global'), 'gizmo', 'gizmo_maker', 'global'].filter((t, i, a) => a.indexOf(t) === i));
-    expect(typeDef('post')?.label).toBe('Posts');
+    // The code's post type wins over the made one named post.
+    expect(typeDef('post')?.label).toBe(CODE_TYPES.find((t) => t.type === 'post')!.label);
     expect(TYPE_BASES.gizmo).toBe('gizmos');
     expect(ARCHIVE_PATHS.gizmo).toBe('/gizmo-shop/');
     expect(fieldsFor('gizmo')).toEqual([{ key: 'price', label: 'Price', type: 'number' }]);
