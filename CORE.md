@@ -499,8 +499,10 @@ intent; on every page, once a visit or once every N days (the browser's storage)
 or all but some (`/path/`, `/prefix/*`; `popupsFor`). `renderRequest` prepares and renders the popups for
 the address with the page (`src/render/popups.ts`: `.c-popup`, `hidden`, settings in `data-popup`; not on
 previews) and `public/assets/js/popups.js` shows them (focus kept in a dialog, Escape and × close, links to
-`#close-popup`). One popup can be the **cookie consent banner** (`consent`, `consentPopup`): Accept and
-Reject buttons styled alike, neither played down (`data-consent-choice`), a policy link, on every page until the visitor chooses (cookie
+`#close-popup`). One popup can be the **cookie consent banner** (`consent`, `consentPopup`): its content holds the
+Accept and Reject buttons, ordinary Button blocks linking to `#accept-cookies` and `#reject-cookies`, and the
+policy link (`CONSENT_STARTER`, edited like any content); a banner whose content has no Accept link gets
+Accept and Reject added, styled alike (`hasOwnConsentButtons`, `data-consent-choice`). It shows on every page until the visitor chooses (cookie
 `site_consent`: `all` or `necessary`, six months); links to `#cookie-settings` open it again, and
 `#accept-cookies` / `#reject-cookies` choose. While it waits, no other popup shows. Accepting runs the
 code snippets kept for consent and fires `c-consent` (the Stats cookie starts); rejecting fires

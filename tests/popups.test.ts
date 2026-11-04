@@ -3,7 +3,7 @@
 // for consent in a <template>, and the Stats cookie told about the banner.
 import { describe, expect, it } from 'vitest';
 import { siteDb } from '../src/lib/db/site';
-import { consentPopup, popupsFor, popupsFrom } from '../src/lib/popups';
+import { CONSENT_STARTER, consentPopup, popupsFor, popupsFrom } from '../src/lib/popups';
 import { renderRequest } from '../src/render/page';
 
 describe('popups', () => {
@@ -63,4 +63,18 @@ describe('popups', () => {
     expect(plain).not.toContain('Ten percent off');
     expect(plain).toContain('We use cookies.');
   });
+
+  it('uses the Accept and Reject buttons in the banner content, adding none of its own', async () => {
+    const db = siteDb();
+    await db.from('templates').insert({ kind: 'part', slug: 'own-buttons-banner', title: 'Banner', content: { root: { props: {} }, content: CONSENT_STARTER, zones: {} } });
+    await db.from('entries').insert({ type: 'page', slug: 'banner-page', title: 'Banner page', status: 'publish', content: { content: [], root: { props: {} } } });
+    const { data } = await db.from('settings').select('value').eq('key', 'site').maybeSingle();
+    await db.from('settings').upsert({ key: 'site', value: { ...((data?.value as object) ?? {}), popups: popupsFrom([{ id: 'cookies', name: 'Cookie consent', enabled: true, part: 'own-buttons-banner', consent: true }]) } });
+    const html = (await renderRequest(new URL('http://localhost/banner-page/'), db)).html;
+    expect(html).toMatch(/<a class="c-button__link" href="#accept-cookies"[^>]*>Accept<\/a>/);
+    expect(html).toMatch(/<a class="c-button__link" href="#reject-cookies"[^>]*>Reject<\/a>/);
+    expect(html).toContain('href="/privacy/"');
+    expect(html).not.toContain('data-consent-choice');
+  });
 });
+

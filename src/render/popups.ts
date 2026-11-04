@@ -1,7 +1,7 @@
 // Popups on a page (src/lib/popups.ts): each its template part in a .c-popup wrapper, hidden until
-// public/assets/js/popups.js shows it; the consent banner with its Accept and Reject buttons, styled alike.
+// public/assets/js/popups.js shows it; the consent banner's Accept and Reject buttons are in its content (else added here, styled alike).
 import type { PuckItem } from '../lib/puck/types';
-import type { Popup } from '../lib/popups';
+import { hasOwnConsentButtons, type Popup } from '../lib/popups';
 import type { Env } from './env';
 import { renderItems } from './engine';
 
@@ -16,7 +16,8 @@ export function renderPopup(p: Popup, env: Env): string {
   if (!content && !p.consent) return '';
   const settings = { id: p.id, trigger: p.trigger, delay: p.delay, scroll: p.scroll, frequency: p.frequency, days: p.days, consent: p.consent || undefined };
   const modal = p.layout === 'modal';
-  const actions = p.consent
+  // A consent banner's buttons are in its content; one whose content has none gets Accept and Reject here.
+  const actions = p.consent && !hasOwnConsentButtons(content)
     ? `<div class="c-popup__actions"><div class="c-button"><button type="button" class="c-button__link" data-consent-choice="all">${esc(p.acceptLabel ?? 'Accept')}</button></div><div class="c-button"><button type="button" class="c-button__link" data-consent-choice="necessary">${esc(p.rejectLabel ?? 'Reject')}</button></div>${p.policyUrl ? `<a class="c-popup__policy" href="${esc(p.policyUrl)}">${esc(p.policyLabel ?? 'Privacy policy')}</a>` : ''}</div>`
     : '';
   const closer = p.consent ? '' : '<button type="button" class="c-popup__close" aria-label="Close" data-popup-close><span aria-hidden="true">&times;</span></button>';

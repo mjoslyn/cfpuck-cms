@@ -28,9 +28,11 @@ Visitors close a popup with its **×**, the Escape key, or by clicking outside a
 
 ## The cookie consent banner
 
-Press **Add a cookie consent banner**. It starts with a heading and a line of text; change them with
-**Edit content**. Set the words on its **Accept** and **Reject** buttons, and the address of your privacy
-or cookie policy. Turn it on and press **Save settings**.
+Press **Add a cookie consent banner**. It starts with a heading, a line of text with a link to your privacy
+policy, and **Accept** and **Reject** buttons. Press **Edit content** to change any of them: the buttons
+are ordinary buttons, so you can change their words, size, colours and corners like any other. Accept
+links to `#accept-cookies` and Reject to `#reject-cookies`; keep those links so the buttons work. Point
+the policy link at your own privacy page. Turn the banner on and press **Save settings**.
 
 The banner shows on every page until the visitor chooses, and their choice is remembered for six
 months. Add a link to `#cookie-settings` somewhere on the site, such as the footer, so visitors can open

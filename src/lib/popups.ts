@@ -47,7 +47,9 @@ export interface Popup {
   /** Which pages: all, only those listed, or all but those listed (`paths`: /path/ or /prefix/*). */
   pages: 'all' | 'only' | 'except';
   paths?: string[];
-  /** The cookie consent banner: Accept and Reject buttons, shown until the visitor chooses. */
+  /** The cookie consent banner: shown until the visitor chooses. Its content holds the Accept and Reject
+   * buttons (links to #accept-cookies and #reject-cookies); the labels and policy link below are only for a
+   * banner whose content has none, which gets them added. */
   consent?: boolean;
   acceptLabel?: string;
   rejectLabel?: string;
@@ -139,8 +141,24 @@ export interface StatsSettings {
 }
 export const statsSettingsFrom = (v: unknown): StatsSettings | undefined => (v && typeof v === 'object' && (v as StatsSettings).cookies === true ? { cookies: true } : undefined);
 
-/** A new consent banner's content: a heading and a line, for the editor to change. */
+/** A new consent banner's content: a heading, a line with the privacy policy's link, and the Accept and
+ * Reject buttons (links to #accept-cookies and #reject-cookies), all for the editor to change. */
 export const CONSENT_STARTER = [
   { type: 'heading', props: { id: 'consent-heading', attrs: { level: 2, content: 'Cookies on this site' } } },
-  { type: 'text', props: { id: 'consent-text', attrs: { content: 'We use cookies to understand how the site is used. You can accept them or keep to the cookies the site needs to work.' } } },
+  { type: 'text', props: { id: 'consent-text', attrs: { content: 'We use cookies to understand how the site is used. You can accept them or keep to the cookies the site needs to work. <a href="/privacy/">Privacy policy</a>' } } },
+  {
+    type: 'buttons',
+    props: {
+      id: 'consent-buttons',
+      attrs: { style: { margin: { top: 'var(--space-20)' } } },
+      children: [
+        { type: 'button', props: { id: 'consent-accept', attrs: { text: 'Accept', href: '#accept-cookies' } } },
+        { type: 'button', props: { id: 'consent-reject', attrs: { text: 'Reject', href: '#reject-cookies' } } },
+      ],
+    },
+  },
 ];
+
+/** Whether a consent banner's content has its own Accept button (a link to #accept-cookies); without one the
+ * banner adds Accept and Reject itself, so a visitor can always choose. */
+export const hasOwnConsentButtons = (html: string) => /href="#accept-cookies"/.test(html);

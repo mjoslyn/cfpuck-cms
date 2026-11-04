@@ -39,7 +39,7 @@ export default function PopupsSettings({ value, parts: initialParts, onChange }:
       const { slug } = (await r.json()) as { slug: string };
       setParts((ps) => [...ps, { slug, title: name }]);
       const popup: Popup = consent
-        ? { id: newId(name, value.map((p) => p.id)), name, enabled: false, part: slug, layout: 'bar-bottom', trigger: 'load', frequency: 'always', pages: 'all', consent: true, acceptLabel: 'Accept', rejectLabel: 'Reject' }
+        ? { id: newId(name, value.map((p) => p.id)), name, enabled: false, part: slug, layout: 'bar-bottom', trigger: 'load', frequency: 'always', pages: 'all', consent: true }
         : { id: newId(name, value.map((p) => p.id)), name, enabled: false, part: slug, layout: 'modal', trigger: 'delay', delay: 5, frequency: 'session', pages: 'all' };
       onChange([...value, popup]);
     } catch (e) {
@@ -159,24 +159,8 @@ export default function PopupsSettings({ value, parts: initialParts, onChange }:
             )}
             {p.consent && (
               <>
-                <label className="block">
-                  <span className={label}>Accept button</span>
-                  <input className={inputClass} value={p.acceptLabel ?? ''} placeholder="Accept" onChange={(e) => update(i, { acceptLabel: e.target.value })} />
-                </label>
-                <label className="block">
-                  <span className={label}>Reject button</span>
-                  <input className={inputClass} value={p.rejectLabel ?? ''} placeholder="Reject" onChange={(e) => update(i, { rejectLabel: e.target.value })} />
-                </label>
-                <label className="block">
-                  <span className={label}>Privacy or cookie policy (address)</span>
-                  <input className={inputClass} value={p.policyUrl ?? ''} placeholder="/privacy/" onChange={(e) => update(i, { policyUrl: e.target.value })} />
-                </label>
-                <label className="block">
-                  <span className={label}>Its link's words</span>
-                  <input className={inputClass} value={p.policyLabel ?? ''} placeholder="Privacy policy" onChange={(e) => update(i, { policyLabel: e.target.value })} />
-                </label>
                 <p className="text-xs text-admin-muted sm:col-span-2">
-                  Shows on every page until the visitor chooses, then not again for six months. Until they accept, the Stats cookie isn't set and code snippets marked “Only after visitors accept cookies” don't run. A link to <code>#cookie-settings</code> anywhere on the site (in the footer, say) opens it again so they can change their mind.
+                  Its Accept and Reject buttons and the privacy policy link are in its content: use <strong>Edit content</strong> to change their words, size and look like any other button (Accept links to <code>#accept-cookies</code>, Reject to <code>#reject-cookies</code>). Shows on every page until the visitor chooses, then not again for six months. Until they accept, the Stats cookie isn't set and code snippets marked “Only after visitors accept cookies” don't run. A link to <code>#cookie-settings</code> anywhere on the site (in the footer, say) opens it again so they can change their mind.
                 </p>
               </>
             )}
