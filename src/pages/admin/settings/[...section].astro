@@ -20,9 +20,10 @@ const [{ data: settings }, { data: pages }, { data: templates }, { data: redirec
   db.from('not_found').select('*').order('hits', { ascending: false }).limit(200),
 ]);
 const { data: mailLists } = await db.from('mail_lists').select('*').order('sort').order('id');
+const { data: parts } = await db.from('templates').select('slug, title').eq('kind', 'part').is('trashed_at', null).order('title');
 const byKey = Object.fromEntries((settings ?? []).map((s) => [s.key, s.value]));
 ---
 <Admin title="Settings">
   <h1 class="mb-6 text-3xl font-normal">Settings</h1>
-  <SiteSettings client:load section={section || 'general'} site={byKey.site ?? {}} options={byKey.options ?? {}} pages={pages ?? []} templates={(templates ?? []).map((t) => ({ slug: t.slug, title: t.title, content: hasContentBlock((t.content as any)?.content) }))} redirects={redirects ?? []} notFound={notFound ?? []} ticketProviders={providerStatus()} mailgun={mailgunStatus()} mailLists={mailLists ?? []} />
+  <SiteSettings client:load section={section || 'general'} site={byKey.site ?? {}} options={byKey.options ?? {}} pages={pages ?? []} templates={(templates ?? []).map((t) => ({ slug: t.slug, title: t.title, content: hasContentBlock((t.content as any)?.content) }))} redirects={redirects ?? []} notFound={notFound ?? []} ticketProviders={providerStatus()} mailgun={mailgunStatus()} mailLists={mailLists ?? []} parts={parts ?? []} />
 </Admin>

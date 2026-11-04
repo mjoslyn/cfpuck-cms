@@ -265,10 +265,10 @@ export const SCHEMA: Record<string, TableSchema> = {
   },
   site_stat_visitors: {
     pk: ["day","hash"],
-    columns: {"day":"date","hash":"text"},
+    columns: {"day":"date","hash":"text","cookie":"bool"},
     generated: [],
     fks: [],
-    defaults: {},
+    defaults: {"cookie":false},
     touch: false,
   },
   site_stats: {

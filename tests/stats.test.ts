@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { serviceClient, sessionDb, siteDb } from '../src/lib/db/site';
 import { STATS_DAY_ROWS } from '../src/lib/db/functions';
-import { pruneStats, recordHit, referrerHost, statPath, statsCsv, statsRange, statsSummary, statTarget, statsDay } from '../src/lib/stats';
+import { campaignKey, pruneStats, recordHit, referrerHost, statPath, statsCsv, statsRange, statsSummary, statTarget, statsDay } from '../src/lib/stats';
 
 const last = (days: number, when: Date) => statsRange(new URLSearchParams({ days: String(days) }), when);
 import { renderRequest } from '../src/render/page';
@@ -39,7 +39,7 @@ describe('site stats', () => {
     const s = await statsSummary(db, last(7, at));
     expect(s.to).toBe(statsDay(at));
     expect(s.daily).toHaveLength(7);
-    expect(s.totals).toEqual({ views: 3, visitors: 2, clicks: 2 });
+    expect(s.totals).toEqual({ views: 3, visitors: 2, clicks: 2, returning: 0, uniqueOverRange: false });
     expect(s.pages).toEqual([{ path: '/', views: 2, clicks: 1 }, { path: '/about/', views: 1, clicks: 1 }]);
     expect(s.links).toEqual([{ target: 'example.org/tickets', clicks: 2, pages: 2 }]);
     expect(s.referrers).toEqual([{ host: 'google.com', visits: 1 }]);
@@ -69,6 +69,43 @@ describe('site stats', () => {
     expect(csv).toContain('Link,Clicks,Pages clicked from\r\n');
     expect(csv).toContain('/a/,1,1');
     expect(statsCsv({ ...(await statsSummary(db, range)), links: [{ target: '=HYPERLINK("x")', clicks: 1, pages: 1 }] }, 'links')).toContain(`"'=HYPERLINK(""x"")"`);
+  });
+
+  it('counts a visitor with the Stats cookie once over a range, and their return visits', async () => {
+    const db = serviceClient();
+    const id = 'AbCdEfGhIjKlMnOpQrStUv';
+    const d1 = new Date('2026-08-03T15:00:00Z');
+    const d2 = new Date('2026-08-05T15:00:00Z');
+    await recordHit(db, { t: 'view', p: '/', v: id }, req(), d1);
+    await recordHit(db, { t: 'view', p: '/x/', v: id }, req(), d1);
+    await recordHit(db, { t: 'view', p: '/', v: id }, req('Mozilla/5.0 (Windows) Firefox', '192.0.2.9'), d2);
+    // Someone else without the cookie, on both days.
+    await recordHit(db, { t: 'view', p: '/' }, req('Mozilla/5.0 (Linux) Chrome', '192.0.2.50'), d1);
+    await recordHit(db, { t: 'view', p: '/' }, req('Mozilla/5.0 (Linux) Chrome', '192.0.2.50'), d2);
+    // A made-up cookie value is ignored (counted by the day's hash).
+    await recordHit(db, { t: 'view', p: '/', v: 'not a cookie' }, req('Mozilla/5.0 (Linux) Chrome', '192.0.2.50'), d2);
+    const range = statsRange(new URLSearchParams({ from: '2026-08-01', to: '2026-08-07' }), at);
+    const s = await statsSummary(db, range);
+    expect(s.totals).toMatchObject({ views: 6, visitors: 3, returning: 1, uniqueOverRange: true });
+    // Cookie rows are kept past the day; the rest go.
+    await pruneStats(db, new Date('2026-08-10T15:00:00Z'));
+    const { data } = await db.from('site_stat_visitors').select('day, cookie').gte('day', '2026-08-01').lte('day', '2026-08-07');
+    expect(data!.every((r) => r.cookie)).toBe(true);
+    expect(data).toHaveLength(2);
+  });
+
+  it('records campaigns from utm parameters and lists them', async () => {
+    const db = serviceClient();
+    expect(campaignKey({ c: ' spring|sale ', s: 'newsletter', m: 'email' })).toBe('spring sale|newsletter|email');
+    expect(campaignKey({ m: 'email' })).toBe('');
+    const d = new Date('2026-07-10T15:00:00Z');
+    await recordHit(db, { t: 'view', p: '/', u: { c: 'spring', s: 'newsletter', m: 'email' } }, req(), d);
+    await recordHit(db, { t: 'view', p: '/shop/', u: { c: 'spring', s: 'newsletter', m: 'email' } }, req(), d);
+    await recordHit(db, { t: 'view', p: '/', u: { s: 'facebook' } }, req(), d);
+    const range = statsRange(new URLSearchParams({ from: '2026-07-10', to: '2026-07-10' }), at);
+    const s = await statsSummary(db, range);
+    expect(s.campaigns).toEqual([{ campaign: 'spring', source: 'newsletter', medium: 'email', visits: 2 }, { campaign: '', source: 'facebook', medium: '', visits: 1 }]);
+    expect(statsCsv(s, 'campaigns')).toContain('Campaign,Source,Medium,Visits\r\nspring,newsletter,email,2\r\n');
   });
 
   it('stops adding rows to a day past its limit, still counting the ones it has', async () => {

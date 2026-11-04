@@ -9,6 +9,7 @@ import { env } from './env';
 import { SITE_TZ } from './site';
 import { scannerAgent } from './mailing/clicks';
 import { clientIp } from './mailing/request';
+import { VISITOR_COOKIE } from './popups';
 
 /** How long daily counts are kept. */
 export const STATS_KEEP_DAYS = 400;
@@ -68,11 +69,30 @@ export function referrerHost(ref: unknown, origin: string): string {
   }
 }
 
+/** A Stats visitor cookie's value: 22 base64url characters (16 random bytes), made in the browser. */
+export const visitorCookieOk = (v: unknown): v is string => typeof v === 'string' && /^[A-Za-z0-9_-]{22}$/.test(v);
+
+/** The hash a visitor with a cookie is kept under: the same every day, not the cookie itself. */
+export async function cookieHash(id: string): Promise<string> {
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`site-stats-cookie|${env('AUTH_SECRET') ?? ''}|${id}`)));
+  return [...digest.slice(0, 16)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
 /** The visitor's hash for the day: the same all day, unrelated from one day to the next. */
 export async function visitorHash(day: string, ip: string, ua: string): Promise<string> {
   const bytes = new TextEncoder().encode(`site-stats|${env('AUTH_SECRET') ?? ''}|${day}|${ip}|${ua}`);
   const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
   return [...digest.slice(0, 16)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** A visit's campaign from its utm_ parameters ({ c: campaign, s: source, m: medium }), as kept:
+ * `campaign|source|medium`, each trimmed to 100 characters without `|`; '' without a campaign or source. */
+export function campaignKey(u: unknown): string {
+  if (!u || typeof u !== 'object') return '';
+  const part = (v: unknown) => (typeof v === 'string' ? v.replace(/[|\u0000-\u001f]/g, ' ').trim().slice(0, 100) : '');
+  const { c, s, m } = u as Record<string, unknown>;
+  const [campaign, source, medium] = [part(c), part(s), part(m)];
+  return campaign || source ? `${campaign}|${source}|${medium}` : '';
 }
 
 export interface Hit {
@@ -84,6 +104,10 @@ export interface Hit {
   r?: string;
   /** A click's link (its href). */
   h?: string;
+  /** A view's utm_campaign, utm_source and utm_medium. */
+  u?: { c?: string; s?: string; m?: string };
+  /** The Stats visitor cookie (VISITOR_COOKIE), sent only when it is on and the visitor allowed it. */
+  v?: string;
 }
 
 /** Counts one hit the browser reported; false when it isn't counted (not a page, a machine, bad data). */
@@ -100,15 +124,18 @@ export async function recordHit(db: Db, body: unknown, request: Request, at: Dat
     return true;
   }
   if (hit.t !== 'view') return false;
-  const visitor = await visitorHash(day, clientIp(request), request.headers.get('user-agent') ?? '');
-  await db.rpc('stat_hit', { kind: 'view', day, path, visitor, referrer: referrerHost(hit.r, origin) });
+  // The visitor cookie (${VISITOR_COOKIE}) when the browser sent one, else the day's hash.
+  const cookie = visitorCookieOk(hit.v);
+  const visitor = cookie ? await cookieHash(hit.v as string) : await visitorHash(day, clientIp(request), request.headers.get('user-agent') ?? '');
+  await db.rpc('stat_hit', { kind: 'view', day, path, visitor, cookie, referrer: referrerHost(hit.r, origin), campaign: campaignKey(hit.u) });
   return true;
 }
 
 /** Drops visitor hashes from before today and counts older than STATS_KEEP_DAYS (the hourly run). */
 export async function pruneStats(db: Db, at: Date = new Date()): Promise<string> {
   const today = statsDay(at);
-  const { count: visitors } = await db.from('site_stat_visitors').delete({ count: 'exact' }).lt('day', today);
+  const { count: visitors } = await db.from('site_stat_visitors').delete({ count: 'exact' }).eq('cookie', false).lt('day', today);
+  await db.from('site_stat_visitors').delete().eq('cookie', true).lt('day', daysBefore(today, STATS_KEEP_DAYS));
   const { count: days } = await db.from('site_stats').delete({ count: 'exact' }).lt('day', daysBefore(today, STATS_KEEP_DAYS));
   return `${visitors ?? 0} visitor hashes and ${days ?? 0} old counts pruned`;
 }
@@ -153,13 +180,20 @@ export function statsRange(params: URLSearchParams, at: Date = new Date()): Stat
 export interface StatsSummary {
   from: string;
   to: string;
-  totals: { views: number; visitors: number; clicks: number };
+  /**
+   * views and clicks; visitors: people over the range (each with a cookie once, each without one once a
+   * day, `uniqueOverRange` when any came with a cookie); returning: days of visitors with a cookie seen on
+   * an earlier day.
+   */
+  totals: { views: number; visitors: number; clicks: number; returning: number; uniqueOverRange: boolean };
   /** Every day of the range, oldest first. */
   daily: { day: string; views: number; visitors: number; clicks: number }[];
   /** Every page viewed or clicked from (up to 2,000), with its views and the clicks on links in it. */
   pages: { path: string; views: number; clicks: number }[];
   links: { target: string; clicks: number; pages: number }[];
   referrers: { host: string; visits: number }[];
+  /** Visits that came with utm_ parameters, by campaign, source and medium (the top 200). */
+  campaigns: { campaign: string; source: string; medium: string; visits: number }[];
 }
 
 /** The Stats screen's numbers for a range (the editors' `stats_summary`), its pages by views or clicks. */
@@ -168,7 +202,7 @@ export async function statsSummary(db: Db, range: { from: string; to: string }, 
   const days = daysBetween(from, to);
   const { data, error } = await db.rpc('stats_summary', { from, to, sort });
   if (error) throw new Error(error.message);
-  const r = data as Omit<StatsSummary, 'from' | 'to' | 'totals' | 'daily'> & { daily: { day: string; kind: string; hits: number }[] };
+  const r = data as Omit<StatsSummary, 'from' | 'to' | 'totals' | 'daily' | 'campaigns'> & { campaigns: { target: string; visits: number }[]; daily: { day: string; kind: string; hits: number }[]; cookieVisitors: { days: number; people: number; returning: number } };
   const byDay = new Map<string, { day: string; views: number; visitors: number; clicks: number }>();
   for (let i = days - 1; i >= 0; i--) {
     const day = daysBefore(to, i);
@@ -182,11 +216,17 @@ export async function statsSummary(db: Db, range: { from: string; to: string }, 
   }
   const daily = [...byDay.values()];
   const sum = (k: 'views' | 'visitors' | 'clicks') => daily.reduce((n, d) => n + d[k], 0);
-  return { from, to, totals: { views: sum('views'), visitors: sum('visitors'), clicks: sum('clicks') }, daily, pages: r.pages.map((p) => ({ path: p.path, views: Number(p.views), clicks: Number(p.clicks) })), links: r.links, referrers: r.referrers };
+  const c = r.cookieVisitors;
+  // Days of visitors with a cookie are counted once each over the range instead.
+  const visitors = sum('visitors') - c.days + c.people;
+  return { from, to, totals: { views: sum('views'), visitors, clicks: sum('clicks'), returning: c.returning, uniqueOverRange: c.days > 0 }, daily, pages: r.pages.map((p) => ({ path: p.path, views: Number(p.views), clicks: Number(p.clicks) })), links: r.links, referrers: r.referrers, campaigns: r.campaigns.map((x) => {
+    const [campaign = '', source = '', medium = ''] = x.target.split('|');
+    return { campaign, source, medium, visits: Number(x.visits) };
+  }) };
 }
 
 /** The tables the Stats screen exports as CSV. */
-export const STATS_TABLES = ['daily', 'pages', 'links', 'referrers'] as const;
+export const STATS_TABLES = ['daily', 'pages', 'links', 'referrers', 'campaigns'] as const;
 export type StatsTable = (typeof STATS_TABLES)[number];
 
 /** One of the Stats screen's tables as CSV (a byte order mark first, for spreadsheets; formulas guarded). */
@@ -201,6 +241,7 @@ export function statsCsv(s: StatsSummary, table: StatsTable): string {
     table === 'daily' ? [['Day', 'Views', 'Visitors', 'Link clicks'], ...s.daily.map((d) => [d.day, d.views, d.visitors, d.clicks])]
     : table === 'pages' ? [['Page', 'Views', 'Link clicks'], ...s.pages.map((p) => [p.path, p.views, p.clicks])]
     : table === 'links' ? [['Link', 'Clicks', 'Pages clicked from'], ...s.links.map((l) => [l.target, l.clicks, l.pages])]
+    : table === 'campaigns' ? [['Campaign', 'Source', 'Medium', 'Visits'], ...s.campaigns.map((c) => [c.campaign, c.source, c.medium, c.visits])]
     : [['Site', 'Visits'], ...s.referrers.map((r) => [r.host, r.visits])];
   return `﻿${rows.map((r) => r.map(cell).join(',')).join('\r\n')}\r\n`;
 }

@@ -33,13 +33,15 @@ import type { TicketSettings } from '../lib/tickets/config';
 import type { Redirect } from '../lib/redirects';
 import { MENU_FIELDS } from '../lib/navigation';
 import { SNIPPET_MAX, SNIPPET_PLACES, type CodeSnippets } from '../lib/snippets';
+import { consentPopup, type Popup, type StatsSettings } from '../lib/popups';
+import PopupsSettings from '../admin/PopupsSettings';
 import type { TaxonomyMeta } from '../lib/page-meta';
 import { ADMIN_THEME_DEFAULTS, ADMIN_THEME_FIELDS, adminThemeVars, contrast, type AdminTheme } from '../lib/admin-theme';
 
 interface Props {
   /** The section the address names. */
   section: string;
-  site: { name?: string; description?: string; front_page_id?: number | null; not_found_page_id?: number | null; timezone?: string; search_types?: string[]; social?: { network: string; url: string }[]; share_image?: number; share_image_url?: string; templates?: TemplateMap; taxonomy_templates?: Record<string, string>; taxonomy_pages_off?: string[]; taxonomy_meta?: Record<string, TaxonomyMeta>; listing_meta?: Record<string, TaxonomyMeta>; listings_off?: string[]; featured_types?: string[]; icons?: Record<string, string>; icon_media_id?: number | null; icon_preview?: string; admin_theme?: AdminTheme; tickets?: TicketSettings; members?: Partial<MemberSettings>; mailing?: MailingSettings; events?: { enabled?: boolean }; a11y?: { block_publish?: boolean }; snippets?: CodeSnippets };
+  site: { name?: string; description?: string; front_page_id?: number | null; not_found_page_id?: number | null; timezone?: string; search_types?: string[]; social?: { network: string; url: string }[]; share_image?: number; share_image_url?: string; templates?: TemplateMap; taxonomy_templates?: Record<string, string>; taxonomy_pages_off?: string[]; taxonomy_meta?: Record<string, TaxonomyMeta>; listing_meta?: Record<string, TaxonomyMeta>; listings_off?: string[]; featured_types?: string[]; icons?: Record<string, string>; icon_media_id?: number | null; icon_preview?: string; admin_theme?: AdminTheme; tickets?: TicketSettings; members?: Partial<MemberSettings>; mailing?: MailingSettings; events?: { enabled?: boolean }; a11y?: { block_publish?: boolean }; snippets?: CodeSnippets; popups?: Popup[]; stats?: StatsSettings };
   options: Record<string, any>;
   pages: { id: number; title: string }[];
   templates: TemplateInfo[];
@@ -50,6 +52,8 @@ interface Props {
   /** Mailgun's keys (for Mailing) and the mailing lists. */
   mailgun: MailgunInfo;
   mailLists: MailList[];
+  /** The site's template parts (a popup's content). */
+  parts: { slug: string; title: string }[];
 }
 
 /** The template pickers' value for "Off" (no listing page, no term pages). */
@@ -58,7 +62,7 @@ const OFF = '__off__';
 /** Every IANA timezone the browser knows. */
 const TIMEZONES: string[] = (Intl as any).supportedValuesOf?.('timeZone') ?? [config.timezone];
 
-export default function SiteSettings({ section, site: initialSite, options: initialOptions, pages, templates, redirects, notFound, ticketProviders, mailgun, mailLists }: Props) {
+export default function SiteSettings({ section, site: initialSite, options: initialOptions, pages, templates, redirects, notFound, ticketProviders, mailgun, mailLists, parts }: Props) {
   const [site, setSite] = useState(initialSite);
   const [options, setOptions] = useState(initialOptions);
   const [status, setStatus] = useState('');
@@ -279,6 +283,30 @@ export default function SiteSettings({ section, site: initialSite, options: init
       panel: <MailingSettingsPanel value={site.mailing ?? {}} mailgun={mailgun} lists={mailLists} membersOn={!!site.members?.enabled} onChange={(mailing) => setSite((s) => ({ ...s, mailing }))} />,
     },
     {
+      id: 'popups',
+      label: 'Popups',
+      panel: <PopupsSettings value={site.popups ?? []} parts={parts} onChange={(popups) => setSite((s) => ({ ...s, popups }))} />,
+    },
+    {
+      id: 'stats',
+      label: 'Stats',
+      panel: (
+        <>
+          <Toggle title="Recognise returning visitors with a cookie" value={site.stats?.cookies} onChange={(on) => setSite((s) => ({ ...s, stats: on ? { cookies: true } : undefined }))} />
+          <p className="mb-3 text-xs text-admin-muted">
+            Off, Stats counts each visitor once a day without any cookie, so the same person on three days counts three times. On, it keeps a random id in a cookie for 13 months, so Stats counts unique visitors over any range and shows how many came back.
+          </p>
+          {site.stats?.cookies && (
+            <p className={`rounded px-3 py-2 text-xs ${consentPopup(site.popups) ? 'bg-admin-soft text-admin-muted' : 'bg-[#c4592a]/10 text-[#c4592a]'}`}>
+              {consentPopup(site.popups)
+                ? 'The cookie is set only for visitors who accept cookies in the consent banner (Settings > Popups). Others are still counted once a day.'
+                : 'No cookie consent banner is on, so every visitor gets the cookie. In the EU and UK the law asks for consent first: add a cookie consent banner under Settings > Popups.'}
+            </p>
+          )}
+        </>
+      ),
+    },
+    {
       id: 'code',
       label: 'Code snippets',
       panel: (
@@ -298,8 +326,19 @@ export default function SiteSettings({ section, site: initialSite, options: init
                 value={site.snippets?.[p.key] ?? ''}
                 onChange={(e) => setSite((s) => ({ ...s, snippets: { ...s.snippets, [p.key]: e.target.value } }))}
               />
+              <span className="mt-1 flex items-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  checked={!!site.snippets?.consent?.[p.key]}
+                  onChange={(e) => setSite((s) => ({ ...s, snippets: { ...s.snippets, consent: { ...s.snippets?.consent, [p.key]: e.target.checked } } }))}
+                />
+                Only after visitors accept cookies
+              </span>
             </label>
           ))}
+          {Object.values(site.snippets?.consent ?? {}).some(Boolean) && !consentPopup(site.popups) && (
+            <p className="rounded bg-[#c4592a]/10 px-3 py-2 text-xs text-[#c4592a]">No cookie consent banner is on (Settings &gt; Popups), so nobody can accept: snippets marked to wait for it won't run.</p>
+          )}
         </>
       ),
     },
@@ -406,7 +445,7 @@ export default function SiteSettings({ section, site: initialSite, options: init
           </div>
         </div>
         {tabs.map((t) => (
-          <section key={t.id} aria-label={t.label} hidden={t.id !== current.id} className={['redirects', 'sync', 'backups'].includes(t.id) ? 'max-w-5xl' : t.id === 'site' || t.id === 'types' || t.id === 'tickets' || t.id === 'connections' || t.id === 'code' ? 'max-w-3xl' : 'max-w-md'}>
+          <section key={t.id} aria-label={t.label} hidden={t.id !== current.id} className={['redirects', 'sync', 'backups'].includes(t.id) ? 'max-w-5xl' : t.id === 'site' || t.id === 'types' || t.id === 'tickets' || t.id === 'connections' || t.id === 'code' || t.id === 'popups' ? 'max-w-3xl' : 'max-w-md'}>
             {t.panel}
           </section>
         ))}

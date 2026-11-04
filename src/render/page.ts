@@ -1,7 +1,9 @@
 // Request -> full HTML document:
 // resolve the queried object, pick a template via the template hierarchy, render blocks,
 // then texturize the result (get_the_block_template_html) and wrap it in the page shell.
-import type { CodeSnippets } from '../lib/snippets';
+import { snippetAt, type CodeSnippets } from '../lib/snippets';
+import { consentPopup, popupsFor, type Popup } from '../lib/popups';
+import { popupItem, renderPopup } from './popups';
 import { VENDOR_CSS } from './vendor';
 import type { Db } from '../lib/db/query';
 import { Loader } from '../lib/data';
@@ -309,6 +311,9 @@ export async function renderRequest(url: URL, db: Db, form?: FormResult, preview
     }
   }
   await prepare(template ?? [], ctx);
+  // Popups shown here (Settings > Popups; the consent banner on every page), prepared with the page.
+  const popups: Popup[] = preview ? [] : [...new Set([consentPopup(settings.site?.popups), ...popupsFor(settings.site?.popups, url.pathname)].filter((p): p is Popup => !!p))];
+  if (popups.length) await prepare(popups.map(popupItem), ctx);
   // A list (or a picked entry) left out members-only entries: a member's view of the page differs (while
   // Members is off nobody is one, and the page stays shared).
   if (loader.hidMembersOnly && memberSettings(settings.site).enabled) ctx.personal = true;
@@ -319,7 +324,9 @@ export async function renderRequest(url: URL, db: Db, form?: FormResult, preview
   }
 
   // Block themes run the main loop on singular requests, which drives image loading attributes.
-  const body = await modernizeImages(optimizeImages(texturize(renderItems(template ?? [], { ctx, post: queried.entry ?? null, query: null, parentLayout: null })), queried.kind === 'singular'), db);
+  const env = { ctx, post: queried.entry ?? null, query: null, parentLayout: null };
+  const popupHtml = popups.map((p) => renderPopup(p, env)).join('');
+  const body = await modernizeImages(optimizeImages(texturize(renderItems(template ?? [], env) + popupHtml), queried.kind === 'singular'), db);
   const css = [...new Set(ctx.css)].join('');
   const pre = vendorCss(ctx).map((b) => `<link rel="stylesheet" id="${b}-css" href="${VENDOR_CSS[b]}" media="all" />\n`).join('');
   const site = settings.site ?? {};
@@ -336,7 +343,11 @@ export async function renderRequest(url: URL, db: Db, form?: FormResult, preview
   if (mailingOn(site) && !preview) scripts.push('<script src="/assets/js/mail-seen.js" defer></script>');
   // Site statistics: the page's view and the links followed from it (src/lib/stats.ts); not on previews
   // or pages not found.
-  if (!preview && queried.kind !== '404' && !queried.notFound) scripts.push('<script src="/assets/js/stats.js" defer></script>');
+  // Popups, and snippets that wait for consent (src/lib/popups.ts).
+  if (popupHtml || Object.values(snippets.consent ?? {}).some(Boolean)) scripts.push('<script src="/assets/js/popups.js" defer></script>');
+  const stats = (settings.site?.stats ?? {}) as { cookies?: boolean };
+  const banner = !!consentPopup(settings.site?.popups);
+  if (!preview && queried.kind !== '404' && !queried.notFound) scripts.push(`<script src="/assets/js/stats.js"${stats.cookies ? ' data-cookie="1"' : ''}${banner ? ' data-consent="1"' : ''} defer></script>`);
 
   // A calendar view names itself ("Events for October 2026"), unless its listing has a search title of its own.
   const title = ctx.data.get('calendar') && !ownTitle(queried, site) ? `${esc((ctx.data.get('calendar') as { title: string }).title)} &#8211; ${site.name ?? ''}` : documentTitle(queried, site);
@@ -351,13 +362,13 @@ ${meta}${pre}<style id='core-block-supports-inline-css'>
 ${css}
 </style>
 ${(ctx.headScripts ?? []).map((s) => `${s}\n`).join('')}<link rel='stylesheet' id='site-css' href='${siteCss}' media='all' />
-${SITE_RENDER.head ? `${SITE_RENDER.head(ctx)}\n` : ''}${icons['32'] ? `<link rel="icon" href="${icons['32']}" sizes="32x32" />\n` : ''}${icons['192'] ? `<link rel="icon" href="${icons['192']}" sizes="192x192" />\n` : ''}${icons['180'] ? `<link rel="apple-touch-icon" href="${icons['180']}" />\n` : ''}${snippets.head ? `${snippets.head}\n` : ''}</head>
+${SITE_RENDER.head ? `${SITE_RENDER.head(ctx)}\n` : ''}${icons['32'] ? `<link rel="icon" href="${icons['32']}" sizes="32x32" />\n` : ''}${icons['192'] ? `<link rel="icon" href="${icons['192']}" sizes="192x192" />\n` : ''}${icons['180'] ? `<link rel="apple-touch-icon" href="${icons['180']}" />\n` : ''}${snippetAt(snippets, 'head')}</head>
 
 <body class="${bodyClasses(queried)}"${editTargets(queried, templateSlug, !!preview)}>
-${snippets.bodyStart ? `${snippets.bodyStart}\n` : ''}<a class="c-skip-link c-sr-only" href="#content">Skip to content</a>
+${snippetAt(snippets, 'bodyStart')}<a class="c-skip-link c-sr-only" href="#content">Skip to content</a>
 <div class="c-page">${body.replace(/<main(?![^>]*\sid=)/, '<main id="content"')}</div>
 ${scripts.join('\n')}
-${snippets.footer ? `${snippets.footer}\n` : ''}</body>
+${snippetAt(snippets, 'footer')}</body>
 </html>
 `;
   return { status: queried.kind === '404' || queried.notFound ? 404 : 200, html, personal: !!ctx.personal, locked: !!queried.entry?.locked };

@@ -63,7 +63,7 @@ const sortLink = (k: 'views' | 'clicks', label: string) => (sort === k ? `${labe
 
   <div class="mt-6 grid gap-4 sm:grid-cols-3">
     <div class={card}><p class="text-xs font-semibold tracking-wider text-admin-muted uppercase">Page views</p><p class="mt-1 text-3xl">{fmt(s.totals.views)}</p></div>
-    <div class={card}><p class="text-xs font-semibold tracking-wider text-admin-muted uppercase">Visitors</p><p class="mt-1 text-3xl">{fmt(s.totals.visitors)}</p><p class="mt-1 text-xs text-admin-muted">Counted once a day each</p></div>
+    <div class={card}><p class="text-xs font-semibold tracking-wider text-admin-muted uppercase">Visitors</p><p class="mt-1 text-3xl">{fmt(s.totals.visitors)}</p><p class="mt-1 text-xs text-admin-muted">{s.totals.uniqueOverRange ? `Each with the Stats cookie counted once in these dates; ${fmt(s.totals.returning)} return visits` : 'Counted once a day each'}</p></div>
     <div class={card}><p class="text-xs font-semibold tracking-wider text-admin-muted uppercase">Links clicked</p><p class="mt-1 text-3xl">{fmt(s.totals.clicks)}</p></div>
   </div>
 
@@ -144,6 +144,17 @@ const sortLink = (k: 'views' | 'clicks', label: string) => (sort === k ? `${labe
         <tbody>
           {s.referrers.map((r) => <tr><td class={`${td} break-all`}>{r.host}</td><td class={`${td} text-right tabular-nums`}>{fmt(Number(r.visits))}</td></tr>)}
           {!s.referrers.length && <tr><td class={`${td} text-admin-muted`} colspan="2">None yet: visits typed in, from bookmarks or from apps don't name a site.</td></tr>}
+        </tbody>
+      </table>
+    </section>
+    <section class="lg:col-span-2">
+      <h2 class="flex justify-between gap-2 text-sm font-semibold">Campaigns <a class={csvLink} href={csv('campaigns')} download>Download CSV</a></h2>
+      <p class="text-xs text-admin-muted">Visits that arrived by an address with <code>utm_campaign</code>, <code>utm_source</code> or <code>utm_medium</code>, such as <code>/?utm_campaign=spring-sale&amp;utm_source=newsletter&amp;utm_medium=email</code>.</p>
+      <table class="mt-2 w-full border-collapse overflow-hidden rounded bg-white text-sm shadow-[0_0_0_1px_rgba(26,26,46,0.08)]">
+        <thead class="bg-admin-soft text-left text-xs tracking-wider text-admin-muted uppercase"><tr><th class={th}>Campaign</th><th class={th}>Source</th><th class={th}>Medium</th><th class={`${th} text-right`}>Visits</th></tr></thead>
+        <tbody>
+          {s.campaigns.map((c) => <tr><td class={`${td} break-all`}>{c.campaign || <span class="text-admin-muted">(none)</span>}</td><td class={`${td} break-all`}>{c.source || <span class="text-admin-muted">(none)</span>}</td><td class={`${td} break-all`}>{c.medium || <span class="text-admin-muted">(none)</span>}</td><td class={`${td} text-right tabular-nums`}>{fmt(c.visits)}</td></tr>)}
+          {!s.campaigns.length && <tr><td class={`${td} text-admin-muted`} colspan="4">None yet.</td></tr>}
         </tbody>
       </table>
     </section>

@@ -477,17 +477,42 @@ addresses: a visitor is counted once a day by a hash of the day, `AUTH_SECRET`, 
 (`site_stat_visitors`, emptied after the day by the hourly run, `pruneStats`). A link is kept as its path
 on the site, or host and path elsewhere, `mailto:`/`tel:` as written, without query or fragment
 (`statTarget`); a referrer as its host (`referrerHost`). Machines (`scannerAgent`) and signed-in editors
-aren't counted; addresses that aren't pages (`/admin`, `/api`, `/media`...) are refused (`statPath`). A
+aren't counted; addresses that aren't pages (`/admin`, `/api`, `/media`...) are refused (`statPath`). **Campaigns**: a view whose address has `utm_campaign`
+or `utm_source` (with `utm_medium`) counts under kind `campaign`, target `campaign|source|medium`
+(`campaignKey`; migration `*_site_stats_campaigns.sql`), listed and exported with the others. **The Stats
+cookie** (Settings > Stats, `settings.site.stats.cookies`): stats.js keeps a random id in `site_vid` (13
+months) and sends it; the visitor is kept under its hash (`cookieHash`, `site_stat_visitors.cookie`, kept
+as long as the counts; migration `*_site_stats_cookie.sql`), so Visitors counts each once over the range
+and the screen shows return visits (`cookieVisitors` in `stats_summary`). While a consent banner is on
+(see Popups) the cookie is set only after the visitor accepts; without one Settings warns. A
 day holds at most `STATS_DAY_ROWS` (5,000) rows, past which only rows it has are counted, so made-up
 addresses can't fill the table. Counts older than `STATS_KEEP_DAYS` (400) go hourly. Not synced or backed
 up.
+
+## Popups and cookie consent
+
+Settings > Popups (admins; `settings.site.popups`, `src/lib/popups.ts`, `src/admin/PopupsSettings.tsx`):
+each popup shows a template part (made with it, edited in the visual editor; **Edit content**) as a dialog,
+a bar along the bottom or top, or a corner box; on load, after a delay, at a scroll depth or on exit
+intent; on every page, once a visit or once every N days (the browser's storage); on all pages, only some
+or all but some (`/path/`, `/prefix/*`; `popupsFor`). `renderRequest` prepares and renders the popups for
+the address with the page (`src/render/popups.ts`: `.c-popup`, `hidden`, settings in `data-popup`; not on
+previews) and `public/assets/js/popups.js` shows them (focus kept in a dialog, Escape and × close, links to
+`#close-popup`). One popup can be the **cookie consent banner** (`consent`, `consentPopup`): Accept and
+Reject buttons (`data-consent-choice`), a policy link, on every page until the visitor chooses (cookie
+`site_consent`: `all` or `necessary`, six months); links to `#cookie-settings` open it again, and
+`#accept-cookies` / `#reject-cookies` choose. While it waits, no other popup shows. Accepting runs the
+code snippets kept for consent and fires `c-consent` (the Stats cookie starts); rejecting fires
+`c-consent-reject` (the Stats cookie is removed).
 
 ## Code snippets
 
 Settings > Code snippets (admins; `settings.site.snippets`, `src/lib/snippets.ts`): markup put on every
 page as written (analytics, chat, verification tags): `head` at the end of `<head>`, `bodyStart` right
 after `<body>`, `footer` before `</body>` (`renderRequest`, after texturize, so it is never changed). Not on
-previews. Up to `SNIPPET_MAX` (20,000) characters each. Synced with the other settings.
+previews. Up to `SNIPPET_MAX` (20,000) characters each. A place ticked **Only after visitors accept
+cookies** (`snippets.consent`) is kept in a `<template data-consent-snippet>` that popups.js puts in place,
+its scripts run in order, once the visitor accepts in the consent banner (`snippetAt`). Synced with the other settings.
 
 ## Compose with Claude
 
@@ -1218,7 +1243,7 @@ builder's and campaign editor's Compose dialogs, or the editor's panel, whose co
 
 **Settings** (admins; `src/puck/SiteSettings.tsx`, page `src/pages/admin/settings/[...section].astro`): a side
 menu of sections in groups (`SETTINGS_GROUPS`, `src/lib/admin/settings-sections.ts`): Site (General, Menu,
-Social, Search, Types, the site's own options, Code snippets), Features (Events, Tickets, Members, Mailing Lists, marked
+Social, Search, Types, the site's own options, Popups, Stats, Code snippets), Features (Events, Tickets, Members, Mailing Lists, marked
 On or Off), Services (Connections), Admin (Accessibility, Appearance) and Upkeep (Redirects, Sync,
 Backups); a Section dropdown on phones. Each section has its own address, `/admin/settings/<section>/`
 (General `/admin/settings/`; `sectionOf`, `settingsPath`); the screen moves between them in place, so

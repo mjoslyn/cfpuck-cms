@@ -1,4 +1,4 @@
-// One of the Stats screen's tables as CSV (editors): GET /api/admin/stats.csv?table=daily|pages|links|referrers
+// One of the Stats screen's tables as CSV (editors): GET /api/admin/stats.csv?table=daily|pages|links|referrers|campaigns
 // with the screen's range (days, or from and to) and sort.
 import type { APIRoute } from 'astro';
 import { STATS_TABLES, statsCsv, statsRange, statsSummary, type StatsTable } from '../../../lib/stats';

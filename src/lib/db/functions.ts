@@ -172,28 +172,39 @@ export const FUNCTIONS: Record<string, Fn> = {
       }
       if (a.kind !== 'view') return null;
       await count('view', path, '');
-      if (a.visitor && (await exec.changes('INSERT INTO site_stat_visitors (day, hash) VALUES (?1, ?2) ON CONFLICT DO NOTHING', [day, String(a.visitor).slice(0, 64)]))) await count('visitor', '', '');
+      // A visitor once a day: by their cookie's hash (`cookie`, kept for unique and returning visitors over
+      // a range) or the day's hash of their address and browser.
+      if (a.visitor && (await exec.changes('INSERT INTO site_stat_visitors (day, hash, cookie) VALUES (?1, ?2, ?3) ON CONFLICT DO NOTHING', [day, String(a.visitor).slice(0, 64), a.cookie ? 1 : 0]))) await count('visitor', '', '');
       if (a.referrer) await count('referrer', '', String(a.referrer));
+      if (a.campaign) await count('campaign', '', String(a.campaign));
       return null;
     },
   },
 
   /**
    * The Stats screen's numbers from `from` to `to` (days): daily totals; every page (up to 2,000) with its
-   * views and the clicks on links in it, by `sort` (views or clicks); the top links and referrers.
+   * views and the clicks on links in it, by `sort` (views or clicks); the top links, referrers and campaigns.
    */
   stats_summary: {
     editors: true,
     async run(exec, a) {
       const range = [String(a.from ?? ''), String(a.to ?? '')];
       const by = a.sort === 'clicks' ? 'clicks DESC, views DESC' : 'views DESC, clicks DESC';
-      const [daily, pages, links, referrers] = await Promise.all([
+      const [daily, pages, links, referrers, campaigns] = await Promise.all([
         exec.rows(`SELECT day, kind, sum(hits) AS hits FROM site_stats WHERE day BETWEEN ?1 AND ?2 AND kind IN ('view', 'visitor', 'click') GROUP BY day, kind`, range),
         exec.rows(`SELECT path, sum(CASE WHEN kind = 'view' THEN hits ELSE 0 END) AS views, sum(CASE WHEN kind = 'click' THEN hits ELSE 0 END) AS clicks FROM site_stats WHERE day BETWEEN ?1 AND ?2 AND kind IN ('view', 'click') GROUP BY path ORDER BY ${by}, path LIMIT 2000`, range),
         exec.rows(`SELECT target, sum(hits) AS clicks, count(DISTINCT path) AS pages FROM site_stats WHERE day BETWEEN ?1 AND ?2 AND kind = 'click' GROUP BY target ORDER BY clicks DESC, target LIMIT 100`, range),
         exec.rows(`SELECT target AS host, sum(hits) AS visits FROM site_stats WHERE day BETWEEN ?1 AND ?2 AND kind = 'referrer' GROUP BY target ORDER BY visits DESC, target LIMIT 15`, range),
+        exec.rows(`SELECT target, sum(hits) AS visits FROM site_stats WHERE day BETWEEN ?1 AND ?2 AND kind = 'campaign' GROUP BY target ORDER BY visits DESC, target LIMIT 200`, range),
       ]);
-      return { daily, pages, links, referrers };
+      // Visitors counted by a cookie are kept: each counts once over the range (unique), and a day of one
+      // seen on an earlier day is a returning visit. Those without a cookie count once a day.
+      const [v] = await exec.rows<{ days: number; people: number; back: number }>(
+        `SELECT count(*) AS days, count(DISTINCT hash) AS people, coalesce(sum(EXISTS (SELECT 1 FROM site_stat_visitors e WHERE e.hash = v.hash AND e.cookie = 1 AND e.day < v.day)), 0) AS back
+         FROM site_stat_visitors v WHERE v.cookie = 1 AND v.day BETWEEN ?1 AND ?2`,
+        range,
+      );
+      return { daily, pages, links, referrers, campaigns, cookieVisitors: { days: Number(v?.days ?? 0), people: Number(v?.people ?? 0), returning: Number(v?.back ?? 0) } };
     },
   },
 

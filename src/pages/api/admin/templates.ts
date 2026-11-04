@@ -55,7 +55,9 @@ export const POST: APIRoute = async ({ request, locals, redirect }) => {
     if (body.action === 'create') {
       if (!['template', 'part', 'pattern'].includes(body.kind) || !title) return new Response('Bad request', { status: 400 });
       const slug = await freeSlug(locals.db, body.kind, title);
-      const { error } = await locals.db.from('templates').insert({ kind: body.kind, slug, title, content: { root: { props: {} }, content: [], zones: {} } });
+      // A part made for a popup can start with blocks (a consent banner's heading and text).
+      const start = body.kind === 'part' && Array.isArray(body.content) ? body.content.slice(0, 20) : [];
+      const { error } = await locals.db.from('templates').insert({ kind: body.kind, slug, title, content: { root: { props: {} }, content: start, zones: {} } });
       if (error) return new Response(error.message, { status: 400 });
       return Response.json({ slug });
     }
