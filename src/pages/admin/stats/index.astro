@@ -1,15 +1,17 @@
 ---
-// Stats (editors): the site's page views, visitors and links clicked over a range of days, with the top
-// pages, links and sites visits came from (src/lib/stats.ts).
+// Stats (editors): the site's page views, visitors and links clicked over a range of days (the last 7,
+// 30, 90 or 365, or dates chosen), every page with its views and link clicks, and the top links and sites
+// visits came from (src/lib/stats.ts).
 import Admin from '../../../layouts/Admin.astro';
-import { STATS_RANGES, statsSummary } from '../../../lib/stats';
+import { STATS_MAX_DAYS, STATS_RANGES, statsDay, statsRange, statsSummary } from '../../../lib/stats';
 
-const asked = Number(Astro.url.searchParams.get('days'));
-const days = (STATS_RANGES as readonly number[]).includes(asked) ? asked : 30;
-const s = await statsSummary(Astro.locals.db, days);
+const range = statsRange(Astro.url.searchParams);
+const sort = Astro.url.searchParams.get('sort') === 'clicks' ? 'clicks' : 'views';
+const s = await statsSummary(Astro.locals.db, range, sort);
+const today = statsDay();
 
-// A year shows a bar a week (from the range's first day); shorter ranges a bar a day.
-const step = days > 90 ? 7 : 1;
+// Over 90 days a bar a week (from the range's first day); shorter ranges a bar a day.
+const step = range.days > 90 ? 7 : 1;
 const bars: { label: string; views: number; visitors: number; clicks: number }[] = [];
 for (let i = 0; i < s.daily.length; i += step) {
   const group = s.daily.slice(i, i + step);
@@ -18,14 +20,24 @@ for (let i = 0; i < s.daily.length; i += step) {
 }
 const max = Math.max(1, ...bars.map((b) => b.views));
 const fmt = (n: number) => n.toLocaleString('en-US');
-const dayLabel = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+// Years are named when the range isn't all in this year.
+const withYear = s.from.slice(0, 4) !== s.to.slice(0, 4) || s.to.slice(0, 4) !== today.slice(0, 4);
+const dayLabel = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...(withYear ? { year: 'numeric' } : {}), timeZone: 'UTC' });
 const barLabel = (l: string) => (l.startsWith('Week of ') ? `Week of ${dayLabel(l.slice(8))}` : dayLabel(l));
 const external = (t: string) => !t.startsWith('/') && !t.startsWith('mailto:') && !t.startsWith('tel:');
 const linkHref = (t: string) => (external(t) ? `https://${t}` : t);
+// This address with some parameters changed (the range kept when sorting, the sort kept when ranging).
+const rangeParams = range.preset ? { days: String(range.preset) } : { from: range.from, to: range.to };
+const href = (p: Record<string, string>) => `?${new URLSearchParams({ ...rangeParams, ...(sort === 'clicks' ? { sort } : {}), ...p })}`;
+const presetHref = (n: number) => `?${new URLSearchParams({ days: String(n), ...(sort === 'clicks' ? { sort } : {}) })}`;
 const card = 'rounded bg-white p-5 shadow-[0_0_0_1px_rgba(26,26,46,0.08)]';
 const th = 'px-4 py-2.5 font-semibold';
 const td = 'border-t border-admin-ink/5 px-4 py-2';
+const input = 'rounded border border-admin-ink/15 bg-white px-2 py-1 text-sm outline-none focus:border-admin-accent';
 const empty = !s.totals.views && !s.totals.clicks;
+const csv = (table: string) => `/api/admin/stats.csv${href({ table })}`;
+const csvLink = 'text-xs font-normal text-admin-accent hover:underline';
+const sortLink = (k: 'views' | 'clicks', label: string) => (sort === k ? `${label} ↓` : label);
 ---
 <Admin title="Stats">
   <div class="flex flex-wrap items-end justify-between gap-6">
@@ -33,12 +45,21 @@ const empty = !s.totals.views && !s.totals.clicks;
       <h1 class="text-3xl font-normal">Stats</h1>
       <p class="mt-1 text-sm text-admin-muted">Visits to the site and the links people follow. No cookies are used; signed-in editors and machines aren't counted.</p>
     </div>
-    <nav class="flex gap-1 rounded bg-white p-1 text-sm shadow-[0_0_0_1px_rgba(26,26,46,0.08)]" aria-label="Range">
-      {STATS_RANGES.map((n) => (
-        <a href={`?days=${n}`} aria-current={n === days ? 'page' : undefined} class={`rounded-sm px-3 py-1.5 ${n === days ? 'bg-admin-ink text-white' : 'hover:bg-admin-soft'}`}>{n === 365 ? 'Year' : `${n} days`}</a>
-      ))}
-    </nav>
+    <div class="flex flex-wrap items-end gap-3">
+      <nav class="flex gap-1 rounded bg-white p-1 text-sm shadow-[0_0_0_1px_rgba(26,26,46,0.08)]" aria-label="Range">
+        {STATS_RANGES.map((n) => (
+          <a href={presetHref(n)} aria-current={n === range.preset ? 'page' : undefined} class={`rounded-sm px-3 py-1.5 ${n === range.preset ? 'bg-admin-ink text-white' : 'hover:bg-admin-soft'}`}>{n === 365 ? 'Year' : `${n} days`}</a>
+        ))}
+      </nav>
+      <form method="get" class="flex flex-wrap items-end gap-2" aria-label="Dates">
+        <label class="text-xs text-admin-muted">From<br /><input type="date" name="from" value={range.from} max={today} required class={input} /></label>
+        <label class="text-xs text-admin-muted">To<br /><input type="date" name="to" value={range.to} max={today} required class={input} /></label>
+        {sort === 'clicks' && <input type="hidden" name="sort" value="clicks" />}
+        <button class={`rounded-sm px-3 py-1.5 text-sm ${range.preset ? 'border border-admin-ink/15 hover:border-admin-accent' : 'bg-admin-ink text-white'}`}>Show</button>
+      </form>
+    </div>
   </div>
+  {range.days === STATS_MAX_DAYS && <p class="mt-2 text-xs text-admin-muted">Ranges go back at most {STATS_MAX_DAYS} days from their end.</p>}
 
   <div class="mt-6 grid gap-4 sm:grid-cols-3">
     <div class={card}><p class="text-xs font-semibold tracking-wider text-admin-muted uppercase">Page views</p><p class="mt-1 text-3xl">{fmt(s.totals.views)}</p></div>
@@ -47,7 +68,7 @@ const empty = !s.totals.views && !s.totals.clicks;
   </div>
 
   <section class={`${card} mt-4`}>
-    <h2 class="text-sm font-semibold">Page views {step === 1 ? 'a day' : 'a week'}</h2>
+    <h2 class="flex justify-between gap-2 text-sm font-semibold">Page views {step === 1 ? 'a day' : 'a week'} <a class={csvLink} href={csv('daily')} download>Download CSV</a></h2>
     <p class="text-xs text-admin-muted">{dayLabel(s.from)} to {dayLabel(s.to)}</p>
     {empty ? (
       <p class="mt-6 text-sm text-admin-muted">Nothing counted yet in this range. Visits show here once people view the site's pages.</p>
@@ -75,19 +96,31 @@ const empty = !s.totals.views && !s.totals.clicks;
     )}
   </section>
 
-  <div class="mt-4 grid gap-4 lg:grid-cols-2">
-    <section>
-      <h2 class="text-sm font-semibold">Top pages</h2>
-      <table class="mt-2 w-full border-collapse overflow-hidden rounded bg-white text-sm shadow-[0_0_0_1px_rgba(26,26,46,0.08)]">
-        <thead class="bg-admin-soft text-left text-xs tracking-wider text-admin-muted uppercase"><tr><th class={th}>Page</th><th class={`${th} text-right`}>Views</th></tr></thead>
+  <section class="mt-4">
+    <div class="flex flex-wrap items-baseline justify-between gap-2">
+      <h2 class="text-sm font-semibold">Pages <span class="font-normal text-admin-muted">({fmt(s.pages.length)}{s.pages.length === 2000 ? ', the first 2,000' : ''})</span></h2>
+      <p class="text-xs text-admin-muted">Link clicks: links followed from that page. Sorted by {sort === 'clicks' ? 'link clicks' : 'views'}. <a class={csvLink} href={csv('pages')} download>Download CSV</a></p>
+    </div>
+    <div class="mt-2 max-h-[32rem] overflow-auto rounded bg-white shadow-[0_0_0_1px_rgba(26,26,46,0.08)]">
+      <table class="w-full border-collapse text-sm">
+        <thead class="sticky top-0 bg-admin-soft text-left text-xs tracking-wider text-admin-muted uppercase">
+          <tr>
+            <th class={th}>Page</th>
+            <th class={`${th} text-right`} aria-sort={sort === 'views' ? 'descending' : undefined}><a class="hover:text-admin-accent" href={href({ sort: 'views' })}>{sortLink('views', 'Views')}</a></th>
+            <th class={`${th} text-right`} aria-sort={sort === 'clicks' ? 'descending' : undefined}><a class="hover:text-admin-accent" href={href({ sort: 'clicks' })}>{sortLink('clicks', 'Link clicks')}</a></th>
+          </tr>
+        </thead>
         <tbody>
-          {s.pages.map((p) => <tr><td class={`${td} break-all`}><a class="hover:underline" href={p.path} target="_blank" rel="noopener">{p.path}</a></td><td class={`${td} text-right tabular-nums`}>{fmt(Number(p.views))}</td></tr>)}
-          {!s.pages.length && <tr><td class={`${td} text-admin-muted`} colspan="2">None yet.</td></tr>}
+          {s.pages.map((p) => <tr><td class={`${td} break-all`}><a class="hover:underline" href={p.path} target="_blank" rel="noopener">{p.path}</a></td><td class={`${td} text-right tabular-nums`}>{fmt(p.views)}</td><td class={`${td} text-right tabular-nums`}>{fmt(p.clicks)}</td></tr>)}
+          {!s.pages.length && <tr><td class={`${td} text-admin-muted`} colspan="3">None yet.</td></tr>}
         </tbody>
       </table>
-    </section>
+    </div>
+  </section>
+
+  <div class="mt-4 grid gap-4 lg:grid-cols-2">
     <section>
-      <h2 class="text-sm font-semibold">Links clicked</h2>
+      <h2 class="flex justify-between gap-2 text-sm font-semibold">Links clicked <a class={csvLink} href={csv('links')} download>Download CSV</a></h2>
       <table class="mt-2 w-full border-collapse overflow-hidden rounded bg-white text-sm shadow-[0_0_0_1px_rgba(26,26,46,0.08)]">
         <thead class="bg-admin-soft text-left text-xs tracking-wider text-admin-muted uppercase"><tr><th class={th}>Link</th><th class={`${th} text-right`}>Clicks</th></tr></thead>
         <tbody>
@@ -105,7 +138,7 @@ const empty = !s.totals.views && !s.totals.clicks;
       </table>
     </section>
     <section>
-      <h2 class="text-sm font-semibold">Where visits came from</h2>
+      <h2 class="flex justify-between gap-2 text-sm font-semibold">Where visits came from <a class={csvLink} href={csv('referrers')} download>Download CSV</a></h2>
       <table class="mt-2 w-full border-collapse overflow-hidden rounded bg-white text-sm shadow-[0_0_0_1px_rgba(26,26,46,0.08)]">
         <thead class="bg-admin-soft text-left text-xs tracking-wider text-admin-muted uppercase"><tr><th class={th}>Site</th><th class={`${th} text-right`}>Visits</th></tr></thead>
         <tbody>

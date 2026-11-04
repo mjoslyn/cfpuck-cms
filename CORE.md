@@ -463,8 +463,12 @@ term fires a cancelable `c-search:term` on the form.
 ## Statistics
 
 **Stats** (`/admin/stats/`, editors; `src/lib/stats.ts`, `src/pages/admin/stats/index.astro`): page
-views, visitors, links clicked and referring sites over 7, 30, 90 or 365 days (a bar a day, a week for a
-year), with the top pages, links and referrers (`stats_summary`, an editors' function). Pages are cached
+views, visitors, links clicked and referring sites over the last 7, 30, 90 or 365 days or dates chosen
+(`?from=&to=`, up to `STATS_MAX_DAYS`, 731, ending today at the latest; `statsRange`), a bar a day (a
+week past 90 days); every page (up to 2,000) with its views and the clicks on links in it, sorted by
+either (`?sort=clicks`); the top 100 links and 15 referrers (`stats_summary`, an editors' function). Each
+table downloads as CSV (`GET /api/admin/stats.csv?table=daily|pages|links|referrers` with the screen's
+range and sort; `statsCsv`, formulas guarded). Pages are cached
 for everyone, so `public/assets/js/stats.js` (on every page but previews and Not found) reports the view
 and each link followed (`click` and middle-click; not `#` links) with `sendBeacon` to `POST /api/stats`,
 which counts them by day in the site's time zone (`stat_hit`, table `site_stats`: `day`, `kind` view,
@@ -477,6 +481,13 @@ aren't counted; addresses that aren't pages (`/admin`, `/api`, `/media`...) are 
 day holds at most `STATS_DAY_ROWS` (5,000) rows, past which only rows it has are counted, so made-up
 addresses can't fill the table. Counts older than `STATS_KEEP_DAYS` (400) go hourly. Not synced or backed
 up.
+
+## Code snippets
+
+Settings > Code snippets (admins; `settings.site.snippets`, `src/lib/snippets.ts`): markup put on every
+page as written (analytics, chat, verification tags): `head` at the end of `<head>`, `bodyStart` right
+after `<body>`, `footer` before `</body>` (`renderRequest`, after texturize, so it is never changed). Not on
+previews. Up to `SNIPPET_MAX` (20,000) characters each. Synced with the other settings.
 
 ## Compose with Claude
 
@@ -1207,7 +1218,7 @@ builder's and campaign editor's Compose dialogs, or the editor's panel, whose co
 
 **Settings** (admins; `src/puck/SiteSettings.tsx`, page `src/pages/admin/settings/[...section].astro`): a side
 menu of sections in groups (`SETTINGS_GROUPS`, `src/lib/admin/settings-sections.ts`): Site (General, Menu,
-Social, Search, Types, the site's own options), Features (Events, Tickets, Members, Mailing Lists, marked
+Social, Search, Types, the site's own options, Code snippets), Features (Events, Tickets, Members, Mailing Lists, marked
 On or Off), Services (Connections), Admin (Accessibility, Appearance) and Upkeep (Redirects, Sync,
 Backups); a Section dropdown on phones. Each section has its own address, `/admin/settings/<section>/`
 (General `/admin/settings/`; `sectionOf`, `settingsPath`); the screen moves between them in place, so

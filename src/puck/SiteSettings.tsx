@@ -32,13 +32,14 @@ import { eventsOn, showsTaxonomy, showsType } from '../lib/events/on';
 import type { TicketSettings } from '../lib/tickets/config';
 import type { Redirect } from '../lib/redirects';
 import { MENU_FIELDS } from '../lib/navigation';
+import { SNIPPET_MAX, SNIPPET_PLACES, type CodeSnippets } from '../lib/snippets';
 import type { TaxonomyMeta } from '../lib/page-meta';
 import { ADMIN_THEME_DEFAULTS, ADMIN_THEME_FIELDS, adminThemeVars, contrast, type AdminTheme } from '../lib/admin-theme';
 
 interface Props {
   /** The section the address names. */
   section: string;
-  site: { name?: string; description?: string; front_page_id?: number | null; not_found_page_id?: number | null; timezone?: string; search_types?: string[]; social?: { network: string; url: string }[]; share_image?: number; share_image_url?: string; templates?: TemplateMap; taxonomy_templates?: Record<string, string>; taxonomy_pages_off?: string[]; taxonomy_meta?: Record<string, TaxonomyMeta>; listing_meta?: Record<string, TaxonomyMeta>; listings_off?: string[]; featured_types?: string[]; icons?: Record<string, string>; icon_media_id?: number | null; icon_preview?: string; admin_theme?: AdminTheme; tickets?: TicketSettings; members?: Partial<MemberSettings>; mailing?: MailingSettings; events?: { enabled?: boolean }; a11y?: { block_publish?: boolean } };
+  site: { name?: string; description?: string; front_page_id?: number | null; not_found_page_id?: number | null; timezone?: string; search_types?: string[]; social?: { network: string; url: string }[]; share_image?: number; share_image_url?: string; templates?: TemplateMap; taxonomy_templates?: Record<string, string>; taxonomy_pages_off?: string[]; taxonomy_meta?: Record<string, TaxonomyMeta>; listing_meta?: Record<string, TaxonomyMeta>; listings_off?: string[]; featured_types?: string[]; icons?: Record<string, string>; icon_media_id?: number | null; icon_preview?: string; admin_theme?: AdminTheme; tickets?: TicketSettings; members?: Partial<MemberSettings>; mailing?: MailingSettings; events?: { enabled?: boolean }; a11y?: { block_publish?: boolean }; snippets?: CodeSnippets };
   options: Record<string, any>;
   pages: { id: number; title: string }[];
   templates: TemplateInfo[];
@@ -278,6 +279,31 @@ export default function SiteSettings({ section, site: initialSite, options: init
       panel: <MailingSettingsPanel value={site.mailing ?? {}} mailgun={mailgun} lists={mailLists} membersOn={!!site.members?.enabled} onChange={(mailing) => setSite((s) => ({ ...s, mailing }))} />,
     },
     {
+      id: 'code',
+      label: 'Code snippets',
+      panel: (
+        <>
+          <p className="mb-3 text-xs text-admin-muted">
+            Code put on every page of the site exactly as written, such as an analytics, chat or advertising service's tag or a site verification tag. It runs for every visitor, so paste only code from a service you trust. Previews leave it out.
+          </p>
+          {SNIPPET_PLACES.map((p) => (
+            <label key={p.key} className="mb-4 block">
+              <span className="block text-sm font-semibold">{p.label}</span>
+              <span className="mb-1 block text-xs text-admin-muted">{p.help}</span>
+              <textarea
+                className={`${inputClass} font-mono text-xs`}
+                rows={6}
+                spellCheck={false}
+                maxLength={SNIPPET_MAX}
+                value={site.snippets?.[p.key] ?? ''}
+                onChange={(e) => setSite((s) => ({ ...s, snippets: { ...s.snippets, [p.key]: e.target.value } }))}
+              />
+            </label>
+          ))}
+        </>
+      ),
+    },
+    {
       id: 'accessibility',
       label: 'Accessibility',
       panel: (
@@ -380,7 +406,7 @@ export default function SiteSettings({ section, site: initialSite, options: init
           </div>
         </div>
         {tabs.map((t) => (
-          <section key={t.id} aria-label={t.label} hidden={t.id !== current.id} className={['redirects', 'sync', 'backups'].includes(t.id) ? 'max-w-5xl' : t.id === 'site' || t.id === 'types' || t.id === 'tickets' || t.id === 'connections' ? 'max-w-3xl' : 'max-w-md'}>
+          <section key={t.id} aria-label={t.label} hidden={t.id !== current.id} className={['redirects', 'sync', 'backups'].includes(t.id) ? 'max-w-5xl' : t.id === 'site' || t.id === 'types' || t.id === 'tickets' || t.id === 'connections' || t.id === 'code' ? 'max-w-3xl' : 'max-w-md'}>
             {t.panel}
           </section>
         ))}

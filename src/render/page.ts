@@ -1,6 +1,7 @@
 // Request -> full HTML document:
 // resolve the queried object, pick a template via the template hierarchy, render blocks,
 // then texturize the result (get_the_block_template_html) and wrap it in the page shell.
+import type { CodeSnippets } from '../lib/snippets';
 import { VENDOR_CSS } from './vendor';
 import type { Db } from '../lib/db/query';
 import { Loader } from '../lib/data';
@@ -322,6 +323,8 @@ export async function renderRequest(url: URL, db: Db, form?: FormResult, preview
   const css = [...new Set(ctx.css)].join('');
   const pre = vendorCss(ctx).map((b) => `<link rel="stylesheet" id="${b}-css" href="${VENDOR_CSS[b]}" media="all" />\n`).join('');
   const site = settings.site ?? {};
+  // Settings > Code snippets (src/lib/snippets.ts), as written; not on previews.
+  const snippets: CodeSnippets = preview ? {} : (site.snippets ?? {});
   const icons = site.icons ?? {};
 
   // Footer scripts: those the blocks added, arranged (and added to) by the site; then the editor bar
@@ -348,13 +351,13 @@ ${meta}${pre}<style id='core-block-supports-inline-css'>
 ${css}
 </style>
 ${(ctx.headScripts ?? []).map((s) => `${s}\n`).join('')}<link rel='stylesheet' id='site-css' href='${siteCss}' media='all' />
-${SITE_RENDER.head ? `${SITE_RENDER.head(ctx)}\n` : ''}${icons['32'] ? `<link rel="icon" href="${icons['32']}" sizes="32x32" />\n` : ''}${icons['192'] ? `<link rel="icon" href="${icons['192']}" sizes="192x192" />\n` : ''}${icons['180'] ? `<link rel="apple-touch-icon" href="${icons['180']}" />\n` : ''}</head>
+${SITE_RENDER.head ? `${SITE_RENDER.head(ctx)}\n` : ''}${icons['32'] ? `<link rel="icon" href="${icons['32']}" sizes="32x32" />\n` : ''}${icons['192'] ? `<link rel="icon" href="${icons['192']}" sizes="192x192" />\n` : ''}${icons['180'] ? `<link rel="apple-touch-icon" href="${icons['180']}" />\n` : ''}${snippets.head ? `${snippets.head}\n` : ''}</head>
 
 <body class="${bodyClasses(queried)}"${editTargets(queried, templateSlug, !!preview)}>
-<a class="c-skip-link c-sr-only" href="#content">Skip to content</a>
+${snippets.bodyStart ? `${snippets.bodyStart}\n` : ''}<a class="c-skip-link c-sr-only" href="#content">Skip to content</a>
 <div class="c-page">${body.replace(/<main(?![^>]*\sid=)/, '<main id="content"')}</div>
 ${scripts.join('\n')}
-</body>
+${snippets.footer ? `${snippets.footer}\n` : ''}</body>
 </html>
 `;
   return { status: queried.kind === '404' || queried.notFound ? 404 : 200, html, personal: !!ctx.personal, locked: !!queried.entry?.locked };

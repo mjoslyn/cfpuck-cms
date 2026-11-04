@@ -15,12 +15,19 @@ sidebar:
 - **Links clicked**: how many times people followed a link on the site, to another page or another site.
 - **Page views a day**: a bar for each day. Point at a bar (or tab to it) to see that day's views,
   visitors and clicks. **Show as a table** lists the same numbers.
-- **Top pages**: the pages opened most.
+- **Pages**: every page, with its views and **Link clicks** (links followed from that page). Click
+  **Views** or **Link clicks** at the top of the list to sort by it.
 - **Links clicked**: the links followed most, and how many pages they were clicked from.
 - **Where visits came from**: other sites that sent people here, such as a search engine. Visits typed
   in, from bookmarks or from apps don't name a site.
 
-Choose **7 days**, **30 days**, **90 days** or **Year** at the top. A year shows a bar a week.
+Choose **7 days**, **30 days**, **90 days** or **Year** at the top, or pick your own dates in **From** and
+**To** and press **Show**. Ranges over 90 days show a bar a week.
+
+## Downloading the numbers
+
+Each part has **Download CSV**, a file that opens in Excel, Numbers or Google Sheets, for the dates you
+are looking at.
 
 ## What isn't counted
 

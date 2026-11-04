@@ -178,15 +178,19 @@ export const FUNCTIONS: Record<string, Fn> = {
     },
   },
 
-  /** The Stats screen's numbers from `from` to `to` (days): daily totals and the top pages, links and referrers. */
+  /**
+   * The Stats screen's numbers from `from` to `to` (days): daily totals; every page (up to 2,000) with its
+   * views and the clicks on links in it, by `sort` (views or clicks); the top links and referrers.
+   */
   stats_summary: {
     editors: true,
     async run(exec, a) {
       const range = [String(a.from ?? ''), String(a.to ?? '')];
+      const by = a.sort === 'clicks' ? 'clicks DESC, views DESC' : 'views DESC, clicks DESC';
       const [daily, pages, links, referrers] = await Promise.all([
         exec.rows(`SELECT day, kind, sum(hits) AS hits FROM site_stats WHERE day BETWEEN ?1 AND ?2 AND kind IN ('view', 'visitor', 'click') GROUP BY day, kind`, range),
-        exec.rows(`SELECT path, sum(hits) AS views FROM site_stats WHERE day BETWEEN ?1 AND ?2 AND kind = 'view' GROUP BY path ORDER BY views DESC, path LIMIT 25`, range),
-        exec.rows(`SELECT target, sum(hits) AS clicks, count(DISTINCT path) AS pages FROM site_stats WHERE day BETWEEN ?1 AND ?2 AND kind = 'click' GROUP BY target ORDER BY clicks DESC, target LIMIT 25`, range),
+        exec.rows(`SELECT path, sum(CASE WHEN kind = 'view' THEN hits ELSE 0 END) AS views, sum(CASE WHEN kind = 'click' THEN hits ELSE 0 END) AS clicks FROM site_stats WHERE day BETWEEN ?1 AND ?2 AND kind IN ('view', 'click') GROUP BY path ORDER BY ${by}, path LIMIT 2000`, range),
+        exec.rows(`SELECT target, sum(hits) AS clicks, count(DISTINCT path) AS pages FROM site_stats WHERE day BETWEEN ?1 AND ?2 AND kind = 'click' GROUP BY target ORDER BY clicks DESC, target LIMIT 100`, range),
         exec.rows(`SELECT target AS host, sum(hits) AS visits FROM site_stats WHERE day BETWEEN ?1 AND ?2 AND kind = 'referrer' GROUP BY target ORDER BY visits DESC, target LIMIT 15`, range),
       ]);
       return { daily, pages, links, referrers };

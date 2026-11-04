@@ -3,7 +3,9 @@
 import { describe, expect, it } from 'vitest';
 import { serviceClient, sessionDb, siteDb } from '../src/lib/db/site';
 import { STATS_DAY_ROWS } from '../src/lib/db/functions';
-import { pruneStats, recordHit, referrerHost, statPath, statsSummary, statTarget, statsDay } from '../src/lib/stats';
+import { pruneStats, recordHit, referrerHost, statPath, statsCsv, statsRange, statsSummary, statTarget, statsDay } from '../src/lib/stats';
+
+const last = (days: number, when: Date) => statsRange(new URLSearchParams({ days: String(days) }), when);
 import { renderRequest } from '../src/render/page';
 
 const at = new Date('2026-11-04T15:00:00Z');
@@ -34,11 +36,11 @@ describe('site stats', () => {
     expect(await recordHit(db, { t: 'view', p: '/' }, req('Googlebot/2.1 (+http://www.google.com/bot.html)'), at)).toBe(false);
     expect(await recordHit(db, { t: 'view', p: '/admin/' }, req(), at)).toBe(false);
 
-    const s = await statsSummary(db, 7, at);
+    const s = await statsSummary(db, last(7, at));
     expect(s.to).toBe(statsDay(at));
     expect(s.daily).toHaveLength(7);
     expect(s.totals).toEqual({ views: 3, visitors: 2, clicks: 2 });
-    expect(s.pages[0]).toEqual({ path: '/', views: 2 });
+    expect(s.pages).toEqual([{ path: '/', views: 2, clicks: 1 }, { path: '/about/', views: 1, clicks: 1 }]);
     expect(s.links).toEqual([{ target: 'example.org/tickets', clicks: 2, pages: 2 }]);
     expect(s.referrers).toEqual([{ host: 'google.com', visits: 1 }]);
 
@@ -46,7 +48,27 @@ describe('site stats', () => {
     const next = new Date(at.getTime() + 86_400_000);
     await recordHit(db, { t: 'view', p: '/' }, req(), next);
     expect(await pruneStats(db, next)).toMatch(/^2 visitor hashes/);
-    expect((await statsSummary(db, 7, next)).totals.visitors).toBe(3);
+    expect((await statsSummary(db, last(7, next))).totals.visitors).toBe(3);
+  });
+
+  it('lists every page by clicks, takes chosen dates and exports CSV', async () => {
+    const db = serviceClient();
+    const day = new Date('2026-09-10T15:00:00Z');
+    await recordHit(db, { t: 'view', p: '/a/' }, req(), day);
+    await recordHit(db, { t: 'view', p: '/a/' }, req(), day);
+    await recordHit(db, { t: 'click', p: '/b/', h: '=cmd|x' }, req(), day);
+    await recordHit(db, { t: 'click', p: '/b/', h: '/a/' }, req(), day);
+    const range = statsRange(new URLSearchParams({ from: '2026-09-12', to: '2026-09-08' }), at);
+    expect(range).toEqual({ from: '2026-09-08', to: '2026-09-12', days: 5, preset: null });
+    expect((await statsSummary(db, range, 'clicks')).pages).toEqual([{ path: '/b/', views: 0, clicks: 2 }, { path: '/a/', views: 2, clicks: 0 }]);
+    expect((await statsSummary(db, range, 'views')).pages[0].path).toBe('/a/');
+    // Dates past today stop at today; a range too long is cut; bad dates fall back to 30 days.
+    expect(statsRange(new URLSearchParams({ from: '2020-01-01', to: '2030-01-01' }), at)).toMatchObject({ to: '2026-11-04', days: 731 });
+    expect(statsRange(new URLSearchParams({ from: '2026-02-30', to: 'x' }), at)).toMatchObject({ days: 30, preset: 30 });
+    const csv = statsCsv(await statsSummary(db, range, 'clicks'), 'links');
+    expect(csv).toContain('Link,Clicks,Pages clicked from\r\n');
+    expect(csv).toContain('/a/,1,1');
+    expect(statsCsv({ ...(await statsSummary(db, range)), links: [{ target: '=HYPERLINK("x")', clicks: 1, pages: 1 }] }, 'links')).toContain(`"'=HYPERLINK(""x"")"`);
   });
 
   it('stops adding rows to a day past its limit, still counting the ones it has', async () => {

@@ -113,22 +113,60 @@ export async function pruneStats(db: Db, at: Date = new Date()): Promise<string>
   return `${visitors ?? 0} visitor hashes and ${days ?? 0} old counts pruned`;
 }
 
+/** The longest range the Stats screen shows, in days. */
+export const STATS_MAX_DAYS = 731;
+
+/** Days from `from` to `to`, both counted. */
+export const daysBetween = (from: string, to: string) => Math.round((Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86_400_000) + 1;
+
+export interface StatsRange {
+  from: string;
+  to: string;
+  days: number;
+  /** One of STATS_RANGES when the range is the last that many days, else null (dates chosen). */
+  preset: number | null;
+}
+
+const isDay = (d: string | null): d is string => !!d && /^\d{4}-\d{2}-\d{2}$/.test(d) && !Number.isNaN(Date.parse(`${d}T12:00:00Z`)) && new Date(`${d}T12:00:00Z`).toISOString().startsWith(d);
+
+/**
+ * The range a Stats address asks for: `from` and `to` (dates, in either order, up to STATS_MAX_DAYS
+ * long, ending at the latest today), else `days` (one of STATS_RANGES), else the last 30 days.
+ */
+export function statsRange(params: URLSearchParams, at: Date = new Date()): StatsRange {
+  const today = statsDay(at);
+  let from = params.get('from');
+  let to = params.get('to');
+  if (isDay(from) && isDay(to)) {
+    if (from > to) [from, to] = [to, from];
+    if (to > today) to = today;
+    if (from > to) from = to;
+    if (daysBetween(from, to) > STATS_MAX_DAYS) from = daysBefore(to, STATS_MAX_DAYS - 1);
+    const days = daysBetween(from, to);
+    return { from, to, days, preset: to === today && (STATS_RANGES as readonly number[]).includes(days) ? days : null };
+  }
+  const asked = Number(params.get('days'));
+  const days = (STATS_RANGES as readonly number[]).includes(asked) ? asked : 30;
+  return { from: daysBefore(today, days - 1), to: today, days, preset: days };
+}
+
 export interface StatsSummary {
   from: string;
   to: string;
   totals: { views: number; visitors: number; clicks: number };
   /** Every day of the range, oldest first. */
   daily: { day: string; views: number; visitors: number; clicks: number }[];
-  pages: { path: string; views: number }[];
+  /** Every page viewed or clicked from (up to 2,000), with its views and the clicks on links in it. */
+  pages: { path: string; views: number; clicks: number }[];
   links: { target: string; clicks: number; pages: number }[];
   referrers: { host: string; visits: number }[];
 }
 
-/** The Stats screen's numbers for the `days` days up to today (the editors' `stats_summary`). */
-export async function statsSummary(db: Db, days: number, at: Date = new Date()): Promise<StatsSummary> {
-  const to = statsDay(at);
-  const from = daysBefore(to, days - 1);
-  const { data, error } = await db.rpc('stats_summary', { from, to });
+/** The Stats screen's numbers for a range (the editors' `stats_summary`), its pages by views or clicks. */
+export async function statsSummary(db: Db, range: { from: string; to: string }, sort: 'views' | 'clicks' = 'views'): Promise<StatsSummary> {
+  const { from, to } = range;
+  const days = daysBetween(from, to);
+  const { data, error } = await db.rpc('stats_summary', { from, to, sort });
   if (error) throw new Error(error.message);
   const r = data as Omit<StatsSummary, 'from' | 'to' | 'totals' | 'daily'> & { daily: { day: string; kind: string; hits: number }[] };
   const byDay = new Map<string, { day: string; views: number; visitors: number; clicks: number }>();
@@ -144,5 +182,25 @@ export async function statsSummary(db: Db, days: number, at: Date = new Date()):
   }
   const daily = [...byDay.values()];
   const sum = (k: 'views' | 'visitors' | 'clicks') => daily.reduce((n, d) => n + d[k], 0);
-  return { from, to, totals: { views: sum('views'), visitors: sum('visitors'), clicks: sum('clicks') }, daily, pages: r.pages, links: r.links, referrers: r.referrers };
+  return { from, to, totals: { views: sum('views'), visitors: sum('visitors'), clicks: sum('clicks') }, daily, pages: r.pages.map((p) => ({ path: p.path, views: Number(p.views), clicks: Number(p.clicks) })), links: r.links, referrers: r.referrers };
+}
+
+/** The tables the Stats screen exports as CSV. */
+export const STATS_TABLES = ['daily', 'pages', 'links', 'referrers'] as const;
+export type StatsTable = (typeof STATS_TABLES)[number];
+
+/** One of the Stats screen's tables as CSV (a byte order mark first, for spreadsheets; formulas guarded). */
+export function statsCsv(s: StatsSummary, table: StatsTable): string {
+  const cell = (v: unknown) => {
+    let t = String(v ?? '');
+    // A leading = + - @ would run as a formula in a spreadsheet (paths and links come from visitors).
+    if (/^[=+\-@\t\r]/.test(t)) t = `'${t}`;
+    return /[",\n\r]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+  };
+  const rows: unknown[][] =
+    table === 'daily' ? [['Day', 'Views', 'Visitors', 'Link clicks'], ...s.daily.map((d) => [d.day, d.views, d.visitors, d.clicks])]
+    : table === 'pages' ? [['Page', 'Views', 'Link clicks'], ...s.pages.map((p) => [p.path, p.views, p.clicks])]
+    : table === 'links' ? [['Link', 'Clicks', 'Pages clicked from'], ...s.links.map((l) => [l.target, l.clicks, l.pages])]
+    : [['Site', 'Visits'], ...s.referrers.map((r) => [r.host, r.visits])];
+  return `﻿${rows.map((r) => r.map(cell).join(',')).join('\r\n')}\r\n`;
 }
