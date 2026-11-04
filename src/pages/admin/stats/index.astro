@@ -3,9 +3,14 @@
 // 30, 90 or 365, or dates chosen), every page with its views and link clicks, and the top links and sites
 // visits came from (src/lib/stats.ts).
 import Admin from '../../../layouts/Admin.astro';
+import { consentPopup, type Popup } from '../../../lib/popups';
 import { STATS_MAX_DAYS, STATS_RANGES, statsDay, statsRange, statsSummary } from '../../../lib/stats';
 
 const range = statsRange(Astro.url.searchParams);
+// How visitors are counted: with the Stats cookie (Settings > Stats) and the cookie consent banner (Settings > Popups).
+const { data: siteRow } = await Astro.locals.db.from('settings').select('value').eq('key', 'site').maybeSingle();
+const statsCookie = !!(siteRow?.value as any)?.stats?.cookies;
+const banner = !!consentPopup((siteRow?.value as any)?.popups as Popup[] | undefined);
 const sort = Astro.url.searchParams.get('sort') === 'clicks' ? 'clicks' : 'views';
 const s = await statsSummary(Astro.locals.db, range, sort);
 const today = statsDay();
@@ -43,7 +48,13 @@ const sortLink = (k: 'views' | 'clicks', label: string) => (sort === k ? `${labe
   <div class="flex flex-wrap items-end justify-between gap-6">
     <div>
       <h1 class="text-3xl font-normal">Stats</h1>
-      <p class="mt-1 text-sm text-admin-muted">Visits to the site and the links people follow. No cookies are used; signed-in editors and machines aren't counted.</p>
+      <p class="mt-1 text-sm text-admin-muted">
+        Visits to the site and the links people follow; signed-in editors and machines aren't counted.
+        {!statsCookie && (banner ? ' Stats uses no cookies. A cookie consent banner is on (Settings > Popups) for the site\'s other cookies.' : ' No cookies are used.')}
+        {statsCookie && banner && ' Returning visitors are recognised with a cookie, set only for visitors who accept cookies in the cookie consent banner; the rest are counted once a day.'}
+        {statsCookie && !banner && <span class="text-[#c4592a]"> Returning visitors are recognised with a cookie, set for every visitor: no cookie consent banner is on. Add one under <a class="underline" href="/admin/settings/popups/">Settings &gt; Popups</a>.</span>}
+        {' '}<a class="underline" href="/admin/settings/stats/">Stats settings</a>
+      </p>
     </div>
     <div class="flex flex-wrap items-end gap-3">
       <nav class="flex gap-1 rounded bg-white p-1 text-sm shadow-[0_0_0_1px_rgba(26,26,46,0.08)]" aria-label="Range">

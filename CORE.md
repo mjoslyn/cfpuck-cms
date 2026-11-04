@@ -487,7 +487,8 @@ and the screen shows return visits (`cookieVisitors` in `stats_summary`). While 
 (see Popups) the cookie is set only after the visitor accepts; without one Settings warns. A
 day holds at most `STATS_DAY_ROWS` (5,000) rows, past which only rows it has are counted, so made-up
 addresses can't fill the table. Counts older than `STATS_KEEP_DAYS` (400) go hourly. Not synced or backed
-up.
+up. The screen's introduction says how visitors are counted: without cookies, or with the Stats cookie
+and whether a consent banner gates it (a warning when none does).
 
 ## Popups and cookie consent
 
@@ -499,7 +500,7 @@ or all but some (`/path/`, `/prefix/*`; `popupsFor`). `renderRequest` prepares a
 the address with the page (`src/render/popups.ts`: `.c-popup`, `hidden`, settings in `data-popup`; not on
 previews) and `public/assets/js/popups.js` shows them (focus kept in a dialog, Escape and × close, links to
 `#close-popup`). One popup can be the **cookie consent banner** (`consent`, `consentPopup`): Accept and
-Reject buttons (`data-consent-choice`), a policy link, on every page until the visitor chooses (cookie
+Reject buttons styled alike, neither played down (`data-consent-choice`), a policy link, on every page until the visitor chooses (cookie
 `site_consent`: `all` or `necessary`, six months); links to `#cookie-settings` open it again, and
 `#accept-cookies` / `#reject-cookies` choose. While it waits, no other popup shows. Accepting runs the
 code snippets kept for consent and fires `c-consent` (the Stats cookie starts); rejecting fires

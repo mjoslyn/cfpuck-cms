@@ -51,6 +51,8 @@ describe('popups', () => {
     expect(offer).toContain('Ten percent off this week.');
     expect(offer).toContain('id="popup-cookies"');
     expect(offer).toContain('data-consent-choice="all">Allow all</button>');
+    // Accept and Reject look alike: neither is played down.
+    expect(offer).toContain('<div class="c-button"><button type="button" class="c-button__link" data-consent-choice="necessary">Reject</button>');
     expect(offer).toContain('<a class="c-popup__policy" href="/privacy/">Privacy policy</a>');
     expect(offer).toContain('<template data-consent-snippet><script src="https://analytics.example/a.js"></script></template>\n</head>');
     expect(offer).toContain('<script>window.ok = 1</script>\n</body>');
