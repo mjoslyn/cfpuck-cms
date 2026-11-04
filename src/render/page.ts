@@ -331,6 +331,9 @@ export async function renderRequest(url: URL, db: Db, form?: FormResult, preview
   if (body.includes('c-search-form') || body.includes('data-live-search')) scripts.push('<script src="/assets/js/search.js" defer></script>');
   // A visit from a tracked email link reports the visitor's first interaction (Mailing on).
   if (mailingOn(site) && !preview) scripts.push('<script src="/assets/js/mail-seen.js" defer></script>');
+  // Site statistics: the page's view and the links followed from it (src/lib/stats.ts); not on previews
+  // or pages not found.
+  if (!preview && queried.kind !== '404' && !queried.notFound) scripts.push('<script src="/assets/js/stats.js" defer></script>');
 
   // A calendar view names itself ("Events for October 2026"), unless its listing has a search title of its own.
   const title = ctx.data.get('calendar') && !ownTitle(queried, site) ? `${esc((ctx.data.get('calendar') as { title: string }).title)} &#8211; ${site.name ?? ''}` : documentTitle(queried, site);

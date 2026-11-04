@@ -1,0 +1,133 @@
+---
+// Stats (editors): the site's page views, visitors and links clicked over a range of days, with the top
+// pages, links and sites visits came from (src/lib/stats.ts).
+import Admin from '../../../layouts/Admin.astro';
+import { STATS_RANGES, statsSummary } from '../../../lib/stats';
+
+const asked = Number(Astro.url.searchParams.get('days'));
+const days = (STATS_RANGES as readonly number[]).includes(asked) ? asked : 30;
+const s = await statsSummary(Astro.locals.db, days);
+
+// A year shows a bar a week (from the range's first day); shorter ranges a bar a day.
+const step = days > 90 ? 7 : 1;
+const bars: { label: string; views: number; visitors: number; clicks: number }[] = [];
+for (let i = 0; i < s.daily.length; i += step) {
+  const group = s.daily.slice(i, i + step);
+  const sum = (k: 'views' | 'visitors' | 'clicks') => group.reduce((n, d) => n + d[k], 0);
+  bars.push({ label: step === 1 ? group[0].day : `Week of ${group[0].day}`, views: sum('views'), visitors: sum('visitors'), clicks: sum('clicks') });
+}
+const max = Math.max(1, ...bars.map((b) => b.views));
+const fmt = (n: number) => n.toLocaleString('en-US');
+const dayLabel = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+const barLabel = (l: string) => (l.startsWith('Week of ') ? `Week of ${dayLabel(l.slice(8))}` : dayLabel(l));
+const external = (t: string) => !t.startsWith('/') && !t.startsWith('mailto:') && !t.startsWith('tel:');
+const linkHref = (t: string) => (external(t) ? `https://${t}` : t);
+const card = 'rounded bg-white p-5 shadow-[0_0_0_1px_rgba(26,26,46,0.08)]';
+const th = 'px-4 py-2.5 font-semibold';
+const td = 'border-t border-admin-ink/5 px-4 py-2';
+const empty = !s.totals.views && !s.totals.clicks;
+---
+<Admin title="Stats">
+  <div class="flex flex-wrap items-end justify-between gap-6">
+    <div>
+      <h1 class="text-3xl font-normal">Stats</h1>
+      <p class="mt-1 text-sm text-admin-muted">Visits to the site and the links people follow. No cookies are used; signed-in editors and machines aren't counted.</p>
+    </div>
+    <nav class="flex gap-1 rounded bg-white p-1 text-sm shadow-[0_0_0_1px_rgba(26,26,46,0.08)]" aria-label="Range">
+      {STATS_RANGES.map((n) => (
+        <a href={`?days=${n}`} aria-current={n === days ? 'page' : undefined} class={`rounded-sm px-3 py-1.5 ${n === days ? 'bg-admin-ink text-white' : 'hover:bg-admin-soft'}`}>{n === 365 ? 'Year' : `${n} days`}</a>
+      ))}
+    </nav>
+  </div>
+
+  <div class="mt-6 grid gap-4 sm:grid-cols-3">
+    <div class={card}><p class="text-xs font-semibold tracking-wider text-admin-muted uppercase">Page views</p><p class="mt-1 text-3xl">{fmt(s.totals.views)}</p></div>
+    <div class={card}><p class="text-xs font-semibold tracking-wider text-admin-muted uppercase">Visitors</p><p class="mt-1 text-3xl">{fmt(s.totals.visitors)}</p><p class="mt-1 text-xs text-admin-muted">Counted once a day each</p></div>
+    <div class={card}><p class="text-xs font-semibold tracking-wider text-admin-muted uppercase">Links clicked</p><p class="mt-1 text-3xl">{fmt(s.totals.clicks)}</p></div>
+  </div>
+
+  <section class={`${card} mt-4`}>
+    <h2 class="text-sm font-semibold">Page views {step === 1 ? 'a day' : 'a week'}</h2>
+    <p class="text-xs text-admin-muted">{dayLabel(s.from)} to {dayLabel(s.to)}</p>
+    {empty ? (
+      <p class="mt-6 text-sm text-admin-muted">Nothing counted yet in this range. Visits show here once people view the site's pages.</p>
+    ) : (
+      <div class="stats-chart mt-4">
+        <span class="stats-max text-xs text-admin-muted">{fmt(max)}</span>
+        <div class="stats-bars" role="img" aria-label={`Page views ${step === 1 ? 'a day' : 'a week'}, up to ${fmt(max)}`}>
+          {bars.map((b) => (
+            <div class="stats-bar" tabindex="0" data-tip={`${barLabel(b.label)}: ${fmt(b.views)} views, ${fmt(b.visitors)} visitors, ${fmt(b.clicks)} clicks`}>
+              <span style={`height:${(b.views / max) * 100}%`}></span>
+            </div>
+          ))}
+        </div>
+        <div class="mt-1 flex justify-between text-xs text-admin-muted"><span>{dayLabel(s.from)}</span><span>{dayLabel(s.to)}</span></div>
+      </div>
+    )}
+    {!empty && (
+      <details class="mt-3 text-sm">
+        <summary class="cursor-pointer text-xs text-admin-muted">Show as a table</summary>
+        <table class="mt-2 w-full text-left text-sm">
+          <thead class="text-xs text-admin-muted"><tr><th class="py-1 font-semibold">{step === 1 ? 'Day' : 'Week'}</th><th class="py-1 text-right font-semibold">Views</th><th class="py-1 text-right font-semibold">Visitors</th><th class="py-1 text-right font-semibold">Clicks</th></tr></thead>
+          <tbody>{[...bars].reverse().map((b) => <tr class="border-t border-admin-ink/5"><td class="py-1">{barLabel(b.label)}</td><td class="py-1 text-right tabular-nums">{fmt(b.views)}</td><td class="py-1 text-right tabular-nums">{fmt(b.visitors)}</td><td class="py-1 text-right tabular-nums">{fmt(b.clicks)}</td></tr>)}</tbody>
+        </table>
+      </details>
+    )}
+  </section>
+
+  <div class="mt-4 grid gap-4 lg:grid-cols-2">
+    <section>
+      <h2 class="text-sm font-semibold">Top pages</h2>
+      <table class="mt-2 w-full border-collapse overflow-hidden rounded bg-white text-sm shadow-[0_0_0_1px_rgba(26,26,46,0.08)]">
+        <thead class="bg-admin-soft text-left text-xs tracking-wider text-admin-muted uppercase"><tr><th class={th}>Page</th><th class={`${th} text-right`}>Views</th></tr></thead>
+        <tbody>
+          {s.pages.map((p) => <tr><td class={`${td} break-all`}><a class="hover:underline" href={p.path} target="_blank" rel="noopener">{p.path}</a></td><td class={`${td} text-right tabular-nums`}>{fmt(Number(p.views))}</td></tr>)}
+          {!s.pages.length && <tr><td class={`${td} text-admin-muted`} colspan="2">None yet.</td></tr>}
+        </tbody>
+      </table>
+    </section>
+    <section>
+      <h2 class="text-sm font-semibold">Links clicked</h2>
+      <table class="mt-2 w-full border-collapse overflow-hidden rounded bg-white text-sm shadow-[0_0_0_1px_rgba(26,26,46,0.08)]">
+        <thead class="bg-admin-soft text-left text-xs tracking-wider text-admin-muted uppercase"><tr><th class={th}>Link</th><th class={`${th} text-right`}>Clicks</th></tr></thead>
+        <tbody>
+          {s.links.map((l) => (
+            <tr>
+              <td class={`${td} break-all`}>
+                <a class="hover:underline" href={linkHref(l.target)} target="_blank" rel="noopener">{l.target}</a>
+                <span class="ml-1 text-xs text-admin-muted">{external(l.target) ? 'another site' : ''}{Number(l.pages) > 1 ? `${external(l.target) ? ', ' : ''}from ${l.pages} pages` : ''}</span>
+              </td>
+              <td class={`${td} text-right tabular-nums`}>{fmt(Number(l.clicks))}</td>
+            </tr>
+          ))}
+          {!s.links.length && <tr><td class={`${td} text-admin-muted`} colspan="2">None yet.</td></tr>}
+        </tbody>
+      </table>
+    </section>
+    <section>
+      <h2 class="text-sm font-semibold">Where visits came from</h2>
+      <table class="mt-2 w-full border-collapse overflow-hidden rounded bg-white text-sm shadow-[0_0_0_1px_rgba(26,26,46,0.08)]">
+        <thead class="bg-admin-soft text-left text-xs tracking-wider text-admin-muted uppercase"><tr><th class={th}>Site</th><th class={`${th} text-right`}>Visits</th></tr></thead>
+        <tbody>
+          {s.referrers.map((r) => <tr><td class={`${td} break-all`}>{r.host}</td><td class={`${td} text-right tabular-nums`}>{fmt(Number(r.visits))}</td></tr>)}
+          {!s.referrers.length && <tr><td class={`${td} text-admin-muted`} colspan="2">None yet: visits typed in, from bookmarks or from apps don't name a site.</td></tr>}
+        </tbody>
+      </table>
+    </section>
+  </div>
+</Admin>
+
+<style>
+  .stats-chart { position: relative; padding-left: 3rem; }
+  .stats-max { position: absolute; left: 0; top: 0; }
+  .stats-bars { display: flex; align-items: flex-end; gap: 2px; height: 180px; border-bottom: 1px solid color-mix(in srgb, var(--color-admin-ink) 15%, transparent); }
+  .stats-bar { position: relative; flex: 1 1 0; height: 100%; display: flex; align-items: flex-end; outline: none; }
+  .stats-bar span { display: block; width: 100%; min-height: 1px; border-radius: 4px 4px 0 0; background: var(--color-admin-accent); }
+  .stats-bar:hover span, .stats-bar:focus-visible span { background: var(--color-admin-accent-dark); }
+  .stats-bar:hover::after, .stats-bar:focus-visible::after {
+    content: attr(data-tip); position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); z-index: 1;
+    white-space: nowrap; padding: 4px 8px; border-radius: 4px; font-size: 12px; background: var(--color-admin-bar); color: var(--color-admin-on-bar); pointer-events: none;
+  }
+  .stats-bar:first-child:hover::after, .stats-bar:first-child:focus-visible::after { left: 0; transform: none; }
+  .stats-bar:last-child:hover::after, .stats-bar:last-child:focus-visible::after { left: auto; right: 0; transform: none; }
+</style>

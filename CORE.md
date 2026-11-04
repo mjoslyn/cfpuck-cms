@@ -460,6 +460,24 @@ term fires a cancelable `c-search:term` on the form.
   span. **Site title** (`site-title`): the site's icon and name from Settings, with optional text
   before the name.
 
+## Statistics
+
+**Stats** (`/admin/stats/`, editors; `src/lib/stats.ts`, `src/pages/admin/stats/index.astro`): page
+views, visitors, links clicked and referring sites over 7, 30, 90 or 365 days (a bar a day, a week for a
+year), with the top pages, links and referrers (`stats_summary`, an editors' function). Pages are cached
+for everyone, so `public/assets/js/stats.js` (on every page but previews and Not found) reports the view
+and each link followed (`click` and middle-click; not `#` links) with `sendBeacon` to `POST /api/stats`,
+which counts them by day in the site's time zone (`stat_hit`, table `site_stats`: `day`, `kind` view,
+visitor, click or referrer, `path`, `target`, `hits`; migration `*_site_stats.sql`). No cookies, storage or
+addresses: a visitor is counted once a day by a hash of the day, `AUTH_SECRET`, their address and browser
+(`site_stat_visitors`, emptied after the day by the hourly run, `pruneStats`). A link is kept as its path
+on the site, or host and path elsewhere, `mailto:`/`tel:` as written, without query or fragment
+(`statTarget`); a referrer as its host (`referrerHost`). Machines (`scannerAgent`) and signed-in editors
+aren't counted; addresses that aren't pages (`/admin`, `/api`, `/media`...) are refused (`statPath`). A
+day holds at most `STATS_DAY_ROWS` (5,000) rows, past which only rows it has are counted, so made-up
+addresses can't fill the table. Counts older than `STATS_KEEP_DAYS` (400) go hourly. Not synced or backed
+up.
+
 ## Compose with Claude
 
 `/admin/compose/` and the Compose panel in the page editor (docked beside the canvas; pin keeps it
@@ -1162,7 +1180,7 @@ The admin bar (`src/layouts/Admin.astro`, its items from `adminNav` in `src/lib/
 dropdown (each type shown, its list at `/admin/?type=<type>`, then Taxonomies, then Templates in a section
 of its own, `section`; the content list has no tabs of its own for the types), a **Compose** dropdown
 (each type with a page, at `/admin/compose/?type=<type>`; then Form and, while Mailing is on, Campaign;
-then Template, Template part and Pattern), Media, a **Forms** dropdown (Forms, Submissions) and a **People** dropdown (Users and Members
+then Template, Template part and Pattern), Media, Stats, a **Forms** dropdown (Forms, Submissions) and a **People** dropdown (Users and Members
 for admins, Mailing Lists and Tickets, each while its feature is on; a group of one shows as its link),
 then a gear for Settings (admins), **?**, View site and the account menu. Below 1024px it all sits behind
 one menu button, the groups as headings. The dropdowns are `details[data-menu]`: one open at a time, closed
@@ -1323,7 +1341,7 @@ only add; one that switches block types or settings goes out with `npm run deplo
 - Bindings: `DB` (D1), `BUCKET` (R2), `IMAGES` (Cloudflare Images), `JOBS` (a queue: Compose turns, campaign
   sending runs and restores, each run once with up to 15 minutes, `src/lib/jobs.ts`),
   `CF_VERSION_METADATA` (the page cache's validators). The Cron Triggers: mailing every 5 minutes and at
-  06:20 UTC, snapshots at 07:00 UTC, ticket emails hourly (`SCHEDULES`).
+  06:20 UTC, snapshots at 07:00 UTC, ticket emails and the statistics' pruning hourly (`SCHEDULES`).
 - Variables and secrets reach the code as `process.env` (`nodejs_compat`); secrets are set with
   `npx wrangler secret put`. Code reads them with `env()` (`src/lib/env.ts`), which reads `.env` through
   `import.meta.env` under `astro dev` only: a build would write the build machine's `.env` values into

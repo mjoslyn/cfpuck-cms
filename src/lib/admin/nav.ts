@@ -51,6 +51,7 @@ export function adminNav(o: { isAdmin: boolean; ticketsOn: boolean; mailOn: bool
       ],
     },
     { href: '/admin/media/', label: 'Media' },
+    { href: '/admin/stats/', label: 'Stats' },
     // A group of one is just its link.
     ...groups.filter((g) => g.items.length).map((g) => (g.items.length === 1 ? g.items[0] : g)),
   ];

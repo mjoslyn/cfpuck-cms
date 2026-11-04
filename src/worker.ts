@@ -28,8 +28,15 @@ const SCHEDULES: Record<string, { name: string; run: () => Promise<string> }> = 
   '20 6 * * *': { name: 'mail nightly', run: async () => (await import('./lib/mailing/due')).runNightly() },
   // Snapshots of this site when they are on and due (src/lib/sync.ts); 07:00 UTC.
   '0 7 * * *': { name: 'scheduled snapshot', run: async () => (await import('./lib/sync')).scheduledSnapshot() },
-  // Ticket reminders, follow-ups, expired holds, waitlists (src/lib/tickets/orders.ts); hourly.
-  '0 * * * *': { name: 'ticket emails', run: async () => (await import('./lib/tickets/orders')).sendDueTicketEmails() },
+  // Ticket reminders, follow-ups, expired holds, waitlists (src/lib/tickets/orders.ts), and yesterday's
+  // visitor hashes and old site statistics pruned (src/lib/stats.ts); hourly.
+  '0 * * * *': {
+    name: 'hourly',
+    run: async () => {
+      const stats = await (await import('./lib/stats')).pruneStats((await import('./lib/db/site')).siteDb()).catch((e: Error) => `stats prune failed: ${e.message}`);
+      return `${await (await import('./lib/tickets/orders')).sendDueTicketEmails()}; ${stats}`;
+    },
+  },
 };
 
 async function runJob(job: Job): Promise<void> {

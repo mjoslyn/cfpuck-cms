@@ -263,6 +263,22 @@ export const SCHEMA: Record<string, TableSchema> = {
     defaults: {"hint":""},
     touch: true,
   },
+  site_stat_visitors: {
+    pk: ["day","hash"],
+    columns: {"day":"date","hash":"text"},
+    generated: [],
+    fks: [],
+    defaults: {},
+    touch: false,
+  },
+  site_stats: {
+    pk: ["day","kind","path","target"],
+    columns: {"day":"date","kind":"text","path":"text","target":"text","hits":"int8"},
+    generated: [],
+    fks: [],
+    defaults: {"path":"","target":"","hits":0},
+    touch: false,
+  },
   sync_nonces: {
     pk: ["nonce"],
     columns: {"nonce":"text","at":"int8"},

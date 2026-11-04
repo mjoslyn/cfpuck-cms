@@ -78,6 +78,9 @@ export const POLICIES: Record<string, TablePolicy> = {
   mail_suppressions: readOnly(admins),
   // Signed sync requests' nonces (src/lib/sync-remote.ts): the server's only.
   sync_nonces: all(nobody, nobody),
+  // Site statistics (src/lib/stats.ts): counted by the server, read by editors (Stats).
+  site_stats: readOnly(editors),
+  site_stat_visitors: all(nobody, nobody),
   // Admins change other people's profiles; editors rename themselves but don't change their own role.
   profiles: {
     select: editors,
