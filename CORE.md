@@ -846,7 +846,9 @@ with neither, only free tickets, and the payment settings are hidden), currency,
 tickets (30-120 minutes), and the emails with the reminder's and follow-up's timing.
 
 - Rendering: `src/render/c/tickets.ts`. The Event details block shows the form below the content and a
-  Tickets box in its sidebar, unless the page has a `tickets` block for its event. The `tickets` block
+  Tickets box in its sidebar, unless the page has a `tickets` block for its event. On an event's page
+  with neither block (a template with only a Page content block), the form goes under the Page content
+  block of its main area (`ticketsAfterContent`), so an event that sells tickets always shows them. The `tickets` block
   goes on any page or template: it shows the event it names (`attrs.event`, and `attrs.date` for one
   date of a recurring event, else its next; with the event's name and date over the form), else the
   page's own event (`prepareTicketsBlock`); a page can have several. An event that doesn't sell tickets

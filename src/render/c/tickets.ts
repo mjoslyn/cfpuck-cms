@@ -338,6 +338,17 @@ export function ticketsSection(env: Env, heading?: string, target = pageEvent(en
   );
 }
 
+/**
+ * The page's own event's tickets, under its Page content block (main area) when nothing else on the page
+ * shows them: no Tickets block for it and no Event details block (which shows them itself). So an event
+ * whose template has neither still sells the tickets added to it.
+ */
+export function ticketsAfterContent(env: Env): string {
+  const target = pageEvent(env.ctx);
+  if (!target || !setUp(target) || env.ctx.data.get('tickets-block') || env.ctx.data.get('event-details')) return '';
+  return ticketsSection(env, undefined, target);
+}
+
 /** "From $25" / "Free" / "$10 – $40", for the event's details sidebar. */
 export function ticketPriceSummary(env: Env): string {
   const ev = pageEvent(env.ctx);

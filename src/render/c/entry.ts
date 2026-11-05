@@ -20,6 +20,7 @@ import { ARCHIVE_PATHS, typeDef } from '../../lib/site';
 import type { Env } from '../env';
 import type { Term } from '../../lib/types';
 import { lockedContent } from './members';
+import { ticketsAfterContent } from './tickets';
 import { entryImageHeight } from '../../lib/content/image-height';
 
 const esc = (s: unknown) => String(s ?? '').replace(/&(?!(?:#\d+|#x[0-9a-f]+|[a-z][a-z0-9]*);)/gi, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -189,9 +190,11 @@ export const entryContent: Renderer = (b, env) => {
   const inner = editing
     ? env.contentSlot!.replace('<cms-content>', `<cms-content data-area="${area}">`)
     : markImages(renderItems(ctx.docs.get(area === MAIN_AREA ? `content:${post.id}` : `content:${post.id}:${area}`), { ...env, parentLayout: a.layout ?? null, imgCtx: 'content' }), 'content');
-  if (!editing && !inner.trim()) return '';
+  // The page's own event's tickets, when no other block on the page shows them.
+  const tickets = area === MAIN_AREA && post.id === ctx.queried.entry?.id ? ticketsAfterContent(env) : '';
+  if (!editing && !inner.trim() && !tickets) return '';
   const l = layout(ctx, a.layout ?? { type: 'flow' }, a.gap, a.style?.padding);
-  return `<div ${root(a, ['c-entry-content', ...l.classes], l.decls)}>${inner}</div>`;
+  return `<div ${root(a, ['c-entry-content', ...l.classes], l.decls)}>${inner}</div>${tickets}`;
 };
 
 /**

@@ -152,6 +152,8 @@ async function walk(items: PuckItem[], ctx: RenderCtx, state: WalkState) {
         const e = ctx.queried.entry;
         const area = areaName(attrs.area);
         if (e) await loadDoc(ctx, area === MAIN_AREA ? `content:${e.id}` : `content:${e.id}:${area}`, async () => areaItems(e.content, area) as PuckItem[], state);
+        // An event's tickets go under its content when no other block shows them (ticketsAfterContent).
+        if (e?.type === 'event' && area === MAIN_AREA) await prepareTickets(ctx);
         break;
       }
       case 'image':
@@ -274,6 +276,7 @@ async function walk(items: PuckItem[], ctx: RenderCtx, state: WalkState) {
       case 'event-details': {
         const e = ctx.queried.entry;
         if (!e) break;
+        ctx.data.set('event-details', true);
         await prepareTickets(ctx);
         const venue = Number(e.fields?.venue) || 0;
         if (venue) await ctx.loader.entriesByIds([venue]);

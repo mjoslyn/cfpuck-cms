@@ -43,7 +43,8 @@ An event takes bookings once it has at least one ticket type. In the event's set
 2. Optionally set **How many** are available, and when it is **On sale from** and **until**.
 3. Set the event's overall capacity if there is one, and whether to offer a **Waitlist when sold
    out**.
-4. Publish the event. The booking form appears on its page.
+4. Publish the event. The booking form appears on its page, under the event's description, whatever
+   template the event uses. To put it somewhere else on the page, add a **Tickets** block there.
 
 Paid tickets need card payments set up for your site; ask your admin. Free tickets work without.
 
