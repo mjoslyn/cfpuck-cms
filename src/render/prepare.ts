@@ -21,7 +21,7 @@ import type { Overrides } from '../lib/content/linked-patterns';
 import { applyFilters, filterSpec, findFilters } from './c/filters';
 import { prepareMap } from './c/map';
 import { prepareNavigation } from './c/navigation';
-import { prepareTickets, prepareTicketsBlock } from './c/tickets';
+import { isPageTickets, prepareTickets, prepareTicketsBlock } from './c/tickets';
 import { EVENT_BLOCKS, eventsOn } from '../lib/events/on';
 import { LISTS_KEY } from './c/mailing';
 import { renderHooks } from './hooks';
@@ -270,7 +270,7 @@ async function walk(items: PuckItem[], ctx: RenderCtx, state: WalkState) {
       case 'tickets': {
         // The Event details block leaves its event's tickets to this one.
         const target = await prepareTicketsBlock(ctx, props.id, attrs);
-        if (target?.own) ctx.data.set('tickets-block', true);
+        if (isPageTickets(ctx, target)) ctx.data.set('tickets-block', true);
         break;
       }
       case 'event-details': {

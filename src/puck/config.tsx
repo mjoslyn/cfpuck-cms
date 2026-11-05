@@ -49,7 +49,7 @@ Object.assign(PANELS, {
         <p className="mb-3 text-xs text-admin-muted">With no event chosen, it shows the tickets of the event whose page it is on (in an event template, each event's own).</p>
       )}
       <Text title="Heading" value={a.heading} placeholder="Tickets (or the event's own)" onChange={(v) => set({ heading: v || undefined })} />
-      <p className="mb-2 text-xs text-admin-muted">The event's ticket types, prices and questions are in its settings, under Tickets. On an event's page the Event details block shows them on its own, unless a Tickets block for that event is on the page.</p>
+      <p className="mb-2 text-xs text-admin-muted">The event's ticket types, prices and questions are set up under People &gt; Tickets (Set up tickets in its settings). On an event's page the Event details block shows them on its own, unless a Tickets block for that event is on the page.</p>
     </>
   ),
   members: (a: Attrs, set: (p: Attrs) => void) => <MembersPanel a={a} set={set} />,

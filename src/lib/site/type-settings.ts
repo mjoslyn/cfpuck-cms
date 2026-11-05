@@ -39,7 +39,7 @@ export interface MadeType {
 }
 
 /** Field keys the core keeps for itself in entries.fields. */
-export const RESERVED_FIELD_KEYS = ['seo', 'access', 'template', 'featured', 'tickets', 'recurrence', 'timezone', 'imported_from'];
+export const RESERVED_FIELD_KEYS = ['seo', 'access', 'template', 'featured', 'tickets', 'tickets_from', 'recurrence', 'timezone', 'imported_from'];
 /** Type names the core uses for other things. */
 export const RESERVED_TYPES = ['page', 'post', 'global', 'event', 'venue', 'any', 'terms', 'tags', 'tag', 'search', 'all'];
 

@@ -6,12 +6,16 @@ sidebar:
 ---
 
 With [Events](../events/) on, an event sells tickets (or takes free registrations) when it has
-ticket types: add them in its settings, under Tickets. Free tickets need nothing else; paid ones go through Stripe or Square, whichever has its keys set (chosen
+ticket types, set up on its page under **People > Tickets** (**Set up tickets** in the event's settings links there). Free tickets need nothing else; paid ones go through Stripe or Square, whichever has its keys set (chosen
 under **Settings > Tickets** when both do).
 
 ## An event's tickets
 
-In the event's settings, under Tickets (stored in `fields.tickets`, `src/lib/tickets/config.ts`):
+On the event's page in the Tickets admin, **Ticket types and settings** (`/admin/tickets/<id>/?view=setup`; stored in
+`fields.tickets`, `src/lib/tickets/config.ts`, `src/lib/tickets/setup.ts`). Saving there writes the live event and any
+changes kept aside; the editor's saves keep the stored setup. An event can instead share another
+event's tickets, one pool for all (**Share its tickets**; `fields.tickets_from`): orders, capacity, the
+waitlist and emails stay on the event that holds them.
 
 - **Ticket types**: name, description, price (empty or 0 is free), how many there are, the most in one
   order, and when they're on sale (empty: now, until the event ends). A type no longer offered stays for

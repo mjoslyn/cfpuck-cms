@@ -1,7 +1,8 @@
-// An event's tickets, in its settings (fields.tickets; src/lib/tickets/config.ts): on or off, the
-// ticket types with prices, capacities and sales windows, what buyers are asked (phone, address, the
-// event's own questions) and the waitlist. Its emails are on its attendee list (Emails).
-import { useEffect, useRef, useState } from 'react';
+// An event's ticket setup (fields.tickets; src/lib/tickets/config.ts), edited on its page in the Tickets
+// admin (src/admin/TicketSetup.tsx): the ticket types with prices, capacities and sales windows, what
+// buyers are asked (phone, address, the event's own questions) and the waitlist. Its emails are on the
+// same page (Emails).
+import { useRef, useState } from 'react';
 import { Num, Row, Select, Text, Toggle, inputClass } from './fields';
 import { TICKETS_KEY, newId, parsePrice, type EventTickets, type TicketQuestion, type TicketType } from '../lib/tickets/config';
 import { MIN_CHARGE } from '../lib/payments/money';
@@ -118,25 +119,17 @@ function MemberPricing({ type, levels, onChange }: { type: TicketType; levels: M
   );
 }
 
-export function TicketsForm({ fields, onChange }: { fields: Record<string, any>; onChange: (fields: Record<string, any>) => void }) {
+export function TicketsForm({ eventId, fields, onChange }: { eventId: number; fields: Record<string, any>; onChange: (fields: Record<string, any>) => void }) {
   const members = useMemberSettings();
   const t: EventTickets = { types: [], ...(fields[TICKETS_KEY] ?? {}) };
   // `enabled` isn't stored any more: an event sells tickets while it has ticket types.
   const { enabled: _enabled, ...stored } = t;
   const set = (patch: Partial<EventTickets>) => onChange({ ...fields, [TICKETS_KEY]: { ...stored, ...patch } });
-  // The attendee list, for an event that has been saved (/admin/edit/<id>/).
-  const [entryId, setEntryId] = useState<string | null>(null);
-  useEffect(() => setEntryId(location.pathname.match(/\/admin\/edit\/(\d+)/)?.[1] ?? null), []);
 
   return (
     <>
       {/* The event sells tickets (or takes registrations) while it has ticket types. */}
       {!t.types.length && <p className="mb-2 text-xs text-admin-muted">Add a ticket type to sell tickets or take registrations (a price of 0 is free).</p>}
-      {entryId && t.types.length > 0 && (
-        <p className="mb-3 text-xs">
-          <a className="text-admin-accent underline" href={`/admin/tickets/${entryId}/`} target="_blank" rel="noopener">Attendee list and orders</a>
-        </p>
-      )}
       {t.types.length > 0 && <Text title="Heading" value={t.heading} placeholder="Tickets" onChange={(heading) => set({ heading: heading || undefined })} />}
       {t.types.length > 0 && <span className="mb-1 block text-xs font-medium text-admin-muted">Ticket types</span>}
       <List<TicketType>
@@ -199,13 +192,9 @@ export function TicketsForm({ fields, onChange }: { fields: Record<string, any>;
           <span className="mt-4 mb-1 block text-xs font-semibold tracking-wider text-admin-muted uppercase">Emails</span>
           <p className="mb-3 text-xs text-admin-muted">
             Buyers get the emails designed under Settings &gt; Tickets.{' '}
-            {entryId ? (
-              <a className="text-admin-accent underline" href={`/admin/tickets/${entryId}/?view=emails`} target="_blank" rel="noopener">
-                Give this event its own
-              </a>
-            ) : (
-              'Save the event to give it its own.'
-            )}
+            <a className="text-admin-accent underline" href={`/admin/tickets/${eventId}/?view=emails`}>
+              Give this event its own
+            </a>
           </p>
         </>
       )}

@@ -11,7 +11,7 @@ import { localToUtc } from '../../lib/recurrence';
 import { zoneLabel } from '../../lib/events/timezone';
 import { termPagesOn } from '../../lib/templates';
 import { taxonomiesOf } from '../../lib/site';
-import { ticketPriceSummary, ticketsSection } from '../c/tickets';
+import { pageTicketsAnchor, ticketPriceSummary, ticketsSection } from '../c/tickets';
 import { lockedContent } from '../c/members';
 
 /** The event type's taxonomies (its categories), from the site config. */
@@ -84,7 +84,7 @@ function details(env: Env, e: Entry): string {
   }
   // Tickets sold here: their prices and a link to the form below the content.
   const tickets = ticketPriceSummary(env);
-  if (tickets) out += box('Tickets', `<p>${esc(tickets)}</p><p class="c-event__map"><a href="#tickets">Get tickets</a></p>`);
+  if (tickets) out += box('Tickets', `<p>${esc(tickets)}</p><p class="c-event__map"><a href="${pageTicketsAnchor(env.ctx)}">Get tickets</a></p>`);
   else if (cost) out += box('Cost', `<p>${esc(cost)}</p>`);
   if (website) out += box('Website', `<p><a href="${esc(website)}" target="_blank" rel="noopener">${esc(String(website).replace(/^https?:\/\/(www\.)?|\/$/g, ''))}</a></p>`);
   if (cats.length) out += box('Category', `<p>${cats.map((t) => (termPagesOn(env.ctx.settings.site, t.taxonomy) ? `<a href="${termLink(t)}" rel="tag">${esc(t.name)}</a>` : esc(t.name))).join(', ')}</p>`);

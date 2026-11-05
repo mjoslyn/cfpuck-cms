@@ -29,6 +29,7 @@ import {
   priceFor,
   ticketSettings,
   ticketsOf,
+  ticketsFromOf,
   type EventTickets,
   type TicketQuestion,
 } from '../../lib/tickets/config';
@@ -63,10 +64,34 @@ export interface TicketsTarget {
 
 const targetOf = (e: Entry, own: boolean): TicketsTarget => ({ e, id: e.series_id ?? e.id, occurrence: e.occurrence ?? '', own });
 
-/** The page's own event. */
+/** The page's own event's tickets: its own, or those of the event it shares them with (loadHost). */
 function pageEvent(ctx: RenderCtx): TicketsTarget | null {
   const e = ctx.queried.entry;
-  return e && e.type === 'event' ? targetOf(e, true) : null;
+  if (!e || e.type !== 'event') return null;
+  if (!ticketsFromOf(e.fields)) return targetOf(e, true);
+  const host = ctx.data.get(HOST_KEY) as Entry | null | undefined;
+  return host ? targetOf(host, false) : null;
+}
+const HOST_KEY = 'tickets-host';
+
+/** The event whose tickets the page's event shares (its next date, for a recurring one), loaded once. */
+async function loadHost(ctx: RenderCtx) {
+  const e = ctx.queried.entry;
+  const from = e?.type === 'event' ? ticketsFromOf(e.fields) : 0;
+  if (!from || ctx.data.has(HOST_KEY)) return;
+  ctx.data.set(HOST_KEY, from === (e!.series_id ?? e!.id) ? null : await namedEvent(ctx, from, ''));
+}
+
+/** Whether a target is the page's own event's tickets (its own, or the ones it shares). */
+export function isPageTickets(ctx: RenderCtx, t: TicketsTarget | null): boolean {
+  const page = pageEvent(ctx);
+  return !!t && !!page && page.id === t.id && page.occurrence === t.occurrence;
+}
+
+/** The anchor of the page's own event's tickets (ticketsAt in src/lib/tickets/orders.ts). */
+export function pageTicketsAnchor(ctx: RenderCtx): string {
+  const t = pageEvent(ctx);
+  return !t || t.own ? '#tickets' : `#tickets-${t.id}`;
 }
 const dataKey = (t: Pick<TicketsTarget, 'id' | 'occurrence'>) => `tickets:${t.id}:${t.occurrence}`;
 const blockKey = (blockId: string) => `tickets-target:${blockId}`;
@@ -116,12 +141,13 @@ function editableBlock(ctx: RenderCtx, blockId: string): boolean {
 export async function prepareTicketsBlock(ctx: RenderCtx, blockId: string, attrs: Record<string, any>): Promise<TicketsTarget | null> {
   // Worked out before the walk loads the page's content (the site), when only the editor has set it.
   const editable = !!ctx.editor && editableBlock(ctx, blockId);
+  await loadHost(ctx);
   const page = pageEvent(ctx);
   const id = Number(attrs.event) || 0;
   let target = page;
   if (id) {
     const e = await namedEvent(ctx, id, /^\d{4}-\d{2}-\d{2}$/.test(String(attrs.date ?? '')) ? attrs.date : '');
-    target = e ? targetOf(e, !!page && page.id === (e.series_id ?? e.id) && page.occurrence === (e.occurrence ?? '')) : null;
+    target = e ? targetOf(e, !!page && page.own && page.id === (e.series_id ?? e.id) && page.occurrence === (e.occurrence ?? '')) : null;
   }
   ctx.data.set(blockKey(blockId), { target, editable } satisfies TicketsBlock);
   if (target) await prepareTickets(ctx, target);
@@ -129,7 +155,9 @@ export async function prepareTicketsBlock(ctx: RenderCtx, blockId: string, attrs
 }
 
 /** Loads what's taken and the buyer's order (for the Tickets and Event details blocks). */
-export async function prepareTickets(ctx: RenderCtx, target = pageEvent(ctx)) {
+export async function prepareTickets(ctx: RenderCtx, given?: TicketsTarget | null) {
+  await loadHost(ctx);
+  const target = given === undefined ? pageEvent(ctx) : given;
   const tickets = target ? ticketsOf(target.e.fields) : null;
   if (!target || !tickets?.enabled) return;
   // Member prices and members-only tickets depend on who is buying.
@@ -284,7 +312,7 @@ export function ticketsSection(env: Env, heading?: string, target = pageEvent(en
   const end = endsAt(e);
   if (end && now >= end && !env.ctx.editor) return close(`<p class="c-tickets__note">Ticket sales for this event have closed.</p>`);
   const types = offeredTypes(t);
-  if (!types.length) return env.ctx.editor ? close('<p class="c-tickets__note">Add ticket types in the event settings (Tickets).</p>') : '';
+  if (!types.length) return env.ctx.editor ? close('<p class="c-tickets__note">Add ticket types under People &gt; Tickets (Set up tickets in the event’s settings).</p>') : '';
   const left = remaining(t, data.sold);
   const open = types.filter((x) => !offSale(x, now));
   if (!open.length) {
@@ -376,7 +404,7 @@ function sampleTickets(env: Env, b: { attrs: Record<string, any> }, target: Tick
   const why = b.attrs.event && !target
     ? 'That event isn’t there, or has no such date.'
     : base
-      ? `${target!.own ? 'This event' : esc(base.title)} doesn’t sell tickets yet (turn on Tickets and add ticket types in its settings), so the site shows nothing here.`
+      ? `${target!.own ? 'This event' : esc(base.title)} doesn’t sell tickets yet (add ticket types under People &gt; Tickets), so the site shows nothing here.`
       : 'On an event’s page this shows its tickets, and nothing for events that don’t sell any. Or choose an event in the block’s settings.';
   const note = `<p class="c-tickets__note c-tickets__sample">Sample tickets. ${why}</p>`;
   const fields = { ...(base?.fields ?? {}), tickets: { ...ticketsOf(base?.fields), enabled: true, types: SAMPLE_TYPES } };

@@ -36,15 +36,24 @@ phone number; every event at that venue updates.
 
 ## Selling tickets or taking sign-ups
 
-An event takes bookings once it has at least one ticket type. In the event's settings, under
-**Tickets**:
+An event takes bookings once it has at least one ticket type. Tickets are set up in the Tickets
+admin: in the event's settings, under **Tickets**, press **Set up tickets** (or click **People**, then
+**Tickets**, and choose the event under **Add tickets to**). Then, under **Ticket types and settings**:
 
 1. Add a ticket type, for example "Adult" or "Free entry", with its price (0 for free).
 2. Optionally set **How many** are available, and when it is **On sale from** and **until**.
 3. Set the event's overall capacity if there is one, and whether to offer a **Waitlist when sold
    out**.
-4. Publish the event. The booking form appears on its page, under the event's description, whatever
+4. Press **Save tickets**, and publish the event. The booking form appears on its page, under the event's description, whatever
    template the event uses. To put it somewhere else on the page, add a **Tickets** block there.
+
+### One set of tickets for several events
+
+Several events can sell the same tickets, from one pool, like a festival pass: set up the tickets on
+one event, then on each of the others press **Set up tickets** and, under **Or use another event's
+tickets**, choose that event and press **Share its tickets**. Tickets bought at any of them count
+against the same ticket types and capacity, and all the orders, the waitlist and the emails are on the
+first event's page. **Stop sharing** ends it for that event.
 
 Paid tickets need card payments set up for your site; ask your admin. Free tickets work without.
 

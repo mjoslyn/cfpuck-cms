@@ -8,7 +8,6 @@ import { fieldsFor as siteFields, PAGELESS_TYPES, SITE_TZ, type FieldDef, taxono
 import { permalink } from '../lib/permalink';
 import { isPlaceholderSlug, slugify } from '../lib/slug';
 import { SeoForm } from './SeoForm';
-import { TicketsForm } from './TicketsForm';
 import { useMemberSettings } from './member-settings';
 import { accessOf } from '../lib/members/config';
 import { itemsText } from '../lib/seo';
@@ -437,9 +436,9 @@ export function EntryForm({ type, value, onChange, templates, pageItems }: { typ
         </details>
       )}
       {type === 'event' && (
-        <details open={!!value.fields?.tickets?.types?.length} className="mt-4 border-t border-admin-ink/10 pt-3">
+        <details open className="mt-4 border-t border-admin-ink/10 pt-3">
           <summary className="mb-2 cursor-pointer text-xs font-semibold tracking-wider text-admin-muted uppercase">Tickets</summary>
-          <TicketsForm fields={value.fields} onChange={(fields) => set({ fields })} />
+          <EventTicketsLink types={(value.fields?.tickets?.types ?? []).filter((x: any) => !x?.hidden).length} shared={!!value.fields?.tickets_from} />
         </details>
       )}
       {!PAGELESS_TYPES.has(type) && <AccessForm fields={value.fields} onChange={(fields) => set({ fields })} />}
@@ -450,6 +449,23 @@ export function EntryForm({ type, value, onChange, templates, pageItems }: { typ
         </details>
       )}
     </div>
+  );
+}
+
+/** An event's tickets are set up in the Tickets admin: a link there, for an event that has been saved. */
+function EventTicketsLink({ types, shared }: { types: number; shared: boolean }) {
+  const [entryId, setEntryId] = useState<string | null>(null);
+  useEffect(() => setEntryId(location.pathname.match(/\/admin\/edit\/(\d+)/)?.[1] ?? null), []);
+  if (!entryId) return <p className="text-xs text-admin-muted">Save the event to set up tickets.</p>;
+  return (
+    <>
+      <p className="mb-2 text-xs text-admin-muted">
+        {shared ? 'Sells another event’s tickets (one pool shared by both).' : types ? `Sells ${types} ticket type${types === 1 ? '' : 's'}.` : 'No tickets. Set up ticket types, or share another event’s, to sell tickets or take registrations.'} Tickets are set up in the Tickets admin.
+      </p>
+      <a className="inline-block rounded-sm border border-admin-ink/20 px-2 py-1 text-xs font-semibold hover:border-admin-ink/50" href={`/admin/tickets/${entryId}/?view=setup`} target="_blank" rel="noopener">
+        {types || shared ? 'Manage tickets' : 'Set up tickets'}
+      </a>
+    </>
   );
 }
 

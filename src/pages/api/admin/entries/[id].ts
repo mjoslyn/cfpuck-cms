@@ -1,4 +1,5 @@
 import type { APIRoute } from 'astro';
+import { keepTickets } from '../../../../lib/tickets/setup';
 import { addressTakenBy, eventDates, mediaIdForUrl, renderedExcerpt, renderedTitle, setEntryTerms, setEntryTags, uniqueSlug, isStale, STALE } from '../../../../lib/admin/save';
 import { isPlaceholderSlug, slugify } from '../../../../lib/slug';
 import { Loader } from '../../../../lib/data';
@@ -115,6 +116,8 @@ export const PUT: APIRoute = async ({ params, request, locals }) => {
       ...('fields' in e ? { fields: e.fields ?? {} } : {}),
       ...('featured_image' in e ? { featured_media_id: await mediaIdForUrl(db, e.featured_image) } : {}),
     });
+    // An event's tickets are set up in the Tickets admin: the stored setup stays, whatever the fields brought.
+    if (current.type === 'event' && patch.fields) patch.fields = keepTickets(patch.fields, current.fields);
     if (current.type === 'event') Object.assign(patch, eventDates(e, patch.fields ?? current.fields ?? {}));
   }
   // A typed address another type already has at the same URL (a page and a post both live at /<slug>/),

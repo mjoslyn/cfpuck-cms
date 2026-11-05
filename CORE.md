@@ -832,9 +832,25 @@ one the newest 1,100 occurrences are kept. Saving an event rewrites the `start`/
 
 ## Tickets
 
-While Events is on, an event sells tickets or takes free registrations when it has ticket types (its
-settings, Tickets: `fields.tickets`, `src/puck/TicketsForm.tsx`; read with `ticketsOf`, whose `enabled`
-is derived from the types, `src/lib/tickets/config.ts`; there is no switch of its own):
+While Events is on, an event sells tickets or takes free registrations when it has ticket types
+(`fields.tickets`, read with `ticketsOf`, whose `enabled` is derived from the types,
+`src/lib/tickets/config.ts`; there is no switch of its own). They are set up on the event's page in the
+Tickets admin, **Ticket types and settings** (`/admin/tickets/<id>/?view=setup`, the default for an
+event without types; `src/admin/TicketSetup.tsx` around `src/puck/TicketsForm.tsx`; POST
+`/api/admin/ticket-setup`, `saveTicketSetup` in `src/lib/tickets/setup.ts`, which writes the live entry's
+fields and any changes kept aside, keeping `updated_at`, and clears the page cache). The event's settings
+only link there (**Set up tickets** / **Manage tickets**), and the Tickets list adds tickets to an event
+without them; the entries API keeps the stored setup whenever it writes an event's fields (`keepTickets`),
+so an editor's save, a publish of changes kept aside or a restored version never brings back an older one.
+**Shared tickets**: an event can sell another event's tickets instead of its own (**Or use another event's
+tickets** on its setup tab; `attachTickets`, `detachTickets`; `fields.tickets_from`, `ticketsFromOf`, a
+reserved field key), one pool for every event sharing them, like a pass: the ticket types, capacity,
+orders, waitlist, emails and attendee list stay on the event that holds them, whose setup tab lists the
+events sharing it. The page of an event sharing them renders the holder's tickets (its next date when it
+repeats) as a Tickets block naming it would (`loadHost`, `pageEvent` in `src/render/c/tickets.ts`;
+`#tickets-<holder id>`, `pageTicketsAnchor` for Event details' Get tickets link). Not allowed: sharing an
+event that shares another's (no chains), and for an event with orders of its own or whose own tickets
+others share. The setup:
 ticket types (name, description, price in cents, capacity, most per order, (an empty capacity is no
 limit; 0 is none left, sold out) sales window as local times
 in the event's timezone, hidden for past ones), the event's capacity (per date for a recurring event),

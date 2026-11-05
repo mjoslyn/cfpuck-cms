@@ -77,6 +77,11 @@ export interface EventTickets {
 }
 
 export const TICKETS_KEY = 'tickets';
+/** An event that shares another event's tickets (one pool: its ticket types, capacity, orders and waitlist)
+ * keeps that event's id here (src/lib/tickets/setup.ts). */
+export const TICKETS_FROM_KEY = 'tickets_from';
+/** The event whose tickets an event shares, or 0. */
+export const ticketsFromOf = (fields: Record<string, any> | null | undefined) => Math.max(0, Math.floor(Number(fields?.[TICKETS_FROM_KEY]) || 0));
 
 /** The site's ticket settings (settings.site.tickets). */
 export interface TicketSettings {
