@@ -848,9 +848,13 @@ reserved field key), one pool for every event sharing them, like a pass: the tic
 orders, waitlist, emails and attendee list stay on the event that holds them, whose setup tab lists the
 events sharing it. The page of an event sharing them renders the holder's tickets (its next date when it
 repeats) as a Tickets block naming it would (`loadHost`, `pageEvent` in `src/render/c/tickets.ts`;
-`#tickets-<holder id>`, `pageTicketsAnchor` for Event details' Get tickets link). Not allowed: sharing an
-event that shares another's (no chains), and for an event with orders of its own or whose own tickets
-others share. The setup:
+`#tickets-<holder id>`, `pageTicketsAnchor` for Event details' Get tickets link). Orders bought there are
+the holder's (`ticket_orders.page` says where); the sharing event's Orders tab lists them (those whose page
+is under its address) with any orders of its own from before, and the holder's list says which page each
+came from. An event's own setup stays, set aside, while it shares (`ticketsOf` answers `enabled: false`
+for it, so checkout, the waitlist and availability refuse its own), and comes back on Stop sharing. Not
+allowed: sharing an event that shares another's (no chains), or sharing while others share its own. The
+setup:
 ticket types (name, description, price in cents, capacity, most per order, (an empty capacity is no
 limit; 0 is none left, sold out) sales window as local times
 in the event's timezone, hidden for past ones), the event's capacity (per date for a recurring event),

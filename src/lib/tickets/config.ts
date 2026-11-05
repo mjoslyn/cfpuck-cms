@@ -254,7 +254,8 @@ export function ticketsOf(fields: Record<string, any> | null | undefined): Event
       help: str(q.help, 500) || undefined,
     }));
   return {
-    enabled: types.length > 0,
+    // An event sharing another's tickets sells those, not its own (kept for its earlier orders).
+    enabled: types.length > 0 && !ticketsFromOf(fields),
     heading: str(t.heading, 200) || undefined,
     types,
     capacity: num(t.capacity),

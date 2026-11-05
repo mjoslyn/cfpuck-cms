@@ -31,8 +31,8 @@ for (const w of waiting ?? []) waitlist.set(w.entry_id, (waitlist.get(w.entry_id
 const { data: others } = await allRows(db.from('entries').select('id, title, status, fields, event_start').eq('type', 'event').neq('status', 'trash').order('event_start', { ascending: false }).order('id'));
 const now = new Date().toISOString();
 // Events sharing another's tickets, by the event they share.
-const sharing = new Map<number, string[]>();
-for (const e of others ?? []) if (ticketsFromOf(e.fields)) sharing.set(ticketsFromOf(e.fields), [...(sharing.get(ticketsFromOf(e.fields)) ?? []), e.title || '(untitled)']);
+const sharing = new Map<number, { id: number; title: string }[]>();
+for (const e of others ?? []) if (ticketsFromOf(e.fields)) sharing.set(ticketsFromOf(e.fields), [...(sharing.get(ticketsFromOf(e.fields)) ?? []), { id: e.id, title: e.title || '(untitled)' }]);
 const addable = (others ?? []).filter((e) => !ticketsOf(e.fields).enabled && !ticketsFromOf(e.fields)).sort((a, b) => Number((b.event_start ?? '') >= now) - Number((a.event_start ?? '') >= now));
 const when = (s: string | null) => (s ? new Date(s).toLocaleDateString('en-US', { timeZone: SITE_TZ, month: 'short', day: 'numeric', year: 'numeric' }) : '-');
 ---
@@ -73,7 +73,7 @@ const when = (s: string | null) => (s ? new Date(s).toLocaleDateString('en-US', 
               <td class="px-4 py-3">
                 <a href={`/admin/tickets/${e.id}/`} class="font-medium hover:text-admin-accent">{e.title || '(untitled)'}</a>
                 {e.status !== 'publish' && <span class="ml-2 rounded bg-[#f1f5f9] px-2 py-0.5 text-xs text-admin-muted">Draft</span>}
-                {sharing.get(e.id) && <div class="text-xs text-admin-muted">Also sold at {sharing.get(e.id)!.join(', ')}</div>}
+                {sharing.get(e.id) && <div class="text-xs text-admin-muted">Also sold at {sharing.get(e.id)!.map((x, i) => <>{i ? ', ' : ''}<a href={`/admin/tickets/${x.id}/`} class="underline hover:text-admin-accent">{x.title}</a></>)}</div>}
               </td>
               <td class="px-4 py-3 text-admin-muted">{recurrenceOf(e as any) ? 'Repeats' : when(e.event_start)}</td>
               <td class="px-4 py-3">{s?.sold ?? 0}{t.capacity != null && !recurrenceOf(e as any) ? ` of ${t.capacity}` : ''}</td>

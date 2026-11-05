@@ -52,8 +52,9 @@ admin: in the event's settings, under **Tickets**, press **Set up tickets** (or 
 Several events can sell the same tickets, from one pool, like a festival pass: set up the tickets on
 one event, then on each of the others press **Set up tickets** and, under **Or use another event's
 tickets**, choose that event and press **Share its tickets**. Tickets bought at any of them count
-against the same ticket types and capacity, and all the orders, the waitlist and the emails are on the
-first event's page. **Stop sharing** ends it for that event.
+against the same ticket types and capacity. Each event's **Orders** list shows the people who booked on
+its page; the first event's list shows everyone, with the page they booked on. The waitlist and emails
+are on the first event's page. **Stop sharing** ends it for that event.
 
 Paid tickets need card payments set up for your site; ask your admin. Free tickets work without.
 

@@ -57,15 +57,11 @@ export async function attachTickets(db: Db, id: number, from: number): Promise<s
   if (ticketsFromOf(host.fields)) return 'That event shares another event’s tickets itself: choose that one.';
   if (!ticketsOf(host.fields).enabled) return 'That event has no tickets to share.';
   if ((await sharingEvents(db, id)).length) return 'Other events share this event’s tickets: they would lose them.';
-  const { data: orders } = await db.from('ticket_orders').select('id').eq('entry_id', id).limit(1);
-  if (orders?.length) return 'This event has orders of its own, so it keeps its own tickets.';
-  return writeSetup(db, id, (fields) => {
-    const { [TICKETS_KEY]: _own, ...rest } = fields;
-    return { ...rest, [TICKETS_FROM_KEY]: from };
-  });
+  // Its own setup stays, set aside: its earlier orders keep their questions, and stopping sharing brings it back.
+  return writeSetup(db, id, (fields) => ({ ...fields, [TICKETS_FROM_KEY]: from }));
 }
 
-/** Stops event `id` sharing another event's tickets (it then has none of its own). */
+/** Stops event `id` sharing another event's tickets (its own, if it had any, are sold again). */
 export function detachTickets(db: Db, id: number): Promise<string | null> {
   return writeSetup(db, id, (fields) => {
     const { [TICKETS_FROM_KEY]: _from, ...rest } = fields;

@@ -9,6 +9,7 @@ import { defaultHorizon, expandEntry, recurrenceOf } from '../../../lib/recurren
 import { money, ticketSettings, ticketsFromOf, ticketsOf } from '../../../lib/tickets/config';
 import { addressText, type OrderRow, type WaitlistRow } from '../../../lib/tickets/orders';
 import type { Entry } from '../../../lib/types';
+import { permalink } from '../../../lib/permalink';
 import TicketEmails from '../../../admin/TicketEmails';
 import TicketSetup from '../../../admin/TicketSetup';
 import { sharingEvents } from '../../../lib/tickets/setup';
@@ -26,14 +27,16 @@ const params = Astro.url.searchParams;
 // Sharing another event's tickets: they are sold and managed there.
 const fromId = ticketsFromOf(event.fields);
 const sharedFrom = fromId ? (await db.from('entries').select('id, title').eq('id', fromId).maybeSingle()).data : null;
-// An event without ticket types (or sharing another's) opens on its setup.
-const VIEWS = ['waitlist', 'emails', 'setup'];
-const view = fromId ? 'setup' : VIEWS.includes(params.get('view') ?? '') ? params.get('view')! : t.types.length ? 'attendees' : 'setup';
+// An event without ticket types opens on its setup. One sharing another's tickets has its orders
+// (those bought on its page, kept with that event's, and any of its own from before) and its setup.
+const VIEWS = fromId ? ['setup'] : ['waitlist', 'emails', 'setup'];
+const view = VIEWS.includes(params.get('view') ?? '') ? params.get('view')! : fromId || t.types.length ? 'attendees' : 'setup';
 const status = params.get('status') ?? 'paid';
 const search = (params.get('q') ?? '').trim().toLowerCase();
 
 // A recurring event's dates: those with orders or a waitlist, and the next ones to come.
-const recurring = !!recurrenceOf(event);
+const recurring = !fromId && !!recurrenceOf(event);
+const path = permalink(event);
 const today = new Date().toLocaleDateString('en-CA', { timeZone: SITE_TZ });
 let dates: string[] = [];
 if (recurring) {
@@ -44,7 +47,10 @@ if (recurring) {
 }
 const date = recurring ? params.get('date') || dates.find((d) => d >= today) || dates[dates.length - 1] || '' : '';
 
-const { data: all } = await allRows<OrderRow>(db.from('ticket_orders').select('*').eq('entry_id', id).eq('occurrence', date).order('created_at', { ascending: false }).order('id'));
+const { data: own } = await allRows<OrderRow>((fromId ? db.from('ticket_orders').select('*').eq('entry_id', id) : db.from('ticket_orders').select('*').eq('entry_id', id).eq('occurrence', date)).order('created_at', { ascending: false }).order('id'));
+// Sharing another's tickets: the orders bought on this event's page (its dates' pages too).
+const { data: soldHere } = fromId ? await allRows<OrderRow>(db.from('ticket_orders').select('*').eq('entry_id', fromId).order('created_at', { ascending: false }).order('id')) : { data: [] as OrderRow[] };
+const all = [...(own ?? []), ...(soldHere ?? []).filter((o) => o.page && o.page.startsWith(path))].sort((a, b) => b.created_at.localeCompare(a.created_at));
 const orders = (all ?? []).filter((o) => (status === 'all' ? true : status === 'closed' ? ['cancelled', 'expired'].includes(o.status) : o.status === status)).filter((o) => !search || `${o.code} ${o.name} ${o.email} ${o.phone}`.toLowerCase().includes(search));
 const paid = (all ?? []).filter((o) => o.status === 'paid');
 const sold = new Map<string, number>();
@@ -81,13 +87,12 @@ const STATUS: Record<string, [string, string]> = {
 };
 const { enabled: _enabled, ...setup } = t;
 // The setup tab: the events sharing this one's tickets, and those whose tickets it could share instead
-// (not while it has orders or others share its own).
+// (not while others share its own).
 let sources: { id: number; title: string; when: string; types: number }[] = [];
 let sharedWith: { id: number; title: string }[] = [];
 if (view === 'setup' && !fromId) {
   sharedWith = await sharingEvents(db, id);
-  const { data: anyOrder } = await db.from('ticket_orders').select('id').eq('entry_id', id).limit(1);
-  if (!sharedWith.length && !anyOrder?.length) {
+    if (!sharedWith.length) {
     const { data: rows } = await db.from('entries').select('id, title, fields, event_start').eq('type', 'event').neq('id', id).neq('status', 'trash').not('fields->tickets->types', 'is', null).order('event_start', { ascending: false }).limit(200);
     sources = (rows ?? []).flatMap((e) => {
       const tk = ticketsOf(e.fields);
@@ -120,7 +125,7 @@ const csv = `/api/admin/tickets/attendees.csv?event=${id}${recurring ? `&date=${
     </div>
   </div>
 
-  {!fromId && (
+  {(
   <>
   <dl class="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
     <div class="rounded bg-white p-4 shadow-[0_0_0_1px_rgba(26,26,46,0.08)]"><dt class="text-xs text-admin-muted">Tickets sold</dt><dd class="mt-1 text-2xl">{tickets}{t.capacity != null ? <span class="text-sm text-admin-muted"> of {t.capacity}</span> : ''}</dd></div>
@@ -137,8 +142,8 @@ const csv = `/api/admin/tickets/attendees.csv?event=${id}${recurring ? `&date=${
   <nav class="mt-6 flex flex-wrap gap-1 border-b border-admin-ink/10 text-sm print:hidden" aria-label="Lists">
     <a href={link({ view: '', status: '' })} aria-current={view === 'attendees' ? 'page' : undefined} class:list={['-mb-px border-b-2 px-3 py-2', view === 'attendees' ? 'border-admin-accent text-admin-ink' : 'border-transparent text-admin-muted hover:text-admin-ink']}>Orders</a>
     <a href={link({ view: 'setup', status: '' })} aria-current={view === 'setup' ? 'page' : undefined} class:list={['-mb-px border-b-2 px-3 py-2', view === 'setup' ? 'border-admin-accent text-admin-ink' : 'border-transparent text-admin-muted hover:text-admin-ink']}>Ticket types and settings</a>
-    <a href={link({ view: 'emails', status: '' })} aria-current={view === 'emails' ? 'page' : undefined} class:list={['-mb-px border-b-2 px-3 py-2', view === 'emails' ? 'border-admin-accent text-admin-ink' : 'border-transparent text-admin-muted hover:text-admin-ink']}>Emails{ownRows?.length ? ` (${ownRows.length} own)` : ''}</a>
-    {t.waitlist !== 'off' || waitlist?.length ? (
+    {!fromId && <a href={link({ view: 'emails', status: '' })} aria-current={view === 'emails' ? 'page' : undefined} class:list={['-mb-px border-b-2 px-3 py-2', view === 'emails' ? 'border-admin-accent text-admin-ink' : 'border-transparent text-admin-muted hover:text-admin-ink']}>Emails{ownRows?.length ? ` (${ownRows.length} own)` : ''}</a>}
+    {!fromId && (t.waitlist !== 'off' || waitlist?.length) ? (
       <a href={link({ view: 'waitlist', status: '' })} aria-current={view === 'waitlist' ? 'page' : undefined} class:list={['-mb-px border-b-2 px-3 py-2', view === 'waitlist' ? 'border-admin-accent text-admin-ink' : 'border-transparent text-admin-muted hover:text-admin-ink']}>Waitlist ({(waitlist ?? []).length})</a>
     ) : null}
   </nav>
@@ -183,6 +188,7 @@ const csv = `/api/admin/tickets/attendees.csv?event=${id}${recurring ? `&date=${
                   <td class="px-4 py-3">
                     <div class="font-medium">{o.name}</div>
                     <div class="text-xs text-admin-muted">{o.email}{o.phone ? ` · ${o.phone}` : ''}</div>
+                    {o.page && !o.page.startsWith(path) && <div class="text-xs text-admin-muted">Bought on <a class="underline hover:text-admin-accent" href={o.page}>{o.page}</a></div>}
                   </td>
                   <td class="px-4 py-3 font-mono text-xs">{o.code}</td>
                   <td class="px-4 py-3">{o.items.map((i) => `${i.quantity} × ${i.name}`).join(', ')}</td>

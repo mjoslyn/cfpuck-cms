@@ -67,10 +67,10 @@ export default function TicketSetup({ eventId, tickets, sources = [], sharedFrom
     return (
       <div className={panel}>
         <p className="text-sm">
-          This event sells the tickets of <a className="text-admin-accent underline" href={`/admin/tickets/${sharedFrom.id}/?view=setup`}>{sharedFrom.title}</a>: one pool of tickets for every event sharing them. Their ticket types, capacity, orders, waitlist and emails are on that event's page.
+          This event sells the tickets of <a className="text-admin-accent underline" href={`/admin/tickets/${sharedFrom.id}/?view=setup`}>{sharedFrom.title}</a>: one pool of tickets for every event sharing them, set up on that event's page with its capacity, waitlist and emails. Orders bought on this event's page are under Orders here, and on that event's page with all the others.
         </p>
         <div className="mt-4 flex items-center gap-3 border-t border-admin-ink/10 pt-4">
-          <button type="button" onClick={() => act({ action: 'detach' }, `Stop selling ${sharedFrom.title}'s tickets here? This event then has no tickets of its own until you add some. Orders already made stay with ${sharedFrom.title}.`)} className="rounded border border-admin-ink/20 px-3 py-1.5 text-sm hover:border-admin-accent hover:text-admin-accent">
+          <button type="button" onClick={() => act({ action: 'detach' }, `Stop selling ${sharedFrom.title}'s tickets here? This event goes back to its own ticket types, if it had any. Orders already made stay where they were made.`)} className="rounded border border-admin-ink/20 px-3 py-1.5 text-sm hover:border-admin-accent hover:text-admin-accent">
             Stop sharing
           </button>
           <span role="status" className="text-sm text-admin-muted">{status}</span>

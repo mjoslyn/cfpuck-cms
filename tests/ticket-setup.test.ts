@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { siteDb } from '../src/lib/db/site';
 import { attachTickets, detachTickets, keepTickets, saveTicketSetup, sharingEvents, storedTickets } from '../src/lib/tickets/setup';
 import { renderRequest } from '../src/render/page';
+import { ticketsOf } from '../src/lib/tickets/config';
 
 describe('ticket setup', () => {
   it('keeps the stored setup whatever an editor save brings', () => {
@@ -71,6 +72,16 @@ describe('ticket setup', () => {
     const talk = (await renderRequest(new URL('http://localhost/event/talk-two/'), db)).html;
     expect(talk.match(new RegExp(`id="tickets-${id('festival')}"`, 'g'))).toHaveLength(1);
     expect(talk).toContain(`href="#tickets-${id('festival')}">Get tickets`);
+
+    // An event with orders of its own can share too: they stay with it, and it stops selling its own.
+    await db.from('ticket_orders').insert({ entry_id: id('market'), occurrence: '', code: 'MKT1', token: 'tok-mkt-1', name: 'Ann', email: 'ann@example.org', items: [{ type: 'stall', name: 'Stall', price: 0, quantity: 1 }], quantity: 1, amount: 0, currency: 'usd', status: 'paid', provider: 'free' });
+    expect(await attachTickets(db, id('market'), id('festival'))).toBeNull();
+    const { data: market } = await db.from('entries').select('fields').eq('id', id('market')).single();
+    expect(market!.fields.tickets.types[0].id).toBe('stall');
+    expect(ticketsOf(market!.fields).enabled).toBe(false);
+    expect(await detachTickets(db, id('market'))).toBeNull();
+    const { data: back } = await db.from('entries').select('fields').eq('id', id('market')).single();
+    expect(ticketsOf(back!.fields).enabled).toBe(true);
 
     expect(await detachTickets(db, id('concert'))).toBeNull();
     const after = (await renderRequest(new URL('http://localhost/event/concert/'), db)).html;
