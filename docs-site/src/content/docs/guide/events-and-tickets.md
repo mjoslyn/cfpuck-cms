@@ -40,7 +40,8 @@ Tickets are made under **People** > **Tickets**, and an event sells the ticket i
 ticket can be sold at several events, from one pool, like a festival pass.
 
 The quickest way: in the event's settings, under **Tickets**, choose **New ticket for this event…** in
-**Sells**. The ticket opens in a new tab. Or click **People**, then **Tickets**, type a name next to
+**Sells**, give the ticket a name and press **Make**. The ticket opens in a new tab. If another ticket
+already has that name, a number is added (for example "Christmas Stroll 2"). Or click **People**, then **Tickets**, type a name next to
 **New ticket** and press **Make ticket**. Then, under **Ticket types and settings**:
 
 1. Add a ticket type, for example "Adult" or "Free entry", with its price (0 for free).

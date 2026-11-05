@@ -63,6 +63,13 @@ describe('tickets as their own records', () => {
     expect(await saveTicketSetup(db, 999999, { types: [] })).toBe('No such ticket.');
   });
 
+  it('gives a new ticket a name no other ticket has', async () => {
+    const db = siteDb();
+    expect((await createTicket(db, 'Christmas Stroll')).title).toBe('Christmas Stroll');
+    expect((await createTicket(db, ' christmas  stroll ')).title).toBe('christmas stroll 2');
+    expect((await createTicket(db, 'Christmas Stroll')).title).toBe('Christmas Stroll 3');
+  });
+
   it('sells one ticket from every event attached to it, each on its own page', async () => {
     const db = siteDb();
     const id = await events([

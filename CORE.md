@@ -842,8 +842,9 @@ and attendee list (`ticket_orders.entry_id` and the others are the ticket's id).
 up under People > Tickets (`src/pages/admin/tickets/`): **New ticket** on the list, and on a ticket's page
 **Ticket types and settings** (`?view=setup`, the default for a ticket without types;
 `src/admin/TicketSetup.tsx` around `src/puck/TicketsForm.tsx`) with its name, the events attached
-(Attach, Detach) and Delete for one without orders. An event's settings pick its ticket, or make one named
-after it (`EventTicketPicker`, `src/puck/entry-fields.tsx`), saved at once. All of it through POST
+(Attach, Detach) and Delete for one without orders. An event's settings pick its ticket, or make one under a name asked
+for there (`EventTicketPicker`, `src/puck/entry-fields.tsx`), saved at once. A new ticket's name is made unique
+(`freeTicketName`: "Christmas Stroll 2"). All of it through POST
 `/api/admin/ticket-setup` (`src/lib/tickets/setup.ts`: `createTicket`, `saveTicketSetup`, `attachEvent`,
 `deleteTicket`; attaching writes the event's fields and any changes kept aside, keeping `updated_at`), which
 clears the page cache. The entries API keeps the stored `ticket` whenever it writes an event's fields

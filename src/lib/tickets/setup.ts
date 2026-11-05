@@ -55,12 +55,21 @@ export async function ticketEvents(db: Db, id: number): Promise<{ id: number; ti
   return (data ?? []).map((e) => ({ id: e.id, title: e.title || '(untitled)', status: e.status, event_start: e.event_start }));
 }
 
-/** Makes a ticket (`name`, else "Tickets"), with `setup` if given. Returns its id, or an error. */
-export async function createTicket(db: Db, name: string, setup?: unknown): Promise<{ id?: number; error?: string }> {
-  const title = name.trim().slice(0, 200) || 'Tickets';
+/** A name no other ticket has: `name`, else it with the next free number ("Christmas Stroll 2"). */
+export async function freeTicketName(db: Db, name: string): Promise<string> {
+  const base = name.trim().replace(/\s+/g, ' ').slice(0, 190) || 'Tickets';
+  const { data } = await db.from('entries').select('title').eq('type', 'ticket');
+  const taken = new Set((data ?? []).map((r) => String(r.title ?? '').trim().toLowerCase()));
+  if (!taken.has(base.toLowerCase())) return base;
+  for (let n = 2; ; n++) if (!taken.has(`${base} ${n}`.toLowerCase())) return `${base} ${n}`;
+}
+
+/** Makes a ticket (`name`, else "Tickets", made unique), with `setup` if given. Returns its id and name, or an error. */
+export async function createTicket(db: Db, name: string, setup?: unknown): Promise<{ id?: number; title?: string; error?: string }> {
+  const title = await freeTicketName(db, name);
   const slug = `ticket-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
   const { data, error } = await db.from('entries').insert({ type: 'ticket', slug, title, status: 'publish', fields: setup ? { [TICKETS_KEY]: storedTickets(setup) } : {}, content: { content: [], root: { props: {} } } }).select('id').single();
-  return error ? { error: error.message } : { id: data.id };
+  return error ? { error: error.message } : { id: data.id, title };
 }
 
 /** Saves a ticket's setup (and its name, if given). Returns an error message, or null. */

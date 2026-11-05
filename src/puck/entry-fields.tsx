@@ -462,6 +462,8 @@ function EventTicketPicker({ ticket, title }: { ticket: number; title: string })
   const [current, setCurrent] = useState(ticket);
   const [tickets, setTickets] = useState<{ id: number; title: string }[] | null>(null);
   const [status, setStatus] = useState('');
+  // Making a ticket: its name, asked first (null: not making one).
+  const [naming, setNaming] = useState<string | null>(null);
   useEffect(() => setEntryId(location.pathname.match(/\/admin\/edit\/(\d+)/)?.[1] ?? null), []);
   useEffect(() => {
     browserClient().from('entries').select('id, title').eq('type', 'ticket').order('title').then(({ data }) => setTickets((data ?? []) as { id: number; title: string }[]));
@@ -477,23 +479,24 @@ function EventTicketPicker({ ticket, title }: { ticket: number; title: string })
     setStatus('Saved.');
     return res.json();
   };
+  const make = async () => {
+    const made = await post({ action: 'create', name: naming || title || 'Tickets' });
+    if (!made?.id) return;
+    setTickets([...(tickets ?? []), { id: made.id, title: made.title }]);
+    setCurrent(made.id);
+    setNaming(null);
+    window.open(`/admin/tickets/${made.id}/?view=setup`, '_blank', 'noopener');
+  };
   const choose = async (v: string) => {
-    if (v === 'new') {
-      const made = await post({ action: 'create', name: title || 'Tickets' });
-      if (made?.id) {
-        setTickets([...(tickets ?? []), { id: made.id, title: title || 'Tickets' }]);
-        setCurrent(made.id);
-        window.open(`/admin/tickets/${made.id}/?view=setup`, '_blank', 'noopener');
-      }
-      return;
-    }
+    if (v === 'new') return setNaming(`${title || 'Event'} tickets`);
+    setNaming(null);
     const id = Number(v) || 0;
     if ((await post(id ? { action: 'attach', ticket: id } : { action: 'detach' })) !== null) setCurrent(id);
   };
   return (
     <>
       <Row title="Sells">
-        <select className={inputClass} value={current || ''} disabled={!tickets} onChange={(e) => choose(e.target.value)}>
+        <select className={inputClass} value={naming !== null ? 'new' : current || ''} disabled={!tickets} onChange={(e) => choose(e.target.value)}>
           <option value="">No tickets</option>
           {(tickets ?? []).map((k) => (
             <option key={k.id} value={k.id}>{k.title || 'Tickets'}</option>
@@ -501,6 +504,15 @@ function EventTicketPicker({ ticket, title }: { ticket: number; title: string })
           <option value="new">New ticket for this event…</option>
         </select>
       </Row>
+      {naming !== null && (
+        <Row title="New ticket's name">
+          <div className="flex gap-2">
+            <input className={inputClass} value={naming} autoFocus onChange={(e) => setNaming(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), make())} />
+            <button type="button" className="rounded-sm border border-admin-ink/20 px-2 py-1 text-xs font-semibold hover:border-admin-ink/50" onClick={make}>Make</button>
+            <button type="button" className="text-xs text-admin-muted hover:text-admin-ink" onClick={() => setNaming(null)}>Cancel</button>
+          </div>
+        </Row>
+      )}
       <p className="mb-2 text-xs text-admin-muted">
         Tickets are set up under People &gt; Tickets, and any number of events can sell the same one from one pool. {status}
       </p>
