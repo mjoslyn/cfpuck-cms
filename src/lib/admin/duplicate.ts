@@ -2,6 +2,7 @@
 // own address; it has the original's content, fields, tags and other terms, template, featured image
 // and dates, all as its unpublished changes have them when it has some (else as published). Revisions
 // and publish dates stay with the original.
+import { keepTickets } from '../tickets/setup';
 import type { Db } from '../db/query';
 import type { PuckItem } from '../puck/types';
 import { eventDates, mediaIdForUrl, renderedExcerpt, renderedTitle, setEntryTags, setEntryTerms, uniqueSlug } from './save';
@@ -27,6 +28,8 @@ export async function duplicateEntry(db: Db, id: number): Promise<number> {
   let fields = d.fields ?? e.fields;
   let dates = { event_start: e.event_start, event_end: e.event_end, event_all_day: e.event_all_day };
   if (e.type === 'event' && 'event_start' in d) ({ fields, ...dates } = eventDates(d, fields ?? {}));
+  // A copy sells no tickets until it is attached to a ticket (it would otherwise share the original's pool).
+  if (e.type === 'event') fields = keepTickets(fields ?? {}, null);
   const row = {
     type: e.type,
     slug,

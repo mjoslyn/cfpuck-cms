@@ -832,60 +832,62 @@ one the newest 1,100 occurrences are kept. Saving an event rewrites the `start`/
 
 ## Tickets
 
-While Events is on, an event sells tickets or takes free registrations when it has ticket types
-(`fields.tickets`, read with `ticketsOf`, whose `enabled` is derived from the types,
-`src/lib/tickets/config.ts`; there is no switch of its own). They are set up on the event's page in the
-Tickets admin, **Ticket types and settings** (`/admin/tickets/<id>/?view=setup`, the default for an
-event without types; `src/admin/TicketSetup.tsx` around `src/puck/TicketsForm.tsx`; POST
-`/api/admin/ticket-setup`, `saveTicketSetup` in `src/lib/tickets/setup.ts`, which writes the live entry's
-fields and any changes kept aside, keeping `updated_at`, and clears the page cache). The event's settings
-only link there (**Set up tickets** / **Manage tickets**), and the Tickets list adds tickets to an event
-without them; the entries API keeps the stored setup whenever it writes an event's fields (`keepTickets`),
-so an editor's save, a publish of changes kept aside or a restored version never brings back an older one.
-**Shared tickets**: an event can sell another event's tickets instead of its own (**Or use another event's
-tickets** on its setup tab; `attachTickets`, `detachTickets`; `fields.tickets_from`, `ticketsFromOf`, a
-reserved field key), one pool for every event sharing them, like a pass: the ticket types, capacity,
-orders, waitlist, emails and attendee list stay on the event that holds them, whose setup tab lists the
-events sharing it. The page of an event sharing them renders the holder's tickets (its next date when it
-repeats) as a Tickets block naming it would (`loadHost`, `pageEvent` in `src/render/c/tickets.ts`;
-`#tickets-<holder id>`, `pageTicketsAnchor` for Event details' Get tickets link). Orders bought there are
-the holder's (`ticket_orders.page` says where); the sharing event's Orders tab lists them (those whose page
-is under its address) with any orders of its own from before, and the holder's list says which page each
-came from. An event's own setup stays, set aside, while it shares (`ticketsOf` answers `enabled: false`
-for it, so checkout, the waitlist and availability refuse its own), and comes back on Stop sharing. Not
-allowed: sharing an event that shares another's (no chains), or sharing while others share its own. The
-setup:
+While Events is on, events sell tickets or take free registrations through **tickets**, records of their
+own: entries of the hidden `ticket` type (`TICKET_TYPE`, `src/lib/events/types.ts`; no page, not in the
+content lists) whose `fields.tickets` holds the setup (read with `ticketsOf`, whose `enabled` is derived
+from the ticket types, `src/lib/tickets/config.ts`). An event sells the ticket it is attached to
+(`fields.ticket`, `ticketOf`; `ticket` and `tickets` are reserved field keys), and any number of events can
+attach to one, all selling from its one pool, like a pass. The ticket holds the orders, waitlist, emails
+and attendee list (`ticket_orders.entry_id` and the others are the ticket's id). Tickets are made and set
+up under People > Tickets (`src/pages/admin/tickets/`): **New ticket** on the list, and on a ticket's page
+**Ticket types and settings** (`?view=setup`, the default for a ticket without types;
+`src/admin/TicketSetup.tsx` around `src/puck/TicketsForm.tsx`) with its name, the events attached
+(Attach, Detach) and Delete for one without orders. An event's settings pick its ticket, or make one named
+after it (`EventTicketPicker`, `src/puck/entry-fields.tsx`), saved at once. All of it through POST
+`/api/admin/ticket-setup` (`src/lib/tickets/setup.ts`: `createTicket`, `saveTicketSetup`, `attachEvent`,
+`deleteTicket`; attaching writes the event's fields and any changes kept aside, keeping `updated_at`), which
+clears the page cache. The entries API keeps the stored `ticket` whenever it writes an event's fields
+(`keepTickets`), so an editor's save, a publish of changes kept aside or a restored version never changes
+it; a duplicated event sells nothing until attached. Detaching leaves the ticket and its orders. Dates
+(`ticketSpan`, `src/lib/tickets/span.ts`): a ticket for one event takes its dates, and for one recurring
+event sells each date separately (`occurrence`); a ticket for several events is one pool for all their
+dates, from the first start (reminders) to the last end (sales close). Migration
+`*_tickets_own_records.sql` made a ticket of every event's own tickets (named after it) and attached the
+events that shared them. The setup:
 ticket types (name, description, price in cents, capacity, most per order, (an empty capacity is no
 limit; 0 is none left, sold out) sales window as local times
-in the event's timezone, hidden for past ones), the event's capacity (per date for a recurring event),
-most per order, phone (off, optional, required), address (off, for paid orders, always), the event's own
+in the event's timezone, hidden for past ones), the ticket's capacity (per date for one recurring event),
+most per order, phone (off, optional, required), address (off, for paid orders, always), the ticket's own
 questions (asked once per order) and a waitlist (`off`, `auto`, `manual`). Settings > Tickets
 (`settings.site.tickets`, `ticketSettings`, `src/admin/TicketSettings.tsx`): the payment provider (Stripe
 or Square, offered only when both have keys (Settings > Connections or the environment), `providerStatus`; with one, it is used;
 with neither, only free tickets, and the payment settings are hidden), currency, how long an unpaid order holds its
 tickets (30-120 minutes), and the emails with the reminder's and follow-up's timing.
 
-- Rendering: `src/render/c/tickets.ts`. The Event details block shows the form below the content and a
-  Tickets box in its sidebar, unless the page has a `tickets` block for its event. On an event's page
+- Rendering: `src/render/c/tickets.ts`. On an event's page, its ticket (`loadPageTicket`, `targetFor`:
+  the ticket, its attached events as the page's loader sees them, and the date). The Event details block
+  shows the form below the content and a Tickets box in its sidebar, unless the page has a `tickets` block
+  for its ticket. On an event's page
   with neither block (a template with only a Page content block), the form goes under the Page content
   block of its main area (`ticketsAfterContent`), so an event that sells tickets always shows them. The `tickets` block
-  goes on any page or template: it shows the event it names (`attrs.event`, and `attrs.date` for one
-  date of a recurring event, else its next; with the event's name and date over the form), else the
-  page's own event (`prepareTicketsBlock`); a page can have several. An event that doesn't sell tickets
-  (Tickets off, or no ticket types) shows nothing. In the editor the block shows the full form: with no
+  goes on any page or template: it shows the ticket of the event it names (`attrs.event`, and `attrs.date`
+  for one date of a recurring event, else its next; with the event's name and date over the form), else
+  the page's own event's (`prepareTicketsBlock`); a page can have several. An event that doesn't sell
+  tickets (no ticket, or one without ticket types) shows nothing. In the editor the block shows the full form: with no
   event that sells tickets, sample ticket types and a note saying why, when the block is part of what is
   being edited (the page's own content, or a template being edited; a template's block on such an
   event's page shows nothing, as on the site). The form posts the page it is on (`page`): the order and a
   waitlist place keep it (`ticket_orders.page`, `ticket_waitlist.page`), and the buyer is sent back
-  there, to the section's anchor (`ticketsAt`: `#tickets` on the event's own page, else
-  `#tickets-<event id>`); emails' `{order_link}` goes there too (a waitlist's: the tickets where they
+  there, to the section's anchor (`ticketsAt`: `#tickets` on an attached event's own page, else
+  `#tickets-<ticket id>`); the form posts the ticket's id as `event`; emails' `{order_link}` goes there too (a waitlist's: the tickets where they
   joined). `prepareTickets` loads what's taken (`ticket_sold`) and, with `?order=<token>`, the buyer's
-  order (`ticket_order_status`; both read with the site's key), shown in its event's section.
-  `?tickets=<reason>&event=<id>` shows a checkout's outcome in that event's section.
+  order (`ticket_order_status`; both read with the site's key), shown in its ticket's section.
+  `?tickets=<reason>&event=<ticket id>` shows a checkout's outcome in that ticket's section.
   Pages with either are never cached. `public/assets/js/tickets.js` adds the total, the address only
   for paid orders, and what's left now (`GET /api/tickets/availability`). Checkout, the waitlist and
-  availability load the event as its page does (`visibleTo` with the viewer, `siteViewer`), so
-  members-only events are only for those members.
+  availability load the ticket with its events as their pages do (`loadEvent`, `attachedEvents`: `visibleTo`
+  with the viewer, `siteViewer`; a ticket with no event the viewer may see is refused), so members-only
+  events are only for those members. Orders and emails call it after its one event, else by its name.
 - Orders (`ticket_orders`, editors read, the site writes with the service key; `src/lib/tickets/orders.ts`):
   `POST /api/tickets/checkout` checks the order and holds its tickets in `ticket_order_create`, which takes
   counts paid orders and unexpired holds against the capacities in the same statement that inserts the
@@ -909,11 +911,13 @@ tickets (30-120 minutes), and the emails with the reminder's and follow-up's tim
   not paid for in an hour per address (`ticket_orders.ip`, IPv6 as its /64) and per email, and unpaid
   held tickets (with free ones from the last hour) per address at twice the most per order; a refused
   order goes back with `?tickets=limit`.
-- Attendee list (`/admin/tickets/`, `/admin/tickets/<id>/[?date=]`; actions `POST /api/admin/tickets`,
-  `GET /api/admin/tickets/attendees.csv`): check-in, resend, cancel (unpaid, free or fully refunded),
+- Attendee list (`/admin/tickets/`, a ticket's page `/admin/tickets/<ticket id>/[?date=][&on=<event id>]`;
+  an event's id there leads to its ticket's; actions `POST /api/admin/tickets`,
+  `GET /api/admin/tickets/attendees.csv`, with the page each order was bought on): orders by the event they
+  were bought at (`on`, for a ticket of several events), check-in, resend, cancel (unpaid, free or fully refunded),
   refund (admins; part or all, at the provider; all of it frees the tickets), the waitlist with Notify.
   Its writes don't clear the page cache.
-- Waitlist (`ticket_waitlist`, one place per email per event and date; `POST /api/tickets/waitlist`):
+- Waitlist (`ticket_waitlist`, one place per email per ticket and date; `POST /api/tickets/waitlist`):
   joining again keeps the place as it is (name, phone, status and turn), only a place still waiting takes
   the new quantity and page, and the answer is the same either way:
   shown when every type on sale is sold out. `notifyWaitlist` emails people in order as far as the free
@@ -923,14 +927,14 @@ tickets (30-120 minutes), and the emails with the reminder's and follow-up's tim
   waitlist, and the admin's copy of each order (`notify`). Each is a subject, an email builder design
   and an optional plain text (`TicketEmail`), with ticket merge tags (`MERGE_TAGS`) and an Order details
   block (`ORDER_DETAILS`: the summary table, date, venue, code, tickets, total, answers, the buyer's
-  contact), and the Payment block (a paid order's payment; nothing for free orders). Sent: the event's own (table `ticket_emails`, its attendee list > Emails,
-  `src/admin/TicketEmails.tsx`; kept out of the event's fields so editor saves can't overwrite it), else
+  contact), and the Payment block (a paid order's payment; nothing for free orders). Sent: the ticket's own (table `ticket_emails`, its page > Emails,
+  `src/admin/TicketEmails.tsx`), else
   the site's, else the default template for that kind (`ticket:<kind>`, see Forms), else `DEFAULT_EMAILS` (`emailToSend`). `src/lib/tickets/email.ts` renders them with the
   forms' renderer (`renderEmail`); the builder's kit is `src/admin/ticket-email.ts`, its preview a sample
   order rendered in the browser. The Worker runs `sendDueTicketEmails` hourly (`src/worker.ts`,
   deployed site only): reminders, follow-ups, expired holds, auto waitlists. Links use `SITE_URL`, else
   the request's address.
-- Orders, waitlists and events' own emails aren't synced or backed up: they stay on the copy where they were made.
+- Orders, waitlists and tickets' own emails aren't synced or backed up: they stay on the copy where they were made. Tickets (the records) sync and back up as entries, with the events.
 
 ## Members
 

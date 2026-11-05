@@ -1,16 +1,14 @@
 ---
-// Events that sell tickets: what each has sold, its takings and its waitlist, linking to its attendee list.
+// Tickets (their own records, src/lib/tickets/setup.ts): each one's events, what it has sold, its takings
+// and its waitlist, linking to its page (orders, setup, emails, waitlist). New ticket makes one.
 import Admin from '../../../layouts/Admin.astro';
 import { SITE_TZ } from '../../../lib/site';
 import { allRows } from '../../../lib/rows';
-import { money, ticketSettings, ticketsFromOf, ticketsOf } from '../../../lib/tickets/config';
-import { recurrenceOf } from '../../../lib/recurrence';
+import { TICKET_KEY, money, ticketOf, ticketSettings, ticketsOf } from '../../../lib/tickets/config';
 
 const db = Astro.locals.db;
-const { data: rows, error } = await db.from('entries').select('id, title, status, fields, event_start').eq('type', 'event').not('fields->tickets->types', 'is', null).order('event_start', { ascending: false });
+const { data: tickets, error } = await allRows(db.from('entries').select('id, title, fields').eq('type', 'ticket').order('id', { ascending: false }));
 if (error) throw error;
-// An event sells tickets when it has ticket types (Events on).
-const events = (rows ?? []).filter((e) => ticketsOf(e.fields).enabled);
 const { data: settings } = await db.from('settings').select('value').eq('key', 'site').maybeSingle();
 const currency = ticketSettings(settings?.value).currency ?? 'usd';
 const { data: orders } = await allRows(db.from('ticket_orders').select('entry_id, quantity, amount, refunded_amount, status').in('status', ['paid', 'refunded']).order('id'));
@@ -27,36 +25,32 @@ for (const o of orders ?? []) {
 }
 const waitlist = new Map<number, number>();
 for (const w of waiting ?? []) waitlist.set(w.entry_id, (waitlist.get(w.entry_id) ?? 0) + 1);
-// Events to add tickets to: those without ticket types, coming ones first.
-const { data: others } = await allRows(db.from('entries').select('id, title, status, fields, event_start').eq('type', 'event').neq('status', 'trash').order('event_start', { ascending: false }).order('id'));
-const now = new Date().toISOString();
-// Events sharing another's tickets, by the event they share.
-const sharing = new Map<number, { id: number; title: string }[]>();
-for (const e of others ?? []) if (ticketsFromOf(e.fields)) sharing.set(ticketsFromOf(e.fields), [...(sharing.get(ticketsFromOf(e.fields)) ?? []), { id: e.id, title: e.title || '(untitled)' }]);
-const addable = (others ?? []).filter((e) => !ticketsOf(e.fields).enabled && !ticketsFromOf(e.fields)).sort((a, b) => Number((b.event_start ?? '') >= now) - Number((a.event_start ?? '') >= now));
-const when = (s: string | null) => (s ? new Date(s).toLocaleDateString('en-US', { timeZone: SITE_TZ, month: 'short', day: 'numeric', year: 'numeric' }) : '-');
+// Each ticket's events, earliest first.
+const { data: attached } = await allRows(db.from('entries').select('id, title, status, fields, event_start').eq('type', 'event').neq('status', 'trash').not(`fields->>${TICKET_KEY}`, 'is', null).order('event_start').order('id'));
+const events = new Map<number, { id: number; title: string; status: string; event_start: string | null }[]>();
+for (const e of attached ?? []) {
+  const t = ticketOf(e.fields);
+  if (t) events.set(t, [...(events.get(t) ?? []), { id: e.id, title: e.title || '(untitled)', status: e.status, event_start: e.event_start }]);
+}
+const when = (s: string | null) => (s ? new Date(s).toLocaleDateString('en-US', { timeZone: SITE_TZ, month: 'short', day: 'numeric', year: 'numeric' }) : '');
 ---
 <Admin title="Tickets">
   <h1 class="text-3xl font-normal">Tickets</h1>
   <div class="flex flex-wrap items-end justify-between gap-4">
-    <p class="mt-1 text-sm text-admin-muted">Events that sell tickets or take registrations. Payments and emails are under <a class="underline hover:text-admin-accent" href="/admin/settings/tickets/">Settings &gt; Tickets</a>.</p>
-    {addable.length > 0 && (
-      <form id="add-tickets" class="flex items-center gap-2">
-        <label for="add-event" class="text-sm text-admin-muted">Add tickets to</label>
-        <select id="add-event" name="event" required class="max-w-xs rounded border border-admin-ink/15 bg-white px-2 py-1.5 text-sm">
-          <option value="">Choose an event</option>
-          {addable.map((e) => <option value={e.id}>{e.title || '(untitled)'}{e.event_start ? ` (${when(e.event_start)})` : ''}{e.status !== 'publish' ? ' (draft)' : ''}</option>)}
-        </select>
-        <button class="rounded bg-admin-accent px-3 py-1.5 text-sm text-white hover:bg-admin-accent-dark">Set up tickets</button>
-      </form>
-    )}
+    <p class="mt-1 text-sm text-admin-muted">Each ticket has its own types, prices and attendee list, and any number of events can sell it from one pool. Payments and emails are under <a class="underline hover:text-admin-accent" href="/admin/settings/tickets/">Settings &gt; Tickets</a>.</p>
+    <form id="new-ticket" class="flex items-center gap-2">
+      <label for="new-ticket-name" class="text-sm text-admin-muted">New ticket</label>
+      <input id="new-ticket-name" name="name" required placeholder="Name, such as Summer pass" class="w-56 rounded border border-admin-ink/15 bg-white px-2 py-1.5 text-sm" />
+      <button class="rounded bg-admin-accent px-3 py-1.5 text-sm text-white hover:bg-admin-accent-dark">Make ticket</button>
+    </form>
   </div>
+  <p id="new-ticket-error" class="mt-2 text-sm text-[#b91c1c]" role="alert" hidden></p>
   <div class="mt-6 overflow-hidden rounded bg-white shadow-[0_0_0_1px_rgba(26,26,46,0.08)]">
     <table class="w-full text-sm">
       <thead class="border-b border-admin-ink/10 text-left text-xs text-admin-muted">
         <tr>
-          <th class="px-4 py-2 font-medium">Event</th>
-          <th class="px-4 py-2 font-medium">Date</th>
+          <th class="px-4 py-2 font-medium">Ticket</th>
+          <th class="px-4 py-2 font-medium">Events</th>
           <th class="px-4 py-2 font-medium">Sold</th>
           <th class="px-4 py-2 font-medium">Orders</th>
           <th class="px-4 py-2 font-medium">Takings</th>
@@ -65,32 +59,33 @@ const when = (s: string | null) => (s ? new Date(s).toLocaleDateString('en-US', 
         </tr>
       </thead>
       <tbody>
-        {(events ?? []).map((e) => {
-          const t = ticketsOf(e.fields);
-          const s = sums.get(e.id);
+        {(tickets ?? []).map((k) => {
+          const t = ticketsOf(k.fields);
+          const s = sums.get(k.id);
+          const evs = events.get(k.id) ?? [];
           return (
             <tr class="border-b border-admin-ink/5 last:border-0 hover:bg-admin-bg">
               <td class="px-4 py-3">
-                <a href={`/admin/tickets/${e.id}/`} class="font-medium hover:text-admin-accent">{e.title || '(untitled)'}</a>
-                {e.status !== 'publish' && <span class="ml-2 rounded bg-[#f1f5f9] px-2 py-0.5 text-xs text-admin-muted">Draft</span>}
-                {sharing.get(e.id) && <div class="text-xs text-admin-muted">Also sold at {sharing.get(e.id)!.map((x, i) => <>{i ? ', ' : ''}<a href={`/admin/tickets/${x.id}/`} class="underline hover:text-admin-accent">{x.title}</a></>)}</div>}
+                <a href={`/admin/tickets/${k.id}/`} class="font-medium hover:text-admin-accent">{k.title || 'Tickets'}</a>
+                {!t.enabled && <span class="ml-2 rounded bg-[#f1f5f9] px-2 py-0.5 text-xs text-admin-muted">No ticket types</span>}
               </td>
-              <td class="px-4 py-3 text-admin-muted">{recurrenceOf(e as any) ? 'Repeats' : when(e.event_start)}</td>
-              <td class="px-4 py-3">{s?.sold ?? 0}{t.capacity != null && !recurrenceOf(e as any) ? ` of ${t.capacity}` : ''}</td>
+              <td class="px-4 py-3 text-admin-muted">
+                {evs.length ? evs.map((e, i) => <>{i ? ', ' : ''}<a href={`/admin/edit/${e.id}/`} class="hover:text-admin-accent">{e.title}</a>{e.event_start ? ` (${when(e.event_start)})` : ''}{e.status !== 'publish' ? ' (draft)' : ''}</>) : 'None yet'}
+              </td>
+              <td class="px-4 py-3">{s?.sold ?? 0}{t.capacity != null ? ` of ${t.capacity}` : ''}</td>
               <td class="px-4 py-3 text-admin-muted">{s?.orders ?? 0}</td>
               <td class="px-4 py-3 text-admin-muted">{money(s?.takings ?? 0, currency, '-')}</td>
-              <td class="px-4 py-3 text-admin-muted">{t.waitlist === 'off' ? '-' : waitlist.get(e.id) ?? 0}</td>
+              <td class="px-4 py-3 text-admin-muted">{t.waitlist === 'off' ? '-' : waitlist.get(k.id) ?? 0}</td>
               <td class="px-4 py-3 text-right whitespace-nowrap">
-                <a href={`/admin/tickets/${e.id}/`} class="text-xs text-admin-muted hover:text-admin-accent">Attendees</a>
-                <a href={`/admin/tickets/${e.id}/?view=setup`} class="ml-3 text-xs text-admin-muted hover:text-admin-accent">Ticket types</a>
-                <a href={`/admin/edit/${e.id}/`} class="ml-3 text-xs text-admin-muted hover:text-admin-accent">Edit event</a>
+                <a href={`/admin/tickets/${k.id}/`} class="text-xs text-admin-muted hover:text-admin-accent">Attendees</a>
+                <a href={`/admin/tickets/${k.id}/?view=setup`} class="ml-3 text-xs text-admin-muted hover:text-admin-accent">Ticket types</a>
               </td>
             </tr>
           );
         })}
-        {!events?.length && (
+        {!tickets?.length && (
           <tr>
-            <td colspan="7" class="px-4 py-10 text-center text-admin-muted">No events sell tickets yet.</td>
+            <td colspan="7" class="px-4 py-10 text-center text-admin-muted">No tickets yet. Make one, then attach events to it (from the ticket’s page, or an event’s settings).</td>
           </tr>
         )}
       </tbody>
@@ -99,9 +94,18 @@ const when = (s: string | null) => (s ? new Date(s).toLocaleDateString('en-US', 
 </Admin>
 
 <script>
-  document.getElementById('add-tickets')?.addEventListener('submit', (e) => {
+  const form = document.getElementById('new-ticket') as HTMLFormElement | null;
+  form?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const id = (document.getElementById('add-event') as HTMLSelectElement).value;
-    if (id) location.href = `/admin/tickets/${id}/?view=setup`;
+    const err = document.getElementById('new-ticket-error')!;
+    const name = (document.getElementById('new-ticket-name') as HTMLInputElement).value.trim();
+    const res = await fetch('/api/admin/ticket-setup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'create', name }) });
+    if (!res.ok) {
+      err.textContent = (await res.text()) || 'Could not make the ticket.';
+      err.hidden = false;
+      return;
+    }
+    const { id } = await res.json();
+    location.href = `/admin/tickets/${id}/?view=setup`;
   });
 </script>

@@ -438,7 +438,7 @@ export function EntryForm({ type, value, onChange, templates, pageItems }: { typ
       {type === 'event' && (
         <details open className="mt-4 border-t border-admin-ink/10 pt-3">
           <summary className="mb-2 cursor-pointer text-xs font-semibold tracking-wider text-admin-muted uppercase">Tickets</summary>
-          <EventTicketsLink types={(value.fields?.tickets?.types ?? []).filter((x: any) => !x?.hidden).length} shared={!!value.fields?.tickets_from} />
+          <EventTicketPicker ticket={Number(value.fields?.ticket) || 0} title={value.title} />
         </details>
       )}
       {!PAGELESS_TYPES.has(type) && <AccessForm fields={value.fields} onChange={(fields) => set({ fields })} />}
@@ -452,19 +452,63 @@ export function EntryForm({ type, value, onChange, templates, pageItems }: { typ
   );
 }
 
-/** An event's tickets are set up in the Tickets admin: a link there, for an event that has been saved. */
-function EventTicketsLink({ types, shared }: { types: number; shared: boolean }) {
+/**
+ * The ticket an event sells (fields.ticket; tickets are their own records, People > Tickets): pick one,
+ * make one named after the event, or none. Saved at once (POST /api/admin/ticket-setup), not with the
+ * event, whose saves keep the stored ticket (keepTickets).
+ */
+function EventTicketPicker({ ticket, title }: { ticket: number; title: string }) {
   const [entryId, setEntryId] = useState<string | null>(null);
+  const [current, setCurrent] = useState(ticket);
+  const [tickets, setTickets] = useState<{ id: number; title: string }[] | null>(null);
+  const [status, setStatus] = useState('');
   useEffect(() => setEntryId(location.pathname.match(/\/admin\/edit\/(\d+)/)?.[1] ?? null), []);
-  if (!entryId) return <p className="text-xs text-admin-muted">Save the event to set up tickets.</p>;
+  useEffect(() => {
+    browserClient().from('entries').select('id, title').eq('type', 'ticket').order('title').then(({ data }) => setTickets((data ?? []) as { id: number; title: string }[]));
+  }, []);
+  if (!entryId) return <p className="text-xs text-admin-muted">Save the event to sell tickets.</p>;
+  const post = async (body: Record<string, unknown>) => {
+    setStatus('Saving…');
+    const res = await fetch('/api/admin/ticket-setup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event: Number(entryId), ...body }) });
+    if (!res.ok) {
+      setStatus(`Not saved: ${await res.text()}`);
+      return null;
+    }
+    setStatus('Saved.');
+    return res.json();
+  };
+  const choose = async (v: string) => {
+    if (v === 'new') {
+      const made = await post({ action: 'create', name: title || 'Tickets' });
+      if (made?.id) {
+        setTickets([...(tickets ?? []), { id: made.id, title: title || 'Tickets' }]);
+        setCurrent(made.id);
+        window.open(`/admin/tickets/${made.id}/?view=setup`, '_blank', 'noopener');
+      }
+      return;
+    }
+    const id = Number(v) || 0;
+    if ((await post(id ? { action: 'attach', ticket: id } : { action: 'detach' })) !== null) setCurrent(id);
+  };
   return (
     <>
+      <Row title="Sells">
+        <select className={inputClass} value={current || ''} disabled={!tickets} onChange={(e) => choose(e.target.value)}>
+          <option value="">No tickets</option>
+          {(tickets ?? []).map((k) => (
+            <option key={k.id} value={k.id}>{k.title || 'Tickets'}</option>
+          ))}
+          <option value="new">New ticket for this event…</option>
+        </select>
+      </Row>
       <p className="mb-2 text-xs text-admin-muted">
-        {shared ? 'Sells another event’s tickets (one pool shared by both).' : types ? `Sells ${types} ticket type${types === 1 ? '' : 's'}.` : 'No tickets. Set up ticket types, or share another event’s, to sell tickets or take registrations.'} Tickets are set up in the Tickets admin.
+        Tickets are set up under People &gt; Tickets, and any number of events can sell the same one from one pool. {status}
       </p>
-      <a className="inline-block rounded-sm border border-admin-ink/20 px-2 py-1 text-xs font-semibold hover:border-admin-ink/50" href={`/admin/tickets/${entryId}/?view=setup`} target="_blank" rel="noopener">
-        {types || shared ? 'Manage tickets' : 'Set up tickets'}
-      </a>
+      {current > 0 && (
+        <a className="inline-block rounded-sm border border-admin-ink/20 px-2 py-1 text-xs font-semibold hover:border-admin-ink/50" href={`/admin/tickets/${current}/?view=setup`} target="_blank" rel="noopener">
+          Manage ticket
+        </a>
+      )}
     </>
   );
 }

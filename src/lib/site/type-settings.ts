@@ -39,9 +39,9 @@ export interface MadeType {
 }
 
 /** Field keys the core keeps for itself in entries.fields. */
-export const RESERVED_FIELD_KEYS = ['seo', 'access', 'template', 'featured', 'tickets', 'tickets_from', 'recurrence', 'timezone', 'imported_from'];
+export const RESERVED_FIELD_KEYS = ['seo', 'access', 'template', 'featured', 'tickets', 'ticket', 'recurrence', 'timezone', 'imported_from'];
 /** Type names the core uses for other things. */
-export const RESERVED_TYPES = ['page', 'post', 'global', 'event', 'venue', 'any', 'terms', 'tags', 'tag', 'search', 'all'];
+export const RESERVED_TYPES = ['page', 'post', 'global', 'event', 'venue', 'ticket', 'any', 'terms', 'tags', 'tag', 'search', 'all'];
 
 const text = (v: unknown, max: number) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 

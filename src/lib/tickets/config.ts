@@ -77,11 +77,9 @@ export interface EventTickets {
 }
 
 export const TICKETS_KEY = 'tickets';
-/** An event that shares another event's tickets (one pool: its ticket types, capacity, orders and waitlist)
- * keeps that event's id here (src/lib/tickets/setup.ts). */
-export const TICKETS_FROM_KEY = 'tickets_from';
-/** The event whose tickets an event shares, or 0. */
-export const ticketsFromOf = (fields: Record<string, any> | null | undefined) => Math.max(0, Math.floor(Number(fields?.[TICKETS_FROM_KEY]) || 0));
+/** The ticket an event is attached to (`fields.ticket`: a `ticket` entry's id, src/lib/tickets/setup.ts), or 0. */
+export const TICKET_KEY = 'ticket';
+export const ticketOf = (fields: Record<string, any> | null | undefined) => Math.max(0, Math.floor(Number(fields?.[TICKET_KEY]) || 0));
 
 /** The site's ticket settings (settings.site.tickets). */
 export interface TicketSettings {
@@ -254,8 +252,7 @@ export function ticketsOf(fields: Record<string, any> | null | undefined): Event
       help: str(q.help, 500) || undefined,
     }));
   return {
-    // An event sharing another's tickets sells those, not its own (kept for its earlier orders).
-    enabled: types.length > 0 && !ticketsFromOf(fields),
+    enabled: types.length > 0,
     heading: str(t.heading, 200) || undefined,
     types,
     capacity: num(t.capacity),

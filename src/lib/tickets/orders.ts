@@ -6,7 +6,7 @@ import { randomBytes, randomInt } from 'node:crypto';
 import type { Db } from '../db/query';
 import { serviceClient } from '../db/site';
 import { ENTRY_COLUMNS, type Entry } from '../types';
-import { defaultHorizon, expandEntry, localToUtc, recurrenceOf } from '../recurrence';
+import { onEventPage, poolSpan, ticketSpan } from './span';
 import { permalink } from '../permalink';
 import { eventWhen, venueLines } from '../events/model';
 import { eventsOnIn } from '../events/on';
@@ -16,7 +16,7 @@ import { isIP } from '../net';
 import { emailEvents } from '../events/email';
 import { SITE_TZ, site } from '../site';
 import { sendMail } from '../forms/mail';
-import { emailToSend, mayBuy, priceFor, localNow, maxFor, offSale, offeredTypes, remaining, ticketEmailFrom, ticketSettings, ticketsOf, timedEmail, DEFAULT_MAX_PER_ORDER, type EmailKind, type EventEmail, type EventTickets, type TicketSettings } from './config';
+import { emailToSend, mayBuy, priceFor, localNow, maxFor, offSale, offeredTypes, remaining, ticketEmailFrom, ticketSettings, ticketsOf, timedEmail, TICKET_KEY, DEFAULT_MAX_PER_ORDER, type EmailKind, type EventEmail, type EventTickets, type TicketSettings } from './config';
 import { PROVIDERS, ProviderError, closeCheckout, pickProvider, providerOf, type CheckoutState, type PaymentEvent, type PaymentProvider } from '../payments';
 import { ticketEmail, type EventView, type OrderView } from './email';
 import type { EmailPayment } from '../forms/email';
@@ -94,60 +94,75 @@ export const siteOrigin = (fallback?: string) => (env('SITE_URL') || fallback ||
 // ---- Events ----------------------------------------------------------------------------------
 
 export interface LoadedEvent {
+  /** The ticket (an entry of the hidden `ticket` type): its setup, orders, waitlist and emails. */
   series: Entry;
-  /** The occurrence for a recurring event's date, else the event. */
+  /** The events attached to it. */
+  events: Entry[];
+  /** The one event (or date of a recurring one) it is for, else the first event (else the ticket). */
   entry: Entry;
+  /** The date of a ticket for one recurring event; else ''. */
+  occurrence: string;
+  /** What emails and orders call it: its one event's title, else the ticket's name. */
+  title: string;
   tickets: EventTickets;
   tz: string;
-  /** Local "Y-m-d H:i:s". */
+  /** Local "Y-m-d H:i:s" of the first date. */
   start: string;
   end: string;
   allDay: boolean;
   startUtc: number | null;
+  /** When the last date ends (sales close). */
   endUtc: number | null;
+  /** The page buyers go back to by default: its one event's (date's), else the first event's. */
   path: string;
+  /** The attached events' pages (#tickets on these; ticketsAt). */
+  paths: string[];
   venue?: Entry;
-  /** The event's own emails (table ticket_emails), by kind. */
+  /** The ticket's own emails (table ticket_emails), by kind. */
   emails: Partial<Record<EmailKind, EventEmail>>;
 }
 
+/** The events attached to a ticket, oldest first; `scope`: only those its viewer may see. */
+export async function attachedEvents(db: Db, ticket: number, scope: LoaderScope | null): Promise<Entry[]> {
+  const q = db.from('entries').select(ENTRY_COLUMNS).eq('type', 'event').neq('status', 'trash').eq(`fields->>${TICKET_KEY}`, String(ticket)).order('event_start');
+  const { data, error } = await (scope ? visibleTo(q, scope) : q);
+  if (error) throw error;
+  return (data ?? []) as Entry[];
+}
+
 /**
- * An event (and date, for a recurring one) as tickets see it. `scope`: only an event its viewer may see
- * (published, and members-only ones for those members, as pages); null for any event (the attendee list,
- * emails).
+ * A ticket (and date, for one recurring event) as orders see it. `scope`: only a ticket with an event
+ * its viewer may see (published, and members-only ones for those members, as pages); null for any (the
+ * attendee list, emails), taking an order's date loosely when events were attached since.
  */
 export async function loadEvent(db: Db, id: number, occurrence: string, scope: LoaderScope | null = PUBLIC_SCOPE): Promise<LoadedEvent | null> {
   if (!id) return null;
-  const q = db.from('entries').select(ENTRY_COLUMNS).eq('id', id).eq('type', 'event');
-  const { data: series, error } = await (scope ? visibleTo(q, scope) : q).maybeSingle<Entry>();
+  const { data: ticket, error } = await db.from('entries').select(ENTRY_COLUMNS).eq('id', id).eq('type', 'ticket').maybeSingle<Entry>();
   if (error) throw error;
-  if (!series) return null;
-  let entry: Entry = series;
-  if (recurrenceOf(series)) {
-    // A date of the series; tickets are sold per date.
-    const occ = occurrence ? expandEntry(series, defaultHorizon(new Date(Date.now() + 366 * 86400000))).find((o) => o.occurrence === occurrence) : undefined;
-    if (!occ) return null;
-    entry = occ;
-  } else if (occurrence) return null;
-  const tz = series.fields?.timezone || SITE_TZ;
-  const start = String(entry.fields?.start ?? '');
-  const end = String(entry.fields?.end ?? start);
-  const allDay = entry.fields?.all_day === true || entry.event_all_day === true;
-  const utc = (s: string) => (/^\d{4}-\d{2}-\d{2}/.test(s) ? Date.parse(localToUtc(s.length === 10 ? `${s} 00:00:00` : s, tz)) : null);
-  // An all-day event lasts to the end of its last day.
-  const endUtc = allDay && /^\d{4}-\d{2}-\d{2}/.test(end) ? utc(`${end.slice(0, 10)} 23:59:59`) : utc(end);
+  if (!ticket) return null;
+  const events = await attachedEvents(db, id, scope);
+  if (scope && !events.length) return null;
+  const span = ticketSpan(events, occurrence) ?? (scope ? null : { ...poolSpan(events), occurrence });
+  if (!span) return null;
+  const venueIds = [...new Set(events.map((e) => Number(e.fields?.venue) || 0))];
   let venue: Entry | undefined;
-  const venueId = Number(series.fields?.venue) || 0;
-  if (venueId) venue = (await db.from('entries').select(ENTRY_COLUMNS).eq('id', venueId).maybeSingle<Entry>()).data ?? undefined;
-  const { data: own } = await db.from('ticket_emails').select('kind, subject, design, text, off').eq('entry_id', series.id);
+  if (venueIds.length === 1 && venueIds[0]) venue = (await db.from('entries').select(ENTRY_COLUMNS).eq('id', venueIds[0]).maybeSingle<Entry>()).data ?? undefined;
+  const { data: own } = await db.from('ticket_emails').select('kind, subject, design, text, off').eq('entry_id', id);
   const emails = Object.fromEntries((own ?? []).map((r) => [r.kind, { ...ticketEmailFrom(r), off: r.off === true }]));
-  return { series, entry, tickets: ticketsOf(series.fields), tz, start, end, allDay, startUtc: utc(start), endUtc, path: permalink(entry), venue, emails };
+  const entry = span.entry ?? events[0] ?? ticket;
+  const path = span.entry || events[0] ? permalink(entry) : '/';
+  const title = events.length === 1 ? events[0].title : ticket.title;
+  return {
+    series: ticket, events, entry, occurrence: span.occurrence, title, tickets: ticketsOf(ticket.fields), tz: span.tz,
+    start: span.start, end: span.end, allDay: span.allDay, startUtc: span.startUtc, endUtc: span.endUtc,
+    path, paths: [...new Set([path, ...events.map((e) => permalink(e))])], venue, emails,
+  };
 }
 
 
 /** The event as emails show it. */
 export function eventView(ev: LoadedEvent, origin: string): EventView {
-  return { title: ev.series.title, ...eventWhen(ev.start, ev.end, ev.allDay), venue: venueLines(ev.venue), link: `${origin}${ev.path}` };
+  return { title: ev.title, ...eventWhen(ev.start, ev.end, ev.allDay), venue: venueLines(ev.venue), link: `${origin}${ev.path}` };
 }
 
 /** Tickets taken per type for an event and date. */
@@ -195,13 +210,13 @@ const postedPage = (data: FormData) => {
 };
 
 /**
- * Where an event's tickets show: the page the form was on (a Tickets block can be on any page), else
- * the event's own; and the section's anchor there (#tickets on the event's own page, else
- * #tickets-<event id>, as src/render/c/tickets.ts names it).
+ * Where a ticket's form shows: the page the form was on (a Tickets block can be on any page), else its
+ * event's own; and the section's anchor there (#tickets on an attached event's own page, else
+ * #tickets-<ticket id>, as src/render/c/tickets.ts names it).
  */
-export function ticketsAt(ev: Pick<LoadedEvent, 'path' | 'series'>, page = ''): { path: string; anchor: string } {
+export function ticketsAt(ev: Pick<LoadedEvent, 'path' | 'paths' | 'series'>, page = ''): { path: string; anchor: string } {
   const path = page || ev.path;
-  return { path, anchor: path === ev.path ? '#tickets' : `#tickets-${ev.series.id}` };
+  return { path, anchor: onEventPage(ev.paths, path) ? '#tickets' : `#tickets-${ev.series.id}` };
 }
 const backTo = (ev: LoadedEvent, page: string) => {
   const at = ticketsAt(ev, page);
@@ -281,7 +296,7 @@ export async function startCheckout(data: FormData, origin: string, viewer: View
   };
   const { data: made, error } = await db.rpc('ticket_order_create', {
     p_order: {
-      token, code, entry_id: ev.series.id, occurrence: (ev.entry as { occurrence?: string }).occurrence ?? '', event_title: ev.series.title, page, member_id: isActive(member) ? member.user_id : null, ip: buyerAddress(ip),
+      token, code, entry_id: ev.series.id, occurrence: ev.occurrence, event_title: ev.title, page, member_id: isActive(member) ? member.user_id : null, ip: buyerAddress(ip),
       status: free ? 'paid' : 'pending', provider: free ? 'free' : providerName, name, email, phone, address, answers, items, amount, currency,
       // A paid order holds its tickets a little longer than the checkout takes payment.
       expires_at: free ? null : new Date(Date.now() + hold + 2 * 60_000).toISOString(),
@@ -300,7 +315,7 @@ export async function startCheckout(data: FormData, origin: string, viewer: View
     return orderLink;
   }
   try {
-    const label = (n: string) => `${ev.series.title}${(ev.entry as { occurrence?: string }).occurrence ? ` (${eventView(ev, origin).date})` : ''}: ${n}`;
+    const label = (n: string) => `${ev.title}${ev.occurrence ? ` (${eventView(ev, origin).date})` : ''}: ${n}`;
     const returnUrl = `${origin}/api/tickets/return?order=${token}`;
     const checkout = await PROVIDERS[providerName!].create({
       reference: code,
@@ -515,7 +530,7 @@ export async function joinWaitlist(data: FormData, viewer: Viewer | null = null)
   const phone = t.phone === 'off' ? '' : field(data, 'phone', 40);
   const quantity = Math.floor(Number(data.get('quantity')) || 1);
   if (!name || !EMAIL.test(email) || quantity < 1 || quantity > (t.maxPerOrder || DEFAULT_MAX_PER_ORDER)) return back('invalid');
-  const occurrence = (ev.entry as { occurrence?: string }).occurrence ?? '';
+  const occurrence = ev.occurrence;
   const { count } = await db.from('ticket_waitlist').select('id', { count: 'exact', head: true }).eq('entry_id', ev.series.id).gte('created_at', new Date(Date.now() - 60_000).toISOString());
   if ((count ?? 0) >= MAX_PER_MINUTE) return back('busy');
   // Anyone can post any address, so joining again changes little: a place keeps its name, phone, status
@@ -533,7 +548,7 @@ export async function joinWaitlist(data: FormData, viewer: Viewer | null = null)
 
 /** Tickets on sale now (null: no limit). */
 async function availableNow(db: Db, ev: LoadedEvent): Promise<number | null> {
-  const occurrence = (ev.entry as { occurrence?: string }).occurrence ?? '';
+  const occurrence = ev.occurrence;
   const left = remaining(ev.tickets, await soldCounts(db, ev.series.id, occurrence));
   const now = localNow(ev.tz);
   const open = offeredTypes(ev.tickets).filter((t) => !offSale(t, now));
@@ -549,7 +564,7 @@ async function availableNow(db: Db, ev: LoadedEvent): Promise<number | null> {
  * counting those told in the last day as still deciding. Returns how many were emailed.
  */
 export async function notifyWaitlist(db: Db, ev: LoadedEvent, origin: string, ids?: number[]): Promise<number> {
-  const occurrence = (ev.entry as { occurrence?: string }).occurrence ?? '';
+  const occurrence = ev.occurrence;
   let q = db.from('ticket_waitlist').select('*').eq('entry_id', ev.series.id).eq('occurrence', occurrence).order('id');
   q = ids ? q.in('id', ids).in('status', ['waiting', 'notified']) : q.eq('status', 'waiting');
   const { data: people, error } = await q.limit(500);
@@ -587,7 +602,7 @@ export async function waitlistAfterRelease(db: Db, entryId: number | null, occur
   if (!entryId) return;
   const ev = await loadEvent(db, entryId, occurrence, null);
   if (ev?.tickets.waitlist === 'auto' && (ev.endUtc == null || ev.endUtc > Date.now())) {
-    await notifyWaitlist(db, ev, siteOrigin(origin)).catch((e) => console.error(`tickets: waitlist for ${ev.series.title}: ${e.message}`));
+    await notifyWaitlist(db, ev, siteOrigin(origin)).catch((e) => console.error(`tickets: waitlist for ${ev.title}: ${e.message}`));
   }
 }
 

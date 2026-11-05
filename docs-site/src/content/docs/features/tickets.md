@@ -5,34 +5,38 @@ sidebar:
   order: 6
 ---
 
-With [Events](../events/) on, an event sells tickets (or takes free registrations) when it has
-ticket types, set up on its page under **People > Tickets** (**Set up tickets** in the event's settings links there). Free tickets need nothing else; paid ones go through Stripe or Square, whichever has its keys set (chosen
+With [Events](../events/) on, events sell **tickets** (or take free registrations). A ticket is its own
+record under **People > Tickets**, with its ticket types, capacity, questions, waitlist, emails and
+attendee list, and any number of events can be attached to it, all selling from its one pool. Free
+tickets need nothing else; paid ones go through Stripe or Square, whichever has its keys set (chosen
 under **Settings > Tickets** when both do).
 
-## An event's tickets
+## A ticket
 
-On the event's page in the Tickets admin, **Ticket types and settings** (`/admin/tickets/<id>/?view=setup`; stored in
-`fields.tickets`, `src/lib/tickets/config.ts`, `src/lib/tickets/setup.ts`). Saving there writes the live event and any
-changes kept aside; the editor's saves keep the stored setup. An event can instead share another
-event's tickets, one pool for all (**Share its tickets**; `fields.tickets_from`): orders, capacity, the
-waitlist and emails stay on the event that holds them.
+Made with **New ticket** on the Tickets list, or **New ticket for this event…** in an event's settings
+(**Sells**, which also attaches an existing one). On its page (`/admin/tickets/<id>/`), **Ticket types
+and settings** has its name, the events selling it (**Attach**, **Detach**), the setup (stored in the
+ticket's `fields.tickets`; `src/lib/tickets/config.ts`, `src/lib/tickets/setup.ts`) and **Delete ticket**
+for one without orders. An event's `fields.ticket` names its ticket; the editor's saves keep it.
+Detaching an event leaves the ticket and its orders.
 
+- **Dates**: a ticket for one event follows its dates; for one recurring event it sells each date
+  separately, with the same capacity for each. A ticket for several events is one pool for all of
+  them: reminders go before the first, and sales close when the last ends.
 - **Ticket types**: name, description, price (empty or 0 is free), how many there are, the most in one
   order, and when they're on sale (empty: now, until the event ends). A type no longer offered stays for
   past orders; to stop selling, mark every type no longer offered or remove them.
-- **Capacity**: all types together (empty: no limit; 0: sold out, as for a type's own number). A
-  recurring event sells each date separately, with the same capacity
-  for each.
+- **Capacity**: all types together (empty: no limit; 0: sold out, as for a type's own number).
 - **Waitlist**: off; on, emailing people as tickets free up; or on, notified by hand from the attendee list.
 - **Members** (when Members is on): a price per membership level, and members-only types. See
   [Members](../members/).
 - **Buyers are asked**: name and email always; phone (optional or required); address (for paid orders,
   or always); and questions of your own (short or long text, a choice, a checkbox, a number).
 
-The ticket form shows below the event's content in the Event details block, with the prices in its
+The ticket form shows on each attached event's page, below its content in the Event details block, with the prices in its
 sidebar.
 
-The **Tickets** block puts an event's ticket form on any page or template. Choose the event in its
+The **Tickets** block puts an event's ticket on any page or template. Choose the event in its
 settings (and, for a recurring event, a date; empty: its next date), and it shows that event's name and
 date over the form. With no event chosen it shows the tickets of the event whose page it is on, so an
 event template can place it instead of relying on Event details (which then leaves its own form out).
@@ -47,8 +51,8 @@ sent back to where they joined.
 
 1. The form posts to `/api/tickets/checkout`. The server checks the order (what's on sale, quantities,
    the required fields) and holds the tickets in one database call (`ticket_order_create`), which locks
-   the event and date so two buyers can't both take the last ticket. One buyer (by address and by email)
-   gets at most 5 unpaid orders an hour per event, and can hold at most twice the most per order at once.
+   the ticket and date so two buyers can't both take the last ticket. One buyer (by address and by email)
+   gets at most 5 unpaid orders an hour per ticket, and can hold at most twice the most per order at once.
 2. A free order is confirmed at once. A paid one is held (30 minutes by default) and the buyer goes to
    Stripe Checkout or a Square payment link.
 3. Back from paying (`/api/tickets/return`), the payment is checked with the provider and the page the
@@ -61,17 +65,18 @@ function closes Square's payment links, which don't expire).
 
 ## The attendee list
 
-**Tickets** in the admin (under People) lists the events that sell tickets, with what each has sold. An event's
-attendee list (`/admin/tickets/<id>/`):
+**Tickets** in the admin (under People) lists the tickets, with their events and what each has sold. A
+ticket's attendee list (`/admin/tickets/<id>/`; an event's id there leads to its ticket):
 
-- orders by status, searchable, with a checkbox to check people in at the door
+- orders by status, searchable, with a checkbox to check people in at the door; for a ticket of several
+  events, the event each was bought at, and a filter by event
 - each order's details: phone, address, answers, payment, emails sent
 - **Resend confirmation**, **Cancel order** (unpaid or free orders; an unpaid one is checked with the
   provider first, and if it was paid after all it's marked paid instead) and **Refund** (admins: all or
   part of a paid order, at Stripe or Square; refunding all of it puts its tickets back on sale; a refund
   the provider refuses isn't recorded)
 - the waitlist, with **Notify selected** and **Notify as many as tickets allow**
-- the event's own **Emails**
+- the ticket's own **Emails**
 - **Export CSV** and **Print**
 
 Refunds made in the Stripe or Square dashboard are recorded too, through the webhook, and a refund that

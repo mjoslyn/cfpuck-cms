@@ -1,80 +1,84 @@
 ---
-// An event's attendee list: its orders (paid by default) with check-in at the door, the buyer's
-// details and answers, resend, cancel and refund; what's sold of each ticket type; and the waitlist,
-// with Notify. A recurring event's dates each have their own list. Actions: /api/admin/tickets.
+// A ticket's page (src/lib/tickets/setup.ts): its orders (paid by default) with check-in at the door, the
+// buyer's details and answers and the event page they bought on, resend, cancel and refund; what's sold of
+// each ticket type; its setup and the events attached to it; its emails; and the waitlist, with Notify. A
+// ticket for one recurring event has a list per date; a ticket for several events can be narrowed to one
+// (the orders bought on its pages). Actions: /api/admin/tickets.
 import Admin from '../../../layouts/Admin.astro';
 import { SITE_TZ } from '../../../lib/site';
 import { allRows } from '../../../lib/rows';
 import { defaultHorizon, expandEntry, recurrenceOf } from '../../../lib/recurrence';
-import { money, ticketSettings, ticketsFromOf, ticketsOf } from '../../../lib/tickets/config';
+import { TICKET_KEY, money, ticketOf, ticketSettings, ticketsOf } from '../../../lib/tickets/config';
 import { addressText, type OrderRow, type WaitlistRow } from '../../../lib/tickets/orders';
-import type { Entry } from '../../../lib/types';
+import { ENTRY_COLUMNS, type Entry } from '../../../lib/types';
 import { permalink } from '../../../lib/permalink';
 import TicketEmails from '../../../admin/TicketEmails';
 import TicketSetup from '../../../admin/TicketSetup';
-import { sharingEvents } from '../../../lib/tickets/setup';
 import { ticketEmailFrom, type EmailKind, type EventEmail } from '../../../lib/tickets/config';
 
 const db = Astro.locals.db;
 const isAdmin = Astro.locals.user?.role === 'admin';
 const id = Number(Astro.params.id) || 0;
-const { data: event } = await db.from('entries').select('id, type, title, slug, status, fields, event_start').eq('id', id).eq('type', 'event').maybeSingle<Entry>();
-if (!event) return Astro.redirect('/admin/tickets/');
-const t = ticketsOf(event.fields);
+const { data: ticket } = await db.from('entries').select('id, type, title, fields').eq('id', id).in('type', ['ticket', 'event']).maybeSingle<Entry>();
+// An event's old address (and its settings' link): its ticket's page.
+if (ticket?.type === 'event') return Astro.redirect(ticketOf(ticket.fields) ? `/admin/tickets/${ticketOf(ticket.fields)}/${Astro.url.search}` : '/admin/tickets/');
+if (!ticket) return Astro.redirect('/admin/tickets/');
+const t = ticketsOf(ticket.fields);
 const { data: settings } = await db.from('settings').select('value').eq('key', 'site').maybeSingle();
 const currency = ticketSettings(settings?.value).currency ?? 'usd';
 const params = Astro.url.searchParams;
-// Sharing another event's tickets: they are sold and managed there.
-const fromId = ticketsFromOf(event.fields);
-const sharedFrom = fromId ? (await db.from('entries').select('id, title').eq('id', fromId).maybeSingle()).data : null;
-// An event without ticket types opens on its setup. One sharing another's tickets has its orders
-// (those bought on its page, kept with that event's, and any of its own from before) and its setup.
-const VIEWS = fromId ? ['setup'] : ['waitlist', 'emails', 'setup'];
-const view = VIEWS.includes(params.get('view') ?? '') ? params.get('view')! : fromId || t.types.length ? 'attendees' : 'setup';
+const { data: evRows } = await db.from('entries').select(ENTRY_COLUMNS).eq('type', 'event').neq('status', 'trash').eq(`fields->>${TICKET_KEY}`, String(id)).order('event_start');
+const events = (evRows ?? []) as Entry[];
+// A ticket without ticket types opens on its setup.
+const VIEWS = ['waitlist', 'emails', 'setup'];
+const view = VIEWS.includes(params.get('view') ?? '') ? params.get('view')! : t.types.length ? 'attendees' : 'setup';
 const status = params.get('status') ?? 'paid';
 const search = (params.get('q') ?? '').trim().toLowerCase();
 
-// A recurring event's dates: those with orders or a waitlist, and the next ones to come.
-const recurring = !fromId && !!recurrenceOf(event);
-const path = permalink(event);
+// A ticket for one recurring event sells per date: those with orders or a waitlist, and the next ones.
+const recurring = events.length === 1 && !!recurrenceOf(events[0]);
 const today = new Date().toLocaleDateString('en-CA', { timeZone: SITE_TZ });
 let dates: string[] = [];
 if (recurring) {
   const { data: used } = await allRows(db.from('ticket_orders').select('occurrence').eq('entry_id', id).order('id'));
   const { data: listed } = await allRows(db.from('ticket_waitlist').select('occurrence').eq('entry_id', id).order('id'));
-  const upcoming = expandEntry(event, defaultHorizon()).map((o) => o.occurrence ?? '').filter((d) => d >= today).slice(0, 24);
+  const upcoming = expandEntry(events[0], defaultHorizon()).map((o) => o.occurrence ?? '').filter((d) => d >= today).slice(0, 24);
   dates = [...new Set([...(used ?? []), ...(listed ?? [])].map((r) => r.occurrence).concat(upcoming))].filter(Boolean).sort();
 }
 const date = recurring ? params.get('date') || dates.find((d) => d >= today) || dates[dates.length - 1] || '' : '';
+// Several events: the orders bought on one's pages (?on=<event id>).
+const on = events.length > 1 ? events.find((e) => String(e.id) === params.get('on')) ?? null : null;
+const pathOf = new Map(events.map((e) => [e.id, permalink(e)]));
+const boughtAt = (page: string) => events.find((e) => page && page.startsWith(pathOf.get(e.id)!)) ?? null;
 
-const { data: own } = await allRows<OrderRow>((fromId ? db.from('ticket_orders').select('*').eq('entry_id', id) : db.from('ticket_orders').select('*').eq('entry_id', id).eq('occurrence', date)).order('created_at', { ascending: false }).order('id'));
-// Sharing another's tickets: the orders bought on this event's page (its dates' pages too).
-const { data: soldHere } = fromId ? await allRows<OrderRow>(db.from('ticket_orders').select('*').eq('entry_id', fromId).order('created_at', { ascending: false }).order('id')) : { data: [] as OrderRow[] };
-const all = [...(own ?? []), ...(soldHere ?? []).filter((o) => o.page && o.page.startsWith(path))].sort((a, b) => b.created_at.localeCompare(a.created_at));
-const orders = (all ?? []).filter((o) => (status === 'all' ? true : status === 'closed' ? ['cancelled', 'expired'].includes(o.status) : o.status === status)).filter((o) => !search || `${o.code} ${o.name} ${o.email} ${o.phone}`.toLowerCase().includes(search));
-const paid = (all ?? []).filter((o) => o.status === 'paid');
+const { data: rows } = await allRows<OrderRow>((recurring ? db.from('ticket_orders').select('*').eq('entry_id', id).eq('occurrence', date) : db.from('ticket_orders').select('*').eq('entry_id', id)).order('created_at', { ascending: false }).order('id'));
+const { count: orderCount } = await db.from('ticket_orders').select('id', { count: 'exact', head: true }).eq('entry_id', id);
+const all = (rows ?? []).filter((o) => !on || boughtAt(o.page)?.id === on.id);
+const orders = all.filter((o) => (status === 'all' ? true : status === 'closed' ? ['cancelled', 'expired'].includes(o.status) : o.status === status)).filter((o) => !search || `${o.code} ${o.name} ${o.email} ${o.phone}`.toLowerCase().includes(search));
+const paid = all.filter((o) => o.status === 'paid');
 const sold = new Map<string, number>();
 for (const o of paid) for (const i of o.items) sold.set(i.type, (sold.get(i.type) ?? 0) + i.quantity);
 const tickets = paid.reduce((n, o) => n + o.quantity, 0);
 const checkedIn = paid.filter((o) => o.checked_in_at).reduce((n, o) => n + o.quantity, 0);
-const takings = (all ?? []).filter((o) => o.status === 'paid' || o.status === 'refunded').reduce((n, o) => n + o.amount - o.refunded_amount, 0);
-const counts: Record<string, number> = { paid: paid.length, pending: 0, closed: 0, refunded: 0, all: all?.length ?? 0 };
-for (const o of all ?? []) {
+const takings = all.filter((o) => o.status === 'paid' || o.status === 'refunded').reduce((n, o) => n + o.amount - o.refunded_amount, 0);
+const counts: Record<string, number> = { paid: paid.length, pending: 0, closed: 0, refunded: 0, all: all.length };
+for (const o of all) {
   if (o.status === 'pending') counts.pending++;
   if (o.status === 'cancelled' || o.status === 'expired') counts.closed++;
   if (o.status === 'refunded') counts.refunded++;
 }
 const { data: waitlist } = await allRows<WaitlistRow>(db.from('ticket_waitlist').select('*').eq('entry_id', id).eq('occurrence', date).in('status', ['waiting', 'notified', 'bought']).order('id'));
 
-// The event's own emails, for the Emails tab.
+// The ticket's own emails, for the Emails tab.
 const { data: ownRows } = await db.from('ticket_emails').select('kind, subject, design, text, off').eq('entry_id', id);
 const ownEmails = Object.fromEntries((ownRows ?? []).map((r) => [r.kind, { ...ticketEmailFrom(r), off: r.off || undefined }])) as Partial<Record<EmailKind, EventEmail>>;
 
 const labels = new Map((t.questions ?? []).map((q) => [q.id, q.label]));
 const when = (s: string | null) => (s ? new Date(s).toLocaleString('en-US', { timeZone: SITE_TZ, dateStyle: 'medium', timeStyle: 'short' }) : '');
+const day = (s: string | null) => (s ? new Date(s).toLocaleDateString('en-US', { timeZone: SITE_TZ, dateStyle: 'medium' }) : '');
 const dayLabel = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 const link = (patch: Record<string, string>) => {
-  const p = new URLSearchParams({ ...(date ? { date } : {}), ...(view === 'waitlist' ? { view } : {}), ...(status !== 'paid' ? { status } : {}), ...(search ? { q: search } : {}), ...patch });
+  const p = new URLSearchParams({ ...(date ? { date } : {}), ...(on ? { on: String(on.id) } : {}), ...(view === 'waitlist' ? { view } : {}), ...(status !== 'paid' ? { status } : {}), ...(search ? { q: search } : {}), ...patch });
   for (const [k, v] of [...p]) if (!v) p.delete(k);
   return `/admin/tickets/${id}/${p.toString() ? `?${p}` : ''}`;
 };
@@ -86,31 +90,29 @@ const STATUS: Record<string, [string, string]> = {
   refunded: ['Refunded', 'bg-[#eff6ff] text-[#1d4ed8]'],
 };
 const { enabled: _enabled, ...setup } = t;
-// The setup tab: the events sharing this one's tickets, and those whose tickets it could share instead
-// (not while others share its own).
-let sources: { id: number; title: string; when: string; types: number }[] = [];
-let sharedWith: { id: number; title: string }[] = [];
-if (view === 'setup' && !fromId) {
-  sharedWith = await sharingEvents(db, id);
-    if (!sharedWith.length) {
-    const { data: rows } = await db.from('entries').select('id, title, fields, event_start').eq('type', 'event').neq('id', id).neq('status', 'trash').not('fields->tickets->types', 'is', null).order('event_start', { ascending: false }).limit(200);
-    sources = (rows ?? []).flatMap((e) => {
-      const tk = ticketsOf(e.fields);
-      return tk.enabled && !ticketsFromOf(e.fields) ? [{ id: e.id, title: e.title || '(untitled)', when: e.event_start ? new Date(e.event_start).toLocaleDateString('en-US', { timeZone: SITE_TZ, dateStyle: 'medium' }) : '', types: tk.types.length }] : [];
-    });
-  }
+// The setup tab: the events attached, and those that could be (with the ticket they sell now, if any).
+let attachable: { id: number; title: string; when: string; draft?: boolean; other?: string }[] = [];
+if (view === 'setup') {
+  const { data: others } = await allRows(db.from('entries').select('id, title, status, fields, event_start').eq('type', 'event').neq('status', 'trash').order('event_start', { ascending: false }).order('id'));
+  const rest = (others ?? []).filter((e) => ticketOf(e.fields) !== id);
+  const names = new Map(((await db.from('entries').select('id, title').eq('type', 'ticket')).data ?? []).map((k) => [k.id, k.title || 'Tickets']));
+  const now = new Date().toISOString();
+  attachable = rest
+    .sort((a, b) => Number((b.event_start ?? '') >= now) - Number((a.event_start ?? '') >= now))
+    .map((e) => ({ id: e.id, title: e.title || '(untitled)', when: day(e.event_start), draft: e.status !== 'publish' || undefined, other: names.get(ticketOf(e.fields)) }));
 }
 const tabs: [string, string][] = [['paid', 'Attendees'], ['pending', 'Awaiting payment'], ['closed', 'Cancelled and expired'], ['refunded', 'Refunded'], ['all', 'All orders']];
 const csv = `/api/admin/tickets/attendees.csv?event=${id}${recurring ? `&date=${date}` : ''}&status=${status === 'closed' ? 'all' : status}`;
+const name = ticket.title || 'Tickets';
 ---
-<Admin title={`Tickets: ${event.title}`}>
+<Admin title={`Tickets: ${name}`}>
   <p class="text-sm print:hidden"><a href="/admin/tickets/" class="text-admin-muted hover:text-admin-accent">← Tickets</a></p>
   <div class="mt-2 flex flex-wrap items-end justify-between gap-4">
     <div>
-      <h1 class="text-3xl font-normal">{event.title}</h1>
+      <h1 class="text-3xl font-normal">{name}</h1>
       <p class="mt-1 text-sm text-admin-muted">
-        {recurring && date ? dayLabel(date) : event.event_start ? when(event.event_start) : ''}
-        {fromId ? <span class="ml-2 rounded bg-[#eff6ff] px-2 py-0.5 text-xs text-[#1d4ed8]">Shares another event's tickets</span> : !t.enabled && <span class="ml-2 rounded bg-[#fffbeb] px-2 py-0.5 text-xs text-[#b45309]">No ticket types yet</span>}
+        {events.length ? events.map((e, i) => <>{i ? ' · ' : ''}<a class="hover:text-admin-accent" href={`/admin/edit/${e.id}/`}>{e.title || '(untitled)'}</a>{recurring && date ? `, ${dayLabel(date)}` : e.event_start ? `, ${day(e.event_start)}` : ''}</>) : 'No events yet'}
+        {!t.enabled && <span class="ml-2 rounded bg-[#fffbeb] px-2 py-0.5 text-xs text-[#b45309]">No ticket types yet</span>}
       </p>
     </div>
     <div class="flex flex-wrap items-center gap-2 print:hidden">
@@ -119,9 +121,14 @@ const csv = `/api/admin/tickets/attendees.csv?event=${id}${recurring ? `&date=${
           {dates.map((d) => <option value={d} selected={d === date}>{dayLabel(d)}</option>)}
         </select>
       )}
+      {events.length > 1 && (
+        <select id="on-filter" class="rounded border border-admin-ink/15 bg-white px-2 py-1.5 text-sm" aria-label="Bought at">
+          <option value="">All events</option>
+          {events.map((e) => <option value={e.id} selected={on?.id === e.id}>Bought at {e.title || '(untitled)'}</option>)}
+        </select>
+      )}
       <a href={csv} class="rounded border border-admin-ink/15 bg-white px-3 py-1.5 text-sm hover:border-admin-accent hover:text-admin-accent">Export CSV</a>
       <button type="button" onclick="print()" class="rounded border border-admin-ink/15 bg-white px-3 py-1.5 text-sm hover:border-admin-accent hover:text-admin-accent">Print</button>
-      <a href={`/admin/edit/${id}/`} class="rounded border border-admin-ink/15 bg-white px-3 py-1.5 text-sm hover:border-admin-accent hover:text-admin-accent">Edit event</a>
     </div>
   </div>
 
@@ -142,8 +149,8 @@ const csv = `/api/admin/tickets/attendees.csv?event=${id}${recurring ? `&date=${
   <nav class="mt-6 flex flex-wrap gap-1 border-b border-admin-ink/10 text-sm print:hidden" aria-label="Lists">
     <a href={link({ view: '', status: '' })} aria-current={view === 'attendees' ? 'page' : undefined} class:list={['-mb-px border-b-2 px-3 py-2', view === 'attendees' ? 'border-admin-accent text-admin-ink' : 'border-transparent text-admin-muted hover:text-admin-ink']}>Orders</a>
     <a href={link({ view: 'setup', status: '' })} aria-current={view === 'setup' ? 'page' : undefined} class:list={['-mb-px border-b-2 px-3 py-2', view === 'setup' ? 'border-admin-accent text-admin-ink' : 'border-transparent text-admin-muted hover:text-admin-ink']}>Ticket types and settings</a>
-    {!fromId && <a href={link({ view: 'emails', status: '' })} aria-current={view === 'emails' ? 'page' : undefined} class:list={['-mb-px border-b-2 px-3 py-2', view === 'emails' ? 'border-admin-accent text-admin-ink' : 'border-transparent text-admin-muted hover:text-admin-ink']}>Emails{ownRows?.length ? ` (${ownRows.length} own)` : ''}</a>}
-    {!fromId && (t.waitlist !== 'off' || waitlist?.length) ? (
+    <a href={link({ view: 'emails', status: '' })} aria-current={view === 'emails' ? 'page' : undefined} class:list={['-mb-px border-b-2 px-3 py-2', view === 'emails' ? 'border-admin-accent text-admin-ink' : 'border-transparent text-admin-muted hover:text-admin-ink']}>Emails{ownRows?.length ? ` (${ownRows.length} own)` : ''}</a>
+    {t.waitlist !== 'off' || waitlist?.length ? (
       <a href={link({ view: 'waitlist', status: '' })} aria-current={view === 'waitlist' ? 'page' : undefined} class:list={['-mb-px border-b-2 px-3 py-2', view === 'waitlist' ? 'border-admin-accent text-admin-ink' : 'border-transparent text-admin-muted hover:text-admin-ink']}>Waitlist ({(waitlist ?? []).length})</a>
     ) : null}
   </nav>
@@ -188,7 +195,8 @@ const csv = `/api/admin/tickets/attendees.csv?event=${id}${recurring ? `&date=${
                   <td class="px-4 py-3">
                     <div class="font-medium">{o.name}</div>
                     <div class="text-xs text-admin-muted">{o.email}{o.phone ? ` · ${o.phone}` : ''}</div>
-                    {o.page && !o.page.startsWith(path) && <div class="text-xs text-admin-muted">Bought on <a class="underline hover:text-admin-accent" href={o.page}>{o.page}</a></div>}
+                    {events.length > 1 && o.page && <div class="text-xs text-admin-muted">Bought at <a class="underline hover:text-admin-accent" href={o.page}>{boughtAt(o.page)?.title || o.page}</a></div>}
+                    {events.length <= 1 && o.page && !events.some((e) => o.page.startsWith(pathOf.get(e.id)!)) && <div class="text-xs text-admin-muted">Bought on <a class="underline hover:text-admin-accent" href={o.page}>{o.page}</a></div>}
                   </td>
                   <td class="px-4 py-3 font-mono text-xs">{o.code}</td>
                   <td class="px-4 py-3">{o.items.map((i) => `${i.quantity} × ${i.name}`).join(', ')}</td>
@@ -291,12 +299,12 @@ const csv = `/api/admin/tickets/attendees.csv?event=${id}${recurring ? `&date=${
   )}
   {view === 'setup' && (
     <div class="mt-4">
-      <TicketSetup client:load eventId={id} tickets={setup} sources={sources} sharedWith={sharedWith} sharedFrom={sharedFrom ? { id: sharedFrom.id, title: sharedFrom.title || '(untitled)' } : null} />
+      <TicketSetup client:load ticketId={id} name={name} tickets={setup} events={events.map((e) => ({ id: e.id, title: e.title || '(untitled)', when: day(e.event_start), draft: e.status !== 'publish' || undefined }))} attachable={attachable} hasOrders={!!orderCount} />
     </div>
   )}
   {view === 'emails' && (
     <div class="mt-4">
-      <TicketEmails client:load eventId={id} eventTitle={event.title} own={ownEmails} site={ticketSettings(settings?.value).emails} />
+      <TicketEmails client:load eventId={id} eventTitle={events.length === 1 ? events[0].title : name} own={ownEmails} site={ticketSettings(settings?.value).emails} />
     </div>
   )}
   <p id="ticket-status" role="status" class="mt-3 text-sm text-admin-muted"></p>
@@ -317,6 +325,12 @@ const csv = `/api/admin/tickets/attendees.csv?event=${id}${recurring ? `&date=${
   };
   const money = (cents, currency) => new Intl.NumberFormat('en-US', { style: 'currency', currency: currency.toUpperCase() }).format(cents / 100);
 
+  document.getElementById('on-filter')?.addEventListener('change', (e) => {
+    const p = new URLSearchParams(location.search);
+    if (e.target.value) p.set('on', e.target.value);
+    else p.delete('on');
+    location.search = p.toString();
+  });
   document.getElementById('date-filter')?.addEventListener('change', (e) => {
     const p = new URLSearchParams(location.search);
     p.set('date', e.target.value);

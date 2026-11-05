@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { siteDb } from '../src/lib/db/site';
 import { renderRequest } from '../src/render/page';
+import { createTicket } from '../src/lib/tickets/setup';
 
 const doc = (content: unknown[]) => ({ root: { props: {} }, content, zones: {} });
 const text = (id: string, content: string) => ({ type: 'text', props: { id, attrs: { content } } });
@@ -16,7 +17,8 @@ describe('event tickets', () => {
       { kind: 'template', slug: 'plain-event', title: 'Plain event', content: doc([{ type: 'entry-content', props: { id: 'pc', attrs: {} } }]) },
       { kind: 'template', slug: 'details-event', title: 'Details event', content: doc([{ type: 'event-details', props: { id: 'ed', attrs: {} } }]) },
     ]);
-    const fields = { start: '2099-06-01T19:00', end: '2099-06-01T21:00', tickets: { types: [{ id: 'ga', name: 'General admission', price: 0 }] } };
+    const { id: ticket } = await createTicket(db, 'Gig tickets', { types: [{ id: 'ga', name: 'General admission', price: 0 }] });
+    const fields = { start: '2099-06-01T19:00', end: '2099-06-01T21:00', ticket };
     await db.from('entries').insert([
       { type: 'event', slug: 'gig', title: 'Gig', status: 'publish', template: 'plain-event', fields, content: doc([text('t1', 'Bring a friend.')]) },
       { type: 'event', slug: 'talk', title: 'Talk', status: 'publish', template: 'details-event', fields, content: doc([text('t2', 'A talk.')]) },

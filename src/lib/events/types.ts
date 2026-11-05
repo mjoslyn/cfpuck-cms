@@ -51,10 +51,22 @@ export const VENUE_TYPE: ContentType = {
   fields: [...ADDRESS, { key: 'country', label: 'Country', type: 'text' }, { key: 'phone', label: 'Phone', type: 'text' }, { key: 'website', label: 'Website', type: 'url' }],
 };
 
+/** Tickets (src/lib/tickets/setup.ts): their own records, one pool of ticket types, capacity, orders and
+ * waitlist each; events attach to one (`fields.ticket`). Kept out of the admin's types (`hidden`): they are
+ * managed under People > Tickets. */
+export const TICKET_TYPE: ContentType = {
+  type: 'ticket',
+  label: 'Tickets',
+  singular: 'Ticket',
+  record: true,
+  pageless: true,
+  hidden: true,
+};
+
 export const EVENT_CATEGORY: Taxonomy = { name: 'event_category', label: 'Event category', base: 'events/category' };
 
 /** The content types that belong to Events: hidden from the admin's tabs and pickers while it is off. */
-export const EVENT_TYPES = ['event', 'venue'];
+export const EVENT_TYPES = ['event', 'venue', 'ticket'];
 
 /** A core type with a site's changes (its `events` config): options replaced, fields added, replaced or left out by key. */
 export function extendType(base: ContentType, ext: TypeExtension | undefined): ContentType {
@@ -74,7 +86,7 @@ export function extendType(base: ContentType, ext: TypeExtension | undefined): C
  */
 export function withEvents(types: ContentType[], taxonomies: Taxonomy[], ext: EventsConfig = {}): { types: ContentType[]; taxonomies: Taxonomy[] } {
   const has = (t: string) => types.some((c) => c.type === t);
-  const add = [extendType(EVENT_TYPE, ext.event), extendType(VENUE_TYPE, ext.venue)].filter((t) => !has(t.type));
+  const add = [extendType(EVENT_TYPE, ext.event), extendType(VENUE_TYPE, ext.venue), TICKET_TYPE].filter((t) => !has(t.type));
   // Before the first type without a page (records, globals), so the admin's tabs keep pages first.
   const at = types.findIndex((t) => t.record || t.pageless);
   const merged = at < 0 ? [...types, ...add] : [...types.slice(0, at), ...add, ...types.slice(at)];

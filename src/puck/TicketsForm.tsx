@@ -1,6 +1,6 @@
-// An event's ticket setup (fields.tickets; src/lib/tickets/config.ts), edited on its page in the Tickets
-// admin (src/admin/TicketSetup.tsx): the ticket types with prices, capacities and sales windows, what
-// buyers are asked (phone, address, the event's own questions) and the waitlist. Its emails are on the
+// A ticket's setup (fields.tickets of a ticket record; src/lib/tickets/config.ts), edited on its page in the
+// Tickets admin (src/admin/TicketSetup.tsx): the ticket types with prices, capacities and sales windows,
+// what buyers are asked (phone, address, the ticket's own questions) and the waitlist. Its emails are on the
 // same page (Emails).
 import { useRef, useState } from 'react';
 import { Num, Row, Select, Text, Toggle, inputClass } from './fields';
@@ -119,16 +119,16 @@ function MemberPricing({ type, levels, onChange }: { type: TicketType; levels: M
   );
 }
 
-export function TicketsForm({ eventId, fields, onChange }: { eventId: number; fields: Record<string, any>; onChange: (fields: Record<string, any>) => void }) {
+export function TicketsForm({ ticketId, fields, onChange }: { ticketId: number; fields: Record<string, any>; onChange: (fields: Record<string, any>) => void }) {
   const members = useMemberSettings();
   const t: EventTickets = { types: [], ...(fields[TICKETS_KEY] ?? {}) };
-  // `enabled` isn't stored any more: an event sells tickets while it has ticket types.
+  // `enabled` isn't stored: a ticket sells while it has ticket types.
   const { enabled: _enabled, ...stored } = t;
   const set = (patch: Partial<EventTickets>) => onChange({ ...fields, [TICKETS_KEY]: { ...stored, ...patch } });
 
   return (
     <>
-      {/* The event sells tickets (or takes registrations) while it has ticket types. */}
+      {/* The ticket sells (or takes registrations) while it has ticket types. */}
       {!t.types.length && <p className="mb-2 text-xs text-admin-muted">Add a ticket type to sell tickets or take registrations (a price of 0 is free).</p>}
       {t.types.length > 0 && <Text title="Heading" value={t.heading} placeholder="Tickets" onChange={(heading) => set({ heading: heading || undefined })} />}
       {t.types.length > 0 && <span className="mb-1 block text-xs font-medium text-admin-muted">Ticket types</span>}
@@ -157,7 +157,7 @@ export function TicketsForm({ eventId, fields, onChange }: { eventId: number; fi
       </button>
       {t.types.length > 0 && (
         <>
-          <p className="-mt-1 mb-3 text-xs text-admin-muted">Times are in the event's timezone. A recurring event sells tickets for each date separately.</p>
+          <p className="-mt-1 mb-3 text-xs text-admin-muted">Times are in the event's timezone. A ticket for one recurring event sells each date separately; a ticket for several events is one pool for all of them.</p>
           <Num title="Capacity: tickets of all types together (empty: no limit; 0: sold out)" value={t.capacity ?? undefined} min={0} onChange={(capacity) => set({ capacity: capacity ?? null })} />
           <Num title="Most tickets in one order (default 10)" value={t.maxPerOrder ?? undefined} min={1} onChange={(maxPerOrder) => set({ maxPerOrder: maxPerOrder ?? null })} />
           <Select title="Waitlist when sold out" value={t.waitlist} options={[['off', 'Off'], ['auto', 'On: email people as tickets free up'], ['manual', 'On: notify people from the attendee list']]} onChange={(v) => set({ waitlist: (v as EventTickets['waitlist']) ?? 'off' })} />
@@ -192,8 +192,8 @@ export function TicketsForm({ eventId, fields, onChange }: { eventId: number; fi
           <span className="mt-4 mb-1 block text-xs font-semibold tracking-wider text-admin-muted uppercase">Emails</span>
           <p className="mb-3 text-xs text-admin-muted">
             Buyers get the emails designed under Settings &gt; Tickets.{' '}
-            <a className="text-admin-accent underline" href={`/admin/tickets/${eventId}/?view=emails`}>
-              Give this event its own
+            <a className="text-admin-accent underline" href={`/admin/tickets/${ticketId}/?view=emails`}>
+              Give this ticket its own
             </a>
           </p>
         </>
