@@ -1,11 +1,11 @@
 ---
 title: Sites and upstream
-description: How a site repository relates to cfpuck-cms, and how core updates reach it.
+description: How a site repository relates to moonpuck, and how core updates reach it.
 sidebar:
   order: 3
 ---
 
-`cfpuck-cms` is the upstream. Each site is its own repository with `cfpuck-cms` as its `upstream`
+`moonpuck` is the upstream. Each site is its own repository with `moonpuck` as its `upstream`
 remote. Its history starts from the core's, with a commit that swaps the example `src/site/` for its
 own.
 
@@ -60,7 +60,7 @@ npx wrangler d1 migrations apply DB --local    # local
 ## Sending a fix upstream
 
 A core bug found while working on a site can be fixed there: commit the fix on its own, touching core
-files only, then `git cherry-pick` it into `cfpuck-cms`.
+files only, then `git cherry-pick` it into `moonpuck`.
 
 ## Rules for core code
 

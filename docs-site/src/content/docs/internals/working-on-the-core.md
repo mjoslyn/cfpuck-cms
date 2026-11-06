@@ -54,11 +54,11 @@ land together: push the code, wait for the deploy, then `npx wrangler d1 migrati
 
 ## Workflow
 
-1. Change and commit in `cfpuck-cms`. `npm run check` and `npm test` must pass (a fix comes with a
+1. Change and commit in `moonpuck`. `npm run check` and `npm test` must pass (a fix comes with a
    test in `tests/` that fails without it).
 2. Test on the example site and, for anything real content exercises, in a site: merge the core
    change there without committing and test.
-3. Push `cfpuck-cms` (it deploys nothing), then in each site `git fetch upstream && git merge upstream/main`
+3. Push `moonpuck` (it deploys nothing), then in each site `git fetch upstream && git merge upstream/main`
    and commit. The site's owner pushes the site, which deploys it.
 
 ## Tests

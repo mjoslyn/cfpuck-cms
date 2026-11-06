@@ -32,7 +32,7 @@ To sign out, click your name in the top right corner, then **Sign out**.
 Signing in takes you to the home screen, which asks **What would you like to make?** Pick what it is
 (**Page**, **Post**, **Form**, **Template**...), say in the box what it's for, and click **Compose**.
 Claude writes it in your site's style and it opens as a draft for you to check; nothing goes live until
-you publish it. See [Writing with Claude](/cfpuck-cms/guide/writing-with-claude/).
+you publish it. See [Writing with Claude](/moonpuck/guide/writing-with-claude/).
 
 ![The home screen](../../../assets/guide/home.png)
 
@@ -48,7 +48,7 @@ The dark bar across the top of every admin screen takes you to each part of the 
 | Menu item | What it is for |
 | --- | --- |
 | **Content** ▾ | Your pages, posts and anything else the site lists, such as events, each kind on its own list; **Taxonomies** (categories and tags); and, below a line, **Templates**, the shared layouts every page uses, such as the header and footer. |
-| **Compose** ▾ | Have Claude build something new from your material: a page or post (or any kind of content with a page), a form, an email campaign (with mailing lists), a template, a template part or a pattern. See [Writing with Claude](/cfpuck-cms/guide/writing-with-claude/). |
+| **Compose** ▾ | Have Claude build something new from your material: a page or post (or any kind of content with a page), a form, an email campaign (with mailing lists), a template, a template part or a pattern. See [Writing with Claude](/moonpuck/guide/writing-with-claude/). |
 | **Media** | Your photos, images, videos and documents. |
 | **Forms** ▾ | **Forms** (contact forms, sign-up forms and the like) and **Submissions** (what people sent through them). |
 | **People** ▾ | **Users** (who can sign in to look after the site; admins only), **Members**, **Mailing Lists** and **Tickets** (each only when your site uses it). |
@@ -72,14 +72,14 @@ doesn't use.
 
 ## What's in this guide
 
-- [Pages and posts](/cfpuck-cms/guide/pages-and-posts/): adding, finding and organising content.
-- [Using the page editor](/cfpuck-cms/guide/page-editor/): changing what is on a page.
-- [Saving and publishing](/cfpuck-cms/guide/saving-and-publishing/): drafts, publishing and going back to an earlier version.
-- [Images and files](/cfpuck-cms/guide/images-and-files/): uploading and describing images.
-- [Forms](/cfpuck-cms/guide/forms/): building forms and reading what people send.
-- [Writing with Claude](/cfpuck-cms/guide/writing-with-claude/): having pages drafted for you from your documents.
-- [Accessibility](/cfpuck-cms/guide/accessibility/): making sure everyone can use your pages.
-- [Events and tickets](/cfpuck-cms/guide/events-and-tickets/): listing events and selling tickets.
-- [Menu and settings](/cfpuck-cms/guide/menu-and-settings/): for admins.
-- [People and access](/cfpuck-cms/guide/people/): for admins.
-- [Common questions](/cfpuck-cms/guide/common-questions/): quick answers when something isn't working.
+- [Pages and posts](/moonpuck/guide/pages-and-posts/): adding, finding and organising content.
+- [Using the page editor](/moonpuck/guide/page-editor/): changing what is on a page.
+- [Saving and publishing](/moonpuck/guide/saving-and-publishing/): drafts, publishing and going back to an earlier version.
+- [Images and files](/moonpuck/guide/images-and-files/): uploading and describing images.
+- [Forms](/moonpuck/guide/forms/): building forms and reading what people send.
+- [Writing with Claude](/moonpuck/guide/writing-with-claude/): having pages drafted for you from your documents.
+- [Accessibility](/moonpuck/guide/accessibility/): making sure everyone can use your pages.
+- [Events and tickets](/moonpuck/guide/events-and-tickets/): listing events and selling tickets.
+- [Menu and settings](/moonpuck/guide/menu-and-settings/): for admins.
+- [People and access](/moonpuck/guide/people/): for admins.
+- [Common questions](/moonpuck/guide/common-questions/): quick answers when something isn't working.

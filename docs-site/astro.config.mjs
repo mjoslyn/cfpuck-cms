@@ -1,17 +1,17 @@
-// The cfpuck-cms documentation site (Starlight), published to GitHub Pages by
+// The moonpuck documentation site (Starlight), published to GitHub Pages by
 // .github/workflows/docs.yml.
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
 export default defineConfig({
   site: 'https://mjoslyn.github.io',
-  base: '/cfpuck-cms',
+  base: '/moonpuck',
   integrations: [
     starlight({
-      title: 'cfpuck-cms',
+      title: 'moonpuck',
       description: 'A CMS for small business and organisation sites: Astro on a Cloudflare Worker, D1 and R2, the Puck editor and Compose.',
-      social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/mjoslyn/cfpuck-cms' }],
-      editLink: { baseUrl: 'https://github.com/mjoslyn/cfpuck-cms/edit/main/docs-site/' },
+      social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/mjoslyn/moonpuck' }],
+      editLink: { baseUrl: 'https://github.com/mjoslyn/moonpuck/edit/main/docs-site/' },
       lastUpdated: true,
       sidebar: [
         { label: 'Site guide (editors and admins)', items: [{ autogenerate: { directory: 'guide' } }] },

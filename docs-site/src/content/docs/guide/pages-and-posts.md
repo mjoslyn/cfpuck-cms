@@ -16,7 +16,7 @@ under the heading is how many there are.
 1. Click **Content**, then the kind of thing you want to add (for example **Pages**).
 2. Click the **New** button in the top right (it says **New Page**, **New Post** and so on).
 3. The page editor opens with an empty page. Type a title in the **Title** box on the right.
-4. Add what you want on the page (see [Using the page editor](/cfpuck-cms/guide/page-editor/)).
+4. Add what you want on the page (see [Using the page editor](/moonpuck/guide/page-editor/)).
 5. Click **Publish** when it is ready for visitors, or leave it as a draft for now.
 
 :::tip
@@ -25,7 +25,7 @@ private draft until you click **Publish**, so it is safe to start something and 
 :::
 
 Prefer to start from a document you already have? Use **Compose** instead of **New**. See
-[Writing with Claude](/cfpuck-cms/guide/writing-with-claude/).
+[Writing with Claude](/moonpuck/guide/writing-with-claude/).
 
 ## Finding something
 

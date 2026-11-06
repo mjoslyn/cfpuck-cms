@@ -13,7 +13,7 @@ declare module 'vitest' {
 }
 
 export default function setup(project: TestProject) {
-  const dir = mkdtempSync(join(tmpdir(), 'cfpuck-tests-'));
+  const dir = mkdtempSync(join(tmpdir(), 'moonpuck-tests-'));
   const file = join(dir, 'template.sqlite');
   const db = new DatabaseSync(file);
   for (const name of readdirSync('db/migrations').filter((f) => f.endsWith('.sql')).sort()) {

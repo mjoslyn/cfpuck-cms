@@ -9,7 +9,7 @@ import { database } from '../../src/lib/db/d1';
 import { setBindings } from '../../src/lib/platform';
 import { checkedD1 } from './d1-limits';
 
-const file = join(mkdtempSync(join(tmpdir(), 'cfpuck-test-')), 'd1.sqlite');
+const file = join(mkdtempSync(join(tmpdir(), 'moonpuck-test-')), 'd1.sqlite');
 copyFileSync(inject('d1Template'), file);
 process.env.D1_LOCAL_FILE = file;
 setBindings({ DB: checkedD1(await database()) });
