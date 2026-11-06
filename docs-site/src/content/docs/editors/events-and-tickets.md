@@ -7,7 +7,7 @@ sidebar:
 
 If your site lists events, they appear under **Content**, **Events**, and on your site's
 calendar at `/events/`. (If you don't see **Events** under **Content**, events are turned off; an admin can turn
-them on under **Settings**, **Events**.)
+them on under **Settings**, **Events**: see [Turning features on](/admins/features/#events).)
 
 ## Adding an event
 

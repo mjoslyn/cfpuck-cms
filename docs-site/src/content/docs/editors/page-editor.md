@@ -53,7 +53,7 @@ last change. You can undo several times.
 | **Media & text** | A picture beside some text. |
 | **Columns** | Puts blocks side by side. |
 | **Section** | Groups blocks, with a background colour or spacing around them. |
-| **Form** | One of your [forms](/guide/forms/). |
+| **Form** | One of your [forms](/editors/forms/). |
 | **File** | A link to a document (a PDF, say) with its type, size and a Download button. |
 | **Collection** | An automatic list of your latest posts, events or other content. Each entry shows as a card; select a block in the first card to change them all. For content that can be marked featured (an admin turns this on under **Settings**, **Types**), tick **Featured only** to list just those. A card's **Featured image** is Medium height (240px) unless you pick another **Height**: Small, Large, Extra large, **Auto** (the picture's own height) or **Custom**. |
 
@@ -108,7 +108,7 @@ settings on the right:
 - **Template**: the layout around the page. Usually leave this as it is.
 - **Excerpt**: a sentence or two summing up the page, shown in lists of pages.
 - **Featured image**: the picture used for this page in lists and when it is shared on social media.
-- **Tags** and categories: see [Pages and posts](/guide/pages-and-posts/).
+- **Tags** and categories: see [Pages and posts](/editors/pages-and-posts/).
 - **SEO**: how the page appears in Google. **Compose** can write these for you.
   - **Hide from search engines and AI answer engines** asks Google and the like not to list the page,
     and the tools behind ChatGPT, Claude, Perplexity and Google's AI answers not to read it. Use it
@@ -151,7 +151,7 @@ permanently** removes it for good.
 
 To have Claude build a new template, header, footer or pattern, click **Compose** in the top bar, then
 **Template**, **Template part** or **Pattern**, name it, say what it is for and click **Send**; the
-editor opens and Claude builds it (see [Writing with Claude](/guide/writing-with-claude/)).
+editor opens and Claude builds it (see [Writing with Claude](/editors/writing-with-claude/)).
 
 The menu's links are changed under **Settings**, **Menu**, not in the header itself. See
-[Menu and settings](/guide/menu-and-settings/).
+[Menu and settings](/admins/settings/).

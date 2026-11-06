@@ -1,6 +1,6 @@
 ---
-title: Site guide
-description: "Everyday help for the people who look after a site: signing in, adding pages, images, forms and more."
+title: Editor guide
+description: "Everyday help for the people who keep a site up to date: signing in, adding pages, images, forms and more."
 sidebar:
   order: 0
   label: Start here
@@ -9,7 +9,8 @@ sidebar:
 This guide is for the people who keep a site up to date day to day. You don't need to know anything
 about websites or code to follow it. Each page walks through one job, step by step.
 
-The **?** button at the top of every admin screen brings you back here.
+The **?** button at the top of every admin screen brings you back here. Admins have a guide of their
+own for site-wide settings: the [Admin guide](/admins/).
 
 ## Signing in
 
@@ -32,7 +33,7 @@ To sign out, click your name in the top right corner, then **Sign out**.
 Signing in takes you to the home screen, which asks **What would you like to make?** Pick what it is
 (**Page**, **Post**, **Form**, **Template**...), say in the box what it's for, and click **Compose**.
 Claude writes it in your site's style and it opens as a draft for you to check; nothing goes live until
-you publish it. See [Writing with Claude](/guide/writing-with-claude/).
+you publish it. See [Writing with Claude](/editors/writing-with-claude/).
 
 ![The home screen](../../../assets/guide/home.png)
 
@@ -48,7 +49,7 @@ The dark bar across the top of every admin screen takes you to each part of the 
 | Menu item | What it is for |
 | --- | --- |
 | **Content** ▾ | Your pages, posts and anything else the site lists, such as events, each kind on its own list; **Taxonomies** (categories and tags); and, below a line, **Templates**, the shared layouts every page uses, such as the header and footer. |
-| **Compose** ▾ | Have Claude build something new from your material: a page or post (or any kind of content with a page), a form, an email campaign (with mailing lists), a template, a template part or a pattern. See [Writing with Claude](/guide/writing-with-claude/). |
+| **Compose** ▾ | Have Claude build something new from your material: a page or post (or any kind of content with a page), a form, an email campaign (with mailing lists), a template, a template part or a pattern. See [Writing with Claude](/editors/writing-with-claude/). |
 | **Media** | Your photos, images, videos and documents. |
 | **Forms** ▾ | **Forms** (contact forms, sign-up forms and the like) and **Submissions** (what people sent through them). |
 | **People** ▾ | **Users** (who can sign in to look after the site; admins only), **Members**, **Mailing Lists** and **Tickets** (each only when your site uses it). |
@@ -67,19 +68,18 @@ There are two kinds of account:
 - **Admins** can do everything editors can, and also change site-wide settings, the menu and who
   has access.
 
-If you can't see something this guide mentions, it is probably for admins, or a feature your site
-doesn't use.
+If you can't see something this guide mentions, it is probably for admins (see the
+[Admin guide](/admins/)), or a feature your site doesn't use.
 
 ## What's in this guide
 
-- [Pages and posts](/guide/pages-and-posts/): adding, finding and organising content.
-- [Using the page editor](/guide/page-editor/): changing what is on a page.
-- [Saving and publishing](/guide/saving-and-publishing/): drafts, publishing and going back to an earlier version.
-- [Images and files](/guide/images-and-files/): uploading and describing images.
-- [Forms](/guide/forms/): building forms and reading what people send.
-- [Writing with Claude](/guide/writing-with-claude/): having pages drafted for you from your documents.
-- [Accessibility](/guide/accessibility/): making sure everyone can use your pages.
-- [Events and tickets](/guide/events-and-tickets/): listing events and selling tickets.
-- [Menu and settings](/guide/menu-and-settings/): for admins.
-- [People and access](/guide/people/): for admins.
-- [Common questions](/guide/common-questions/): quick answers when something isn't working.
+- [Pages and posts](/editors/pages-and-posts/): adding, finding and organising content.
+- [Using the page editor](/editors/page-editor/): changing what is on a page.
+- [Saving and publishing](/editors/saving-and-publishing/): drafts, publishing and going back to an earlier version.
+- [Images and files](/editors/images-and-files/): uploading and describing images.
+- [Forms](/editors/forms/): building forms and reading what people send.
+- [Writing with Claude](/editors/writing-with-claude/): having pages drafted for you from your documents.
+- [Accessibility](/editors/accessibility/): making sure everyone can use your pages.
+- [Events and tickets](/editors/events-and-tickets/): listing events and selling tickets.
+- [Stats](/editors/stats/): how many people visit, and what they read.
+- [Common questions](/editors/common-questions/): quick answers when something isn't working.

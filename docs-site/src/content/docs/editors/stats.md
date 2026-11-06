@@ -46,14 +46,9 @@ are looking at.
 
 ## The Stats cookie
 
-Admins can turn on **Recognise returning visitors with a cookie** under **Settings > Stats**. The site then
-keeps a random number in a cookie in each visitor's browser for 13 months, so Stats can tell a returning
-visitor from a new one.
-
-In the EU and UK the law asks visitors' consent before such a cookie is set. With a cookie consent banner
-on (see [Popups and cookie consent](/guide/popups-and-cookies/)), only visitors who accept get
-the cookie; everyone else is still counted, once a day. Without a banner every visitor gets it, and
-Settings warns about that.
+An admin can have Stats recognise returning visitors with a cookie (see
+[The Stats cookie](/admins/popups-and-cookies/#the-stats-cookie) in the Admin guide). Without it, a
+visitor is counted once a day.
 
 ## What isn't counted
 

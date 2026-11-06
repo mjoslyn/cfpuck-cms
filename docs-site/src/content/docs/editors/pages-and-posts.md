@@ -16,7 +16,7 @@ under the heading is how many there are.
 1. Click **Content**, then the kind of thing you want to add (for example **Pages**).
 2. Click the **New** button in the top right (it says **New Page**, **New Post** and so on).
 3. The page editor opens with an empty page. Type a title in the **Title** box on the right.
-4. Add what you want on the page (see [Using the page editor](/guide/page-editor/)).
+4. Add what you want on the page (see [Using the page editor](/editors/page-editor/)).
 5. Click **Publish** when it is ready for visitors, or leave it as a draft for now.
 
 :::tip
@@ -25,7 +25,7 @@ private draft until you click **Publish**, so it is safe to start something and 
 :::
 
 Prefer to start from a document you already have? Use **Compose** instead of **New**. See
-[Writing with Claude](/guide/writing-with-claude/).
+[Writing with Claude](/editors/writing-with-claude/).
 
 ## Finding something
 
@@ -59,7 +59,7 @@ isn't gone: open the **Trash** tab, tick it and choose **Restore** to bring it b
 
 :::caution
 The home page can't be moved to the trash. To use a different home page, ask an admin to change
-it under **Settings**.
+it under **Settings** (see [The home page](/admins/settings/#the-home-page)).
 :::
 
 ## Categories and tags
@@ -73,27 +73,16 @@ Categories and tags group related content, so visitors can find everything on on
 
 ### Featured content
 
-When an admin has turned on **Featured** for a kind of content (**Settings**, **Types**), each one has a
+When an admin has turned on **Featured** for a kind of content ([see how](/admins/content-types/#featured-content)), each one has a
 **Featured** switch in its settings. In the list of that content, a star marks the featured ones; tick
 **Featured only** and click **Filter** to see just those, or tick several and choose **Mark featured** from
 **Bulk actions**. A Collection block can then show featured content only.
 
 ### Your own ways to sort content
 
-Admins can add a taxonomy of their own, such as Colors or Regions, and choose which types of content
-use it.
-
-1. Click **Content**, then **Taxonomies**, then **Add a taxonomy**.
-2. Give it a name (Colors) and a name for one of them (Color).
-3. To give each term a page listing its content, type an address, such as `colors`. Red would then be
-   at `/colors/red/`. Leave it empty for no pages.
-4. Tick **A flat list, like tags** if its terms never sit under each other.
-5. Under **Used on**, tick each type that uses it, then click **Add taxonomy**.
-
-Add its terms on its tab. Each page of a ticked type then has a picker for them in its right-hand
-panel. To change the name, address or types later, open the taxonomy's tab and click its settings.
-The same place adds more types to the site's own taxonomies, such as Category; the types the site
-was built with stay ticked.
+Admins can add taxonomies of their own, such as Colors or Regions (see
+[Kinds of content and taxonomies](/admins/content-types/#your-own-ways-to-sort-content)). Each page of a
+type that uses one then has a picker for its terms in its right-hand panel.
 
 ## Page addresses
 

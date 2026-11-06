@@ -2,7 +2,7 @@
 title: Popups and cookie consent
 description: "Showing a popup on the site, and asking visitors' consent to cookies."
 sidebar:
-  order: 10
+  order: 6
 ---
 
 Popups show a message over the site's pages: a newsletter sign-up, a sale, an announcement. One of them
@@ -40,6 +40,16 @@ it again and change their mind.
 
 Until a visitor accepts:
 
-- The Stats cookie isn't set (see [Stats](/guide/stats/)).
+- The Stats cookie isn't set (see [The Stats cookie](#the-stats-cookie) below).
 - Code snippets marked **Only after visitors accept cookies** (Settings > Code snippets) don't run. Tick
   that box for analytics, advertising and other tracking tags.
+
+## The Stats cookie
+
+Turn on **Recognise returning visitors with a cookie** under **Settings > Stats**. The site then keeps a
+random number in a cookie in each visitor's browser for 13 months, so [Stats](/editors/stats/) can tell a
+returning visitor from a new one.
+
+In the EU and UK the law asks visitors' consent before such a cookie is set. With a cookie consent banner
+on, only visitors who accept get the cookie; everyone else is still counted, once a day. Without a banner
+every visitor gets it, and Settings warns about that.
