@@ -880,7 +880,7 @@ dates, from the first start (reminders) to the last end (sales close). Migration
 `*_tickets_own_records.sql` made a ticket of every event's own tickets (named after it) and attached the
 events that shared them. The setup:
 ticket types (name, description, price in cents, capacity, most per order, (an empty capacity is no
-limit; 0 is none left, sold out) sales window as local times
+limit; 0 is none left, sold out: the type's row says so while it is closed, and a 0 is flagged under its box) sales window as local times
 in the event's timezone, hidden for past ones), the ticket's capacity (per date for one recurring event),
 most per order, phone (off, optional, required), address (off, for paid orders, always), the ticket's own
 questions (asked once per order) and a waitlist (`off`, `auto`, `manual`). Settings > Tickets
@@ -1307,6 +1307,9 @@ Backups); a Section dropdown on phones. Each section has its own address, `/admi
 unsaved changes carry over, and an old `#<section>` link (and `admin`, now `appearance`) forwards to it.
 One **Save settings**, beside the section's title while there are unsaved changes, saves every section's
 form; Connections, Redirects, Sync and Backups save as they go (`SAVES_AS_IT_GOES`).
+
+Every admin page (`src/layouts/AdminTheme.astro`) stops the scroll wheel changing a focused number field, which
+would otherwise set it (from empty, to its minimum) as the page scrolls.
 
 Admin colors and logo (Settings > Appearance, `settings.site.admin_theme`, `src/lib/admin-theme.ts`): accent,
 text, menu bar and background, and a logo for the menu bar in place of the site name (or beside it,
