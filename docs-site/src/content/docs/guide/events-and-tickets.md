@@ -55,6 +55,11 @@ already has that name, a number is added (for example "Christmas Stroll 2"). Or 
 Publish the event. The booking form appears on its page, under the event's description, whatever
 template the event uses. To put it somewhere else on the page, add a **Tickets** block there.
 
+To sell a ticket on any other page (a home page, or a "What's on" page), add a **Tickets** block and
+choose the ticket under **Ticket** in its settings. For a ticket sold at several events, the block lists
+them under the ticket's name. For a ticket of one repeating event, **Date** picks the date (left empty,
+the next one). **Manage ticket** opens the ticket's setup in a new tab.
+
 ### One ticket for several events
 
 Attach more events to the same ticket (on the ticket's page, or in each event's settings under

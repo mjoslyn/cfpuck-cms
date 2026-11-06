@@ -891,9 +891,12 @@ tickets (30-120 minutes), and the emails with the reminder's and follow-up's tim
   for its ticket. On an event's page
   with neither block (a template with only a Page content block), the form goes under the Page content
   block of its main area (`ticketsAfterContent`), so an event that sells tickets always shows them. The `tickets` block
-  goes on any page or template: it shows the ticket of the event it names (`attrs.event`, and `attrs.date`
-  for one date of a recurring event, else its next; with the event's name and date over the form), else
-  the page's own event's (`prepareTicketsBlock`); a page can have several. An event that doesn't sell
+  goes on any page or template: it shows the ticket it names (`attrs.ticket`, picked in its settings,
+  `TicketsBlockPicker`; `attrs.date` for one date of a ticket for one recurring event, else its next; with
+  its event's name and date over the form, or for a ticket of several events its name and theirs, published
+  ones only), else the page's own event's (`prepareTicketsBlock`, `namedTicket`); a page can have several.
+  Blocks from before tickets were their own records name an event (`attrs.event`) and show its ticket
+  until a ticket is chosen. An event that doesn't sell
   tickets (no ticket, or one without ticket types) shows nothing. In the editor the block shows the full form: with no
   event that sells tickets, sample ticket types and a note saying why, when the block is part of what is
   being edited (the page's own content, or a template being edited; a template's block on such an

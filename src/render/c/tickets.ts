@@ -3,8 +3,9 @@
 // ticket's questions, posting to /api/tickets/checkout; a waitlist form when it's sold out; the buyer's
 // order when they come back (?order=<token>); and the outcome of a checkout (?tickets=<reason>&event=<ticket
 // id>). The Event details block shows the page's event's ticket below its content, unless the page has a
-// Tickets block for it. The Tickets block goes on any page or template: it shows the ticket of the event it
-// names (`event`, and `date` for one date of a recurring event, else its next), else the page's own event's.
+// Tickets block for it. The Tickets block goes on any page or template: it shows the ticket it names
+// (`ticket`, and `date` for one date of a ticket for one recurring event, else its next), else the page's
+// own event's. Blocks from before tickets were their own records name an event (`event`): its ticket.
 // The form posts the page it is on, so the buyer comes back there (src/lib/tickets/orders.ts ticketsAt).
 // public/assets/js/tickets.js adds the running total and live availability; without it the form still
 // works and the server checks everything.
@@ -73,6 +74,8 @@ export interface TicketsTarget {
   /** Its events' timezone (sales windows) and when the last of them ends (sales close). */
   tz: string;
   endUtc: number | null;
+  /** A Tickets block's ticket for several events: them, listed over the form under the ticket's name. */
+  events?: Entry[];
 }
 
 const PAGE_KEY = 'tickets-page';
@@ -146,10 +149,32 @@ async function namedEvent(ctx: RenderCtx, id: number, date: string): Promise<Ent
 /** What a Tickets block shows: its ticket, the event it is for, and (in the editor) whether the block is part of what is being edited. */
 interface TicketsBlock {
   target: TicketsTarget | null;
-  /** The event the block names, or the page's own (null: neither). */
+  /** The event the block's ticket is shown for, or the page's own (null: neither). */
   event: Entry | null;
+  /** The ticket the block names, if it is there. */
+  ticket: Entry | null;
   /** In the editor: the block is the page's own content, or the document being edited is a template. */
   editable: boolean;
+}
+
+/**
+ * A ticket a Tickets block names, as the page shows it: for one event, that event (a recurring one's date
+ * `date`, else its next); for several, all of them under the ticket's name. Null when it sells at no
+ * event the page may show.
+ */
+async function namedTicket(ctx: RenderCtx, id: number, date: string): Promise<{ target: TicketsTarget | null; event: Entry | null; ticket: Entry | null }> {
+  const t = await loadTicket(ctx, id);
+  if (!t) return { target: null, event: null, ticket: null };
+  const events = ctx.editor ? t.events : t.events.filter((e) => e.status === 'publish');
+  if (!events.length) return { target: null, event: null, ticket: t.ticket };
+  if (events.length === 1) {
+    const event = await namedEvent(ctx, events[0].id, date);
+    return { target: event ? await targetFor(ctx, event, false) : null, event, ticket: t.ticket };
+  }
+  const span = ticketSpan(t.events, '');
+  if (!span) return { target: null, event: null, ticket: t.ticket };
+  const e = { ...t.ticket, type: 'ticket' } as Entry;
+  return { target: { e, ticket: t.ticket, id, occurrence: '', own: false, tz: span.tz, endUtc: span.endUtc, events }, event: null, ticket: t.ticket };
 }
 
 /** Whether a ticket sells: Tickets on, with ticket types to offer. */
@@ -175,21 +200,25 @@ function editableBlock(ctx: RenderCtx, blockId: string): boolean {
   return !docs.length || docs.some(([, items]) => hasBlock(items, blockId));
 }
 
-/** A Tickets block's ticket (prepare.ts): the one of the event it names, else the page's own. Returns it, if any. */
+/** A Tickets block's ticket (prepare.ts): the one it names, else the page's own event's. Returns it, if any. */
 export async function prepareTicketsBlock(ctx: RenderCtx, blockId: string, attrs: Record<string, any>): Promise<TicketsTarget | null> {
   // Worked out before the walk loads the page's content (the site), when only the editor has set it.
   const editable = !!ctx.editor && editableBlock(ctx, blockId);
   await loadPageTicket(ctx);
-  const page = pageEvent(ctx);
-  const id = Number(attrs.event) || 0;
-  let target = page;
-  let event: Entry | null = ctx.queried.entry?.type === 'event' ? ctx.queried.entry : null;
-  if (id) {
-    event = await namedEvent(ctx, id, /^\d{4}-\d{2}-\d{2}$/.test(String(attrs.date ?? '')) ? attrs.date : '');
-    target = event ? await targetFor(ctx, event, false) : null;
-    if (target && isPageTickets(ctx, target)) target.own = true;
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(String(attrs.date ?? '')) ? attrs.date : '';
+  const ticketId = Number(attrs.ticket) || 0;
+  const eventId = Number(attrs.event) || 0;
+  let block: Omit<TicketsBlock, 'editable'> = { target: pageEvent(ctx), event: ctx.queried.entry?.type === 'event' ? ctx.queried.entry : null, ticket: pageEvent(ctx)?.ticket ?? null };
+  if (ticketId) block = await namedTicket(ctx, ticketId, date);
+  else if (eventId) {
+    // Chosen before tickets were their own records: the event's ticket.
+    const event = await namedEvent(ctx, eventId, date);
+    const target = event ? await targetFor(ctx, event, false) : null;
+    block = { target, event, ticket: target?.ticket ?? null };
   }
-  ctx.data.set(blockKey(blockId), { target, event, editable } satisfies TicketsBlock);
+  const { target } = block;
+  if (target && (ticketId || eventId) && isPageTickets(ctx, target)) target.own = true;
+  ctx.data.set(blockKey(blockId), { ...block, editable } satisfies TicketsBlock);
   if (target) await prepareTickets(ctx, target);
   return target;
 }
@@ -333,8 +362,13 @@ export function ticketsSection(env: Env, heading?: string, target = pageEvent(en
   // The anchor the server sends buyers back to (ticketsAt in src/lib/tickets/orders.ts).
   const anchor = target.own ? 'tickets' : `tickets-${id}`;
   const title = heading || t.heading || 'Tickets';
-  // Another event than the page's: which one, and when.
-  const named = target.own ? '' : `<p class="c-tickets__event"><a href="${esc(permalink(e))}">${esc(e.title)}</a><br /><span class="c-tickets__muted">${esc(eventDateText(e))}</span></p>`;
+  // Another event than the page's: which one, and when; a ticket for several: its name and theirs.
+  const eventLine = (x: Entry) => `<a href="${esc(permalink(x))}">${esc(x.title)}</a><br /><span class="c-tickets__muted">${esc(eventDateText(x))}</span>`;
+  const named = target.own
+    ? ''
+    : target.events?.length
+      ? `<p class="c-tickets__event">${esc(target.ticket.title)}</p><ul class="c-tickets__events">${target.events.map((x) => `<li>${eventLine(x)}</li>`).join('')}</ul>`
+      : `<p class="c-tickets__event">${eventLine(e)}</p>`;
   const head = `<section class="c-tickets${target.own ? '' : ' is-other'}" id="${anchor}" aria-labelledby="${uid}-title"><h2 class="c-tickets__heading" id="${uid}-title">${esc(title)}</h2>${note}${named}${message}${order}`;
   const pageInput = `<input type="hidden" name="page" value="${esc(env.ctx.queried.url.pathname)}" />`;
   const close = (body: string) => `${head}${body}</section>`;
@@ -431,16 +465,24 @@ const SAMPLE_TYPES = [
 function sampleTickets(env: Env, b: { attrs: Record<string, any> }, block: Partial<TicketsBlock>): string {
   const target = block.target ?? null;
   const base = block.event ?? null;
-  const why = b.attrs.event && !base
-    ? 'That event isn’t there, or has no such date.'
-    : base
-      ? `${target?.own !== false && !b.attrs.event ? 'This event' : esc(base.title)} doesn’t sell tickets yet (attach it to a ticket with ticket types under People &gt; Tickets), so the site shows nothing here.`
-      : 'On an event’s page this shows its tickets, and nothing for events that don’t sell any. Or choose an event in the block’s settings.';
+  const chosen = b.attrs.ticket || b.attrs.event;
+  const why = b.attrs.ticket
+    ? !block.ticket
+      ? 'That ticket isn’t there.'
+      : !target
+        ? `${esc(block.ticket.title)} isn’t sold at a published event${base ? ' on that date' : ''} (attach events to it under People &gt; Tickets), so the site shows nothing here.`
+        : `${esc(block.ticket.title)} has no ticket types yet (add them under People &gt; Tickets), so the site shows nothing here.`
+    : b.attrs.event && !base
+      ? 'That event isn’t there, or has no such date.'
+      : base
+        ? `${target?.own !== false && !chosen ? 'This event' : esc(base.title)} doesn’t sell tickets yet (attach it to a ticket with ticket types under People &gt; Tickets), so the site shows nothing here.`
+        : 'On an event’s page this shows its tickets, and nothing for events that don’t sell any. Or choose a ticket in the block’s settings.';
   const note = `<p class="c-tickets__note c-tickets__sample">Sample tickets. ${why}</p>`;
-  const fields = { tickets: { ...ticketsOf(target?.ticket.fields), enabled: true, types: SAMPLE_TYPES } };
-  const ticket = { ...(target?.ticket ?? { id: 0, type: 'ticket', slug: 'sample', title: 'Tickets' }), fields } as Entry;
+  const source = target?.ticket ?? block.ticket ?? null;
+  const fields = { tickets: { ...ticketsOf(source?.fields), enabled: true, types: SAMPLE_TYPES } };
+  const ticket = { ...(source ?? { id: 0, type: 'ticket', slug: 'sample', title: 'Tickets' }), fields } as Entry;
   const e = (base ?? { id: 0, type: 'event', slug: 'sample', title: 'Event', fields: {} }) as Entry;
-  return ticketsSection(env, b.attrs.heading, { e, ticket, id: target?.id ?? 0, occurrence: target?.occurrence ?? '', own: target?.own ?? !b.attrs.event, tz: target?.tz ?? SITE_TZ, endUtc: null }, note);
+  return ticketsSection(env, b.attrs.heading, { e, ticket, id: target?.id ?? 0, occurrence: target?.occurrence ?? '', own: target?.own ?? (!chosen || !base), tz: target?.tz ?? SITE_TZ, endUtc: null, events: target?.events }, note);
 }
 
 export const TICKETS_RENDERERS: Record<string, Renderer> = {

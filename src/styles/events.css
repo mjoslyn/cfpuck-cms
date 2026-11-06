@@ -800,8 +800,20 @@ a.c-cal__arrow:hover {
 .c-tickets__event a {
   color: inherit;
 }
-.c-tickets__event .c-tickets__muted {
+.c-tickets__event .c-tickets__muted,
+.c-tickets__events .c-tickets__muted {
   font-weight: 400;
+}
+.c-tickets__events {
+  margin: -0.5rem 0 1rem;
+  padding-left: 1.25rem;
+}
+.c-tickets__events li + li {
+  margin-top: 0.25rem;
+}
+.c-tickets__events a {
+  color: inherit;
+  font-weight: 600;
 }
 .c-tickets__note {
   margin: 0 0 1rem;
