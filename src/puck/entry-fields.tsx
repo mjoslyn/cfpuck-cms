@@ -798,3 +798,57 @@ export function TagsField({ value, onChange }: { value: string[]; onChange: (v: 
     </div>
   );
 }
+
+/**
+ * The Tickets block's ticket (attrs.ticket): any ticket (People > Tickets), or none (the page's own
+ * event's). A block from before tickets were their own records names an event (attrs.event); it shows
+ * that event's ticket until a ticket is chosen.
+ */
+export function TicketsBlockPicker({ ticket, event, onChange }: { ticket: number; event: number; onChange: (patch: { ticket?: number; event?: undefined; date?: undefined }) => void }) {
+  const [tickets, setTickets] = useState<{ id: number; title: string; events: number }[] | null>(null);
+  const [eventTitle, setEventTitle] = useState('');
+  useEffect(() => {
+    const db = browserClient();
+    Promise.all([
+      db.from('entries').select('id, title').eq('type', 'ticket').neq('status', 'trash').order('title'),
+      db.from('entries').select('id, fields').eq('type', 'event').neq('status', 'trash'),
+    ]).then(([{ data: ts }, { data: evs }]) => {
+      const count = new Map<number, number>();
+      for (const e of (evs ?? []) as { fields: Record<string, any> | null }[]) {
+        const t = Number(e.fields?.ticket) || 0;
+        if (t) count.set(t, (count.get(t) ?? 0) + 1);
+      }
+      setTickets(((ts ?? []) as { id: number; title: string }[]).map((t) => ({ ...t, events: count.get(t.id) ?? 0 })));
+    });
+  }, []);
+  useEffect(() => {
+    if (!event || ticket) return;
+    browserClient().from('entries').select('title').eq('id', event).maybeSingle().then(({ data }) => setEventTitle((data as { title?: string } | null)?.title ?? ''));
+  }, [event, ticket]);
+  const known = !ticket || !tickets || tickets.some((t) => t.id === ticket);
+  return (
+    <>
+      <Row title="Ticket">
+        <select
+          className={inputClass}
+          value={ticket || ''}
+          disabled={!tickets}
+          onChange={(e) => onChange({ ticket: Number(e.target.value) || undefined, event: undefined, date: undefined })}
+        >
+          <option value="">{event && !ticket ? `${eventTitle || 'The event chosen before'}'s ticket` : "The page's event's ticket"}</option>
+          {!known && <option value={ticket}>(a ticket that isn't there)</option>}
+          {(tickets ?? []).map((t) => (
+            <option key={t.id} value={t.id}>
+              {(t.title || 'Tickets') + (t.events ? ` (${t.events} event${t.events === 1 ? '' : 's'})` : ' (no events)')}
+            </option>
+          ))}
+        </select>
+      </Row>
+      {ticket > 0 && (
+        <a className="mb-3 inline-block rounded-sm border border-admin-ink/20 px-2 py-1 text-xs font-semibold hover:border-admin-ink/50" href={`/admin/tickets/${ticket}/?view=setup`} target="_blank" rel="noopener">
+          Manage ticket
+        </a>
+      )}
+    </>
+  );
+}

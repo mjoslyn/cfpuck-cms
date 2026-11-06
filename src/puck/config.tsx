@@ -2,7 +2,7 @@
 import type { Config, Fields } from '@puckeditor/core';
 import { BlockView } from './BlockView';
 import { JsonAttrs, Row, Select, Text, Toggle, inputClass, type Attrs } from './fields';
-import { EntryField } from './entry-fields';
+import { TicketsBlockPicker } from './entry-fields';
 import { MembersPanel } from './MembersPanel';
 import { NewsletterPanel, SubscribePanel } from './SubscribePanel';
 import { FormStylePanel } from './FormStyle';
@@ -40,16 +40,16 @@ const PANELS: Record<string, Panel> = {
 Object.assign(PANELS, {
   tickets: (a: Attrs, set: (p: Attrs) => void) => (
     <>
-      <EntryField title="Event" entryType="event" value={a.event} onChange={(id) => set({ event: id || undefined, date: undefined })} />
-      {a.event ? (
-        <Row title="Date (a recurring event's; empty: its next)">
+      <TicketsBlockPicker ticket={Number(a.ticket) || 0} event={Number(a.event) || 0} onChange={set} />
+      {a.ticket || a.event ? (
+        <Row title="Date (a ticket for one recurring event; empty: its next)">
           <input type="date" className={inputClass} value={a.date ?? ''} onChange={(e) => set({ date: e.target.value || undefined })} />
         </Row>
       ) : (
-        <p className="mb-3 text-xs text-admin-muted">With no event chosen, it shows the tickets of the event whose page it is on (in an event template, each event's own).</p>
+        <p className="mb-3 text-xs text-admin-muted">With no ticket chosen, it shows the ticket of the event whose page it is on (in an event template, each event's own).</p>
       )}
-      <Text title="Heading" value={a.heading} placeholder="Tickets (or the event's own)" onChange={(v) => set({ heading: v || undefined })} />
-      <p className="mb-2 text-xs text-admin-muted">The event's ticket types, prices and questions are set up under People &gt; Tickets (Set up tickets in its settings). On an event's page the Event details block shows them on its own, unless a Tickets block for that event is on the page.</p>
+      <Text title="Heading" value={a.heading} placeholder="Tickets (or the ticket's own)" onChange={(v) => set({ heading: v || undefined })} />
+      <p className="mb-2 text-xs text-admin-muted">Tickets, their types, prices and questions, and the events selling them are set up under People &gt; Tickets. On an event's page the Event details block shows its ticket on its own, unless a Tickets block for that ticket is on the page.</p>
     </>
   ),
   members: (a: Attrs, set: (p: Attrs) => void) => <MembersPanel a={a} set={set} />,

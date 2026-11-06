@@ -38,4 +38,38 @@ describe('event tickets', () => {
     expect(walk).toContain('A walk.');
     expect(walk).not.toContain('c-tickets');
   });
+
+  it('shows the ticket a Tickets block names: one event’s, or several under the ticket’s name', async () => {
+    const db = siteDb();
+    const { id: solo } = await createTicket(db, 'Solo tickets', { types: [{ id: 'a', name: 'Solo seat', price: 0 }] });
+    const { id: pass } = await createTicket(db, 'Weekend pass', { types: [{ id: 'p', name: 'Pass', price: 0 }] });
+    const at = (d: string) => ({ start: `2099-07-0${d}T19:00`, end: `2099-07-0${d}T21:00` });
+    const none = doc([]);
+    const { error } = await db.from('entries').insert([
+      { type: 'event', content: none, slug: 'solo', title: 'Solo show', status: 'publish', fields: { ...at('1'), ticket: solo } },
+      { type: 'event', content: none, slug: 'fri', title: 'Friday night', status: 'publish', fields: { ...at('3'), ticket: pass } },
+      { type: 'event', content: none, slug: 'sat', title: 'Saturday night', status: 'publish', fields: { ...at('4'), ticket: pass } },
+      { type: 'event', content: none, slug: 'sun', title: 'Sunday draft', status: 'draft', fields: { ...at('5'), ticket: pass } },
+      {
+        type: 'page', slug: 'buy', title: 'Buy', status: 'publish', template: 'plain-event', fields: {},
+        content: doc([
+          { type: 'tickets', props: { id: 'tk1', attrs: { ticket: solo } } },
+          { type: 'tickets', props: { id: 'tk2', attrs: { ticket: pass } } },
+          { type: 'tickets', props: { id: 'tk3', attrs: { ticket: 999999 } } },
+        ]),
+      },
+    ]);
+    expect(error).toBeNull();
+    const html = (await renderRequest(new URL('http://localhost/buy/'), db)).html;
+    expect(html).toContain(`id="tickets-${solo}"`);
+    expect(html).toContain('Solo seat');
+    expect(html).toContain('>Solo show</a>');
+    expect(html).toContain(`id="tickets-${pass}"`);
+    expect(html).toContain('<p class="c-tickets__event">Weekend pass</p>');
+    expect(html).toContain('>Friday night</a>');
+    expect(html).toContain('>Saturday night</a>');
+    // A draft event isn't listed; a ticket that isn't there shows nothing.
+    expect(html).not.toContain('Sunday draft');
+    expect(html.match(/<section class="c-tickets/g)).toHaveLength(2);
+  });
 });

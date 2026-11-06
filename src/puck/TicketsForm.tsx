@@ -134,7 +134,7 @@ export function TicketsForm({ ticketId, fields, onChange }: { ticketId: number; 
       {t.types.length > 0 && <span className="mb-1 block text-xs font-medium text-admin-muted">Ticket types</span>}
       <List<TicketType>
         items={t.types}
-        label={(x) => `${x.name || 'Ticket'}${x.hidden ? ' (not offered)' : ''}`}
+        label={(x) => `${x.name || 'Ticket'}${x.hidden ? ' (not offered)' : x.capacity === 0 ? ' (0 available: sold out)' : x.capacity != null ? ` (${x.capacity} available)` : ''}`}
         onChange={(types) => set({ types })}
         render={(x, setType) => (
           <>
@@ -145,6 +145,7 @@ export function TicketsForm({ ticketId, fields, onChange }: { ticketId: number; 
             <PriceInput value={x.price} onChange={(price) => setType({ price: price ?? 0 })} />
             {members?.enabled && members.levels.length > 0 && <MemberPricing type={x} levels={members.levels} onChange={setType} />}
             <Num title="How many (empty: no limit of its own; 0: sold out)" value={x.capacity ?? undefined} min={0} onChange={(capacity) => setType({ capacity: capacity ?? null })} />
+            {x.capacity === 0 && <p className="-mt-2 mb-3 text-xs text-[#b45309]">0: this ticket type shows as sold out. Empty the box for no limit.</p>}
             <Num title="Most in one order" value={x.maxPerOrder ?? undefined} min={1} onChange={(maxPerOrder) => setType({ maxPerOrder: maxPerOrder ?? null })} />
             <DateTime title="On sale from (empty: now)" value={x.salesStart} onChange={(salesStart) => setType({ salesStart })} />
             <DateTime title="On sale until (empty: until the event ends)" value={x.salesEnd} onChange={(salesEnd) => setType({ salesEnd })} />
@@ -159,6 +160,7 @@ export function TicketsForm({ ticketId, fields, onChange }: { ticketId: number; 
         <>
           <p className="-mt-1 mb-3 text-xs text-admin-muted">Times are in the event's timezone. A ticket for one recurring event sells each date separately; a ticket for several events is one pool for all of them.</p>
           <Num title="Capacity: tickets of all types together (empty: no limit; 0: sold out)" value={t.capacity ?? undefined} min={0} onChange={(capacity) => set({ capacity: capacity ?? null })} />
+          {t.capacity === 0 && <p className="-mt-2 mb-3 text-xs text-[#b45309]">0: every ticket type shows as sold out. Empty the box for no limit.</p>}
           <Num title="Most tickets in one order (default 10)" value={t.maxPerOrder ?? undefined} min={1} onChange={(maxPerOrder) => set({ maxPerOrder: maxPerOrder ?? null })} />
           <Select title="Waitlist when sold out" value={t.waitlist} options={[['off', 'Off'], ['auto', 'On: email people as tickets free up'], ['manual', 'On: notify people from the attendee list']]} onChange={(v) => set({ waitlist: (v as EventTickets['waitlist']) ?? 'off' })} />
 

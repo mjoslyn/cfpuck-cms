@@ -109,9 +109,13 @@ block's ratio for Image; else its main point), written as `--focal`, `--focal-ta
 on the block; the stylesheet picks one as `--focal-at` (tablet up to 1024px, phone up to 599px), which
 the image's `object-position` reads (`screenFocal`, `src/render/c/content.ts`). Galleries hold
 image blocks (`gallery`) or embed and video blocks (`video-gallery`) and show them as a grid, masonry
-columns or a slider (`display`; a scroll-snap row, buttons and autoplay from
+columns or a slider (`display`; a scroll-snap row, buttons, dots and autoplay from
 `public/assets/js/gallery-slider.js`); media picked in the panel arrive as `attrs.add` and become
-child blocks in `resolveGallery` (`config.tsx`).
+child blocks in `resolveGallery` (`config.tsx`). Their look (Style): `radius` (`GALLERY_RADII`), each
+item's caption (`itemCaptions`: below, over the image, hidden) and `hover` (zoom, lift); a slider's:
+`arrows` (round, square, plain, none), `arrowPosition` (over, outside, below), `arrowBg` and `arrowColor`
+(palette tokens, hex, rgb or hsl only), `dots`, `peek` (part of the next item shows) and the autoplay's
+`interval` (2 to 20 seconds); classes `has-*` and custom properties `--gallery-*` (`galleryOf`).
 Props are clean values: styles as CSS with design tokens (`var(--color-*)`, `var(--space-*)`,
 `var(--text-*)`), layouts as `{ type: flow|constrained|row|stack|grid }`.
 
@@ -876,7 +880,7 @@ dates, from the first start (reminders) to the last end (sales close). Migration
 `*_tickets_own_records.sql` made a ticket of every event's own tickets (named after it) and attached the
 events that shared them. The setup:
 ticket types (name, description, price in cents, capacity, most per order, (an empty capacity is no
-limit; 0 is none left, sold out) sales window as local times
+limit; 0 is none left, sold out: the type's row says so while it is closed, and a 0 is flagged under its box) sales window as local times
 in the event's timezone, hidden for past ones), the ticket's capacity (per date for one recurring event),
 most per order, phone (off, optional, required), address (off, for paid orders, always), the ticket's own
 questions (asked once per order) and a waitlist (`off`, `auto`, `manual`). Settings > Tickets
@@ -891,9 +895,12 @@ tickets (30-120 minutes), and the emails with the reminder's and follow-up's tim
   for its ticket. On an event's page
   with neither block (a template with only a Page content block), the form goes under the Page content
   block of its main area (`ticketsAfterContent`), so an event that sells tickets always shows them. The `tickets` block
-  goes on any page or template: it shows the ticket of the event it names (`attrs.event`, and `attrs.date`
-  for one date of a recurring event, else its next; with the event's name and date over the form), else
-  the page's own event's (`prepareTicketsBlock`); a page can have several. An event that doesn't sell
+  goes on any page or template: it shows the ticket it names (`attrs.ticket`, picked in its settings,
+  `TicketsBlockPicker`; `attrs.date` for one date of a ticket for one recurring event, else its next; with
+  its event's name and date over the form, or for a ticket of several events its name and theirs, published
+  ones only), else the page's own event's (`prepareTicketsBlock`, `namedTicket`); a page can have several.
+  Blocks from before tickets were their own records name an event (`attrs.event`) and show its ticket
+  until a ticket is chosen. An event that doesn't sell
   tickets (no ticket, or one without ticket types) shows nothing. In the editor the block shows the full form: with no
   event that sells tickets, sample ticket types and a note saying why, when the block is part of what is
   being edited (the page's own content, or a template being edited; a template's block on such an
@@ -1300,6 +1307,9 @@ Backups); a Section dropdown on phones. Each section has its own address, `/admi
 unsaved changes carry over, and an old `#<section>` link (and `admin`, now `appearance`) forwards to it.
 One **Save settings**, beside the section's title while there are unsaved changes, saves every section's
 form; Connections, Redirects, Sync and Backups save as they go (`SAVES_AS_IT_GOES`).
+
+Every admin page (`src/layouts/AdminTheme.astro`) stops the scroll wheel changing a focused number field, which
+would otherwise set it (from empty, to its minimum) as the page scrolls.
 
 Admin colors and logo (Settings > Appearance, `settings.site.admin_theme`, `src/lib/admin-theme.ts`): accent,
 text, menu bar and background, and a logo for the menu bar in place of the site name (or beside it,

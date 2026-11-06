@@ -69,6 +69,29 @@ Tip: in the editor, the phone and tablet buttons above the page show it at that 
 Type in the search box on the **Media** screen. It searches file names and alt text, which is another
 good reason to write alt text.
 
+## Galleries
+
+The **Image gallery** and **Video gallery** blocks show several pictures or videos as a **Grid**,
+**Masonry** columns or a **Slider** (choose under **Display**). Press **Add images** to pick them from
+the media library.
+
+Under **Style** in the block's settings:
+
+- **Corners**: square, or rounded (small, medium, large).
+- **Each item's caption**: below it, over the image (on a dark fade) or hidden.
+- **On hover**: nothing, zoom the image, or lift.
+
+A slider also has **Slider** settings:
+
+- **Arrows**: round, square, plain (no background) or none, and their place: over the items, either
+  side, or below. Pick the arrows' background and colour from the site's colours.
+- **Dots**: a dot for each stop, to jump to it.
+- **Show part of the next item**, so visitors can see there is more.
+- **Advance automatically**, and how many **Seconds per item**. It stops while someone hovers over it
+  or uses it.
+
+**Copy styles** and **Paste styles** carry these to another gallery.
+
 ## Videos and documents
 
 - **Videos from YouTube or Vimeo**: add an **Embed** or video block to the page and paste the video's

@@ -45,7 +45,9 @@ already has that name, a number is added (for example "Christmas Stroll 2"). Or 
 **New ticket** and press **Make ticket**. Then, under **Ticket types and settings**:
 
 1. Add a ticket type, for example "Adult" or "Free entry", with its price (0 for free).
-2. Optionally set **How many** are available, and when it is **On sale from** and **until**.
+2. Optionally set **How many** are available, and when it is **On sale from** and **until**. Leave
+   **How many** empty for no limit: 0 means none left, and the tickets show as sold out. The ticket
+   type's row shows how many are available while it is closed.
 3. Set the overall capacity if there is one, and whether to offer a **Waitlist when sold out**.
 4. Press **Save tickets**.
 5. If you made the ticket from the Tickets list, attach the event: under **Events selling this
@@ -54,6 +56,11 @@ already has that name, a number is added (for example "Christmas Stroll 2"). Or 
 
 Publish the event. The booking form appears on its page, under the event's description, whatever
 template the event uses. To put it somewhere else on the page, add a **Tickets** block there.
+
+To sell a ticket on any other page (a home page, or a "What's on" page), add a **Tickets** block and
+choose the ticket under **Ticket** in its settings. For a ticket sold at several events, the block lists
+them under the ticket's name. For a ticket of one repeating event, **Date** picks the date (left empty,
+the next one). **Manage ticket** opens the ticket's setup in a new tab.
 
 ### One ticket for several events
 

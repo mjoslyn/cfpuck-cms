@@ -1,7 +1,7 @@
 // Editor panels for the content blocks (src/render/c/content.ts). Values are stored as CSS, with the
 // design tokens as var(--color-*), var(--space-*), var(--text-*), var(--font-*).
 import type { ReactNode } from 'react';
-import { Code, LinkInput, MediaModal, MediaPicker, mediaLibraryUrl, RichText, Row, Segmented, Select, Text, Toggle, inputClass, type Attrs, FieldGroup } from './fields';
+import { Code, LinkInput, MediaModal, MediaPicker, mediaLibraryUrl, Num, RichText, Row, Segmented, Select, Text, Toggle, inputClass, type Attrs, FieldGroup } from './fields';
 import { videoEmbedAttrs } from '../lib/media/video-link';
 import { PRESETS as themeJson } from '../lib/site';
 import { site } from '../lib/site';
@@ -778,7 +778,27 @@ function GalleryPanel({ a, set, video }: { a: Attrs; set: SetFn; video?: boolean
       {!video && display !== 'masonry' && <AspectSelect title="Image shape" value={a.ratio} originalLabel="As uploaded" onChange={(v) => set({ ratio: (v as string) || undefined })} />}
       {!video && display === 'grid' && !a.ratio && <Toggle title="Crop images to fit" value={a.crop !== false} onChange={(v) => set({ crop: v ? undefined : false })} />}
       <Space title="Gap" value={a.gap} onChange={(v) => set({ gap: v })} />
-      {!video && display === 'slider' && <Toggle title="Advance automatically" value={a.autoplay} onChange={(v) => set({ autoplay: v || undefined })} />}
+      <Group title="Style">
+        <Segmented title="Corners" value={a.radius ?? ''} options={[['', 'Square'], ['small', 'Small'], ['medium', 'Medium'], ['large', 'Large']]} onChange={(v) => set({ radius: v || undefined })} />
+        <Select title="Each item's caption" value={a.itemCaptions ?? ''} options={[['', 'Below it'], ...(video ? [] : [['over', 'Over the image'] as [string, string]]), ['hidden', 'Hidden']]} onChange={(v) => set({ itemCaptions: v || undefined })} />
+        <Select title="On hover" value={a.hover ?? ''} options={[['', 'Nothing'], ...(video ? [] : [['zoom', 'Zoom the image'] as [string, string]]), ['lift', 'Lift']]} onChange={(v) => set({ hover: v || undefined })} />
+      </Group>
+      {display === 'slider' && (
+        <Group title="Slider">
+          <Select title="Arrows" value={a.arrows ?? ''} options={[['', 'Round'], ['square', 'Square'], ['plain', 'Plain (no background)'], ['none', 'None']]} onChange={(v) => set({ arrows: v || undefined })} />
+          {a.arrows !== 'none' && (
+            <>
+              <Select title="Arrows' place" value={a.arrowPosition ?? ''} options={[['', 'Over the items'], ['outside', 'Either side'], ['below', 'Below']]} onChange={(v) => set({ arrowPosition: v || undefined })} />
+              {a.arrows !== 'plain' && <Color title="Arrows' background (and the current dot)" value={a.arrowBg} onChange={(v) => set({ arrowBg: v })} />}
+              <Color title="Arrows' colour" value={a.arrowColor} onChange={(v) => set({ arrowColor: v })} />
+            </>
+          )}
+          <Toggle title="Dots" value={a.dots} onChange={(v) => set({ dots: v || undefined })} />
+          <Toggle title="Show part of the next item" value={a.peek} onChange={(v) => set({ peek: v || undefined })} />
+          {!video && <Toggle title="Advance automatically" value={a.autoplay} onChange={(v) => set({ autoplay: v || undefined })} />}
+          {!video && a.autoplay && <Num title="Seconds per item" value={a.interval} min={2} max={20} onChange={(v) => set({ interval: v })} />}
+        </Group>
+      )}
     </>
   );
 }

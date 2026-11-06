@@ -73,7 +73,8 @@ export function Select({ title, value, onChange, options }: { title: string; val
   return (
     <Row title={title}>
       <select className={input} value={value ?? ''} onChange={(e) => onChange(e.target.value || undefined)}>
-        <option value="">Default</option>
+        {/* An option with the value '' names the default itself. */}
+        {!options.some(([v]) => v === '') && <option value="">Default</option>}
         {options.map(([v, l]) => (
           <option key={v} value={v}>
             {l}
