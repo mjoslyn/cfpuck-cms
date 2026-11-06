@@ -310,7 +310,7 @@ each one has a **Featured** switch in its settings, under **Details**. Then:
 - tick **Featured only** and click **Filter** to see just those;
 - tick several and choose **Mark featured** or **Unmark featured** from **Bulk actions**;
 - a Collection block can show featured content only (see
-  [Using the page editor](/editors/page-editor/#common-blocks)).
+  [Using the page editor](/editors/page-editor/#every-block)).
 
 Marking something featured from the list takes effect on the site straight away, and is kept in any
 unpublished changes too.

@@ -1,34 +1,91 @@
 ---
 title: Stats
-description: "How many people visit the site, which pages they read, which links they follow and which campaigns bring them."
+description: "How many people visit the site, which pages they read, which links they follow, where they come from and which campaigns bring them."
 sidebar:
   order: 10
 ---
 
-**Stats** in the menu bar shows how the site is used. Editors and admins can see it.
+**Stats** in the top bar shows how the site is used: how many pages were viewed, by how many people,
+which links they followed, which sites sent them and which campaigns brought them. Editors and admins
+can see it.
 
-## What it shows
+The line under the heading says how visitors are counted on your site: without cookies, or with the
+Stats cookie (see [How visitors are counted](#how-visitors-are-counted)). Admins also see a **Stats
+settings** link there.
+
+## Choosing the dates
+
+At the top right:
+
+- Click **7 days**, **30 days**, **90 days** or **Year** for the last that many days, up to today. Stats
+  opens on the last 30 days.
+- Or pick your own dates: choose **From** and **To**, then press **Show**. **To** can't be later than
+  today. A range can be up to 731 days long.
+
+Every number, table and download on the screen is for the dates chosen. Days follow the site's time zone.
+
+## The totals
+
+Three tiles sum up the dates chosen:
 
 - **Page views**: how many times pages were opened.
-- **Visitors**: how many different people came. Without the Stats cookie (below), each person is counted
-  once a day, so someone who visits on three days counts three times. With it, each person who accepted
-  the cookie counts once for the dates shown, and the tile says how many return visits there were.
-- **Links clicked**: how many times people followed a link on the site, to another page or another site.
-- **Page views a day**: a bar for each day. Point at a bar (or tab to it) to see that day's views,
-  visitors and clicks. **Show as a table** lists the same numbers.
-- **Pages**: every page, with its views and **Link clicks** (links followed from that page). Click
-  **Views** or **Link clicks** at the top of the list to sort by it.
-- **Links clicked**: the links followed most, and how many pages they were clicked from.
-- **Where visits came from**: other sites that sent people here, such as a search engine. Visits typed
-  in, from bookmarks or from apps don't name a site.
-- **Campaigns**: visits that came by a link tagged with a campaign (below).
+- **Visitors**: how many different people came. Without the Stats cookie, each person is counted once
+  a day, so someone who visits on three days counts three times; the tile says **Counted once a day
+  each**. With it, each person who has the cookie counts once for the whole range, and the tile says how
+  many return visits there were.
+- **Links clicked**: how many times people followed a link on the site, to another page, another site,
+  a file, an email address or a phone number.
 
-Choose **7 days**, **30 days**, **90 days** or **Year** at the top, or pick your own dates in **From** and
-**To** and press **Show**. Ranges over 90 days show a bar a week.
+## The chart
 
-## Tracking a campaign
+**Page views a day** has a bar for each day. Ranges over 90 days show **Page views a week** instead, a
+bar for each week.
 
-To see how many visits a newsletter, an ad or a post brings, add `utm_` tags to the link you share:
+- Point at a bar, or press Tab to move to it, to see that day's (or week's) views, visitors and clicks.
+- The number at the top left is the tallest bar, and the dates under the chart are the first and last
+  days.
+- **Show as a table** lists the same numbers, newest first: **Day** (or **Week**), **Views**,
+  **Visitors** and **Clicks**.
+
+Before anything has been counted, it says "Nothing counted yet in this range."
+
+## Pages
+
+Every page that was viewed, with its **Views** and its **Link clicks** (links followed from that page).
+The count beside the heading says how many pages there are; the list shows up to the first 2,000.
+
+- Click **Views** or **Link clicks** at the top of the list to sort by it. An arrow (↓) marks the one
+  in use, and the sort is kept when you change the dates.
+- Click a page's address to open it in a new tab.
+
+## Links clicked
+
+The links followed most, up to 100, with how many **Clicks** each had.
+
+- Links to your own pages show as their address, such as `/about/`; links to other sites show the site
+  and page and are marked **another site**.
+- **from 3 pages** means the same link was clicked on several pages.
+- Email addresses and phone numbers show as written.
+- Anything after a `?` or `#` in a link is left off, so the same link is counted together.
+- Links that only jump within a page aren't counted.
+
+## Where visits came from
+
+The other sites that sent people here most, up to 15, with the number of **Visits** from each, such as
+a search engine or a social network. Moving from page to page on your own site isn't counted here.
+
+Visits typed in, from bookmarks or from many apps (such as email programs) don't name a site, so they
+aren't in this list.
+
+## Campaigns
+
+Visits that came by a link tagged with a campaign, with their **Campaign**, **Source**, **Medium** and
+**Visits**. A part left out of the link shows as **(none)**.
+
+### Tracking a campaign
+
+To see how many visits a newsletter, an advert or a social media post brings, add `utm_` tags to the link
+you share:
 
 `https://example.org/sale/?utm_campaign=spring-sale&utm_source=newsletter&utm_medium=email`
 
@@ -36,25 +93,36 @@ To see how many visits a newsletter, an ad or a post brings, add `utm_` tags to 
 - `utm_source`: where the link is, such as `newsletter`, `facebook` or `poster`.
 - `utm_medium`: the kind of link, such as `email`, `social` or `print`.
 
-Each visit by such a link shows under **Campaigns** with its campaign, source and medium. Free tools such
-as Google's Campaign URL Builder make these links.
+A link needs at least `utm_campaign` or `utm_source` to count as a campaign. Use the same words each
+time (all in small letters is easiest), so visits add up under one line. Free tools such as Google's
+Campaign URL Builder make these links, and a QR code made from such a link tracks a poster or flyer.
 
 ## Downloading the numbers
 
-Each part has **Download CSV**, a file that opens in Excel, Numbers or Google Sheets, for the dates you
-are looking at.
+Each part has **Download CSV**: a file that opens in Excel, Numbers or Google Sheets, for the dates you are
+looking at. There is one for the chart's days, the **Pages** list (in the order you sorted it), **Links
+clicked**, **Where visits came from** and **Campaigns**.
 
-## The Stats cookie
+## How visitors are counted
 
-An admin can have Stats recognise returning visitors with a cookie (see
-[The Stats cookie](/admins/popups-and-cookies/#the-stats-cookie) in the Admin guide). Without it, a
-visitor is counted once a day.
+Each page has a small script that tells the site a page was viewed or a link was followed.
+
+- **Without the Stats cookie** (the usual way), no cookie is set and no visitor's address is kept. A
+  visitor is recognised for one day only, by a scrambled code made from their connection and browser
+  that is thrown away the next day, so each person counts once a day.
+- **With the Stats cookie**, returning visitors are recognised across days. An admin turns it on and,
+  where a cookie consent banner is used, it is set only for visitors who accept cookies (see
+  [The Stats cookie](/admins/popups-and-cookies/#the-stats-cookie) in the Admin guide).
 
 ## What isn't counted
 
-- You, and anyone else signed in as an editor or admin.
-- Search engines and other machines.
-- Previews, and addresses that don't exist.
+- You, and anyone else signed in as an editor or admin. (Members signed in to their account are
+  counted like any visitor.)
+- Search engines and other machines that announce themselves as such.
+- Previews, the admin screens, and pages that don't exist (the "Not found" page).
+- Visitors whose browsers don't run the page's script.
 
-With the Stats cookie off the site sets no cookies for Stats and keeps no visitors' addresses. Numbers
-are kept for about 13 months.
+So Stats is a guide to how the site is used, not an exact count of every visit.
+
+Numbers are kept for about 13 months (400 days), so a range further back than that shows nothing for
+the earlier days.
