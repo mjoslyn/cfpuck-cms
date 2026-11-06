@@ -16,8 +16,10 @@ Update the docs in the same commit as the change, not afterwards:
   it, so describe the core, never a particular site.
 - `AGENTS.md` (this file): how to work on the core, its checklists and open work.
 - `README.md`: setting up a new site and taking core updates.
-- `docs-site/`: the documentation site (Starlight, published to GitHub Pages by
-  `.github/workflows/docs.yml` when it changes on `main`). Preview with `cd docs-site && npm install && npx astro dev`.
+- `docs-site/`: https://moonpuck.com, the home page (`src/pages/index.astro`) and the documentation
+  (Starlight), styled by `src/styles/moonpuck.css`. A Cloudflare Worker serves the built files
+  (`docs-site/wrangler.jsonc`); Workers Builds deploys it when `main` changes. Preview with
+  `cd docs-site && npm install && npx astro dev`.
 - `docs-site/src/content/docs/guide/`: the site guide for editors and admins (a low-tech audience; the
   admin bar's **?** links to it). Change it when a screen they use changes: plain words, the labels as
   they appear on screen, steps. Its screenshots (`docs-site/src/assets/guide/`) are taken from the

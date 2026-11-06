@@ -30,7 +30,7 @@ neither of you loses work.
 ### A picture is cropped badly.
 
 Open it in **Media** and click on the part that matters most (see
-[Images and files](/moonpuck/guide/images-and-files/)).
+[Images and files](/guide/images-and-files/)).
 
 ### I'm not getting emails from a form.
 
@@ -44,7 +44,7 @@ Those are for admins. Ask an admin to make the change, or to give you the admin 
 
 ### Publishing says there are accessibility problems.
 
-See [Accessibility](/moonpuck/guide/accessibility/): fix them, mark them as checked, or publish
+See [Accessibility](/guide/accessibility/): fix them, mark them as checked, or publish
 anyway with a reason.
 
 ### I didn't get my invitation or password email.

@@ -51,7 +51,7 @@ keeps a random number in a cookie in each visitor's browser for 13 months, so St
 visitor from a new one.
 
 In the EU and UK the law asks visitors' consent before such a cookie is set. With a cookie consent banner
-on (see [Popups and cookie consent](/moonpuck/guide/popups-and-cookies/)), only visitors who accept get
+on (see [Popups and cookie consent](/guide/popups-and-cookies/)), only visitors who accept get
 the cookie; everyone else is still counted, once a day. Without a banner every visitor gets it, and
 Settings warns about that.
 

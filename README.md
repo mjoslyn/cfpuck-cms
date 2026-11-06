@@ -7,8 +7,8 @@ the documents, images and links an editor adds.
 The core is everything outside `src/site/`. `src/site/` is an example site called Example Town, with
 its own content types, taxonomies, card designs, colors and theme. A real site is a copy of this
 repository that replaces `src/site/` and keeps this one as its `upstream`. `CORE.md` documents the
-code; `docs-site/` is the same documentation as a site, published to
-https://mjoslyn.github.io/moonpuck/.
+code; `docs-site/` is the project's website, https://moonpuck.com/: its home page and the same
+documentation as a site.
 
 What you get:
 
