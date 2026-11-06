@@ -484,8 +484,8 @@ on the site, or host and path elsewhere, `mailto:`/`tel:` as written, without qu
 aren't counted; addresses that aren't pages (`/admin`, `/api`, `/media`...) are refused (`statPath`). **Campaigns**: a view whose address has `utm_campaign`
 or `utm_source` (with `utm_medium`) counts under kind `campaign`, target `campaign|source|medium`
 (`campaignKey`; migration `*_site_stats_campaigns.sql`), listed and exported with the others. **Make a
-campaign link** above that table (`src/admin/CampaignLink.tsx`; `campaignLink` in `src/lib/campaign-link.ts`)
-adds a campaign's name, source and optional medium to a page on the site (a path or the link picker; the
+campaign link**, a button beside that table's heading opening a dialog (`src/admin/CampaignLink.tsx`; `campaignLink`
+in `src/lib/campaign-link.ts`; what was typed stays while the page is open), adds a campaign's name, source and optional medium to a page on the site (a path or the link picker; the
 home page when empty; other sites refused), lower case with hyphens for spaces and no `|` (`campaignPart`),
 on `SITE_URL` (else the request's address), replacing any utm values the address had and keeping its other
 query values and anchor; the names already counted are suggested, and the link is copied or opened. **The Stats

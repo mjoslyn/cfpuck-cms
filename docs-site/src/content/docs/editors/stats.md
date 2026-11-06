@@ -85,7 +85,8 @@ Visits that came by a link tagged with a campaign, with their **Campaign**, **So
 ### Making a campaign link
 
 To see how many visits a newsletter, an advert or a social media post brings, share a campaign link
-instead of the page's own address. **Make a campaign link**, above the **Campaigns** table, makes one:
+instead of the page's own address. To make one, click **Make a campaign link**, beside the **Campaigns**
+heading. A box opens over Stats:
 
 1. **Page**: the page the link opens. Type its address (such as `/events/`), or click **Find** to search
    for it. Leave it empty for the home page.
@@ -95,8 +96,10 @@ instead of the page's own address. **Make a campaign link**, above the **Campaig
    - **Medium (optional)**: the kind of link, such as `email`, `social`, `print` or `qr`.
 3. **Your link** appears underneath. Click **Copy link** and paste it into your email, post or advert,
    or **Open** to try it.
+4. Click **Done** (or the **×**, or press Escape) to close the box. What you typed is still there if
+   you open it again, until you leave Stats.
 
-![Make a campaign link, with a link made for the events page](../../../assets/guide/stats-campaign-link.png)
+![The Make a campaign link box, with a link made for the events page](../../../assets/guide/stats-campaign-link.png)
 
 Names already used are suggested as you type, so a campaign keeps one spelling and its visits add up
 on one line. Names are made lower case, with hyphens for spaces: "Spring Fair" becomes `spring-fair`.
