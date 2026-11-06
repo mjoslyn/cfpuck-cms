@@ -203,8 +203,17 @@ their lists on their account page.
 
 ### A subscriber's page
 
-Click an address on the **Subscribers** tab. You can change their **First name**, **Last name**, subscriber
-fields, **Lists**, **Tags (comma separated)**, **Other fields** and **Notes**, then click **Save**.
+Click an address on the **Subscribers** tab. You can change:
+
+- **First name**.
+- **Last name**.
+- The subscriber fields.
+- **Lists**.
+- **Tags (comma separated)**.
+- **Other fields**.
+- **Notes**.
+
+Then click **Save**.
 
 - Ticking a list adds them to it, but only while they are **Subscribed**: someone waiting for confirmation
   or unsubscribed has to sign up (or confirm) themselves. Unticking a list takes them off it.

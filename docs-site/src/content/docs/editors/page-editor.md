@@ -145,22 +145,31 @@ clicking their heading. Which groups a block has depends on the block.
 - **Width**: **Default**, **Wide** or **Full width**. Inside a section that keeps its content to a
   reading width, **Wide** lets the block spread wider and **Full width** takes it from edge to edge.
 - **Color**:
-  - **Text**, **Background** and **Links**. Click one of the site's colours, the **/** circle to go
-    back to the default, or type a colour code (such as `#1a1a2e`) in the box.
+  - **Text**.
+  - **Background**.
+  - **Links**.
+  - For each: click one of the site's colours, the **/** circle to go back to the default, or type a
+    colour code (such as `#1a1a2e`) in the box.
 - **Text** (for blocks with words):
   - **Size**: one of the site's text sizes.
   - **Font**: the site's display font or its body font.
   - **Weight**: **Light**, **Regular**, **Medium**, **Semibold** or **Bold**.
   - **Alignment**: **Left**, **Center** or **Right**.
   - **Case**: **Uppercase** or **As typed**.
-  - **Letter spacing** and **Line height**: type a value, such as `0.06em` or `1.6`.
+  - **Letter spacing**: type a value, such as `0.06em`.
+  - **Line height**: type a value, such as `1.6`.
 - **Spacing**:
-  - **Padding top**, **Padding right**, **Padding bottom** and **Padding left**: space inside the
-    block, between its edge and its content.
-  - **Margin top** and **Margin bottom**: space outside the block, between it and its neighbours.
+  - **Padding top**: space inside the block, between its edge and its content.
+  - **Padding right**.
+  - **Padding bottom**.
+  - **Padding left**.
+  - **Margin top**: space outside the block, between it and its neighbours.
+  - **Margin bottom**.
   - Each is **None**, one of the site's spacing sizes, or **Custom** (type a value such as `2rem`).
-- **Border**: **Corner radius** (how round the corners are, such as `6px`), **Border width** (such as
-  `1px`) and **Border color**.
+- **Border**:
+  - **Corner radius**: how round the corners are, such as `6px`.
+  - **Border width**: such as `1px`.
+  - **Border color**.
 - **CSS class**: a name your site's designer may give you for a special style. Leave it empty
   otherwise.
 
@@ -174,14 +183,17 @@ inside them are arranged:
 - **Arrange children**:
   - **Stacked**: one under the other, as wide as the block.
   - **Stacked, centred content width**: one under the other, kept to a comfortable reading width in
-    the middle. New sections start like this. **Content width** then sets that width: **Standard
-    (720px)**, **Narrow (560px)**, **Reading (640px)**, **Medium (800px)**, **Large (960px)**, **Extra
-    large (1120px)**, **Wide (1280px)** or **Full width**.
-  - **Row**: side by side. **Justify** (**Start**, **Center**, **End**, **Space between**), **Align**
-    (**Top**, **Center**, **Bottom**, **Stretch**) and **Wrap onto new lines** set how they sit.
+    the middle. New sections start like this. Its setting:
+    - **Content width**: **Standard (720px)**, **Narrow (560px)**, **Reading (640px)**, **Medium
+      (800px)**, **Large (960px)**, **Extra large (1120px)**, **Wide (1280px)** or **Full width**.
+  - **Row**: side by side. Its settings:
+    - **Justify**: **Start**, **Center**, **End** or **Space between**.
+    - **Align**: **Top**, **Center**, **Bottom** or **Stretch**.
+    - **Wrap onto new lines**.
   - **Column (flex)**: one under the other, with the same **Justify** and **Align** settings.
-  - **Grid**: in a grid. **Columns** sets how many (empty: as many as fit), and **Minimum column
-    width** how narrow a column may get (such as `12rem`).
+  - **Grid**: in a grid. Its settings:
+    - **Columns**: how many (empty: as many as fit).
+    - **Minimum column width**: how narrow a column may get (such as `12rem`).
 - **Gap between children**: the space between the blocks inside.
 
 ### Copying a block's look
@@ -262,76 +274,488 @@ Your site may also have blocks of its own, made for its design; they appear in t
 
 ### Text
 
-| Block | What it's for | Its settings |
-| --- | --- | --- |
-| **Paragraph** | Ordinary text. | **Text** (with bold, italic and links), and the **Color**, **Text** and **Spacing** styles. |
-| **Heading** | A title for a section of the page. | **Level**: **H1** to **H6** (see the tip below). **Text**. The **Color**, **Text** and **Spacing** styles. |
-| **List** | Bullet points, numbered steps or a list with icons. | **Marker**: **Bullets**, **Numbers**, **Icon** or **None**. With **Icon**: the **Icon** to use and its **Icon color**. **Items**: each item's text, with **Up**, **Down** and **Remove**; with icons, **Icon for this item** gives one item a different icon. **Add item** adds one; **Paste several** takes a list, one item per line, and **Add lines** adds them all. Under **Text**: the text styles and **Space between items**. |
-| **Quote** | Words quoted from someone. Put **Paragraph** blocks inside for the quote itself. | **Citation**: who said it. All the styles. |
-| **Button** | One link styled as a button, such as "Book now". Put it inside a **Buttons** block. | **Label**: the words on it. **Link** (with **Find**). **Open in a new tab**. **Style**: **Default** or **Outline**. **Width**: **25%**, **50%**, **75%** or **100%** of the space. The **Color**, **Text** and **Border** styles. |
-| **Buttons** | A row of **Button** blocks. | **Justify**: **Start**, **Center**, **End** or **Space between**. **Stack vertically**. **Gap** between the buttons. |
+#### Paragraph
+
+Ordinary text.
+
+![The Paragraph block on a page](../../../assets/guide/blocks/paragraph.png)
+
+Its settings:
+
+- **Text** (with bold, italic and links).
+- The **Color**, **Text** and **Spacing** styles.
+
+#### Heading
+
+A title for a section of the page.
+
+![The Heading block on a page](../../../assets/guide/blocks/heading.png)
+
+Its settings:
+
+- **Level**: **H1** to **H6** (see the tip below).
+- **Text**.
+- The **Color**, **Text** and **Spacing** styles.
 
 :::tip
 Use **H2** for each main section of a page, and **H3** for the parts inside it. The page's title is
 usually already the **H1**, so a page needs no other.
 :::
 
+#### List
+
+Bullet points, numbered steps or a list with icons.
+
+![The List block on a page](../../../assets/guide/blocks/list.png)
+
+Its settings:
+
+- **Marker**: **Bullets**, **Numbers**, **Icon** or **None**.
+- **Icon**: with **Icon**, the icon to use.
+- **Icon color**: its colour.
+- **Items**: each item's text, with **Up**, **Down** and **Remove**; with icons, **Icon for this item** gives one item a different icon.
+- **Add item**: adds one.
+- **Paste several**: takes a list, one item per line; **Add lines** adds them all.
+- **Text**: the text styles and **Space between items**.
+
+#### Quote
+
+Words quoted from someone. Put **Paragraph** blocks inside for the quote itself.
+
+![The Quote block on a page](../../../assets/guide/blocks/quote.png)
+
+Its settings:
+
+- **Citation**: who said it.
+- All the styles.
+
+#### Button
+
+One link styled as a button, such as "Book now". Put it inside a **Buttons** block.
+
+Its settings:
+
+- **Label**: the words on it.
+- **Link** (with **Find**).
+- **Open in a new tab**.
+- **Style**: **Default** or **Outline**.
+- **Width**: **25%**, **50%**, **75%** or **100%** of the space.
+- The **Color**, **Text** and **Border** styles.
+
+#### Buttons
+
+A row of **Button** blocks.
+
+![The Buttons block on a page](../../../assets/guide/blocks/buttons.png)
+
+Its settings:
+
+- **Justify**: **Start**, **Center**, **End** or **Space between**.
+- **Stack vertically**.
+- **Gap** between the buttons.
+
 ### Media
 
 Pictures, galleries, videos and documents are covered in more depth in
 [Images and files](/editors/images-and-files/).
 
-| Block | What it's for | Its settings |
-| --- | --- | --- |
-| **Image** | One picture. | **Image**: **Choose** (or **Replace**) picks one from the media library; **Edit** opens it in the media library in a new tab. **Alt text (describes the image)**. **Caption**. **Link** and **Open link in a new tab**. **Placement**: **Float left**, **Float right** (text wraps round it), **Centred**, **Wide** or **Full width**. **Image size**: **Full (the original)**, **Large (1024px)**, **Medium (768px)**, **Small (300px)** or **Thumbnail (150px square)**. **Aspect ratio**: **Original**, or a shape such as **Square (1:1)** or **Wide (16:9)**. **Fit**: **Cover (crop to fill)** or **Contain (show the whole image)**. **Circle**. **Fill the block behind the content**: the picture fills the block it is in (such as a card), behind the rest. **Shade (darker towards the bottom)**. **Focal point** when it is cropped (see below). The **Spacing** and **Border** styles. |
-| **Cover** | A picture with blocks laid over it, such as a heading and a button. | **Image**. **Use the page's featured image** instead. **Alt text**. **Focal point**. **Overlay color** and **Overlay**: **Even**, **From bottom** or **From left** (a gradient keeps the text readable where it sits and leaves the rest of the picture clear). **Overlay opacity**: how dark, from 0 to 100%. **Minimum height** (such as `430px`). **Content position**: where the blocks sit, from **Top left** to **Bottom right**. **Dark text (light image)**. The **Layout** group and the styles. |
-| **Image gallery** | Several pictures as a grid, masonry columns or a slider. | See [Galleries](/editors/images-and-files/#image-galleries). **Display**, **Add images**, **Columns** (or **Visible at once** in a slider), **Image shape**, **Crop images to fit**, **Gap**, and the **Style** and **Slider** groups. |
-| **Video gallery** | Several videos together. | As the image gallery, with **Add uploaded videos** and **Add YouTube or Vimeo links** (one link per line, then **Add links**). |
-| **Media & text** | A picture beside some text. Drag blocks into the text side. | **Image**. **Image side**: left (**Default**) or **Right**. **Image width (%)** (50 if empty). **Text position**: **Top**, **Middle** or **Bottom**. **Stack on phones**. The styles. |
-| **Embed** | Something from another website, such as a YouTube or Vimeo video. | **URL**: its address. **Embed HTML**: code another website gives you to paste. **Aspect ratio**: **Provider's size** or a shape. |
-| **Video** | A video file from the media library. | **Video**: **Choose** one from the media library. **Or a video file's address**. **Poster image (shown before it plays)**, and **Remove the poster**. **Caption**. **Autoplay (muted)**. **Loop**. **Show controls**. |
-| **File** | A document (a PDF, say) with its type, size and a Download button. | **File**: **Choose** opens the media library on your documents; **Edit** opens the file in the media library. **Or an address**: a document elsewhere. **Link text** (the file's title if empty). **Show its type and size**. **Button**: its words (**Download**); empty for no button. The **Color** and **Spacing** styles. |
+#### Image
+
+One picture.
+
+![The Image block on a page](../../../assets/guide/blocks/image.png)
+
+Its settings:
+
+- **Image**: **Choose** (or **Replace**) picks one from the media library; **Edit** opens it in the media library in a new tab.
+- **Alt text (describes the image)**.
+- **Caption**.
+- **Link**.
+- **Open link in a new tab**.
+- **Placement**: **Float left**, **Float right** (text wraps round it), **Centred**, **Wide** or **Full width**.
+- **Image size**: **Full (the original)**, **Large (1024px)**, **Medium (768px)**, **Small (300px)** or **Thumbnail (150px square)**.
+- **Aspect ratio**: **Original**, or a shape such as **Square (1:1)** or **Wide (16:9)**.
+- **Fit**: **Cover (crop to fill)** or **Contain (show the whole image)**.
+- **Circle**.
+- **Fill the block behind the content**: the picture fills the block it is in (such as a card), behind the rest.
+- **Shade (darker towards the bottom)**.
+- **Focal point** when it is cropped (see below).
+- The **Spacing** and **Border** styles.
+
+#### Cover
+
+A picture with blocks laid over it, such as a heading and a button.
+
+![The Cover block on a page](../../../assets/guide/blocks/cover.png)
+
+Its settings:
+
+- **Image**.
+- **Use the page's featured image** instead.
+- **Alt text**.
+- **Focal point**.
+- **Overlay color**.
+- **Overlay**: **Even**, **From bottom** or **From left** (a gradient keeps the text readable where it sits and leaves the rest of the picture clear).
+- **Overlay opacity**: how dark, from 0 to 100%.
+- **Minimum height** (such as `430px`).
+- **Content position**: where the blocks sit, from **Top left** to **Bottom right**.
+- **Dark text (light image)**.
+- The **Layout** group and the styles.
+
+#### Image gallery
+
+Several pictures as a grid, masonry columns or a slider.
+
+![The Image gallery block on a page](../../../assets/guide/blocks/gallery.png)
+
+Its settings:
+
+- See [Galleries](/editors/images-and-files/#image-galleries).
+- **Display**.
+- **Add images**.
+- **Columns** (or **Visible at once** in a slider).
+- **Image shape**.
+- **Crop images to fit**.
+- **Gap**.
+- The **Style** and **Slider** groups.
+
+#### Video gallery
+
+Several videos together.
+
+Its settings:
+
+- As the image gallery, with **Add uploaded videos** and **Add YouTube or Vimeo links** (one link per line, then **Add links**).
+
+#### Media & text
+
+A picture beside some text. Drag blocks into the text side.
+
+![The Media & text block on a page](../../../assets/guide/blocks/media-text.png)
+
+Its settings:
+
+- **Image**.
+- **Image side**: left (**Default**) or **Right**.
+- **Image width (%)** (50 if empty).
+- **Text position**: **Top**, **Middle** or **Bottom**.
+- **Stack on phones**.
+- The styles.
+
+#### Embed
+
+Something from another website, such as a YouTube or Vimeo video.
+
+Its settings:
+
+- **URL**: its address.
+- **Embed HTML**: code another website gives you to paste.
+- **Aspect ratio**: **Provider's size** or a shape.
+
+#### Video
+
+A video file from the media library.
+
+Its settings:
+
+- **Video**: **Choose** one from the media library.
+- **Or a video file's address**.
+- **Poster image (shown before it plays)**, and **Remove the poster**.
+- **Caption**.
+- **Autoplay (muted)**.
+- **Loop**.
+- **Show controls**.
+
+#### File
+
+A document (a PDF, say) with its type, size and a Download button.
+
+![The File block on a page](../../../assets/guide/blocks/file.png)
+
+Its settings:
+
+- **File**: **Choose** opens the media library on your documents; **Edit** opens the file in the media library.
+- **Or an address**: a document elsewhere.
+- **Link text** (the file's title if empty).
+- **Show its type and size**.
+- **Button**: its words (**Download**); empty for no button.
+- The **Color** and **Spacing** styles.
 
 ### Layout
 
-| Block | What it's for | Its settings |
-| --- | --- | --- |
-| **Section** | A band across the page that holds other blocks, with a background colour and spacing. | **Element**: what kind of area it is for screen readers (such as header, footer or main); usually leave it at **Default**. The **Layout** group. All the styles. |
-| **Columns** | Puts **Column** blocks side by side. | **Gap** between the columns. **Vertical alignment**: **Top**, **Middle** or **Bottom**. **Keep side by side on phones**. The styles. |
-| **Column** | One column inside **Columns**. | **Width**: such as `33.33%` (empty: the columns share the space). **Vertical alignment**: **Top**, **Middle**, **Bottom** or **Stretch**. **Gap between blocks**. The styles. |
-| **Spacer** | Empty space between blocks. | **Height**: such as `40px`. |
-| **Separator** | A line between parts of a page. | **Style**: **Default**, **Full width line** or **Dots**. The **Color** and **Spacing** styles. |
-| **Global** | Content kept in one place and shown on many pages: change it once, and every page shows the change. | **Global**: which one. **Edit this global** opens it in a new tab. |
-| **Site title** | The site's icon and name, linking to the home page (usually in the header). | **Icon** and **Name**: whether to show each. **Before the name**: words in front of it, such as "Welcome to ". |
-| **Navigation** | The site's menu (usually in the header). Its links are changed under **Settings**, **Menu** by an admin (see [Settings and the menu](/admins/settings/#the-menu)). | **Search button**. **Name for screen readers** (such as "Primary"). |
-| **Social links** | Icons linking to the site's social media profiles. The profiles are set under **Settings**, **Social** by an admin. | **Icon size (px)**. **Alignment**: **Left**, **Center** or **Right**. **Show the network names**. The styles. |
+#### Section
+
+A band across the page that holds other blocks, with a background colour and spacing.
+
+![The Section block on a page](../../../assets/guide/blocks/section.png)
+
+Its settings:
+
+- **Element**: what kind of area it is for screen readers (such as header, footer or main); usually leave it at **Default**.
+- The **Layout** group.
+- All the styles.
+
+#### Columns
+
+Puts **Column** blocks side by side.
+
+![The Columns block on a page](../../../assets/guide/blocks/columns.png)
+
+Its settings:
+
+- **Gap** between the columns.
+- **Vertical alignment**: **Top**, **Middle** or **Bottom**.
+- **Keep side by side on phones**.
+- The styles.
+
+#### Column
+
+One column inside **Columns**.
+
+Its settings:
+
+- **Width**: such as `33.33%` (empty: the columns share the space).
+- **Vertical alignment**: **Top**, **Middle**, **Bottom** or **Stretch**.
+- **Gap between blocks**.
+- The styles.
+
+#### Spacer
+
+Empty space between blocks.
+
+Its settings:
+
+- **Height**: such as `40px`.
+
+#### Separator
+
+A line between parts of a page.
+
+![The Separator block on a page](../../../assets/guide/blocks/separator.png)
+
+Its settings:
+
+- **Style**: **Default**, **Full width line** or **Dots**.
+- The **Color** and **Spacing** styles.
+
+#### Global
+
+Content kept in one place and shown on many pages: change it once, and every page shows the change.
+
+Its settings:
+
+- **Global**: which one.
+- **Edit this global** opens it in a new tab.
+
+#### Site title
+
+The site's icon and name, linking to the home page (usually in the header).
+
+![The Site title block on a page](../../../assets/guide/blocks/site-title.png)
+
+Its settings:
+
+- **Icon**: whether to show it.
+- **Name**: whether to show it.
+- **Before the name**: words in front of it, such as "Welcome to ".
+
+#### Navigation
+
+The site's menu (usually in the header). Its links are changed under **Settings**, **Menu** by an admin (see [Settings and the menu](/admins/settings/#the-menu)).
+
+![The Navigation block on a page](../../../assets/guide/blocks/navigation.png)
+
+Its settings:
+
+- **Search button**.
+- **Name for screen readers** (such as "Primary").
+
+#### Social links
+
+Icons linking to the site's social media profiles. The profiles are set under **Settings**, **Social** by an admin.
+
+![The Social links block on a page](../../../assets/guide/blocks/social-links.png)
+
+Its settings:
+
+- **Icon size (px)**.
+- **Alignment**: **Left**, **Center** or **Right**.
+- **Show the network names**.
+- The styles.
 
 ### Lists and listings
 
-| Block | What it's for | Its settings |
-| --- | --- | --- |
-| **Collection** | An automatic list of your posts, events or other content, each shown as a card. | See [Collections](#collections) below. |
-| **Filters** | A search box and a dropdown of categories (or another way of sorting) above a listing, such as a category page. The list updates as visitors use them. | **Search box**, its **Search placeholder** and **Suggestions as you type**. **Filter by**: which kind of term. **Dropdown placeholder**. **Show the count**. Under **Addresses**: **Search parameter** and **Filter parameter**, the names used in the page's address (only change these to keep older links working). |
-| **Map** | A map with a pin for each entry of a kind that has a location. Each pin links to its entry. | **Show**: which kind of content. **Follow the Filters block's**: which kind of term, so the map follows a Filters block on the page. **Only featured entries until filtered**. **Center (latitude, longitude)** (empty: every pin in view). **Zoom (1-19)**. **Height**. Under **Fields**: **Latitude field**, **Longitude field**, **Address field (popup)** and **Leave out when this field is on** (ask whoever set up your site which to use). |
-| **Search** | A search box that leads to the site's search page. | **Placeholder**: the words shown in the empty box. **Button text**. **Label**, and **Show the label**. The styles. |
-| **Events calendar** | Upcoming events as a month calendar or a list, on any page. | See [Events and tickets](/editors/events-and-tickets/). **Title**, **Shows first** (**Calendar** or **List**), **Events in the list**, **Categories (any of)** and **Tagged with (any of)**. |
-| **Events page (list, month, day)** | The full events listing, with its month and day views. Usually only in the events template. | No settings of its own. |
-| **Listing title** | The name of the listing a page shows, such as a category's name, on category pages and other listings. | **Show the prefix (e.g. 'Member Category:')**. The styles. |
+#### Collection
+
+An automatic list of your posts, events or other content, each shown as a card.
+
+![The Collection block on a page](../../../assets/guide/blocks/collection.png)
+
+Its settings:
+
+- See [Collections](#collections) below.
+
+#### Filters
+
+A search box and a dropdown of categories (or another way of sorting) above a listing, such as a category page. The list updates as visitors use them.
+
+Its settings:
+
+- **Search box**, its **Search placeholder** and **Suggestions as you type**.
+- **Filter by**: which kind of term.
+- **Dropdown placeholder**.
+- **Show the count**.
+- **Search parameter** (under **Addresses**): its name in the page's address.
+- **Filter parameter** (under **Addresses**): the same for the dropdown. Only change these two to keep older links working.
+
+#### Map
+
+A map with a pin for each entry of a kind that has a location. Each pin links to its entry.
+
+![The Map block on a page](../../../assets/guide/blocks/map.png)
+
+Its settings:
+
+- **Show**: which kind of content.
+- **Follow the Filters block's**: which kind of term, so the map follows a Filters block on the page.
+- **Only featured entries until filtered**.
+- **Center (latitude, longitude)** (empty: every pin in view).
+- **Zoom (1-19)**.
+- **Height**.
+- **Latitude field** (under **Fields**, as are the next three; ask whoever set up your site which to use).
+- **Longitude field**.
+- **Address field (popup)**.
+- **Leave out when this field is on**.
+
+#### Search
+
+A search box that leads to the site's search page.
+
+![The Search block on a page](../../../assets/guide/blocks/search.png)
+
+Its settings:
+
+- **Placeholder**: the words shown in the empty box.
+- **Button text**.
+- **Label**, and **Show the label**.
+- The styles.
+
+#### Events calendar
+
+Upcoming events as a month calendar or a list, on any page.
+
+![The Events calendar block on a page](../../../assets/guide/blocks/event-calendar.png)
+
+Its settings:
+
+- See [Events and tickets](/editors/events-and-tickets/).
+- **Title**.
+- **Shows first**: **Calendar** or **List**.
+- **Events in the list**.
+- **Categories (any of)**.
+- **Tagged with (any of)**.
+
+#### Events page (list, month, day)
+
+The full events listing, with its month and day views. Usually only in the events template.
+
+![The Events page (list, month, day) block on a page](../../../assets/guide/blocks/events-page.png)
+
+It has no settings of its own.
+
+#### Listing title
+
+The name of the listing a page shows, such as a category's name, on category pages and other listings.
+
+Its settings:
+
+- **Show the prefix (e.g. 'Member Category:')**.
+- The styles.
 
 ### Card fields
 
 These show one piece of an entry. They are mostly used inside a **Collection**'s card, where each card
-shows its own entry's, and in templates, where they show the page's own.
+shows its own entry's, and in templates, where they show the page's own. Each card in the
+**Collection** picture above is a **Featured image**, a **Title** and an **Excerpt**.
 
-| Block | What it's for | Its settings |
-| --- | --- | --- |
-| **Title** | The entry's title. | **Level**: **Paragraph** or **H1** to **H6**. **Link to the entry** and **Open in a new tab**. The styles. |
-| **Featured image** | The entry's featured image. | **Link to the entry** and **Open in a new tab**. **Aspect ratio**. **Height**: **Default**, **Auto (the image's own height)**, **Small**, **Medium**, **Large**, **Extra large** or **Custom**. In a card, **Default** is **Medium** (240px), cropped to fill the card's width. **Fit**. **Image size**. **Fill the card behind the content** (give the card a minimum height). **Shade (darker towards the bottom)**. **Overlay**: how dark, from 0 to 100%. The styles. |
-| **Excerpt** | The entry's short summary. | **Word limit** (55 if empty). **Read more text**. The styles. |
-| **Date** | When the entry was published. | **Date format** (see the note below). **Last updated date** instead. **Link to the entry**. The styles. |
-| **Event date** | An event's date and time. | **Date format (PHP)**. |
-| **Categories** | The entry's terms of one kind, such as its categories or tags. | **Taxonomy**: which kind. **Separator**: what goes between them (a comma if empty). The styles. |
-| **Field** | Any other piece of information the entry has, such as a phone number or website. | **Field**: its name (ask whoever set up your site). **Show as**: **Text**, **Web link**, **Email link**, **Phone link** or **Image**. **Label before it**. For links, **Link text** and (web links) **Open in a new tab**. |
+#### Title
+
+The entry's title.
+
+Its settings:
+
+- **Level**: **Paragraph** or **H1** to **H6**.
+- **Link to the entry**.
+- **Open in a new tab**.
+- The styles.
+
+#### Featured image
+
+The entry's featured image.
+
+Its settings:
+
+- **Link to the entry**.
+- **Open in a new tab**.
+- **Aspect ratio**.
+- **Height**: **Default**, **Auto (the image's own height)**, **Small**, **Medium**, **Large**, **Extra large** or **Custom**. In a card, **Default** is **Medium** (240px), cropped to fill the card's width.
+- **Fit**.
+- **Image size**.
+- **Fill the card behind the content** (give the card a minimum height).
+- **Shade (darker towards the bottom)**.
+- **Overlay**: how dark, from 0 to 100%.
+- The styles.
+
+#### Excerpt
+
+The entry's short summary.
+
+Its settings:
+
+- **Word limit** (55 if empty).
+- **Read more text**.
+- The styles.
+
+#### Date
+
+When the entry was published.
+
+Its settings:
+
+- **Date format** (see the note below).
+- **Last updated date** instead.
+- **Link to the entry**.
+- The styles.
+
+#### Event date
+
+An event's date and time.
+
+Its settings:
+
+- **Date format (PHP)**.
+
+#### Categories
+
+The entry's terms of one kind, such as its categories or tags.
+
+Its settings:
+
+- **Taxonomy**: which kind.
+- **Separator**: what goes between them (a comma if empty).
+- The styles.
+
+#### Field
+
+Any other piece of information the entry has, such as a phone number or website.
+
+Its settings:
+
+- **Field**: its name (ask whoever set up your site).
+- **Show as**: **Text**, **Web link**, **Email link**, **Phone link** or **Image**.
+- **Label before it**.
+- **Link text**, for links.
+- **Open in a new tab**, for web links.
 
 :::note
 Date formats use letters for each part of the date: `F j, Y` shows "March 5, 2026" and `M j, Y` shows
@@ -340,32 +764,108 @@ Date formats use letters for each part of the date: `F j, Y` shows "March 5, 202
 
 ### Sections
 
-| Block | What it's for | Its settings |
-| --- | --- | --- |
-| **Hero** | A large picture across the top of a page, with a title, some text and up to two buttons. | **Image**. **Focal point**. **Overlay (keeps the text readable)**: **None**, **Light**, **Medium** or **Strong**. **Darkest at**: **Bottom**, **Left** or **All over**. **Eyebrow**: a short line above the title. **Title**. **Text**. **Button label** and **Button link**; **Second button label** and **Second button link** (leave a label empty for no button). **Height**: **Full screen**, **Large** or **Medium**. **Title is the page's main heading (h1)**: untick it if the page already has one. |
-| **Form** | One of your [forms](/editors/forms/). | **Form**: which one. **Show the form title**. **Show the form description**. **Form style** (see below). |
+#### Hero
+
+A large picture across the top of a page, with a title, some text and up to two buttons.
+
+![The Hero block on a page](../../../assets/guide/blocks/hero.png)
+
+Its settings:
+
+- **Image**.
+- **Focal point**.
+- **Overlay (keeps the text readable)**: **None**, **Light**, **Medium** or **Strong**.
+- **Darkest at**: **Bottom**, **Left** or **All over**.
+- **Eyebrow**: a short line above the title.
+- **Title**.
+- **Text**.
+- **Button label**: leave it empty for no button.
+- **Button link**.
+- **Second button label**: leave it empty for no second button.
+- **Second button link**.
+- **Height**: **Full screen**, **Large** or **Medium**.
+- **Title is the page's main heading (h1)**: untick it if the page already has one.
+
+#### Form
+
+One of your [forms](/editors/forms/).
+
+![The Form block on a page](../../../assets/guide/blocks/form.png)
+
+Its settings:
+
+- **Form**: which one.
+- **Show the form title**.
+- **Show the form description**.
+- **Form style** (see below).
 
 ### Site
 
 These come with events and tickets, and show only while your site uses them. See
 [Events and tickets](/editors/events-and-tickets/).
 
-| Block | What it's for | Its settings |
-| --- | --- | --- |
-| **Event details** | An event's page: its picture, title, description, date, venue and ticket form. Only on events. | No settings of its own. |
-| **Event schedule** | An event's schedule. Only on events. | No settings of its own. |
-| **Tickets** | The booking form for a ticket, on any page. | See [Selling tickets](/editors/events-and-tickets/#selling-tickets-or-taking-sign-ups). **Ticket**, **Date** and **Heading**. |
+#### Event details
+
+An event's page: its picture, title, description, date, venue and ticket form. Only on events.
+
+![The Event details block on a page](../../../assets/guide/blocks/event-details.png)
+
+It has no settings of its own.
+
+#### Event schedule
+
+An event's schedule. Only on events.
+
+It has no settings of its own.
+
+#### Tickets
+
+The booking form for a ticket, on any page.
+
+![The Tickets block on a page](../../../assets/guide/blocks/tickets.png)
+
+Its settings:
+
+- See [Selling tickets](/editors/events-and-tickets/#selling-tickets-or-taking-sign-ups).
+- **Ticket**.
+- **Date**.
+- **Heading**.
 
 ### Members
 
 Shown only while your site has members (an admin turns them on: see
 [Turning features on](/admins/features/#members)).
 
-| Block | What it's for | Its settings |
-| --- | --- | --- |
-| **Members only** | Blocks only members (and editors) see. Put blocks inside it. Everyone else sees a message and a sign-in link. | **Members of (none ticked: any level)**. **Show nothing to everyone else**. **Message for everyone else**. |
-| **Member account** | Signing in, creating an account and resetting a password; once signed in, the member's details and Sign out. | No settings of its own. |
-| **Member sign-in link** | A link to the account page that reads "Sign in", or "My account" once signed in. | **Label** and **Label when signed in**. |
+#### Members only
+
+Blocks only members (and editors) see. Put blocks inside it. Everyone else sees a message and a sign-in link.
+
+![The Members only block on a page](../../../assets/guide/blocks/members.png)
+
+Its settings:
+
+- **Members of (none ticked: any level)**.
+- **Show nothing to everyone else**.
+- **Message for everyone else**.
+
+#### Member account
+
+Signing in, creating an account and resetting a password; once signed in, the member's details and Sign out.
+
+![The Member account block on a page](../../../assets/guide/blocks/member-account.png)
+
+It has no settings of its own.
+
+#### Member sign-in link
+
+A link to the account page that reads "Sign in", or "My account" once signed in.
+
+![The Member sign-in link block on a page](../../../assets/guide/blocks/member-link.png)
+
+Its settings:
+
+- **Label**.
+- **Label when signed in**.
 
 ### Mailing Lists
 
@@ -373,19 +873,77 @@ Shown only while your site has mailing lists (an admin turns them on: see
 [Turning features on](/admins/features/#mailing-lists)). Everyone who signs up gets an email with a
 link to confirm.
 
-| Block | What it's for | Its settings |
-| --- | --- | --- |
-| **Newsletter signup** | A compact sign-up for one list, for a band or the footer. | **List**. **Heading** and **Text** (clear them to leave them out). **Button**. **Inside the email field**. **Consent wording**. **Tag sign-ups with (comma separated)**. **Align**: **Centred** or **Left**. **Form style**. |
-| **Subscribe** | A sign-up form for one or more lists. | **Lists offered (none ticked: every public list)**. **Heading**, **Text**, **Button**. **Consent wording**. **Tag sign-ups with (comma separated)**. **Ask for first and last name**. **Also ask (optional for visitors)**: extra details. **Form style**. **Layout**: **Stacked** or **In a row**. |
-| **Email preferences** | Where people who follow a link from one of the site's emails confirm, choose their lists or unsubscribe. | **Shows first**: **Email preferences** or **Unsubscribe**. |
+#### Newsletter signup
+
+A compact sign-up for one list, for a band or the footer.
+
+![The Newsletter signup block on a page](../../../assets/guide/blocks/newsletter.png)
+
+Its settings:
+
+- **List**.
+- **Heading**: clear it to leave it out.
+- **Text**: clear it to leave it out.
+- **Button**.
+- **Inside the email field**.
+- **Consent wording**.
+- **Tag sign-ups with (comma separated)**.
+- **Align**: **Centred** or **Left**.
+- **Form style**.
+
+#### Subscribe
+
+A sign-up form for one or more lists.
+
+![The Subscribe block on a page](../../../assets/guide/blocks/subscribe.png)
+
+Its settings:
+
+- **Lists offered (none ticked: every public list)**.
+- **Heading**.
+- **Text**.
+- **Button**.
+- **Consent wording**.
+- **Tag sign-ups with (comma separated)**.
+- **Ask for first and last name**.
+- **Also ask (optional for visitors)**: extra details.
+- **Form style**.
+- **Layout**: **Stacked** or **In a row**.
+
+#### Email preferences
+
+Where people who follow a link from one of the site's emails confirm, choose their lists or unsubscribe.
+
+Its settings:
+
+- **Shows first**: **Email preferences** or **Unsubscribe**.
 
 ### Advanced
 
-| Block | What it's for | Its settings |
-| --- | --- | --- |
-| **HTML** | Your own HTML code, put on the page exactly as written. | **HTML**. |
-| **Template part** | A shared part, such as the header or footer, placed in a template. | **Part**: which one. |
-| **Page content** | In a template: where each page's own content goes. | **Content area** (see [Content areas](#content-areas)). The **Layout** group. |
+#### HTML
+
+Your own HTML code, put on the page exactly as written.
+
+Its settings:
+
+- **HTML**.
+
+#### Template part
+
+A shared part, such as the header or footer, placed in a template.
+
+Its settings:
+
+- **Part**: which one.
+
+#### Page content
+
+In a template: where each page's own content goes.
+
+Its settings:
+
+- **Content area** (see [Content areas](#content-areas)).
+- The **Layout** group.
 
 :::caution
 Code in an **HTML** or **Embed** block runs for everyone who views the page, including admins. Only paste
@@ -398,16 +956,23 @@ The **Form**, **Subscribe** and **Newsletter signup** blocks have a **Form style
 click it to open). Fields are white with black text unless you change them. Every setting left empty
 keeps the default.
 
-- **Form background (default none)**, **Form border (default none)** and **Form text (heading, intro,
-  small print)**. A background or border puts the form in a box.
-- **Field background (default white)**, **Field text (default black)**, **Field border**, **Labels**,
-  **Placeholder text**, **Field being typed in (border and ring)** and **Checkboxes and radio buttons**.
-- **Button background** and **Button text**.
+- **Form background (default none)**: puts the form in a box.
+- **Form border (default none)**: also puts the form in a box.
+- **Form text (heading, intro, small print)**.
+- **Field background (default white)**.
+- **Field text (default black)**.
+- **Field border**.
+- **Labels**.
+- **Placeholder text**.
+- **Field being typed in (border and ring)**.
+- **Checkboxes and radio buttons**.
+- **Button background**.
+- **Button text**.
 - **Field height**: **Normal**, **Compact** or **Large**.
 - **Field text size**: **Normal**, **Small** or **Large**.
 - **Field border width**: **Thin (default)**, **None**, **Medium** or **Thick**.
-- **Field corners** and **Button corners**: **Default**, **Square**, **Slightly rounded**, **Rounded** or
-  **Pill**.
+- **Field corners**: **Default**, **Square**, **Slightly rounded**, **Rounded** or **Pill**.
+- **Button corners**: the same choices.
 
 ## Collections
 
@@ -425,7 +990,8 @@ a team. Its settings are in groups.
       [Featured content](/admins/content-types/#featured-content)).
     - **Order**: **Newest first**, **Oldest first**, **Title A to Z**, **Title Z to A**, **Manual
       order** or **Random**.
-    - **How many** (10 if empty) and **Skip the first** (to leave out ones shown elsewhere).
+    - **How many**: 10 if empty.
+    - **Skip the first**: to leave out ones shown elsewhere.
   - **Hand-picked**: the entries you choose. Under **Entries, in order**, type two or more letters in
     **Search to add** and click an entry to add it. They show in the order of the list: **↑** and **↓**
     move one up or down, and **Remove** takes one off.
@@ -550,9 +1116,10 @@ settings**. What's there depends on the kind of content.
   levels or the **Levels** you tick. Everyone else sees its title, excerpt and featured image with a
   sign-in link, and it is left out of lists and search for them. It applies when the page is published.
 - **SEO**: how the page appears in Google and when it is shared.
-  - **Search title** and **Meta description**: the title and short description search engines show.
-    The counter turns red past 60 and 160 characters, where search engines cut them off. Empty, they
-    use the page's title and excerpt.
+  - **Search title**: the title search engines show. Its counter turns red past 60 characters, where
+    search engines cut it off. Empty, it uses the page's title.
+  - **Meta description**: the short description search engines show. Its counter turns red past 160
+    characters. Empty, it uses the page's excerpt.
   - **Compose**: Claude writes both from the page as it is now. Edit the suggestion as you like.
   - Under them, a preview of how the page may look in search results.
   - **Share image**: the picture shown when the page is shared on social media. Empty, the featured

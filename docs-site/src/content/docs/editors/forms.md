@@ -124,7 +124,8 @@ the type:
 - **Default value**: what the box holds to start with. For a Date, type it as YYYY-MM-DD.
 - **Maximum characters** (Single line and Paragraph text): the longest answer allowed. Visitors see a
   counter as they type.
-- **Minimum** and **Maximum** (Number): the smallest and largest number allowed.
+- **Minimum** (Number): the smallest number allowed.
+- **Maximum** (Number): the largest number allowed.
 - **Format** (Phone): **US: (###) ###-####** formats the number as people type and needs 10 digits;
   **Any** takes any phone number, such as an international one.
 
@@ -259,9 +260,17 @@ text** and **Preview**, and at the top right **Templates** and **Done**. Changes
 form: click **Done**, then **Save** in the form builder.
 
 **Visual** works like the page editor: drag blocks from the left into the email, click one to change
-it on the right. With no block selected, the right side shows the email's own settings: **Preview text
-(after the subject in the inbox)**, **Page background**, **Email background**, **Text colour**,
-**Link and button colour**, **Font** and **Width (px)**. Buttons above the canvas show the email at
+it on the right. With no block selected, the right side shows the email's own settings:
+
+- **Preview text (after the subject in the inbox)**.
+- **Page background**.
+- **Email background**.
+- **Text colour**.
+- **Link and button colour**.
+- **Font**.
+- **Width (px)**.
+
+Buttons above the canvas show the email at
 **Email** width or **Phone** width.
 
 | Block | What it does |
@@ -353,20 +362,23 @@ The same form can be on several pages. Changes you save in the form builder show
 By default fields are white with black text, and labels take the colour of the section around them.
 Open **Form style** in the Form block's settings to change:
 
-- **Form background (default none)** and **Form border (default none)**: either one puts the form in a
-  box with some space around it.
+- **Form background (default none)**: puts the form in a box with some space around it.
+- **Form border (default none)**: also puts the form in a box.
 - **Form text (heading, intro, small print)**.
-- **Field background (default white)**, **Field text (default black)**, **Field border** and
-  **Placeholder text**.
+- **Field background (default white)**.
+- **Field text (default black)**.
+- **Field border**.
+- **Placeholder text**.
 - **Labels**.
-- **Button background** and **Button text**.
+- **Button background**.
+- **Button text**.
 - **Field being typed in (border and ring)**.
 - **Checkboxes and radio buttons**.
 - **Field height**: **Normal**, **Compact** or **Large**.
 - **Field text size**: **Normal**, **Small** or **Large**.
 - **Field border width**: **Thin (default)**, **None**, **Medium** or **Thick**.
-- **Field corners** and **Button corners**: **Default**, **Square**, **Slightly rounded**, **Rounded**
-  or **Pill**.
+- **Field corners**: **Default**, **Square**, **Slightly rounded**, **Rounded** or **Pill**.
+- **Button corners**: the same choices.
 
 Leave a setting empty to keep the default. Check that text stays easy to read against its background.
 

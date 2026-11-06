@@ -60,10 +60,15 @@ Your site may have a few extra settings of its own under **Details**, such as wh
 Under **Details**, beside **Venue**:
 
 - **Choose venue** opens a search box. Type part of the name and click the venue in the list.
-- **New venue** adds a place that isn't there yet: type its **Name** and, if you like, its **Street
-  address**, **City**, **State** and **Postal code**, then click **Add venue**. It is saved at once and
-  chosen for this event. (If you searched first and found nothing, click **New venue** with the name you
-  typed.)
+- **New venue** adds a place that isn't there yet. Fill in:
+  - **Name**.
+  - **Street address** (optional).
+  - **City** (optional).
+  - **State** (optional).
+  - **Postal code** (optional).
+
+  Then click **Add venue**. It is saved at once and chosen for this event. (If you searched first and
+  found nothing, click **New venue** with the name you typed.)
 
 Once a venue is chosen, **Change** picks another, **Edit** opens the venue in a new tab and **Remove**
 leaves the event without one.
@@ -114,9 +119,19 @@ How repeating events work on the site:
 Venues are kept once and reused by every event held there. Find them under **Content**, **Venues**, or
 click **Edit** beside an event's venue.
 
-A venue's page has its **Name**, **Status** (**Published** or **Draft**), **Street address**, **City**,
-**State**, **Postal code**, **Country**, **Phone** and **Website**. Click **Save** when done. On the right,
-**Events at this venue** lists the events held there.
+A venue's page has:
+
+- **Name**.
+- **Status**: **Published** or **Draft**.
+- **Street address**.
+- **City**.
+- **State**.
+- **Postal code**.
+- **Country**.
+- **Phone**.
+- **Website**.
+
+Click **Save** when done. On the right, **Events at this venue** lists the events held there.
 
 Correct an address or phone number here, and every event at that venue updates. On an event's page the
 venue is shown with its address, its phone number (which phones can call with a tap) and a **Get
@@ -230,9 +245,12 @@ times are in the event's time zone.
 
 - **Phone**: **Not asked**, **Optional** or **Required**.
 - **Address**: **Not asked**, **For paid orders** or **Always**.
-- **Questions of your own**: press **Add question** for each one, asked once per order. Each has its
-  **Question**, its **Answer** type (**Short text**, **Long text**, **Choose one** with **Choices, one per
-  line**, **Checkbox (yes)** or **Number**), an optional **Help text** shown under it, and **Required**.
+- **Questions of your own**: press **Add question** for each one, asked once per order. Each has:
+  - **Question**.
+  - **Answer**: **Short text**, **Long text**, **Choose one** (with **Choices, one per line**),
+    **Checkbox (yes)** or **Number**.
+  - **Help text** (optional): shown under it.
+  - **Required**.
 
 **Emails**: buyers get the site's ticket emails; **Give this ticket its own** opens the **Emails** tab
 (see [The ticket's emails](#the-tickets-emails)).

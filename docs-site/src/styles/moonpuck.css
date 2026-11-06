@@ -141,7 +141,12 @@ h1#_top {
 .sl-markdown-content h3 {
   font-size: 1.7rem;
 }
-.sl-markdown-content :is(h4, h5, h6) {
+.sl-markdown-content h4 {
+  font-weight: 700;
+  font-size: 1.25rem;
+  margin-top: 2.5rem;
+}
+.sl-markdown-content :is(h5, h6) {
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;

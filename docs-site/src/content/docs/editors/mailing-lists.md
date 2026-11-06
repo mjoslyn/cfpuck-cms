@@ -135,7 +135,8 @@ and a link. Its settings:
   and, for the kinds that have them, categories or other terms to list only those (**(any of)**).
 - **In a digest: only those new since the last issue**: for weekly digests (see below).
 - **Show the date**.
-- **Image** and **Short description**: **Show** or **Hide**.
+- **Image**: **Show** or **Hide**.
+- **Short description**: **Show** or **Hide**.
 - **Link text under each (empty: the title is the link)**: "Read more" to start with.
 - **When there are none (empty: the block shows nothing)**: a line to show when there is nothing to list.
 
@@ -144,10 +145,18 @@ entries are always left out. The canvas shows the latest ones now.
 
 #### The Events block
 
-The same as in a form's emails: a **Heading (optional)**, and under **Shows** either **Next upcoming**
-(with **How many**, categories and **Featured events only**) or **Picked events**. **Image**, **Venue** and
-**Short description** can each be shown or hidden. Past events are left out. It is offered only while your
-site uses Events.
+The same as in a form's emails. Its settings:
+
+- **Heading (optional)**.
+- **Shows**: **Next upcoming** or **Picked events**.
+- **How many**, with **Next upcoming**.
+- The categories, with **Next upcoming**.
+- **Featured events only**, with **Next upcoming**.
+- **Image**: shown or hidden.
+- **Venue**: shown or hidden.
+- **Short description**: shown or hidden.
+
+Past events are left out. It is offered only while your site uses Events.
 
 ### Merge tags
 
@@ -427,7 +436,9 @@ Three blocks in the page editor's **Mailing Lists** group put mailing lists on y
 A sign-up form for one or more lists. Its settings:
 
 - **Lists offered (none ticked: every public list)**: only public lists can be offered.
-- **Heading**, **Text** and **Button** (the button says "Subscribe" unless you change it).
+- **Heading**.
+- **Text**.
+- **Button**: says "Subscribe" unless you change it.
 - **Consent wording**: the line under the form saying what people agree to. Empty, it uses the wording
   set under **Settings**, **Mailing Lists** ("I agree to receive email from us. I can unsubscribe at any
   time." unless an admin changed it). It is kept with each sign-up.
@@ -445,10 +456,17 @@ receive?" (the first is ticked). With one, there is nothing to tick.
 ### The Newsletter signup block
 
 A compact sign-up for one list, for a coloured band or the footer: a heading, a line of text, then an
-email box and a button in a row. Its settings: **List** (empty: the first public list), **Heading** and
-**Text** (clear them to leave them out), **Button** ("Sign up"), **Inside the email field** (the faint text
-in the empty box), **Consent wording**, **Tag sign-ups with (comma separated)**, **Align** (**Centred** or
-**Left**) and **Form style**.
+email box and a button in a row. Its settings:
+
+- **List**: empty for the first public list.
+- **Heading**: clear it to leave it out.
+- **Text**: clear it to leave it out.
+- **Button**: "Sign up" unless you change it.
+- **Inside the email field**: the faint text in the empty box.
+- **Consent wording**.
+- **Tag sign-ups with (comma separated)**.
+- **Align**: **Centred** or **Left**.
+- **Form style**.
 
 ### The Email preferences block
 

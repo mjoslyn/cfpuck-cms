@@ -27,8 +27,11 @@ renamed things come out of the docs too.
   audience; the admin bar's **?** links editors to the first and admins to the second; each has its own
   sidebar, `starlight-sidebar-topics`). What only admins can change goes in the Admin guide, and the
   Editor guide links to it. Change them when a screen they use changes: plain words, the labels as
-  they appear on screen, steps. Its screenshots (`docs-site/src/assets/guide/`) are taken from the
-  example site at 1280 by 800 with Playwright, with Astro's dev toolbar hidden.
+  they appear on screen, steps, and settings one per line (a list item each, with its choices after a
+  colon), never run together in a sentence or a table cell. Its screenshots (`docs-site/src/assets/guide/`)
+  are taken from the example site at 1280 by 800 with Playwright, with Astro's dev toolbar hidden; each
+  block in the Editor guide's list of blocks has its own heading and, where it shows something, a picture
+  of it on a page (`guide/blocks/`, cropped to the block).
 
 ## Where things go
 

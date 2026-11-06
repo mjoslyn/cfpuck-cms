@@ -252,12 +252,19 @@ page editor](/editors/page-editor/).
 
 ### The Image block
 
-Besides the picture, the **Image** block has **Alt text (describes the image)** (for this place only; it
-wins over the library's), **Caption**, **Link**, **Placement**, **Image size** (from **Thumbnail (150px
-square)** up to **Full (the original)**), **Aspect ratio** (**Original**, **Square (1:1)**, **Wide
-(16:9)**, **Landscape (4:3)**, **Portrait (3:4)**, **Photo (3:2)**, **Tall (2:3)**, **Cinema (21:9)**,
-**Banner (3:1)** or **Story (9:16)**), **Fit** (**Cover (crop to fill)** or **Contain (show the whole
-image)**), **Circle**, **Fill the block behind the content** and **Shade (darker towards the bottom)**.
+Besides the picture, the **Image** block has:
+
+- **Alt text (describes the image)**: for this place only; it wins over the library's.
+- **Caption**.
+- **Link**.
+- **Placement**.
+- **Image size**: from **Thumbnail (150px square)** up to **Full (the original)**.
+- **Aspect ratio**: **Original**, **Square (1:1)**, **Wide (16:9)**, **Landscape (4:3)**, **Portrait
+  (3:4)**, **Photo (3:2)**, **Tall (2:3)**, **Cinema (21:9)**, **Banner (3:1)** or **Story (9:16)**.
+- **Fit**: **Cover (crop to fill)** or **Contain (show the whole image)**.
+- **Circle**.
+- **Fill the block behind the content**.
+- **Shade (darker towards the bottom)**.
 
 :::note
 The **Hero** block's picture is treated as background decoration, so it has no alt text. Put anything
@@ -326,7 +333,8 @@ A slider also has **Slider** settings:
 
 - **Arrows**: **Round**, **Square**, **Plain (no background)** or **None**.
 - **Arrows' place**: **Over the items**, **Either side** or **Below**.
-- **Arrows' background (and the current dot)** and **Arrows' colour**, from the site's colours.
+- **Arrows' background (and the current dot)**: one of the site's colours.
+- **Arrows' colour**: one of the site's colours.
 - **Dots**: a dot for each stop, to jump to it.
 - **Show part of the next item**, so visitors can see there is more.
 - **Advance automatically**, and how many **Seconds per item** (2 to 20). It pauses while someone hovers
@@ -359,9 +367,12 @@ For one video file, add a **Video** block and in its settings:
   upload.
 - **Or a video file's address**: instead of choosing one, paste the address of a video file kept
   elsewhere (an MP4 file, not a YouTube page).
-- **Poster image (shown before it plays)**: a picture shown until the video starts. **Remove the poster**
-  takes it away.
-- **Caption**, **Autoplay (muted)**, **Loop** and **Show controls** (on unless you turn it off).
+- **Poster image (shown before it plays)**: a picture shown until the video starts.
+- **Remove the poster**: takes it away.
+- **Caption**.
+- **Autoplay (muted)**.
+- **Loop**.
+- **Show controls**: on unless you turn it off.
 
 :::caution
 Videos that play by themselves can distract or upset some visitors. If you use **Autoplay (muted)**,
