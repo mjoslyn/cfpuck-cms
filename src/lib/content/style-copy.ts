@@ -38,6 +38,16 @@ export const LOOK = [
   'widthPct',
   'wrap',
   'dropCap',
+  'radius',
+  'itemCaptions',
+  'hover',
+  'arrows',
+  'arrowPosition',
+  'arrowBg',
+  'arrowColor',
+  'dots',
+  'peek',
+  'interval',
 ] as const;
 
 export interface CopiedStyle {

@@ -264,29 +264,60 @@ function featuredImage(env: Env): Record<string, any> | null {
   return m ? { mediaId: m.id, alt: m.alt, size: 'full' } : null;
 }
 
+/** Gallery corner radii (`radius`). */
+export const GALLERY_RADII: Record<string, string> = { small: '4px', medium: '8px', large: '16px' };
+/** A colour a gallery's settings take: a palette token, a hex value or a plain rgb()/hsl(). */
+const galleryColor = (v: unknown) =>
+  typeof v === 'string' && /^(var\(--color-[a-z0-9-]+\)|#[0-9a-f]{3,8}|(rgb|hsl)a?\([0-9.,%\s/]+\))$/i.test(v.trim()) ? v.trim() : undefined;
+
 /**
  * Image galleries (image blocks) and video galleries (embed and video blocks), shown as a grid, as
- * masonry columns or as a slider: a row that scrolls, with buttons and autoplay from
- * /assets/js/gallery-slider.js. Attrs: display, columns, gap, crop and ratio (images), autoplay, caption.
+ * masonry columns or as a slider: a row that scrolls, with buttons, dots and autoplay from
+ * /assets/js/gallery-slider.js. Attrs: display, columns, gap, crop and ratio (images), caption; the look:
+ * radius (corners), itemCaptions (below, over the image, hidden), hover (zoom, lift); the slider's:
+ * arrows (round, square, plain, none), arrowPosition (over, outside, below), arrowBg and arrowColor,
+ * dots, peek (part of the next item shows), autoplay and interval (seconds).
  */
 function galleryOf(video: boolean): Renderer {
   return (b, env, inner) => {
     const a = b.attrs;
     const display = a.display === 'masonry' || a.display === 'slider' ? a.display : 'grid';
+    const slider = display === 'slider';
     const d: Decl[] = [['--gallery-cols', String(a.columns || 3)]];
     if (a.gap) d.push(['--gallery-gap', a.gap]);
+    const radius = GALLERY_RADII[a.radius];
+    if (radius) d.push(['--gallery-radius', radius]);
+    const arrowBg = slider ? galleryColor(a.arrowBg) : undefined;
+    const arrowColor = slider ? galleryColor(a.arrowColor) : undefined;
+    if (arrowBg) d.push(['--gallery-arrow-bg', arrowBg]);
+    if (arrowColor) d.push(['--gallery-arrow-color', arrowColor]);
     const ratio = !video && display !== 'masonry' && a.ratio ? String(a.ratio) : undefined;
     const kids = inner(ratio ? { imageRatio: ratio } : {});
     if (!kids.trim()) return '';
     const cropped = !video && display !== 'masonry' && (a.crop !== false || !!ratio);
-    const cls = ['c-gallery', video ? 'is-video' : null, display === 'grid' ? null : `is-${display}`, cropped ? 'is-cropped' : null];
+    const arrows = ['square', 'plain', 'none'].includes(a.arrows) ? a.arrows : 'round';
+    const arrowsAt = arrows !== 'none' && ['outside', 'below'].includes(a.arrowPosition) ? a.arrowPosition : 'over';
+    const cls = [
+      'c-gallery',
+      video ? 'is-video' : null,
+      display === 'grid' ? null : `is-${display}`,
+      cropped ? 'is-cropped' : null,
+      radius ? 'has-radius' : null,
+      ['over', 'hidden'].includes(a.itemCaptions) ? `has-captions-${a.itemCaptions}` : null,
+      ['zoom', 'lift'].includes(a.hover) ? `has-hover-${a.hover}` : null,
+      slider && arrows !== 'round' ? `has-arrows-${arrows}` : null,
+      slider && arrowsAt !== 'over' ? `has-arrows-${arrowsAt}` : null,
+      slider && a.dots ? 'has-dots' : null,
+      slider && a.peek ? 'has-peek' : null,
+    ];
     const label = video ? 'Videos' : 'Images';
-    const body =
-      display === 'slider'
-        ? `<div class="c-gallery__track" tabindex="0" role="region" aria-label="${label}">${kids}</div>` +
-          `<button type="button" class="c-gallery__prev" aria-label="Previous" hidden>${iconSvg('chevron')}</button><button type="button" class="c-gallery__next" aria-label="Next" hidden>${iconSvg('chevron')}</button>`
-        : kids;
-    const more = display === 'slider' && !video && a.autoplay ? { 'data-autoplay': '5' } : {};
+    const body = slider
+      ? `<div class="c-gallery__track" tabindex="0" role="region" aria-label="${label}">${kids}</div>` +
+        (arrows === 'none' ? '' : `<button type="button" class="c-gallery__prev" aria-label="Previous" hidden>${iconSvg('chevron')}</button><button type="button" class="c-gallery__next" aria-label="Next" hidden>${iconSvg('chevron')}</button>`) +
+        (a.dots ? `<div class="c-gallery__dots" role="group" aria-label="${label}: go to" hidden></div>` : '')
+      : kids;
+    const seconds = Math.min(20, Math.max(2, Math.round(Number(a.interval) || 5)));
+    const more = slider && !video && a.autoplay ? { 'data-autoplay': String(seconds) } : {};
     return `<figure ${root(a, cls, d, more)}>${body}${a.caption ? `<figcaption>${a.caption}</figcaption>` : ''}</figure>`;
   };
 }

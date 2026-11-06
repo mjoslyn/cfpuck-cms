@@ -109,9 +109,13 @@ block's ratio for Image; else its main point), written as `--focal`, `--focal-ta
 on the block; the stylesheet picks one as `--focal-at` (tablet up to 1024px, phone up to 599px), which
 the image's `object-position` reads (`screenFocal`, `src/render/c/content.ts`). Galleries hold
 image blocks (`gallery`) or embed and video blocks (`video-gallery`) and show them as a grid, masonry
-columns or a slider (`display`; a scroll-snap row, buttons and autoplay from
+columns or a slider (`display`; a scroll-snap row, buttons, dots and autoplay from
 `public/assets/js/gallery-slider.js`); media picked in the panel arrive as `attrs.add` and become
-child blocks in `resolveGallery` (`config.tsx`).
+child blocks in `resolveGallery` (`config.tsx`). Their look (Style): `radius` (`GALLERY_RADII`), each
+item's caption (`itemCaptions`: below, over the image, hidden) and `hover` (zoom, lift); a slider's:
+`arrows` (round, square, plain, none), `arrowPosition` (over, outside, below), `arrowBg` and `arrowColor`
+(palette tokens, hex, rgb or hsl only), `dots`, `peek` (part of the next item shows) and the autoplay's
+`interval` (2 to 20 seconds); classes `has-*` and custom properties `--gallery-*` (`galleryOf`).
 Props are clean values: styles as CSS with design tokens (`var(--color-*)`, `var(--space-*)`,
 `var(--text-*)`), layouts as `{ type: flow|constrained|row|stack|grid }`.
 
