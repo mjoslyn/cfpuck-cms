@@ -2,7 +2,7 @@
 title: Popups and cookie consent
 description: "Showing a popup on the site, and asking visitors' consent to cookies."
 sidebar:
-  order: 6
+  order: 7
 ---
 
 Popups show a message over the site's pages: a newsletter sign-up, a sale, an announcement. One of them

@@ -2,7 +2,7 @@
 title: Connections
 description: "Connecting Claude, card payments (Stripe or Square) and Mailgun to the site."
 sidebar:
-  order: 3
+  order: 4
 ---
 
 Admins connect the services the site uses in **Settings > Connections**:

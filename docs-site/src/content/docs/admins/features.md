@@ -34,7 +34,8 @@ once. Members are then listed under **People**, **Members** (see [People and acc
 
 **Settings > Mailing Lists**: turn mailing lists on, and fill in the sender's name and address and the
 postal address every email must carry. Sending needs Mailgun connected (see
-[Connections](/admins/connections/)). **Mailing Lists** then appears under **People**.
+[Connections](/admins/connections/)). **Mailing Lists** then appears under **People**. See
+[Mailing lists](/admins/mailing-lists/) for every setting, the lists, subscribers and sending.
 
 ## Checking accessibility before publishing
 

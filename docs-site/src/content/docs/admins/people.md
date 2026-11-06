@@ -2,7 +2,7 @@
 title: People and access
 description: "Inviting editors and admins, changing roles and removing access."
 sidebar:
-  order: 5
+  order: 6
 ---
 
 **Users** (under **People** in the top bar, admins only) lists everyone who can sign in to look after the site.

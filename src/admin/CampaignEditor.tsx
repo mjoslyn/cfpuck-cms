@@ -8,7 +8,7 @@ import EmailBuilder from '../forms/EmailBuilder';
 import ComposeCampaign, { type ComposedCampaign } from './ComposeCampaign';
 import { takeStart, type ComposeStart } from '../lib/compose/start';
 import { mailingEmailKit } from './mailing-email';
-import { CAMPAIGN_STATUS, rate, type Audience, type Campaign, type CampaignStats, type ContactField, type MailList } from '../lib/mailing/config';
+import { CAMPAIGN_STATUS, rate, sendAction, type Audience, type Campaign, type CampaignStats, type ContactField, type MailList } from '../lib/mailing/config';
 import type { MemberLevel } from '../lib/members/config';
 import type { EmailDoc } from '../lib/forms/email';
 
@@ -374,7 +374,7 @@ export default function CampaignEditor({ campaign, lists, levels, stats, links, 
       {confirming && (
         <div className="fixed inset-0 z-[950] flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-label="Confirm">
           <div className="w-full max-w-md rounded bg-white p-5 shadow-xl">
-            <h2 className="mb-2 text-lg font-semibold">{confirming.action === 'approve' ? 'Approve this issue?' : confirming.action === 'schedule' ? 'Schedule this campaign?' : 'Send this campaign now?'}</h2>
+            <h2 className="mb-2 text-lg font-semibold">{confirming.action === 'approve' ? 'Approve this issue?' : confirming.action === 'schedule' ? 'Schedule this campaign?' : sendAction(c.status, 'send') === 'resume' ? 'Resume this campaign now?' : 'Send this campaign now?'}</h2>
             <p className="mb-3 text-sm">
               “{c.subject || '(no subject)'}” to {listNames || 'no lists'}
               {audience.members === 'members' ? ' (members only)' : audience.members === 'non-members' ? ' (non-members only)' : ''}
@@ -394,12 +394,12 @@ export default function CampaignEditor({ campaign, lists, levels, stats, links, 
                 className={primary}
                 disabled={!confirming.ticked || !confirming.count || busy}
                 onClick={() => {
-                  const a = confirming.action;
+                  const a = sendAction(c.status, confirming.action);
                   setConfirming(null);
-                  run(() => post(a === 'schedule' ? { action: 'schedule', id: c.id, at } : { action: a, id: c.id }), a === 'send' ? 'Sending.' : a === 'approve' ? 'Approved.' : 'Scheduled.', true);
+                  run(() => post(a === 'schedule' ? { action: 'schedule', id: c.id, at } : { action: a, id: c.id }), a === 'send' ? 'Sending.' : a === 'resume' ? 'Resumed.' : a === 'approve' ? 'Approved.' : 'Scheduled.', true);
                 }}
               >
-                {confirming.action === 'approve' ? 'Approve' : confirming.action === 'schedule' ? 'Schedule' : 'Send'}
+                {confirming.action === 'approve' ? 'Approve' : confirming.action === 'schedule' ? 'Schedule' : sendAction(c.status, 'send') === 'resume' ? 'Resume' : 'Send'}
               </button>
             </div>
           </div>

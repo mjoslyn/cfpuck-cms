@@ -2,7 +2,7 @@
 title: Email log and backups
 description: "Checking whether the site's emails went out, and backing the site up."
 sidebar:
-  order: 8
+  order: 9
 ---
 
 ## Email log

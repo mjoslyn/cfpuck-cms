@@ -189,6 +189,11 @@ export function audienceOf(v: unknown): Required<Audience> {
 }
 
 export type CampaignStatus = 'draft' | 'review' | 'scheduled' | 'sending' | 'sent' | 'paused' | 'cancelled' | 'failed' | 'skipped';
+/** What the campaign screen's confirmed Send does: a paused or failed campaign is resumed (its failed
+ *  batches queued again), not started afresh, so **Resume now** does what it says. */
+export const sendAction = (status: CampaignStatus, action: 'send' | 'schedule' | 'approve'): 'send' | 'schedule' | 'approve' | 'resume' =>
+  action === 'send' && (status === 'paused' || status === 'failed') ? 'resume' : action;
+
 export const CAMPAIGN_STATUS: Record<CampaignStatus, string> = {
   draft: 'Draft',
   review: 'Waiting for approval',

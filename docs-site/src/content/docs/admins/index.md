@@ -24,6 +24,7 @@ The **?** button at the top of every admin screen brings admins here, and editor
 
 - [Settings and the menu](/admins/settings/): the site's menu and every section of Settings.
 - [Turning features on](/admins/features/): events, tickets, members, mailing lists and the accessibility check.
+- [Mailing lists](/admins/mailing-lists/): lists, subscribers, sending campaigns and the weekly digest.
 - [Connections](/admins/connections/): Claude, card payments and Mailgun.
 - [Kinds of content and taxonomies](/admins/content-types/): adding your own types of content and ways to sort it.
 - [People and access](/admins/people/): inviting editors and admins, and removing access.

@@ -154,5 +154,7 @@ If you can't see something this guide mentions, it is probably for admins (see t
 - [Accessibility](/editors/accessibility/): making sure everyone can use your pages.
 - [Events and tickets](/editors/events-and-tickets/): events, venues, the calendar, and selling tickets
   or taking sign-ups.
+- [Mailing lists](/editors/mailing-lists/): writing and testing campaigns, the weekly digest, segments,
+  sign-up forms, and how each email went.
 - [Stats](/editors/stats/): how many people visit, what they read and where they come from.
 - [Common questions](/editors/common-questions/): quick answers when something isn't working.

@@ -2,7 +2,7 @@
 title: Kinds of content and taxonomies
 description: "Adding your own kinds of content, marking content featured, and adding your own ways to sort it."
 sidebar:
-  order: 4
+  order: 5
 ---
 
 ## Adding a kind of content

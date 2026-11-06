@@ -2,7 +2,7 @@
 title: Redirects and missing pages
 description: "Sending visitors from old addresses to new ones, catching broken links, and the page people see when an address doesn't exist."
 sidebar:
-  order: 7
+  order: 8
 ---
 
 ## Redirects
