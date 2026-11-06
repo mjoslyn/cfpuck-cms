@@ -12,8 +12,8 @@ export default defineConfig({
   // This folder's own tsconfig: the repository's root one extends a package only the CMS installs, and
   // a build of the site alone (Workers Builds clones the whole repository) would look for it.
   vite: { tsconfig: './tsconfig.json' },
-  // The site guide was one guide at /guide/ until it split into the Editor and Admin guides. The
-  // admin bar's ? button on sites not yet updated still links there.
+  // Old addresses. The site guide was one guide at /guide/ until it split into the Editor and Admin
+  // guides (the admin bar's ? button on sites not yet updated still links there).
   redirects: {
     '/guide/': '/editors/',
     ...Object.fromEntries(
@@ -24,6 +24,9 @@ export default defineConfig({
     '/guide/menu-and-settings/': '/admins/settings/',
     '/guide/people/': '/admins/people/',
     '/guide/popups-and-cookies/': '/admins/popups-and-cookies/',
+    // Getting started moved from /start/ to /docs/.
+    '/start/': '/docs/',
+    ...Object.fromEntries(['local-setup', 'hosting', 'sites-and-upstream'].map((page) => [`/start/${page}/`, `/docs/${page}/`])),
   },
   integrations: [
     starlight({
@@ -56,10 +59,10 @@ export default defineConfig({
           },
           {
             label: 'Developers',
-            link: '/start/local-setup/',
+            link: '/docs/',
             icon: 'laptop',
             items: [
-              { label: 'Getting started', items: [{ autogenerate: { directory: 'start' } }] },
+              { label: 'Getting started', items: [{ autogenerate: { directory: 'docs' } }] },
               { label: 'Building a site', items: [{ autogenerate: { directory: 'site' } }] },
               { label: 'Content', items: [{ autogenerate: { directory: 'content' } }] },
               { label: 'Features', items: [{ autogenerate: { directory: 'features' } }] },

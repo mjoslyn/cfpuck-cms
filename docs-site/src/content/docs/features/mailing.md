@@ -9,7 +9,7 @@ Mailing is optional: turn it on under **Settings > Mailing Lists**. People sign 
 confirm by email), and you send them campaigns and a weekly digest through Mailgun from a marketing
 subdomain. Each email's deliveries, opens and clicks are recorded. The site's other email (form
 notifications, tickets) goes out as before, through Cloudflare Email Service or SMTP. Mailgun's setup is under
-[Hosting](../../start/hosting/#mailing).
+[Hosting](../../docs/hosting/#mailing).
 
 ## Settings
 

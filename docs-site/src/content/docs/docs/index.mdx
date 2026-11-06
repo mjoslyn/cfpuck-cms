@@ -1,0 +1,31 @@
+---
+title: Documentation
+description: "Moonpuck's documentation: guides for editors and admins, and how to set up, build and run a site."
+sidebar:
+  order: 0
+  label: Overview
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+Moonpuck is an open source website builder for small businesses and organisations: a visual editor
+with Claude built in, on a Cloudflare Worker. These pages cover using a site and building one.
+
+## Using a site
+
+<CardGrid>
+  <LinkCard title="Editor guide" href="/editors/" description="Everyday help for the people who keep a site up to date: pages, images, forms, events and more." />
+  <LinkCard title="Admin guide" href="/admins/" description="For the people who run a site: settings, the menu, features, connections and who has access." />
+</CardGrid>
+
+## Building and running a site
+
+<CardGrid>
+  <LinkCard title="Local setup" href="/docs/local-setup/" description="Run the example site on your machine." />
+  <LinkCard title="Hosting" href="/docs/hosting/" description="Deploy a site to Cloudflare: the Worker, D1, R2, mail and the services it connects to." />
+  <LinkCard title="Sites and upstream" href="/docs/sites-and-upstream/" description="Start a site of your own from Moonpuck, and take core updates." />
+  <LinkCard title="Building a site" href="/site/configuration/" description="The site's config, its own blocks and hooks, and its styles." />
+  <LinkCard title="Content" href="/content/data-model/" description="How content is stored: entries, blocks, templates, collections and taxonomies." />
+  <LinkCard title="Features" href="/features/editor/" description="The editor, Compose, media, forms, events, tickets, members, mailing and more." />
+  <LinkCard title="Internals" href="/internals/rendering/" description="How pages are rendered, the commands, and working on the core." />
+</CardGrid>
