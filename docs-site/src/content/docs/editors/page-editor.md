@@ -285,7 +285,7 @@ Pictures, galleries, videos and documents are covered in more depth in
 | --- | --- | --- |
 | **Image** | One picture. | **Image**: **Choose** (or **Replace**) picks one from the media library; **Edit** opens it in the media library in a new tab. **Alt text (describes the image)**. **Caption**. **Link** and **Open link in a new tab**. **Placement**: **Float left**, **Float right** (text wraps round it), **Centred**, **Wide** or **Full width**. **Image size**: **Full (the original)**, **Large (1024px)**, **Medium (768px)**, **Small (300px)** or **Thumbnail (150px square)**. **Aspect ratio**: **Original**, or a shape such as **Square (1:1)** or **Wide (16:9)**. **Fit**: **Cover (crop to fill)** or **Contain (show the whole image)**. **Circle**. **Fill the block behind the content**: the picture fills the block it is in (such as a card), behind the rest. **Shade (darker towards the bottom)**. **Focal point** when it is cropped (see below). The **Spacing** and **Border** styles. |
 | **Cover** | A picture with blocks laid over it, such as a heading and a button. | **Image**. **Use the page's featured image** instead. **Alt text**. **Focal point**. **Overlay color** and **Overlay**: **Even**, **From bottom** or **From left** (a gradient keeps the text readable where it sits and leaves the rest of the picture clear). **Overlay opacity**: how dark, from 0 to 100%. **Minimum height** (such as `430px`). **Content position**: where the blocks sit, from **Top left** to **Bottom right**. **Dark text (light image)**. The **Layout** group and the styles. |
-| **Image gallery** | Several pictures as a grid, masonry columns or a slider. | See [Galleries](/editors/images-and-files/#galleries). **Display**, **Add images**, **Columns** (or **Visible at once** in a slider), **Image shape**, **Crop images to fit**, **Gap**, and the **Style** and **Slider** groups. |
+| **Image gallery** | Several pictures as a grid, masonry columns or a slider. | See [Galleries](/editors/images-and-files/#image-galleries). **Display**, **Add images**, **Columns** (or **Visible at once** in a slider), **Image shape**, **Crop images to fit**, **Gap**, and the **Style** and **Slider** groups. |
 | **Video gallery** | Several videos together. | As the image gallery, with **Add uploaded videos** and **Add YouTube or Vimeo links** (one link per line, then **Add links**). |
 | **Media & text** | A picture beside some text. Drag blocks into the text side. | **Image**. **Image side**: left (**Default**) or **Right**. **Image width (%)** (50 if empty). **Text position**: **Top**, **Middle** or **Bottom**. **Stack on phones**. The styles. |
 | **Embed** | Something from another website, such as a YouTube or Vimeo video. | **URL**: its address. **Embed HTML**: code another website gives you to paste. **Aspect ratio**: **Provider's size** or a shape. |
@@ -427,8 +427,8 @@ a team. Its settings are in groups.
       order** or **Random**.
     - **How many** (10 if empty) and **Skip the first** (to leave out ones shown elsewhere).
   - **Hand-picked**: the entries you choose. Under **Entries, in order**, type two or more letters in
-    **Search to add** and click an entry to add it. They show in the order you add them; **Remove**
-    takes one off.
+    **Search to add** and click an entry to add it. They show in the order of the list: **↑** and **↓**
+    move one up or down, and **Remove** takes one off.
   - **Page's list**: whatever the page is showing, such as a category's entries or search results.
     Used in templates for listing pages.
 - **Shuffle on each visit**: a different random set (or order) each time someone visits.

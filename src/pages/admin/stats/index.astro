@@ -160,7 +160,7 @@ const sortLink = (k: 'views' | 'clicks', label: string) => (sort === k ? `${labe
     </section>
     <section class="lg:col-span-2">
       <h2 class="flex justify-between gap-2 text-sm font-semibold">Campaigns <a class={csvLink} href={csv('campaigns')} download>Download CSV</a></h2>
-      <p class="text-xs text-admin-muted">Visits that arrived by an address with <code>utm_campaign</code>, <code>utm_source</code> or <code>utm_medium</code>, such as <code>/?utm_campaign=spring-sale&amp;utm_source=newsletter&amp;utm_medium=email</code>.</p>
+      <p class="text-xs text-admin-muted">Visits that arrived by an address with <code>utm_campaign</code> or <code>utm_source</code> (and <code>utm_medium</code> if you like), such as <code>/?utm_campaign=spring-sale&amp;utm_source=newsletter&amp;utm_medium=email</code>.</p>
       <table class="mt-2 w-full border-collapse overflow-hidden rounded bg-white text-sm shadow-[0_0_0_1px_rgba(26,26,46,0.08)]">
         <thead class="bg-admin-soft text-left text-xs tracking-wider text-admin-muted uppercase"><tr><th class={th}>Campaign</th><th class={th}>Source</th><th class={th}>Medium</th><th class={`${th} text-right`}>Visits</th></tr></thead>
         <tbody>

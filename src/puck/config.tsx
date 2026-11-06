@@ -169,6 +169,15 @@ const LABELS: Record<string, string> = {
 };
 const label = (type: string) => LABELS[type] ?? type.replace(/-/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
 
+/** What a block without settings of its own says in its panel: what it shows, and where that comes from. */
+const NO_SETTINGS: Record<string, string> = {
+  'events-calendar': "It shows the events calendar for the address it is at (/events/ and the views under it): upcoming or past events, a month or a day, with a search box. The events themselves are under Content, Events.",
+  'event-details': "On an event's page it shows the event: its featured image, its description, a box with the date, time, venue, cost and categories, and its day-by-day schedule, all from the event itself.",
+  'event-schedule': "On an event's page it shows the event's day-by-day schedule, from the event's settings. It shows nothing when the event has no schedule.",
+};
+export const noSettingsNote = (type: string) =>
+  `This block has no settings of its own.${NO_SETTINGS[type] ? ` ${NO_SETTINGS[type]}` : ''}`;
+
 /** Blocks whose children are edited in place (a slot). */
 const CONTAINERS = new Set([...CONTENT_CONTAINERS, 'pattern', 'members']);
 
@@ -181,7 +190,7 @@ function AttrsPanel({ type, value, onChange }: { type: string; value: Attrs; onC
   if (type === 'pattern' && a.linked) return <div className="px-1"><LinkedPatternPanel a={a} /></div>;
   return (
     <div className="px-1">
-      {panel ? panel(a, set) : <p className="mb-2 text-xs text-admin-muted">Configure this block in the attributes below.</p>}
+      {panel ? panel(a, set) : <p className="mb-2 text-xs text-admin-muted">{noSettingsNote(type)}</p>}
       <StyleCopy type={type} label={label(type)} value={a} onChange={onChange} />
       <JsonAttrs value={a} onChange={onChange} />
       <SaveAsPattern />

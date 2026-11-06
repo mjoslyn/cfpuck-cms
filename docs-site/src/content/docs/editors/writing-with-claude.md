@@ -98,7 +98,9 @@ are added to the media library, so they're there for later too.
 
 Good to know about materials:
 
-- Each message takes up to 10 documents, 40 pictures or videos and 20 links; any more are left out.
+- Each message takes up to 10 documents, 40 pictures or videos and 20 links, and 20,000 characters of
+  text. Anything past that is left out, and the conversation says how many were left out, so you can
+  send them in another message.
 - A document over 25 MB is skipped, and the conversation says so.
 - A very long Word or text document is read only up to a point (about 60,000 characters), and a web
   page's text up to about 12,000 characters.
@@ -195,7 +197,7 @@ they're writing while they work, and nothing is saved until you save as usual:
 | --- | --- |
 | A page's settings, under **Excerpt** | A short summary for listings and search results: "Excerpt written. Edit it as you like." |
 | A page's settings, in **SEO** | A search title and meta description from the page as it is in the editor. See [The page's settings](/editors/page-editor/#the-pages-settings). |
-| **Media**, beside an image's **Alt text** | A one-sentence description of the picture (JPEG, PNG, GIF, WebP and AVIF images). See [Describing an image](/editors/images-and-files/#describing-an-image-alt-text). |
+| **Media**, beside an image's **Alt text** | A one-sentence description of the picture (JPEG, PNG, GIF, WebP and AVIF images). See [Describing an image](/editors/images-and-files/#pictures). |
 | **Content > Taxonomies**, a term's **Details** | The term's description, search title and description, and other details, from its name and what is filed under it. See [A term's details](/editors/pages-and-posts/#a-terms-details). |
 | The form builder | A form's questions, thank-you message or page, and emails. See [Forms](/editors/forms/#having-claude-write-it). |
 

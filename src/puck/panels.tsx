@@ -191,7 +191,7 @@ export function StyleControls({ a, set, parts = {} }: { a: Attrs; set: SetFn; pa
       {p.typography && (
         <Group title="Text">
           <Select title="Size" value={s.fontSize} options={SIZES} onChange={(v) => st({ fontSize: v })} />
-          <Select title="Font" value={s.fontFamily} options={[['var(--font-display)', 'Display (Fraunces)'], ['var(--font-body)', 'Body (Work Sans)']]} onChange={(v) => st({ fontFamily: v })} />
+          <Select title="Font" value={s.fontFamily} options={[['var(--font-display)', 'Display font'], ['var(--font-body)', 'Body font']]} onChange={(v) => st({ fontFamily: v })} />
           <Select title="Weight" value={s.fontWeight} options={WEIGHTS} onChange={(v) => st({ fontWeight: v })} />
           <Select title="Alignment" value={s.textAlign} options={[['left', 'Left'], ['center', 'Center'], ['right', 'Right']]} onChange={(v) => st({ textAlign: v })} />
           <Select title="Case" value={s.textTransform} options={[['uppercase', 'Uppercase'], ['none', 'As typed']]} onChange={(v) => st({ textTransform: v })} />

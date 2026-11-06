@@ -148,7 +148,7 @@ ordinary, undoable edit. Blocks inside a linked pattern, and the linked pattern 
 
 A `collection` lists entries with its settings on the block itself (`src/puck/CollectionPanel.tsx`):
 what to show (latest of some types, filtered by category and tags, and featured only where a type has
-Featured, `query.featuredOnly`; hand-picked `query.include`; or the page's own listing), display (grid with desktop/tablet/phone columns, list, slider), card design
+Featured, `query.featuredOnly`; hand-picked `query.include`, shown in the order listed (`EntriesField`, ↑ and ↓ to move one, `moveItem`); or the page's own listing), display (grid with desktop/tablet/phone columns, list, slider), card design
 (the site's `cards`, `src/lib/content/card-presets.ts`; choosing one replaces the item template via
 `resolveCollection` in `config.tsx`; "custom" keeps the blocks), pagination (numbers, previous/next,
 load more: `public/assets/js/collection-more.js` fetches the next page URL and appends that
@@ -578,7 +578,10 @@ marked so in its row, so it is never claimed later; a job marked failed while it
 conversation or outcome.
 One turn at a time per conversation (409 otherwise) and two per person (429). Only the latest message
 carries its selected block's JSON, and a block over 60,000 characters is refused (400) rather than cut.
-Text materials count toward the budget of what is sent in full (`MATERIAL_BUDGET.text`).
+Text materials count toward the budget of what is sent in full (`MATERIAL_BUDGET.text`). A message takes
+up to 10 documents, 40 images and videos, 20 links and 20,000 characters (`MESSAGE_LIMITS`,
+`takeMaterials` in `src/lib/compose/limits.ts`); what is left out past them is named in a note in the
+conversation.
 
 ## How rendering works
 

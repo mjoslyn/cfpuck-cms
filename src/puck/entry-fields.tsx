@@ -12,6 +12,7 @@ import { useMemberSettings } from './member-settings';
 import { accessOf } from '../lib/members/config';
 import { itemsText } from '../lib/seo';
 import { NO_CONTENT_WARNING, templateLabel, type TemplateInfo } from '../lib/templates';
+import { moveItem } from '../lib/admin/move-item';
 
 /** A type's fields, from the site config. */
 export const fieldsFor = (type: string): FieldDef[] => siteFields(type);
@@ -228,7 +229,7 @@ export function EntryField({ title, entryType, create, value, onChange }: { titl
   );
 }
 
-/** An ordered list of entry references (mega menu featured cards). */
+/** An ordered list of entry references (a collection's hand-picked entries, mega menu featured cards). */
 export function EntriesField({ title, types, value, onChange }: { title: string; types: string[]; value: unknown; onChange: (v: number[]) => void }) {
   const ids: number[] = Array.isArray(value) ? value.map(Number) : [];
   const [titles, setTitles] = useState<Record<number, string>>({});
@@ -248,7 +249,11 @@ export function EntriesField({ title, types, value, onChange }: { title: string;
         {ids.map((id, i) => (
           <li key={id} className="flex items-center gap-2 rounded bg-admin-soft px-2 py-1 text-sm">
             <span className="truncate">{titles[id] ?? `#${id}`}</span>
-            <button type="button" className="ml-auto text-xs text-[#c4592a]" onClick={() => onChange(ids.filter((_, j) => j !== i))}>Remove</button>
+            <span className="ml-auto flex shrink-0 items-center gap-1">
+              <button type="button" disabled={i === 0} className="rounded px-1 text-xs text-admin-muted hover:text-admin-ink disabled:opacity-30" title="Move up" aria-label={`Move ${titles[id] ?? `#${id}`} up`} onClick={() => onChange(moveItem(ids, i, -1))}>↑</button>
+              <button type="button" disabled={i === ids.length - 1} className="rounded px-1 text-xs text-admin-muted hover:text-admin-ink disabled:opacity-30" title="Move down" aria-label={`Move ${titles[id] ?? `#${id}`} down`} onClick={() => onChange(moveItem(ids, i, 1))}>↓</button>
+              <button type="button" className="text-xs text-[#c4592a]" onClick={() => onChange(ids.filter((_, j) => j !== i))}>Remove</button>
+            </span>
           </li>
         ))}
       </ul>

@@ -16,6 +16,7 @@ import { COMPOSABLE_TYPES } from '../../../lib/site';
 import type { EditorFields } from '../../../lib/compose/entry-fields';
 import { serviceClient } from '../../../lib/db/site';
 import { emptyRegistry, ingest, type Registry } from '../../../lib/compose/materials';
+import { takeMaterials } from '../../../lib/compose/limits';
 import type { Turn } from '../../../lib/compose/claude';
 import { layoutOf, templateKey } from '../../../lib/compose/layout';
 import { queueJob, runJob, SILENT_MS, STALE_MS, type JobInput } from '../../../lib/compose/job';
@@ -91,10 +92,7 @@ export const GET: APIRoute = async ({ url, locals }) => {
 export const POST: APIRoute = async ({ request, locals }) => {
   const form = await request.formData();
   const db = locals.db;
-  const message = String(form.get('message') ?? '').slice(0, 20_000);
-  const docs = form.getAll('docs').filter((f): f is File => f instanceof File && f.size > 0).slice(0, 10);
-  const mediaIds = form.getAll('media').map(Number).filter(Boolean).slice(0, 40);
-  const links = String(form.get('links') ?? '').split(/\s+/).map((l) => l.trim()).filter((l) => /^https?:\/\//i.test(l)).slice(0, 20);
+  const { message, docs, mediaIds, links, notes: limitNotes } = takeMaterials(form);
   if (!message.trim() && !docs.length && !mediaIds.length && !links.length) return new Response('Write a message or add some materials.', { status: 400 });
   const targetJson = String(form.get('targetJson') ?? '');
   // Cut short, the block couldn't be read back after Claude's (paid) answer; so it is refused whole.
@@ -145,10 +143,10 @@ export const POST: APIRoute = async ({ request, locals }) => {
   } catch {}
 
   // Materials are read here (uploads, link text), so the job only needs the session.
-  let notes: string[] = [];
+  let notes: string[] = limitNotes;
   try {
     const { added, notes: n } = await ingest(serviceClient(), s.id, s.materials, { docs, mediaIds, links });
-    notes = n;
+    notes = [...limitNotes, ...n];
     s.turns.push({ role: 'user', text: message, added, ...(target ? { target } : {}), at: new Date().toISOString() });
     await db.from('compose_sessions').update({ turns: s.turns, materials: s.materials }).eq('id', s.id);
   } catch (e) {
