@@ -373,6 +373,11 @@ export function ticketsSection(env: Env, heading?: string, target = pageEvent(en
   const pageInput = `<input type="hidden" name="page" value="${esc(env.ctx.queried.url.pathname)}" />`;
   const close = (body: string) => `${head}${body}</section>`;
 
+  // A paid order's confirmation takes the form's place (and one being confirmed, its note); the form is a
+  // link away, without the order. Expired, cancelled and refunded orders keep the form below.
+  if (data.order?.status === 'paid') return close(`<p class="c-tickets__again"><a href="${esc(env.ctx.queried.url.pathname)}#${anchor}">Order more tickets</a></p>`);
+  if (data.order?.status === 'pending') return close('');
+
   const now = localNow(target.tz);
   if (target.endUtc != null && target.endUtc < Date.now() && !env.ctx.editor) return close(`<p class="c-tickets__note">Ticket sales for this event have closed.</p>`);
   const types = offeredTypes(t);
