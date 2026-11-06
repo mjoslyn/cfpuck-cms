@@ -22,7 +22,7 @@ export interface LinkEmail {
 export async function sendLink(m: LinkEmail): Promise<'sent' | 'no-smtp'> {
   const html = `<p>Hello,</p><p>${esc(m.intro)}</p><p><a href="${esc(m.url)}" style="display:inline-block;padding:10px 18px;background:#1a1a2e;color:#ffffff;text-decoration:none;border-radius:3px">${esc(m.button)}</a></p><p style="color:#666666;font-size:13px">${esc(m.note)}</p>`;
   const text = `${m.intro}\n\n${m.url}\n\n${m.note}`;
-  return (await sendMail({ to: [m.to], subject: m.subject, html, text })) ? 'sent' : 'no-smtp';
+  return (await sendMail({ to: [m.to], subject: m.subject, html, text, kind: 'account', secret: true })) ? 'sent' : 'no-smtp';
 }
 
 /** A password link (forgot password, or an admin sending one). */

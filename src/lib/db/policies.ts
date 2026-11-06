@@ -76,6 +76,7 @@ export const POLICIES: Record<string, TablePolicy> = {
   ticket_orders: readOnly(editors),
   ticket_waitlist: readOnly(editors),
   mail_suppressions: readOnly(admins),
+  mail_log: readOnly(admins),
   // Signed sync requests' nonces (src/lib/sync-remote.ts): the server's only.
   sync_nonces: all(nobody, nobody),
   // Site statistics (src/lib/stats.ts): counted by the server, read by editors (Stats).

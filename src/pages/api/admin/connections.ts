@@ -33,6 +33,7 @@ async function tellAdmins(origin: string, who: string, what: string) {
     to,
     subject: `${site.name}: ${what}`,
     html: `<p>${esc(who)} ${esc(what.charAt(0).toLowerCase() + what.slice(1))} on ${esc(site.name)} (${esc(when)}).</p><p>If that wasn’t expected, check <a href="${link}">Settings &gt; Connections</a> and change your password.</p>`,
+    kind: 'admin',
   }).catch((e) => console.error(`connections: admin email failed: ${(e as Error).message}`));
 }
 

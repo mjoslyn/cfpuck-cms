@@ -42,6 +42,7 @@ export const SETTINGS_GROUPS: { label: string; sections: SettingsSection[] }[] =
     label: 'Upkeep',
     sections: [
       { id: 'redirects', label: 'Redirects' },
+      { id: 'email-log', label: 'Email log' },
       { id: 'sync', label: 'Sync' },
       { id: 'backups', label: 'Backups' },
     ],

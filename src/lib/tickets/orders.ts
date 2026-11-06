@@ -583,7 +583,7 @@ export async function notifyWaitlist(db: Db, ev: LoadedEvent, origin: string, id
   for (const p of (people ?? []) as WaitlistRow[]) {
     if (p.quantity > budget) continue;
     const mail = ticketEmail(email, { code: '', name: p.name, email: p.email, phone: p.phone, items: [], amount: 0, currency: settings.currency ?? 'usd' }, view, { order: waitlistLink(ev, p.page, origin) }, origin, events);
-    if (!(await sendMail({ to: [p.email], ...mail }))) throw new Error('No mail server is set up (SMTP_* in the environment).');
+    if (!(await sendMail({ to: [p.email], ...mail, kind: 'ticket' }))) throw new Error('No mail server is set up (SMTP_* in the environment).');
     await db.from('ticket_waitlist').update({ status: 'notified', notified_at: new Date().toISOString() }).eq('id', p.id);
     budget -= p.quantity;
     sent++;
@@ -639,7 +639,7 @@ async function sendOrderEmail(kind: EmailKind, o: OrderRow, ev: LoadedEvent, set
   const links = { order: `${origin}${at.path}?order=${o.token}${at.anchor}`, attendees: `${origin}/admin/tickets/${ev.series.id}/${o.occurrence ? `?date=${o.occurrence}` : ''}` };
   const email = emailToSend(kind, settings, ev.emails[kind], await defaultTemplate(serviceClient(), `ticket:${kind}`));
   const mail = ticketEmail(email, orderView(o, ev.tickets), eventView(ev, origin), links, origin, await emailEvents(serviceClient(), email.design, origin));
-  return kind === 'admin' ? sendMail({ to: [notifyAddress()], replyTo: o.email, ...mail }) : sendMail({ to: [o.email], ...mail });
+  return kind === 'admin' ? sendMail({ to: [notifyAddress()], replyTo: o.email, ...mail, kind: 'ticket' }) : sendMail({ to: [o.email], ...mail, kind: 'ticket' });
 }
 
 /** The confirmation to the buyer, and a copy for the site's admin (unless turned off). */

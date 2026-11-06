@@ -8,6 +8,7 @@
 import { site } from '../site';
 import { bindings } from '../platform';
 import { env } from '../env';
+import type { MailKind } from '../mail-log';
 
 interface Smtp {
   host: string;
@@ -25,6 +26,10 @@ export interface Mail {
   text?: string;
   replyTo?: string;
   fromName?: string;
+  /** What it is, for the email log (src/lib/mail-log.ts). */
+  kind?: MailKind;
+  /** It carries a sign-in, password, invitation or confirmation link: the email log keeps it without its body. */
+  secret?: boolean;
 }
 
 function fromHeader(fromName?: string) {
@@ -63,17 +68,36 @@ const party = (h: string) => {
  * headers (or a body) of their own. */
 const oneLine = (v: string) => v.replace(/[\r\n\u2028\u2029]+/g, ' ').trim();
 
+/**
+ * Sends an email: true once sent, false when the site has no mail set up. While the email log is on
+ * (Settings > Email log) each one is kept there, sent, failed or not sent; a `secret` one without its body.
+ */
 export async function sendMail(message: Mail): Promise<boolean> {
   const mail = { ...message, to: message.to.map(oneLine), subject: oneLine(message.subject), fromName: message.fromName && oneLine(message.fromName), replyTo: message.replyTo && oneLine(message.replyTo) };
+  const text = mail.text || textVersion(mail.html);
+  const log = async (status: 'sent' | 'failed' | 'not-sent', via: string, error?: string) =>
+    (await import('../mail-log')).logMail({ kind: mail.kind, to: mail.to, from: fromHeader(mail.fromName), replyTo: mail.replyTo, subject: mail.subject, html: mail.html, text, secret: mail.secret, status, via, error });
+  try {
+    const sent = await deliver(mail, text);
+    await log(sent ? 'sent' : 'not-sent', sent ?? '');
+    return !!sent;
+  } catch (e) {
+    await log('failed', bindings()?.EMAIL ? 'email-service' : 'smtp', (e as Error).message);
+    throw e;
+  }
+}
+
+/** Sends through Email Service or SMTP: how it went out, or null with neither set up. */
+async function deliver(mail: Mail & { fromName?: string }, text: string): Promise<'email-service' | 'smtp' | null> {
   const email = bindings()?.EMAIL;
   if (email) {
-    await email.send({ from: party(fromHeader(mail.fromName)), to: mail.to, replyTo: mail.replyTo ? party(mail.replyTo) : undefined, subject: mail.subject, html: mail.html, text: mail.text || textVersion(mail.html) });
-    return true;
+    await email.send({ from: party(fromHeader(mail.fromName)), to: mail.to, replyTo: mail.replyTo ? party(mail.replyTo) : undefined, subject: mail.subject, html: mail.html, text });
+    return 'email-service';
   }
   const t = transport();
   if (!t) {
     console.warn(`[forms] no SMTP configured; not sending "${mail.subject}" to ${mail.to.join(', ')}`);
-    return false;
+    return null;
   }
   // Loaded when mail goes out: it needs the Worker's sockets, which scripts in Node don't have.
   const { WorkerMailer } = await import('worker-mailer');
@@ -86,7 +110,7 @@ export async function sendMail(message: Mail): Promise<boolean> {
       startTls: !t.secure,
       ...(t.user ? { credentials: { username: t.user, password: t.pass ?? '' }, authType: ['plain', 'login'] as ('plain' | 'login')[] } : {}),
     },
-    { from: party(fromHeader(mail.fromName)), to: mail.to, reply: mail.replyTo ? party(mail.replyTo) : undefined, subject: mail.subject, html: mail.html, text: mail.text || textVersion(mail.html) },
+    { from: party(fromHeader(mail.fromName)), to: mail.to, reply: mail.replyTo ? party(mail.replyTo) : undefined, subject: mail.subject, html: mail.html, text },
   );
-  return true;
+  return 'smtp';
 }

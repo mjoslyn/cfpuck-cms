@@ -517,6 +517,21 @@ previews. Up to `SNIPPET_MAX` (20,000) characters each. A place ticked **Only af
 cookies** (`snippets.consent`) is kept in a `<template data-consent-snippet>` that popups.js puts in place,
 its scripts run in order, once the visitor accepts in the consent banner (`snippetAt`). Synced with the other settings.
 
+## Email log
+
+Settings > Email log (admins; `settings.site.mail_log` { enabled, days }, `src/lib/mail-log.ts`, migration
+`*_mail_log.sql`): while it is on, `sendMail` (`src/lib/forms/mail.ts`) keeps each email the site sends in
+`mail_log`, sent, failed (with the error) or not sent (no mail set up): its kind (`Mail.kind`: form, ticket,
+account, admin, other), recipients, sender, reply-to, subject, how it went out and its HTML and text. An
+email marked `secret` (account emails: password links, invitations, address confirmations, `sendLink` in
+`src/lib/auth/mail.ts`) is kept without its body (`withheld`), so nobody reading the log can use its link.
+Mailing Lists' emails (`kind: 'mailing'`: subscription confirmations, campaigns, its notices to admins) are
+never kept. Logging never stops an email (`logMail` doesn't throw). Whether it is on is read at most once a
+minute per instance. The hourly run deletes entries past the days (default 30, up to 365), and all of them
+while the log is off (`pruneMailLog`). The log (`/admin/email-log/`, admins only, `readOnly(admins)` in the
+policies) lists them newest first, by kind and status, searchable by address or subject, 50 a page; one
+email shows its body in a sandboxed frame and its plain text. Not synced or backed up.
+
 ## Compose with Claude
 
 `/admin/compose/` and the Compose panel in the page editor (docked beside the canvas; pin keeps it
@@ -1274,7 +1289,7 @@ builder's and campaign editor's Compose dialogs, or the editor's panel, whose co
 **Settings** (admins; `src/puck/SiteSettings.tsx`, page `src/pages/admin/settings/[...section].astro`): a side
 menu of sections in groups (`SETTINGS_GROUPS`, `src/lib/admin/settings-sections.ts`): Site (General, Menu,
 Social, Search, Types, the site's own options, Popups, Stats, Code snippets), Features (Events, Tickets, Members, Mailing Lists, marked
-On or Off), Services (Connections), Admin (Accessibility, Appearance) and Upkeep (Redirects, Sync,
+On or Off), Services (Connections), Admin (Accessibility, Appearance) and Upkeep (Redirects, Email log, Sync,
 Backups); a Section dropdown on phones. Each section has its own address, `/admin/settings/<section>/`
 (General `/admin/settings/`; `sectionOf`, `settingsPath`); the screen moves between them in place, so
 unsaved changes carry over, and an old `#<section>` link (and `admin`, now `appearance`) forwards to it.
@@ -1407,7 +1422,7 @@ only add; one that switches block types or settings goes out with `npm run deplo
 - Bindings: `DB` (D1), `BUCKET` (R2), `IMAGES` (Cloudflare Images), `JOBS` (a queue: Compose turns, campaign
   sending runs and restores, each run once with up to 15 minutes, `src/lib/jobs.ts`),
   `CF_VERSION_METADATA` (the page cache's validators). The Cron Triggers: mailing every 5 minutes and at
-  06:20 UTC, snapshots at 07:00 UTC, ticket emails and the statistics' pruning hourly (`SCHEDULES`).
+  06:20 UTC, snapshots at 07:00 UTC, ticket emails and the statistics' and email log's pruning hourly (`SCHEDULES`).
 - Variables and secrets reach the code as `process.env` (`nodejs_compat`); secrets are set with
   `npx wrangler secret put`. Code reads them with `env()` (`src/lib/env.ts`), which reads `.env` through
   `import.meta.env` under `astro dev` only: a build would write the build machine's `.env` values into

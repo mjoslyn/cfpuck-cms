@@ -46,6 +46,7 @@ An item can also open a larger drop-down panel: add **Links** under a **Links he
 | **Appearance** | The colours and logo of these admin screens. |
 | **Connections** | Connecting Claude, card payments (Stripe or Square) and Mailgun (see below). |
 | **Redirects** | Send visitors from an old address to a new one (see below). |
+| **Email log** | Keep a record of the emails the site sends (see below). |
 | **Sync** and **Backups** | Copying content between copies of the site, and backups. Usually left to whoever set up the site. |
 
 ## Connections
@@ -91,6 +92,17 @@ Someone who follows a broken link sees a "page not found" page. To make your own
 2. In **Settings > General**, choose it as the **Not found page**, then **Save settings**.
 
 Search engines don't list it. To go back to the standard one, set **Not found page** to **Default**.
+
+## Email log
+
+To check whether an email went out, turn on **Keep a log of the emails the site sends** in the **Email
+log** section, choose how many days to keep them, and press **Save settings**. Then **Open the email log**
+lists each email: when, who it went to, its subject and whether it was sent. Click a subject to see the
+email as it was sent.
+
+Emails with a sign-in, password, invitation or confirmation link show only who they went to and their
+subject, so nobody reading the log can use the link. Mailing list emails aren't in the log. Turning the
+log off deletes what it kept within the hour.
 
 ## Backups
 

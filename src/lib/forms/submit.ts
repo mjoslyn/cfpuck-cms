@@ -224,7 +224,7 @@ export async function notify(row: FormRow, values: Values, origin: string, payme
     try {
       const mail = renderNotification(row, n, values, origin, payment, await emailEvents(serviceClient(), n.design, origin));
       if (!mail.to.length) continue;
-      await sendMail(mail);
+      await sendMail({ ...mail, kind: 'form' });
     } catch (e) {
       // The submission is stored either way; a mail outage shouldn't lose it or show the visitor an error.
       console.error(`form ${row.id}: notification "${n.name}" failed`, e);

@@ -156,7 +156,7 @@ async function sendConfirmation(db: Db, contact: Contact, lists: MailList[], ori
     `<p>Please confirm that you’d like to receive ${esc(which)} from ${esc(name)} at ${esc(contact.email)}.</p>` +
     `<p><a href="${esc(link)}" style="display:inline-block;padding:10px 20px;background:#1f6672;color:#ffffff;text-decoration:none;border-radius:4px">Confirm my subscription</a></p>` +
     `<p style="color:#64748b;font-size:14px">If you didn’t ask for this, ignore this email: you won’t hear from us.</p>`;
-  return sendMail({ to: [contact.email], subject: `Confirm your subscription to ${name}`, html, fromName: name }).catch((e) => {
+  return sendMail({ to: [contact.email], subject: `Confirm your subscription to ${name}`, html, fromName: name, kind: 'mailing' }).catch((e) => {
     console.error(`mailing: confirmation email failed: ${e.message}`);
     return false;
   });

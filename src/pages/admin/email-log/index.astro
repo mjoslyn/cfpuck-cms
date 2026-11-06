@@ -1,0 +1,126 @@
+---
+// The email log (admins; Settings > Email log, src/lib/mail-log.ts): the emails the site sent, newest
+// first, by kind and status, searchable by address or subject, 50 a page; ?id= shows one, its body in a
+// sandboxed frame (no scripts, no links followed in place) and its plain text.
+import Admin from '../../../layouts/Admin.astro';
+import { SITE_TZ } from '../../../lib/site';
+import { MAIL_KINDS, mailLogSettings } from '../../../lib/mail-log';
+
+const db = Astro.locals.db;
+const params = Astro.url.searchParams;
+const { data: siteRow } = await db.from('settings').select('value').eq('key', 'site').maybeSingle();
+const settings = mailLogSettings(siteRow?.value as Record<string, any>);
+const PER_PAGE = 50;
+const page = Math.max(1, Math.min(9999, Number(params.get('page')) || 1));
+const kind = Object.keys(MAIL_KINDS).includes(params.get('kind') ?? '') ? params.get('kind')! : '';
+const status = ['sent', 'failed', 'not-sent'].includes(params.get('status') ?? '') ? params.get('status')! : '';
+// Characters the filter syntax gives meaning to are left out of a search.
+const q = (params.get('q') ?? '').replace(/[,()%*\\]/g, ' ').trim().slice(0, 100);
+const id = Number(params.get('id')) || 0;
+
+type Row = { id: number; created_at: string; kind: string; to_addresses: string; from_address: string; reply_to: string | null; subject: string; html: string | null; text: string | null; withheld: boolean; status: string; via: string; error: string | null };
+const one = id ? ((await db.from('mail_log').select('*').eq('id', id).maybeSingle<Row>()).data ?? null) : null;
+
+let query = db.from('mail_log').select('id, created_at, kind, to_addresses, subject, withheld, status, via, error', { count: 'exact' });
+if (kind) query = query.eq('kind', kind);
+if (status) query = query.eq('status', status);
+if (q) query = query.or(`to_addresses.ilike.%${q}%,subject.ilike.%${q}%`);
+const { data: rows, count } = await query.order('created_at', { ascending: false }).order('id', { ascending: false }).range((page - 1) * PER_PAGE, page * PER_PAGE - 1);
+const pages = Math.max(1, Math.ceil((count ?? 0) / PER_PAGE));
+
+const when = (s: string) => new Date(s).toLocaleString('en-US', { timeZone: SITE_TZ, dateStyle: 'medium', timeStyle: 'short' });
+const link = (patch: Record<string, string>) => {
+  const p = new URLSearchParams({ ...(kind ? { kind } : {}), ...(status ? { status } : {}), ...(q ? { q } : {}), ...(page > 1 ? { page: String(page) } : {}), ...patch });
+  for (const [k, v] of [...p]) if (!v) p.delete(k);
+  return `/admin/email-log/${p.toString() ? `?${p}` : ''}`;
+};
+const STATUS: Record<string, [string, string]> = {
+  sent: ['Sent', 'bg-[#ecfdf5] text-[#047857]'],
+  failed: ['Failed', 'bg-[#fef2f2] text-[#b91c1c]'],
+  'not-sent': ['Not sent', 'bg-[#fffbeb] text-[#b45309]'],
+};
+const VIA: Record<string, string> = { 'email-service': 'Cloudflare Email Service', smtp: 'SMTP', '': 'Nothing (no mail set up)' };
+---
+<Admin title="Email log">
+  {one ? (
+    <>
+      <p class="text-sm"><a href={link({ id: '' })} class="text-admin-muted hover:text-admin-accent">← Email log</a></p>
+      <h1 class="mt-2 text-2xl font-normal">{one.subject || '(no subject)'}</h1>
+      <dl class="mt-4 grid max-w-3xl grid-cols-[8rem_1fr] gap-x-4 gap-y-1 text-sm">
+        <dt class="text-admin-muted">To</dt><dd>{one.to_addresses}</dd>
+        <dt class="text-admin-muted">From</dt><dd>{one.from_address}</dd>
+        {one.reply_to && (<><dt class="text-admin-muted">Reply to</dt><dd>{one.reply_to}</dd></>)}
+        <dt class="text-admin-muted">When</dt><dd>{when(one.created_at)}</dd>
+        <dt class="text-admin-muted">Kind</dt><dd>{MAIL_KINDS[one.kind as keyof typeof MAIL_KINDS] ?? one.kind}</dd>
+        <dt class="text-admin-muted">Status</dt><dd><span class:list={['rounded px-2 py-0.5 text-xs', STATUS[one.status]?.[1]]}>{STATUS[one.status]?.[0] ?? one.status}</span> <span class="text-admin-muted">via {VIA[one.via] ?? one.via}</span></dd>
+        {one.error && (<><dt class="text-admin-muted">Error</dt><dd class="text-[#b91c1c]">{one.error}</dd></>)}
+      </dl>
+      {one.withheld ? (
+        <p class="mt-6 max-w-3xl rounded bg-admin-soft p-4 text-sm text-admin-muted">Not kept: this email carries a sign-in, password, invitation or confirmation link, so only who it went to and its subject are logged.</p>
+      ) : (
+        <>
+          <h2 class="mt-6 text-sm font-semibold">As sent</h2>
+          <iframe title="The email as sent" sandbox="" srcdoc={one.html ?? ''} class="mt-2 h-[600px] w-full max-w-3xl rounded border border-admin-ink/10 bg-white"></iframe>
+          <details class="mt-4 max-w-3xl">
+            <summary class="cursor-pointer text-sm font-semibold">Plain text</summary>
+            <pre class="mt-2 whitespace-pre-wrap rounded bg-white p-4 text-xs shadow-[0_0_0_1px_rgba(26,26,46,0.08)]">{one.text}</pre>
+          </details>
+        </>
+      )}
+    </>
+  ) : (
+    <>
+      <h1 class="text-3xl font-normal">Email log</h1>
+      <p class="mt-1 text-sm text-admin-muted">
+        {settings.enabled
+          ? `The emails the site sent in the last ${settings.days} days, newest first. Mailing Lists' emails aren't kept here.`
+          : 'The log is off, so nothing new is kept.'}{' '}
+        <a href="/admin/settings/email-log/" class="underline hover:text-admin-accent">Settings &gt; Email log</a>
+      </p>
+      <form method="get" class="mt-4 flex flex-wrap items-center gap-2">
+        <select name="kind" aria-label="Kind" class="rounded border border-admin-ink/15 bg-white px-2 py-1.5 text-sm">
+          <option value="">All kinds</option>
+          {Object.entries(MAIL_KINDS).filter(([k]) => k !== 'mailing').map(([k, label]) => <option value={k} selected={k === kind}>{label}</option>)}
+        </select>
+        <select name="status" aria-label="Status" class="rounded border border-admin-ink/15 bg-white px-2 py-1.5 text-sm">
+          <option value="">Any status</option>
+          {Object.entries(STATUS).map(([k, [label]]) => <option value={k} selected={k === status}>{label}</option>)}
+        </select>
+        <input type="search" name="q" value={q} placeholder="Address or subject" aria-label="Search" class="w-56 rounded border border-admin-ink/15 bg-white px-2 py-1.5 text-sm" />
+        <button class="rounded border border-admin-ink/15 bg-white px-3 py-1.5 text-sm hover:border-admin-accent hover:text-admin-accent">Show</button>
+      </form>
+      <div class="mt-4 overflow-x-auto rounded bg-white shadow-[0_0_0_1px_rgba(26,26,46,0.08)]">
+        <table class="w-full text-sm">
+          <thead class="border-b border-admin-ink/10 text-left text-xs text-admin-muted">
+            <tr>
+              <th class="px-4 py-2 font-medium">When</th>
+              <th class="px-4 py-2 font-medium">To</th>
+              <th class="px-4 py-2 font-medium">Subject</th>
+              <th class="px-4 py-2 font-medium">Kind</th>
+              <th class="px-4 py-2 font-medium">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(rows ?? []).map((r: any) => (
+              <tr class="border-b border-admin-ink/5 last:border-0 hover:bg-admin-bg">
+                <td class="px-4 py-2 whitespace-nowrap text-admin-muted">{when(r.created_at)}</td>
+                <td class="max-w-[16rem] truncate px-4 py-2">{r.to_addresses}</td>
+                <td class="px-4 py-2"><a href={link({ id: String(r.id) })} class="hover:text-admin-accent">{r.subject || '(no subject)'}</a>{r.withheld && <span class="ml-2 text-xs text-admin-muted">(body not kept)</span>}</td>
+                <td class="px-4 py-2 whitespace-nowrap text-admin-muted">{MAIL_KINDS[r.kind as keyof typeof MAIL_KINDS] ?? r.kind}</td>
+                <td class="px-4 py-2"><span class:list={['rounded px-2 py-0.5 text-xs whitespace-nowrap', STATUS[r.status]?.[1]]} title={r.error ?? undefined}>{STATUS[r.status]?.[0] ?? r.status}</span></td>
+              </tr>
+            ))}
+            {!rows?.length && <tr><td colspan="5" class="px-4 py-10 text-center text-admin-muted">{q || kind || status ? 'No emails match.' : 'No emails logged.'}</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      {pages > 1 && (
+        <nav class="mt-4 flex items-center gap-3 text-sm" aria-label="Pages">
+          {page > 1 && <a href={link({ page: String(page - 1) })} class="hover:text-admin-accent">← Newer</a>}
+          <span class="text-admin-muted">Page {page} of {pages}</span>
+          {page < pages && <a href={link({ page: String(page + 1) })} class="hover:text-admin-accent">Older →</a>}
+        </nav>
+      )}
+    </>
+  )}
+</Admin>

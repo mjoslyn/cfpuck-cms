@@ -114,7 +114,7 @@ async function sendLocally(b: Batch): Promise<string> {
   const fill = (s: string, vars: Record<string, string>) => s.replace(/%recipient\.([a-z0-9_]+)%/gi, (_, k) => vars[k] ?? '');
   for (const to of b.to) {
     const vars = b.variables[to] ?? {};
-    await sendMail({ to: [to], subject: fill(b.subject, vars), html: fill(b.html, vars), text: fill(b.text, vars), fromName: b.from.replace(/\s*<[^>]*>$/, ''), replyTo: b.replyTo });
+    await sendMail({ to: [to], subject: fill(b.subject, vars), html: fill(b.html, vars), text: fill(b.text, vars), fromName: b.from.replace(/\s*<[^>]*>$/, ''), replyTo: b.replyTo, kind: 'mailing' });
   }
   return `local-${Date.now()}`;
 }

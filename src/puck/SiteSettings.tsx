@@ -41,7 +41,7 @@ import { ADMIN_THEME_DEFAULTS, ADMIN_THEME_FIELDS, adminThemeVars, contrast, typ
 interface Props {
   /** The section the address names. */
   section: string;
-  site: { name?: string; description?: string; front_page_id?: number | null; not_found_page_id?: number | null; timezone?: string; search_types?: string[]; social?: { network: string; url: string }[]; share_image?: number; share_image_url?: string; templates?: TemplateMap; taxonomy_templates?: Record<string, string>; taxonomy_pages_off?: string[]; taxonomy_meta?: Record<string, TaxonomyMeta>; listing_meta?: Record<string, TaxonomyMeta>; listings_off?: string[]; featured_types?: string[]; icons?: Record<string, string>; icon_media_id?: number | null; icon_preview?: string; admin_theme?: AdminTheme; tickets?: TicketSettings; members?: Partial<MemberSettings>; mailing?: MailingSettings; events?: { enabled?: boolean }; a11y?: { block_publish?: boolean }; snippets?: CodeSnippets; popups?: Popup[]; stats?: StatsSettings };
+  site: { name?: string; description?: string; front_page_id?: number | null; not_found_page_id?: number | null; timezone?: string; search_types?: string[]; social?: { network: string; url: string }[]; share_image?: number; share_image_url?: string; templates?: TemplateMap; taxonomy_templates?: Record<string, string>; taxonomy_pages_off?: string[]; taxonomy_meta?: Record<string, TaxonomyMeta>; listing_meta?: Record<string, TaxonomyMeta>; listings_off?: string[]; featured_types?: string[]; icons?: Record<string, string>; icon_media_id?: number | null; icon_preview?: string; admin_theme?: AdminTheme; tickets?: TicketSettings; members?: Partial<MemberSettings>; mailing?: MailingSettings; events?: { enabled?: boolean }; a11y?: { block_publish?: boolean }; snippets?: CodeSnippets; popups?: Popup[]; stats?: StatsSettings; mail_log?: { enabled?: boolean; days?: number } };
   options: Record<string, any>;
   pages: { id: number; title: string }[];
   templates: TemplateInfo[];
@@ -302,6 +302,26 @@ export default function SiteSettings({ section, site: initialSite, options: init
                 ? 'The cookie is set only for visitors who accept cookies in the consent banner (Settings > Popups). Others are still counted once a day.'
                 : 'No cookie consent banner is on, so every visitor gets the cookie. In the EU and UK the law asks for consent first: add a cookie consent banner under Settings > Popups.'}
             </p>
+          )}
+        </>
+      ),
+    },
+    {
+      id: 'email-log',
+      label: 'Email log',
+      panel: (
+        <>
+          <Toggle title="Keep a log of the emails the site sends" value={site.mail_log?.enabled} onChange={(on) => setSite((s) => ({ ...s, mail_log: { ...s.mail_log, enabled: on } }))} />
+          <p className="mb-3 text-xs text-admin-muted">
+            Form notifications, ticket emails, account emails and notices to admins, each with who it went to, its subject, whether it was sent and what it said. Emails with a sign-in, password, invitation or confirmation link are kept without what they said, so nobody reading the log can use the link. Mailing Lists' emails aren't kept here. Turning the log off deletes what it kept within the hour.
+          </p>
+          {site.mail_log?.enabled && (
+            <>
+              <Row title="Keep emails for (days)">
+                <input type="number" min={1} max={365} className={inputClass} value={site.mail_log?.days ?? 30} onChange={(e) => setSite((s) => ({ ...s, mail_log: { ...s.mail_log, days: Number(e.target.value) || undefined } }))} />
+              </Row>
+              <a className="text-sm text-admin-accent underline" href="/admin/email-log/">Open the email log</a>
+            </>
           )}
         </>
       ),

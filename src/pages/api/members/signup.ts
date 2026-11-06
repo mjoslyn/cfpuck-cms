@@ -41,7 +41,7 @@ export const POST: APIRoute = async ({ request, redirect, url }) => {
   const admin = env('FORMS_ADMIN_EMAIL') || site.adminEmail;
   if (admin) {
     const html = `<p>${esc(name)} (${esc(email)}) created an account${status === 'pending' ? '. It is waiting for approval' : ''}.</p><p><a href="${url.origin}/admin/members/">Members</a></p>`;
-    await sendMail({ to: [admin], subject: `New member sign-up: ${name}`, html }).catch((e) => console.error(`members: sign-up email failed: ${e.message}`));
+    await sendMail({ to: [admin], subject: `New member sign-up: ${name}`, html, kind: 'admin' }).catch((e) => console.error(`members: sign-up email failed: ${e.message}`));
   }
   // Ticked "Send me ... by email" (Mailing on): the member lists, confirmed by email like any sign-up.
   if (form.get('mail_optin')) {

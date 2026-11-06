@@ -29,12 +29,15 @@ const SCHEDULES: Record<string, { name: string; run: () => Promise<string> }> = 
   // Snapshots of this site when they are on and due (src/lib/sync.ts); 07:00 UTC.
   '0 7 * * *': { name: 'scheduled snapshot', run: async () => (await import('./lib/sync')).scheduledSnapshot() },
   // Ticket reminders, follow-ups, expired holds, waitlists (src/lib/tickets/orders.ts), and yesterday's
-  // visitor hashes and old site statistics pruned (src/lib/stats.ts); hourly.
+  // visitor hashes and old site statistics pruned (src/lib/stats.ts), and the email log's old entries
+  // (src/lib/mail-log.ts); hourly.
   '0 * * * *': {
     name: 'hourly',
     run: async () => {
-      const stats = await (await import('./lib/stats')).pruneStats((await import('./lib/db/site')).siteDb()).catch((e: Error) => `stats prune failed: ${e.message}`);
-      return `${await (await import('./lib/tickets/orders')).sendDueTicketEmails()}; ${stats}`;
+      const db = (await import('./lib/db/site')).siteDb();
+      const stats = await (await import('./lib/stats')).pruneStats(db).catch((e: Error) => `stats prune failed: ${e.message}`);
+      const log = await (await import('./lib/mail-log')).pruneMailLog(db).catch((e: Error) => `mail log prune failed: ${e.message}`);
+      return `${await (await import('./lib/tickets/orders')).sendDueTicketEmails()}; ${stats}; ${log}`;
     },
   },
 };

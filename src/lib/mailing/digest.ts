@@ -104,5 +104,5 @@ export async function runDigest(db: Db, d: Digest, now = new Date(), opts: { for
 
 export async function tellAdmins(subject: string, html: string): Promise<void> {
   const admin = env('FORMS_ADMIN_EMAIL') || config.adminEmail;
-  if (admin) await sendMail({ to: [admin], subject, html }).catch((e) => console.error(`mailing: admin email failed: ${e.message}`));
+  if (admin) await sendMail({ to: [admin], subject, html, kind: 'mailing' }).catch((e) => console.error(`mailing: admin email failed: ${e.message}`));
 }
