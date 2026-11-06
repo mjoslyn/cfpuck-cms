@@ -2,6 +2,8 @@
 // moonpuck.com's home page. The docs (Starlight) are everything else on the site.
 const FONTS =
   'https://fonts.googleapis.com/css2?family=Roboto+Serif:ital,opsz,wdth,wght@0,8..144,50..150,300..700;1,8..144,50..150,300..700&family=Instrument+Sans:wght@400;500;600;700&display=swap';
+// The share card (public/og.png), also on every docs page (astro.config.mjs).
+const SHARE_ALT = 'Moonpuck, the open source website builder: Hand it the flyer. Get the page.';
 const description =
   'Moonpuck is an open source website builder for small organisations, with Claude built in. Events, tickets, members and mailing lists come with it, on your own Cloudflare account.';
 ---
@@ -13,8 +15,18 @@ const description =
 <title>Moonpuck: hand it the flyer, get the page</title>
 <meta name="description" content={description}>
 <link rel="canonical" href="https://moonpuck.com/">
-<meta property="og:title" content="Moonpuck">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://moonpuck.com/">
+<meta property="og:site_name" content="moonpuck">
+<meta property="og:title" content="Moonpuck: hand it the flyer, get the page">
 <meta property="og:description" content={description}>
+<meta property="og:image" content="https://moonpuck.com/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content={SHARE_ALT}>
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://moonpuck.com/og.png">
+<meta name="twitter:image:alt" content={SHARE_ALT}>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

@@ -7,6 +7,8 @@ import starlightSidebarTopics from 'starlight-sidebar-topics';
 const FONTS =
   'https://fonts.googleapis.com/css2?family=Roboto+Serif:ital,opsz,wdth,wght@0,8..144,50..150,300..700;1,8..144,50..150,300..700&family=Instrument+Sans:wght@400;500;600;700&display=swap';
 
+const SHARE_ALT = 'Moonpuck, the open source website builder: Hand it the flyer. Get the page.';
+
 export default defineConfig({
   site: 'https://moonpuck.com',
   // This folder's own tsconfig: the repository's root one extends a package only the CMS installs, and
@@ -38,6 +40,15 @@ export default defineConfig({
         { tag: 'link', attrs: { rel: 'preconnect', href: 'https://fonts.googleapis.com' } },
         { tag: 'link', attrs: { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: true } },
         { tag: 'link', attrs: { rel: 'stylesheet', href: FONTS } },
+        // The share card (public/og.png) for every docs page; Starlight writes the other Open Graph tags.
+        ...[
+          ['property', 'og:image', 'https://moonpuck.com/og.png'],
+          ['property', 'og:image:width', '1200'],
+          ['property', 'og:image:height', '630'],
+          ['property', 'og:image:alt', SHARE_ALT],
+          ['name', 'twitter:image', 'https://moonpuck.com/og.png'],
+          ['name', 'twitter:image:alt', SHARE_ALT],
+        ].map(([key, name, content]) => ({ tag: 'meta', attrs: { [key]: name, content } })),
       ],
       social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/mjoslyn/moonpuck' }],
       editLink: { baseUrl: 'https://github.com/mjoslyn/moonpuck/edit/main/docs-site/' },
