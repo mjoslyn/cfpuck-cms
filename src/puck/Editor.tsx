@@ -1,6 +1,7 @@
 // The visual editor. Content mode edits an entry's blocks inside its template; layout mode edits the
 // template document itself (pages like the homepage keep their content in the template).
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { FieldsTrail } from './FieldsTrail';
 import { Puck, blocksPlugin, createUsePuck, outlinePlugin, useGetPuck, type Data } from '@puckeditor/core';
 import Composer, { type LivePage, type Selection } from '../admin/Composer';
 import MakePage from '../admin/MakePage';
@@ -668,6 +669,8 @@ export default function Editor({ entryId, template, admin = false }: EditorProps
         headerTitle={'\u200b'}
         overrides={{
           iframe: CanvasFrame,
+          // Page, then every block the selected one sits inside, above its settings.
+          fields: ({ children }) => <FieldsTrail>{children}</FieldsTrail>,
           // A page edited in layout mode: a line under the header saying the template is what's edited.
           header: ({ children }) => (
             <>

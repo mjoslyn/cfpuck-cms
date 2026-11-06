@@ -30,6 +30,49 @@
   height: 100%;
 }
 
+/* The settings panel's trail (src/puck/FieldsTrail.tsx): Page, then the blocks the selected one sits
+   inside. It replaces Puck's breadcrumbs, which show only the nearest parent. */
+.cms-editor-frame [class*="_SidebarSection-breadcrumbs_"] {
+  flex-wrap: wrap;
+}
+.cms-editor-frame [class*="_SidebarSection-breadcrumbs_"]:has(> .cms-trail) > [class*="_Breadcrumbs_"] {
+  display: none;
+}
+.cms-editor-frame [class*="_SidebarSection-breadcrumbs_"] > .cms-trail {
+  flex-basis: 100%;
+}
+.cms-trail__list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  font-size: var(--puck-font-size-xxs, 0.8125rem);
+}
+.cms-trail--inline {
+  padding: var(--puck-space-3, 12px) var(--puck-space-4, 16px) 0;
+}
+.cms-trail__list button {
+  background: none;
+  border: 0;
+  border-radius: var(--puck-radius-xs, 4px);
+  color: var(--puck-color-interactive, var(--color-admin-accent));
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+}
+.cms-trail__list button:hover {
+  text-decoration: underline;
+}
+.cms-trail__list button:focus-visible {
+  outline: 2px solid var(--puck-color-focus-ring, var(--color-admin-accent));
+  outline-offset: 2px;
+}
+.cms-trail__list button::after {
+  content: '›';
+  color: var(--color-admin-muted);
+  display: inline-block;
+  margin: 0 0.4em;
+}
+
 /* Notification message editor (form builder). */
 .email-message p,
 .email-message ul,

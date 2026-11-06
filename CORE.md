@@ -1222,7 +1222,10 @@ for admins, as is the redirects API (`ADMIN_ONLY` in `src/middleware.ts`; settin
 `src/lib/db/policies.ts`; the users API checks the role itself too, since making accounts is the server's). Editors are trusted with the
 site's markup: the HTML block (and an Embed block's HTML) is put on the page as written, at the admin's
 own address, so a script in it runs as whoever views the page, an admin included. `src/puck/Editor.tsx` renders blocks through the same string renderer inside Puck
-(`BlockView.tsx` parses HTML to React; slots become the block's inner wrapper element). The left rail
+(`BlockView.tsx` parses HTML to React; slots become the block's inner wrapper element). Above the selected
+block's settings, a trail of buttons leads back to it (`src/puck/FieldsTrail.tsx`, the `fields` override;
+`ancestorsOf` in `src/lib/puck/trail.ts`): **Page** (the page's own settings), then every block it sits
+inside, in place of Puck's breadcrumbs, which show only the nearest parent. The left rail
 has Blocks (and Patterns), Outline and an accessibility check (`A11yPanel.tsx`). Problems a person has to judge
 (warnings, and text over an image, which is always a problem since its contrast can't be measured) can be
 marked as checked with a note; the marks live in the document's root props (`a11y`), save on their own as

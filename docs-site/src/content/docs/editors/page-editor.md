@@ -68,8 +68,9 @@ The right-hand panel shows the settings of the selected block, under its name. W
 selected, it shows **Page settings**: the page's title, address, featured image, categories, tags and
 so on (see [The page's settings](#the-pages-settings)).
 
-At the top of the panel, the names of the blocks it sits inside are buttons: click one to select that
-block instead, or click **Page** to go back to the page's settings.
+Above the block's name at the top of the panel is where it sits: **Page**, then each block it is
+inside (such as **Page › Section › Columns › Column**). Click one to select that block instead, or
+click **Page** to go back to the page's settings.
 
 ## Working with blocks
 
