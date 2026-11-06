@@ -1582,6 +1582,8 @@ a content migration or a SQL migration (`db/migrations/`) that edits the JSON. C
 ## Checking changes
 
 - `npm run check` and `npm test` pass; a fix comes with a test that fails without it.
+- The docs match the change, in the same commit: this file for what the code does, and the Editor and
+  Admin guides (`docs-site/src/content/docs/editors/`, `admins/`) for what editors and admins see.
 - Render the affected pages before and after and diff the HTML for unintended changes (ignore
   cache-busting `?v=` values and shuffled collections); look at screenshots (desktop and phone) of
   intended ones. Lazy-loaded images need the page scrolled before a full-page screenshot.

@@ -10,7 +10,10 @@ it too. This file is about working here.
 
 ## Keep the docs current
 
-Update the docs in the same commit as the change, not afterwards:
+Update the docs in the same commit as the change, not afterwards. A change isn't done until the docs
+match it: anything an editor or admin meets (a screen, label, message, setting, limit or behaviour) is
+checked against the Editor and Admin guides, and anything in the code against `CORE.md`. Removed or
+renamed things come out of the docs too.
 
 - `CORE.md`: what the core does and where (features, data, APIs, blocks, settings, rules). Sites read
   it, so describe the core, never a particular site.
@@ -49,12 +52,14 @@ Update the docs in the same commit as the change, not afterwards:
    category in `buildConfig` (`src/puck/config.tsx`); containers go in `CONTENT_CONTAINERS`.
 4. Browser behaviour: a script in `public/assets/js/` that enhances the server markup (the page works
    without it).
-5. Styles in `src/styles/site.css`; a section in `CORE.md`.
+5. Styles in `src/styles/site.css`; a section in `CORE.md`; the block in the Editor guide's list of
+   blocks (`docs-site/src/content/docs/editors/page-editor.md`).
 
 ## Workflow
 
 1. Change and commit here. `npm run check` (TypeScript) and `npm test` (unit tests, `tests/`) must pass;
-   a fix comes with a test that fails without it.
+   a fix comes with a test that fails without it. The same commit updates the docs (see Keep the docs
+   current).
 2. Test on the example site, and for anything that real content exercises, in a site: in
    `../<site>`, `git fetch <path to this repository> main && git merge --no-commit FETCH_HEAD`,
    restart its dev server if config or dependencies changed, and test there.
