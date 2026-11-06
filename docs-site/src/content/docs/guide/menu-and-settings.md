@@ -36,13 +36,13 @@ An item can also open a larger drop-down panel: add **Links** under a **Links he
 | **Types** | The kinds of content the site has (add your own with **Add a type**), which layout (template) each uses, and under **Featured**, which kinds can be marked featured. Usually set up once. |
 | **Search** | Which kinds of content the site search covers. |
 | **Social** | Your social media profiles (shown as icons) and the picture used when a page without its own image is shared. |
-| **Popups** | Popups over the site's pages and the cookie consent banner (see [Popups and cookie consent](/moonpuck/guide/popups-and-cookies/)). |
-| **Stats** | Whether Stats recognises returning visitors with a cookie (see [Stats](/moonpuck/guide/stats/)). |
+| **Popups** | Popups over the site's pages and the cookie consent banner (see [Popups and cookie consent](/guide/popups-and-cookies/)). |
+| **Stats** | Whether Stats recognises returning visitors with a cookie (see [Stats](/guide/stats/)). |
 | **Code snippets** | Code to put on every page: paste a tag from an analytics, chat or advertising service, or a site verification tag, into **Header**, **Body start** or **Footer**, as the service's instructions say. Paste only code from a service you trust. Tick **Only after visitors accept cookies** for tracking tags. |
 | **Events** | Turn events on or off, and the site's time zone. |
 | **Members** | Members-only pages and member accounts, if your site uses them. |
 | **Mailing Lists** | Newsletter sign-ups and sending, if your site uses them. |
-| **Accessibility** | Whether publishing waits for the [accessibility check](/moonpuck/guide/accessibility/). |
+| **Accessibility** | Whether publishing waits for the [accessibility check](/guide/accessibility/). |
 | **Appearance** | The colours and logo of these admin screens. |
 | **Connections** | Connecting Claude, card payments (Stripe or Square) and Mailgun (see below). |
 | **Redirects** | Send visitors from an old address to a new one (see below). |

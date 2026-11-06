@@ -40,6 +40,6 @@ it again and change their mind.
 
 Until a visitor accepts:
 
-- The Stats cookie isn't set (see [Stats](/moonpuck/guide/stats/)).
+- The Stats cookie isn't set (see [Stats](/guide/stats/)).
 - Code snippets marked **Only after visitors accept cookies** (Settings > Code snippets) don't run. Tick
   that box for analytics, advertising and other tracking tags.

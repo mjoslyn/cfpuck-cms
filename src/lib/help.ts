@@ -2,4 +2,4 @@
 // help button. HELP_URL points it elsewhere, such as a site's own guide.
 import { env } from './env';
 
-export const helpUrl = () => env('HELP_URL') || 'https://mjoslyn.github.io/moonpuck/guide/';
+export const helpUrl = () => env('HELP_URL') || 'https://moonpuck.com/guide/';

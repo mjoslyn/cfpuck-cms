@@ -1,0 +1,237 @@
+/* Moonpuck's look for the docs: the home page's colours and type on Starlight's pages.
+   Unlayered, so these rules win over Starlight's own (@layer starlight.*). */
+
+:root {
+  --mp-sky: #2350e6;
+  --mp-navy: #1b2a6b;
+  --mp-night: #0f1840;
+  --mp-ink: #120c1f;
+  --mp-paper: #f7f0f5;
+  --mp-pink: #ffa5ff;
+  --mp-blush: #f5d8ef;
+  --mp-lavender: #dcd8ff;
+  --mp-periwinkle: #9898ff;
+  --mp-lime: #c5e975;
+  --mp-marigold: #fea903;
+  --mp-vermilion: #c83c1f;
+
+  --mp-serif: 'Roboto Serif', Georgia, serif;
+  --sl-font: 'Instrument Sans', system-ui, sans-serif;
+
+  /* Dark theme (Starlight's default block) */
+  --sl-color-accent-low: #2c3c85;
+  --sl-color-accent: var(--mp-pink);
+  --sl-color-accent-high: var(--mp-blush);
+  --sl-color-white: #ffffff;
+  --sl-color-gray-1: #eceaf6;
+  --sl-color-gray-2: #d6d3ea;
+  --sl-color-gray-3: #aaa6cc;
+  --sl-color-gray-4: #7a77a3;
+  --sl-color-gray-5: #3a4378;
+  --sl-color-gray-6: #1b2a6b;
+  --sl-color-black: var(--mp-night);
+  --sl-color-bg-nav: var(--mp-sky);
+  --sl-color-bg-sidebar: #13205a;
+}
+
+:root[data-theme='light'] {
+  --sl-color-accent-low: var(--mp-blush);
+  --sl-color-accent: var(--mp-sky);
+  --sl-color-accent-high: var(--mp-navy);
+  --sl-color-white: var(--mp-ink);
+  --sl-color-gray-1: #241c35;
+  --sl-color-gray-2: #352c48;
+  --sl-color-gray-3: #544a66;
+  --sl-color-gray-4: #7a7189;
+  --sl-color-gray-5: #c9c0d2;
+  --sl-color-gray-6: #eee6ee;
+  --sl-color-gray-7: #faf5f9;
+  --sl-color-black: #ffffff;
+  --sl-color-bg-nav: var(--mp-sky);
+  --sl-color-bg-sidebar: #fcf5fa;
+}
+
+/* Header: always the sky blue, whatever the theme */
+.page > header.header,
+header.header {
+  background-color: var(--mp-sky);
+  border-bottom: 3px solid var(--mp-ink);
+  color: var(--mp-paper);
+}
+header.header .site-title {
+  color: var(--mp-pink);
+  font-family: var(--mp-serif);
+  font-variation-settings: 'wdth' 54, 'opsz' 144;
+  font-weight: 400;
+  font-size: 2rem;
+  letter-spacing: -0.01em;
+}
+header.header .site-title img {
+  height: 1.9rem;
+}
+header.header .social-icons a,
+header.header starlight-theme-select,
+header.header starlight-theme-select select,
+header.header .sl-flex > a {
+  color: var(--mp-paper);
+}
+header.header .social-icons::after {
+  border-color: rgba(247, 240, 245, 0.35);
+}
+header.header button[data-open-modal] {
+  background-color: rgba(255, 255, 255, 0.14);
+  border: 1.5px solid rgba(247, 240, 245, 0.55);
+  border-radius: 999px;
+  color: var(--mp-paper);
+}
+header.header button[data-open-modal]:hover {
+  border-color: var(--mp-paper);
+  color: #ffffff;
+}
+header.header button[data-open-modal] kbd {
+  background-color: transparent;
+  color: var(--mp-paper);
+}
+header.header starlight-menu-button button {
+  background-color: var(--mp-blush);
+  color: var(--mp-ink);
+  border-radius: 999px;
+  box-shadow: none;
+}
+
+/* Sidebar */
+.sidebar-pane {
+  border-inline-end: 1px solid var(--sl-color-hairline);
+}
+.sidebar-content .group-label .large {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sl-color-white);
+}
+.sidebar-content a {
+  border-radius: 999px;
+}
+.sidebar-content a[aria-current='page'],
+.sidebar-content a[aria-current='page']:hover,
+.sidebar-content a[aria-current='page']:focus {
+  background-color: var(--sl-color-accent);
+  color: var(--sl-color-black);
+  font-weight: 600;
+}
+
+/* Page title and headings: the tall serif */
+h1#_top,
+.sl-markdown-content :is(h1, h2, h3),
+.hero h1 {
+  font-family: var(--mp-serif);
+  font-variation-settings: 'wdth' 54, 'opsz' 144;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  line-height: 1.05;
+  color: var(--sl-color-white);
+}
+h1#_top {
+  font-size: clamp(2.6rem, 6vw, 3.6rem);
+}
+.sl-markdown-content h2 {
+  font-size: 2.3rem;
+}
+.sl-markdown-content h3 {
+  font-size: 1.7rem;
+}
+.sl-markdown-content :is(h4, h5, h6) {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 0.95rem;
+}
+
+/* Links */
+.sl-markdown-content a:not(:where(.not-content *)) {
+  color: var(--sl-color-text-accent);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+}
+
+/* Inline code, asides, cards, images: thick outlines and round corners */
+.sl-markdown-content :not(pre) > code {
+  border-radius: 6px;
+}
+.starlight-aside {
+  border: 3px solid var(--mp-ink);
+  border-radius: 16px;
+  background-color: var(--mp-blush);
+  color: var(--mp-ink);
+}
+.starlight-aside .starlight-aside__title {
+  color: var(--mp-ink);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+}
+.starlight-aside--tip {
+  background-color: var(--mp-lime);
+}
+.starlight-aside--caution {
+  background-color: var(--mp-marigold);
+}
+.starlight-aside--danger {
+  background-color: #ffb3a3;
+}
+.starlight-aside :is(a, code) {
+  color: var(--mp-ink);
+}
+:root:not([data-theme='light']) .starlight-aside {
+  border-color: #000000;
+}
+.sl-markdown-content img {
+  border: 3px solid var(--mp-ink);
+  border-radius: 14px;
+}
+.card {
+  border: 3px solid var(--mp-ink);
+  border-radius: 18px;
+}
+
+/* Previous and next */
+.pagination-links a {
+  border: 2px solid var(--sl-color-white);
+  border-radius: 18px;
+  box-shadow: none;
+}
+.pagination-links a:hover {
+  background-color: var(--sl-color-accent-low);
+  border-color: var(--sl-color-white);
+}
+.pagination-links .link-title {
+  font-family: var(--mp-serif);
+  font-variation-settings: 'wdth' 54, 'opsz' 144;
+  font-size: 1.6rem;
+  color: var(--sl-color-white);
+}
+
+/* Search dialog */
+site-search dialog {
+  border: 3px solid var(--mp-ink);
+  border-radius: 18px;
+}
+
+/* The "On this page" bar on small screens sits on the page, not the header's blue */
+mobile-starlight-toc nav {
+  background-color: var(--sl-color-black);
+  border-top: 0;
+}
+
+/* Code blocks: round corners and the ink outline */
+.expressive-code .frame {
+  border: 2px solid var(--mp-ink);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: none;
+}
+.expressive-code .frame pre {
+  border: 0;
+}

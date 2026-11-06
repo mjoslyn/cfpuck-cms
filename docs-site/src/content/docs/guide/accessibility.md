@@ -33,7 +33,7 @@ comes back for another look.
 
 | The check says | What to do |
 | --- | --- |
-| Image has no alt text | Describe the image (see [Images and files](/moonpuck/guide/images-and-files/)). |
+| Image has no alt text | Describe the image (see [Images and files](/guide/images-and-files/)). |
 | Link text doesn't say where it goes | Change "click here" to words that say where the link leads, such as "see the full schedule". |
 | Text contrast is too low | Pick a darker text colour, or a lighter background. |
 | Heading skips a level | Use headings in order: a page title, then sections, then sub-sections. |

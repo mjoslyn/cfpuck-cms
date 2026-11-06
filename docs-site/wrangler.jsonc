@@ -1,0 +1,11 @@
+// moonpuck.com: the home page and the docs, built by `npm run build` into ./dist and served as static
+// files by a Worker. Deploy with `npx wrangler deploy` (Workers Builds runs it on every push to main).
+{
+  "name": "moonpuck-site",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "404-page"
+  },
+  "routes": [{ "pattern": "moonpuck.com", "custom_domain": true }]
+}

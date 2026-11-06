@@ -1,0 +1,308 @@
+---
+// moonpuck.com's home page. The docs (Starlight) are everything else on the site.
+const FONTS =
+  'https://fonts.googleapis.com/css2?family=Roboto+Serif:ital,opsz,wdth,wght@0,8..144,50..150,300..700;1,8..144,50..150,300..700&family=Instrument+Sans:wght@400;500;600;700&display=swap';
+const description =
+  'Moonpuck is an open source website builder for small organisations, with Claude built in. Events, tickets, members and mailing lists come with it, on your own Cloudflare account.';
+---
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Moonpuck: hand it the flyer, get the page</title>
+<meta name="description" content={description}>
+<link rel="canonical" href="https://moonpuck.com/">
+<meta property="og:title" content="Moonpuck">
+<meta property="og:description" content={description}>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href={FONTS}>
+<style is:global>
+body{margin:0;background:#2350E6}
+a{color:#120C1F}a:hover{color:#000000}
+.mp-wrap{max-width:1180px;margin:0 auto;padding-inline:40px;box-sizing:border-box;position:relative}
+.mp-serif{font-family:'Roboto Serif',Georgia,serif;font-variation-settings:"wdth" 54,"opsz" 144;font-weight:400}
+.mp-label{font-family:'Instrument Sans',sans-serif;font-weight:700;font-size:15px;letter-spacing:1px;text-transform:uppercase}
+.mp-pill{display:inline-flex;align-items:center;min-height:46px;box-sizing:border-box;padding:12px 26px;border-radius:999px;font-family:'Instrument Sans',sans-serif;font-weight:700;font-size:14px;letter-spacing:0.6px;text-transform:uppercase;text-decoration:none}
+a.mp-nav-link{color:#F7F0F5;text-decoration:none}
+a.mp-nav-link:hover{text-decoration:underline;text-underline-offset:4px}
+.mp-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:18px}
+.mp-card{border:3px solid #120C1F;border-radius:18px;padding:24px 24px 26px}
+@media (max-width:900px){.mp-nav{display:none!important}.mp-compose{display:none!important}}
+@media (max-width:600px){.mp-wrap{padding-inline:16px}.mp-h1{font-size:60px!important}.mp-h2{font-size:44px!important}.mp-step{font-size:40px!important}.mp-lead{font-size:24px!important}.mp-rail{display:none!important}}
+</style>
+</head>
+<body>
+<div style="font-family: 'Instrument Sans', system-ui, sans-serif; color: #120C1F; background: #2350E6; width: 100%">
+
+<!-- HERO -->
+<section style="background: #2350E6; color: #F7F0F5; overflow: hidden">
+<div class="mp-wrap">
+<header style="display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 26px 0">
+<a href="/" class="mp-nav-link" style="display: flex; align-items: center; gap: 8px">
+<svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><path d="M22 3 A14 14 0 1 0 31 22 A11 11 0 0 1 22 3 Z" fill="#FFA5FF"></path></svg>
+<span class="mp-serif" style="font-size: 38px; line-height: 1; color: #FFA5FF; letter-spacing: -0.5px">moonpuck</span>
+</a>
+<nav class="mp-nav" aria-label="Main" style="display: flex; gap: 28px">
+<a href="#compose" class="mp-nav-link mp-label" style="font-size: 13px">Compose</a>
+<a href="#features" class="mp-nav-link mp-label" style="font-size: 13px">Features</a>
+<a href="#events" class="mp-nav-link mp-label" style="font-size: 13px">Events</a>
+<a href="#developers" class="mp-nav-link mp-label" style="font-size: 13px">Developers</a>
+<a href="/start/local-setup/" class="mp-nav-link mp-label" style="font-size: 13px">Docs</a>
+</nav>
+<a href="https://github.com/mjoslyn/moonpuck" class="mp-pill" style="background: #F5D8EF; color: #120C1F">GitHub</a>
+</header>
+
+<div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: center; padding: 40px 0 24px">
+<h1 class="mp-serif mp-h1" style="flex: 1 1 440px; min-width: 0; margin: 0; font-size: 112px; line-height: 0.98; letter-spacing: -1.5px; color: #F7F0F5">Hand it the flyer. Get the page.</h1>
+
+<div style="flex: 1 1 500px; min-width: 0">
+<svg width="100%" viewBox="0 0 600 560" role="img" aria-label="An illustration: the moon as a hockey puck, floating among clouds and stars, with a tiny town of web pages, a tree and a planted flag on top">
+<g fill="#FFFFFF" opacity="0.22">
+<path d="M40 470 q0 -34 36 -34 q8 -30 44 -26 q24 -28 58 -6 q36 -4 40 30 q30 4 26 36 Z"></path>
+<path d="M380 96 q0 -26 28 -26 q8 -26 38 -20 q22 -20 48 0 q30 -2 30 26 q24 4 20 28 h-164 Z"></path>
+</g>
+<g fill="#FDF152">
+<path d="M90 120 Q90 132 102 132 Q90 132 90 144 Q90 132 78 132 Q90 132 90 120 Z"></path>
+<path d="M540 220 Q540 236 556 236 Q540 236 540 252 Q540 236 524 236 Q540 236 540 220 Z"></path>
+<path d="M200 40 Q200 48 208 48 Q200 48 200 56 Q200 48 192 48 Q200 48 200 40 Z"></path>
+<path d="M500 470 Q500 480 510 480 Q500 480 500 490 Q500 480 490 480 Q500 480 500 470 Z"></path>
+<circle cx="140" cy="250" r="3"></circle><circle cx="470" cy="150" r="2.5"></circle><circle cx="60" cy="330" r="2"></circle><circle cx="560" cy="380" r="3"></circle>
+</g>
+<ellipse cx="300" cy="372" rx="270" ry="96" fill="none" stroke="#120C1F" stroke-width="2" stroke-dasharray="1 9" stroke-linecap="round" transform="rotate(-8 300 372)"></ellipse>
+<!-- puck side -->
+<path d="M90 330 L90 392 A210 70 0 0 0 510 392 L510 330 Z" fill="#E2B92E" stroke="#120C1F" stroke-width="4" stroke-linejoin="round"></path>
+<g fill="#120C1F">
+<ellipse cx="150" cy="400" rx="16" ry="9"></ellipse><ellipse cx="205" cy="420" rx="10" ry="6"></ellipse><ellipse cx="300" cy="432" rx="22" ry="10"></ellipse><ellipse cx="372" cy="424" rx="9" ry="6"></ellipse><ellipse cx="440" cy="408" rx="18" ry="9"></ellipse><ellipse cx="480" cy="380" rx="7" ry="5"></ellipse><ellipse cx="118" cy="370" rx="6" ry="4"></ellipse><ellipse cx="250" cy="398" rx="5" ry="3"></ellipse>
+</g>
+<!-- puck top -->
+<ellipse cx="300" cy="330" rx="210" ry="70" fill="#FDF152" stroke="#120C1F" stroke-width="4"></ellipse>
+<g fill="none" stroke="#120C1F" stroke-width="2.5">
+<ellipse cx="160" cy="340" rx="22" ry="8"></ellipse><ellipse cx="420" cy="360" rx="30" ry="10"></ellipse><ellipse cx="300" cy="378" rx="14" ry="5"></ellipse>
+</g>
+<!-- flag -->
+<line x1="150" y1="336" x2="150" y2="236" stroke="#120C1F" stroke-width="4" stroke-linecap="round"></line>
+<path d="M152 238 L206 252 L152 268 Z" fill="#FF542F" stroke="#120C1F" stroke-width="3" stroke-linejoin="round"></path>
+<!-- house -->
+<path d="M196 330 L196 272 L232 244 L268 272 L268 330 Z" fill="#F7F0F5" stroke="#120C1F" stroke-width="3.5" stroke-linejoin="round"></path>
+<path d="M188 276 L232 240 L276 276" fill="none" stroke="#120C1F" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"></path>
+<path d="M190 274 L232 240 L274 274 L268 270 L232 248 L196 270 Z" fill="#9898FF"></path>
+<rect x="208" y="284" width="18" height="16" fill="#FEA903" stroke="#120C1F" stroke-width="2.5"></rect>
+<rect x="238" y="296" width="18" height="34" fill="#4373EB" stroke="#120C1F" stroke-width="2.5"></rect>
+<!-- browser page building -->
+<rect x="290" y="196" width="124" height="138" fill="#F7F0F5" stroke="#120C1F" stroke-width="3.5"></rect>
+<rect x="290" y="196" width="124" height="20" fill="#2F5BD6" stroke="#120C1F" stroke-width="3.5"></rect>
+<circle cx="302" cy="206" r="3.2" fill="#FFA5FF"></circle><circle cx="313" cy="206" r="3.2" fill="#FDF152"></circle><circle cx="324" cy="206" r="3.2" fill="#C5E975"></circle>
+<rect x="302" y="228" width="100" height="40" fill="#C5E975" stroke="#120C1F" stroke-width="2.5"></rect>
+<path d="M302 268 L330 246 L350 260 L370 240 L402 268 Z" fill="#2F6B4F" stroke="#120C1F" stroke-width="2" stroke-linejoin="round"></path>
+<line x1="302" y1="282" x2="380" y2="282" stroke="#120C1F" stroke-width="4" stroke-linecap="round"></line>
+<line x1="302" y1="296" x2="400" y2="296" stroke="#120C1F" stroke-width="2.5" stroke-linecap="round"></line>
+<line x1="302" y1="308" x2="390" y2="308" stroke="#120C1F" stroke-width="2.5" stroke-linecap="round"></line>
+<rect x="302" y="318" width="40" height="10" rx="5" fill="#FF542F" stroke="#120C1F" stroke-width="2"></rect>
+<!-- tree -->
+<path d="M452 336 L452 274" stroke="#120C1F" stroke-width="5" stroke-linecap="round"></path>
+<path d="M452 290 L436 276 M452 300 L470 284" stroke="#120C1F" stroke-width="3" stroke-linecap="round"></path>
+<path d="M418 262 q-14 -26 12 -38 q2 -28 30 -26 q24 -16 40 8 q28 4 22 32 q14 22 -10 34 q-14 18 -40 8 q-22 12 -38 -6 q-26 2 -16 -12 Z" fill="#C5E975" stroke="#120C1F" stroke-width="3.5" stroke-linejoin="round"></path>
+<g fill="#120C1F"><circle cx="440" cy="236" r="2.5"></circle><circle cx="470" cy="226" r="2"></circle><circle cx="486" cy="252" r="2.5"></circle><circle cx="456" cy="258" r="2"></circle></g>
+<!-- satellite -->
+<g transform="translate(520 300) rotate(-20)"><rect x="-8" y="-6" width="16" height="12" fill="#FFA5FF" stroke="#120C1F" stroke-width="2.5"></rect><rect x="-30" y="-4" width="18" height="8" fill="#9898FF" stroke="#120C1F" stroke-width="2"></rect><rect x="12" y="-4" width="18" height="8" fill="#9898FF" stroke="#120C1F" stroke-width="2"></rect></g>
+</svg>
+</div>
+</div>
+
+<div style="display: flex; flex-wrap: wrap; gap: 56px; align-items: flex-start; padding: 32px 0 120px">
+<div style="flex: 0 0 260px; display: flex; justify-content: center">
+<svg width="240" height="240" viewBox="0 0 240 240" role="img" aria-label="A round badge reading: edit the page, publish the page">
+<defs><path id="mpBadge" d="M120 120 m-92 0 a92 92 0 1 1 184 0 a92 92 0 1 1 -184 0"></path></defs>
+<text fill="#F7F0F5" font-family="Roboto Serif, Georgia, serif" font-style="italic" font-size="25" letter-spacing="2"><textPath href="#mpBadge">edit the page · publish the page · </textPath></text>
+<path d="M134 74 A50 50 0 1 0 168 136 A40 40 0 0 1 134 74 Z" fill="#F7F0F5"></path>
+<path d="M104 104 q6 -6 12 0 M98 130 q8 8 16 0" fill="none" stroke="#2350E6" stroke-width="3" stroke-linecap="round"></path>
+<path d="M186 48 Q186 56 194 56 Q186 56 186 64 Q186 56 178 56 Q186 56 186 48 Z" fill="#FDF152"></path>
+</svg>
+</div>
+<div style="flex: 1 1 520px; min-width: 0">
+<p class="mp-label" style="margin: 0 0 18px; color: #FFA5FF">The open source website builder for small organisations</p>
+<p class="mp-serif mp-lead" style="margin: 0; font-size: 34px; line-height: 1.22; color: #F7F0F5">Moonpuck is a visual editor with Claude built in. Drop in a PDF, a few photos and a link, and get a finished page in your house style, every block still yours to edit.</p>
+<p class="mp-serif mp-lead" style="margin: 26px 0 0; font-size: 34px; line-height: 1.22; color: #F7F0F5">Events, tickets, members and mailing lists come with it, running on your own Cloudflare account.</p>
+<div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 40px">
+<a href="/start/local-setup/" class="mp-pill" style="background: #F5D8EF; color: #120C1F">Get started</a>
+<a href="#compose" class="mp-pill" style="background: #1B2A6B; color: #DCD8FF">How Compose works</a>
+</div>
+</div>
+</div>
+</div>
+</section>
+
+<!-- COMPOSE -->
+<section id="compose" style="background: #C83C1F; color: #FFFFFF; padding: 104px 0 112px">
+<div class="mp-wrap">
+<p class="mp-label" style="margin: 0 0 40px; color: #F5D8EF">Compose with Claude</p>
+
+<div style="display: flex; flex-wrap: wrap; gap: 24px 48px; align-items: flex-end; padding-bottom: 30px; border-bottom: 1px solid #120C1F">
+<h2 class="mp-serif mp-step" style="flex: 1 1 460px; margin: 0; font-size: 76px; line-height: 1; color: #FFFFFF">Add your materials</h2>
+<p style="flex: 1 1 320px; margin: 0; font-size: 18px; line-height: 1.55">PDFs, Word files, text, photos and video from your library, YouTube and Vimeo links, and web pages.</p>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 24px 48px; align-items: flex-end; padding: 40px 0 30px; border-bottom: 1px solid #120C1F">
+<h2 class="mp-serif mp-step" style="flex: 1 1 460px; margin: 0; font-size: 76px; line-height: 1; color: #FFFFFF">Say what you need</h2>
+<p style="flex: 1 1 320px; margin: 0; font-size: 18px; line-height: 1.55">A new page, an event, a form, a campaign. Select a block and ask for a change to just that part.</p>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 24px 48px; align-items: flex-end; padding: 40px 0 30px; border-bottom: 1px solid #120C1F">
+<h2 class="mp-serif mp-step" style="flex: 1 1 460px; margin: 0; font-size: 76px; line-height: 1; color: #FFFFFF">Edit it like any page</h2>
+<p style="flex: 1 1 320px; margin: 0; font-size: 18px; line-height: 1.55">Everything it builds is ordinary blocks. Your hand edits are kept, and the accessibility check runs before you publish.</p>
+</div>
+
+<div role="img" aria-label="The Moonpuck editor: a page on the canvas with the Compose panel open beside it" style="margin-top: 72px; background: #1B2A6B; border: 3px solid #120C1F; border-radius: 18px; overflow: hidden; color: #F7F0F5">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 2px solid #120C1F">
+<div style="display: flex; align-items: center; gap: 12px; font-size: 13px"><span style="font-weight: 600">Spring Fair</span><span style="background: #2C3C85; padding: 3px 10px; border-radius: 999px; font-size: 12px">Draft</span></div>
+<div style="display: flex; gap: 8px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px"><span style="padding: 7px 14px; background: #2C3C85; border-radius: 999px">Preview</span><span style="padding: 7px 14px; background: #F5D8EF; color: #120C1F; border-radius: 999px">Publish</span></div>
+</div>
+<div style="display: flex; min-height: 430px">
+<div class="mp-rail" style="width: 52px; border-right: 2px solid #120C1F; display: flex; flex-direction: column; align-items: center; gap: 18px; padding-top: 18px">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#DCD8FF" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg>
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#DCD8FF" stroke-width="2" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"></path></svg>
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#DCD8FF" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v4l3 2"></path></svg>
+</div>
+<div style="flex: 1 1 auto; min-width: 0; background: #9898FF; padding: 24px">
+<div style="background: #FFFFFF; border: 2px solid #120C1F; border-radius: 10px; max-width: 620px; margin: 0 auto; overflow: hidden; color: #120C1F">
+<div style="height: 160px; background: #2F6B4F; position: relative; display: flex; flex-direction: column; justify-content: flex-end; padding: 18px; box-sizing: border-box">
+<svg width="100%" height="100%" viewBox="0 0 300 150" preserveAspectRatio="none" aria-hidden="true" style="position: absolute; inset: 0"><path d="M0 110 Q 70 70 140 105 T 300 90 V150 H0 Z" fill="#245640"></path><circle cx="250" cy="40" r="18" fill="#F3D27A"></circle></svg>
+<span style="position: relative; font-size: 10px; font-weight: 700; letter-spacing: 1px; color: #F3D27A">SATURDAY, MAY 16</span>
+<span style="position: relative; font-family: Georgia, serif; font-size: 26px; color: #FFFFFF">Riverside Spring Fair</span>
+</div>
+<div style="padding: 16px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; outline: 3px solid #FF542F; outline-offset: -6px; border-radius: 6px">
+<div style="display: flex; flex-direction: column; gap: 6px"><div style="height: 46px; background: #E6E1D3; border-radius: 4px"></div><div style="height: 6px; width: 80%; background: #C9CFDA; border-radius: 3px"></div><div style="height: 6px; width: 55%; background: #DDE1E8; border-radius: 3px"></div></div>
+<div style="display: flex; flex-direction: column; gap: 6px"><div style="height: 46px; background: #E6E1D3; border-radius: 4px"></div><div style="height: 6px; width: 70%; background: #C9CFDA; border-radius: 3px"></div><div style="height: 6px; width: 60%; background: #DDE1E8; border-radius: 3px"></div></div>
+<div style="display: flex; flex-direction: column; gap: 6px"><div style="height: 46px; background: #E6E1D3; border-radius: 4px"></div><div style="height: 6px; width: 75%; background: #C9CFDA; border-radius: 3px"></div><div style="height: 6px; width: 45%; background: #DDE1E8; border-radius: 3px"></div></div>
+</div>
+<div style="padding: 4px 16px 18px; display: flex; flex-direction: column; gap: 6px"><div style="height: 8px; width: 40%; background: #141821; border-radius: 3px"></div><div style="height: 6px; width: 90%; background: #DDE1E8; border-radius: 3px"></div><div style="height: 6px; width: 84%; background: #DDE1E8; border-radius: 3px"></div></div>
+</div>
+</div>
+<div class="mp-compose" style="width: 280px; flex: 0 0 280px; border-left: 2px solid #120C1F; padding: 16px; display: flex; flex-direction: column; gap: 12px; box-sizing: border-box">
+<span style="font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #FFA5FF">Compose</span>
+<div style="align-self: flex-end; background: #F5D8EF; color: #120C1F; border-radius: 14px 14px 4px 14px; padding: 10px 12px; font-size: 13px; line-height: 1.45">Make a page for the fair from the flyer. Keep the vendor list.
+<div style="display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap"><span style="font-size: 11px; background: #FFFFFF; border: 1.5px solid #120C1F; padding: 2px 8px; border-radius: 999px">flyer.pdf</span><span style="font-size: 11px; background: #FFFFFF; border: 1.5px solid #120C1F; padding: 2px 8px; border-radius: 999px">image-1.jpg</span></div>
+</div>
+<div style="font-size: 13px; line-height: 1.5">Built the page: a hero, the schedule, vendors, a map and a sign-up form. The search title and description are filled in too.</div>
+<div style="font-size: 12px; color: #DCD8FF; border-top: 1px solid #2C3C85; padding-top: 10px">Editing the selected section</div>
+<div style="margin-top: auto; background: #2C3C85; border-radius: 12px; padding: 10px 12px; font-size: 13px; color: #DCD8FF">Make the cards show prices…</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+
+<!-- FEATURES -->
+<section id="features" style="background: #9898FF; padding: 104px 0 112px">
+<div class="mp-wrap">
+<p class="mp-label" style="margin: 0 0 10px; color: #120C1F">What's on board</p>
+<h2 class="mp-serif mp-h2" style="margin: 0 0 18px; font-size: 80px; line-height: 1; color: #120C1F">Everything in one orbit</h2>
+<p style="margin: 0 0 48px; font-size: 19px; line-height: 1.55; max-width: 620px">What a small organisation runs on. Turn on what you need under Settings: nothing to install, no plugins to keep up to date.</p>
+<div class="mp-cards">
+<div class="mp-card" style="background: #C5E975"><p class="mp-label" style="margin: 0; font-size: 12px">Editing</p><h3 class="mp-serif" style="margin: 8px 0 8px; font-size: 32px; line-height: 1.05">Visual editor</h3><p style="margin: 0; font-size: 15px; line-height: 1.5">Edit on the page. Templates, patterns, autosave and revisions.</p></div>
+<div class="mp-card" style="background: #FEA903"><p class="mp-label" style="margin: 0; font-size: 12px">Events</p><h3 class="mp-serif" style="margin: 8px 0 8px; font-size: 32px; line-height: 1.05">Events calendar</h3><p style="margin: 0; font-size: 15px; line-height: 1.5">Recurring events, venues, month and day views, calendar feeds.</p></div>
+<div class="mp-card" style="background: #2F5BD6; color: #FFFFFF"><p class="mp-label" style="margin: 0; font-size: 12px">Events</p><h3 class="mp-serif" style="margin: 8px 0 8px; font-size: 32px; line-height: 1.05">Tickets</h3><p style="margin: 0; font-size: 15px; line-height: 1.5">Paid or free, with waitlists, check-in, refunds and reminder emails.</p></div>
+<div class="mp-card" style="background: #FFA5FF"><p class="mp-label" style="margin: 0; font-size: 12px">People</p><h3 class="mp-serif" style="margin: 8px 0 8px; font-size: 32px; line-height: 1.05">Members</h3><p style="margin: 0; font-size: 15px; line-height: 1.5">Levels, sign-ups, members-only pages and member prices.</p></div>
+<div class="mp-card" style="background: #FDF152"><p class="mp-label" style="margin: 0; font-size: 12px">People</p><h3 class="mp-serif" style="margin: 8px 0 8px; font-size: 32px; line-height: 1.05">Mailing lists</h3><p style="margin: 0; font-size: 15px; line-height: 1.5">Campaigns, segments and a weekly digest of what's new.</p></div>
+<div class="mp-card" style="background: #F5D8EF"><p class="mp-label" style="margin: 0; font-size: 12px">Forms</p><h3 class="mp-serif" style="margin: 8px 0 8px; font-size: 32px; line-height: 1.05">Forms and payments</h3><p style="margin: 0; font-size: 15px; line-height: 1.5">Conditional fields, Stripe or Square, designed notification emails.</p></div>
+<div class="mp-card" style="background: #C5E975"><p class="mp-label" style="margin: 0; font-size: 12px">Insight</p><h3 class="mp-serif" style="margin: 8px 0 8px; font-size: 32px; line-height: 1.05">Stats without cookies</h3><p style="margin: 0; font-size: 15px; line-height: 1.5">Views, visitors, clicks and campaigns. No banner needed.</p></div>
+<div class="mp-card" style="background: #FEA903"><p class="mp-label" style="margin: 0; font-size: 12px">Insight</p><h3 class="mp-serif" style="margin: 8px 0 8px; font-size: 32px; line-height: 1.05">Search and SEO</h3><p style="margin: 0; font-size: 15px; line-height: 1.5">Live site search, search titles and share images, written for you.</p></div>
+<div class="mp-card" style="background: #2F5BD6; color: #FFFFFF"><p class="mp-label" style="margin: 0; font-size: 12px">Care</p><h3 class="mp-serif" style="margin: 8px 0 8px; font-size: 32px; line-height: 1.05">Accessibility check</h3><p style="margin: 0; font-size: 15px; line-height: 1.5">Problems flagged in the editor, and optionally held before publishing.</p></div>
+<div class="mp-card" style="background: #FFA5FF"><p class="mp-label" style="margin: 0; font-size: 12px">Care</p><h3 class="mp-serif" style="margin: 8px 0 8px; font-size: 32px; line-height: 1.05">Sync and backups</h3><p style="margin: 0; font-size: 15px; line-height: 1.5">Copy content between copies. Daily snapshots, and restore.</p></div>
+<div class="mp-card" style="background: #FDF152"><p class="mp-label" style="margin: 0; font-size: 12px">Care</p><h3 class="mp-serif" style="margin: 8px 0 8px; font-size: 32px; line-height: 1.05">Redirects</h3><p style="margin: 0; font-size: 15px; line-height: 1.5">Moved pages redirect themselves. Missing addresses are logged.</p></div>
+<div class="mp-card" style="background: #F5D8EF"><p class="mp-label" style="margin: 0; font-size: 12px">Editing</p><h3 class="mp-serif" style="margin: 8px 0 8px; font-size: 32px; line-height: 1.05">Media library</h3><p style="margin: 0; font-size: 15px; line-height: 1.5">Focal points per screen size, AVIF and WebP, alt text written for you.</p></div>
+</div>
+</div>
+</section>
+
+<!-- EVENTS AND MAILING -->
+<section id="events" style="background: #C5E975; padding: 104px 0 112px">
+<div class="mp-wrap">
+<p class="mp-label" style="margin: 0 0 40px">Events, tickets and mail</p>
+<div style="display: flex; flex-wrap: wrap; gap: 56px; align-items: center">
+<div style="flex: 1 1 400px; min-width: 0">
+<h2 class="mp-serif mp-h2" style="margin: 0; font-size: 68px; line-height: 1">Sell out the night market</h2>
+<p style="margin: 22px 0 0; font-size: 19px; line-height: 1.55">No ticketing service. One ticket can cover several events, like a pass. Members see their own price. When it sells out, a waitlist takes over and tells people in turn as tickets come free.</p>
+</div>
+<div role="img" aria-label="A ticket form for the Full Moon Night Market with entry and member tickets and a total" style="flex: 1 1 420px; min-width: 0; background: #FFFFFF; border: 3px solid #120C1F; border-radius: 18px; padding: 28px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap"><span class="mp-serif" style="font-size: 34px; line-height: 1">Full Moon Night Market</span><span style="font-size: 14px; color: #4A4458">Sat, Jun 20, 7 pm</span></div>
+<div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-top: 1.5px solid #120C1F"><div><div style="font-weight: 600">Entry</div><div style="font-size: 14px; color: #4A4458">$8.00</div></div><span style="border: 2px solid #120C1F; border-radius: 999px; padding: 6px 16px; font-weight: 600">2</span></div>
+<div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-top: 1.5px solid #120C1F"><div><div style="font-weight: 600">Entry <span style="font-size: 12px; background: #FFA5FF; padding: 2px 8px; border-radius: 999px; margin-left: 6px">Member price</span></div><div style="font-size: 14px; color: #4A4458">$5.00</div></div><span style="border: 2px solid #120C1F; border-radius: 999px; padding: 6px 16px; font-weight: 600">0</span></div>
+<div style="display: flex; justify-content: space-between; padding-top: 14px; border-top: 1.5px solid #120C1F; font-weight: 700"><span>Total</span><span>$16.00</span></div>
+<span class="mp-pill" style="justify-content: center; background: #1B2A6B; color: #DCD8FF">Continue to payment</span>
+</div>
+</div>
+
+<div style="display: flex; flex-wrap: wrap-reverse; gap: 56px; align-items: center; margin-top: 96px">
+<div role="img" aria-label="A weekly digest email listing new posts and upcoming events" style="flex: 1 1 420px; min-width: 0; background: #FFFFFF; border: 3px solid #120C1F; border-radius: 18px; overflow: hidden">
+<div style="padding: 18px 28px; border-bottom: 1.5px solid #120C1F; font-size: 13px; color: #4A4458">This week at Riverside · Week of Jun 15</div>
+<div style="padding: 24px 28px; display: flex; flex-direction: column; gap: 18px">
+<div style="display: flex; gap: 14px"><div style="width: 72px; height: 56px; background: #FEA903; border: 2px solid #120C1F; border-radius: 8px; flex: 0 0 72px; box-sizing: border-box"></div><div><div style="font-weight: 600">Volunteers wanted for the night market</div><div style="font-size: 14px; color: #4A4458; margin-top: 4px">Sign up for a two-hour shift.</div></div></div>
+<div style="display: flex; gap: 14px"><div style="width: 72px; height: 56px; background: #9898FF; border: 2px solid #120C1F; border-radius: 8px; flex: 0 0 72px; box-sizing: border-box"></div><div><div style="font-weight: 600">Board meeting, Tuesday 7 pm</div><div style="font-size: 14px; color: #4A4458; margin-top: 4px">Community Hall, Room B</div></div></div>
+<div style="font-size: 12px; color: #4A4458; border-top: 1.5px solid #120C1F; padding-top: 14px">Unsubscribe · Email preferences</div>
+</div>
+</div>
+<div style="flex: 1 1 400px; min-width: 0">
+<h2 class="mp-serif mp-h2" style="margin: 0; font-size: 68px; line-height: 1">A weekly email that comes round like the moon</h2>
+<p style="margin: 22px 0 0; font-size: 19px; line-height: 1.55">The digest lists what you published and what's coming up, and waits for your approval before it goes. Sign-ups are confirmed by email, and clicks from mail scanners don't count as people.</p>
+</div>
+</div>
+</div>
+</section>
+
+<!-- DEVELOPERS -->
+<section id="developers" style="background: #1B2A6B; color: #F7F0F5; padding: 104px 0 112px">
+<div class="mp-wrap" style="display: flex; flex-wrap: wrap; gap: 56px; align-items: flex-start">
+<div style="flex: 1 1 420px; min-width: 0">
+<p class="mp-label" style="margin: 0 0 18px; color: #FFA5FF">Under the hood</p>
+<h2 class="mp-serif mp-h2" style="margin: 0; font-size: 68px; line-height: 1">One Worker, your own database, no servers</h2>
+<p style="margin: 22px 0 28px; font-size: 19px; line-height: 1.55; color: #DCD8FF">Moonpuck is Astro on a Cloudflare Worker, with content in D1 and files in R2. Each site is its own repository: your blocks, styles and types live in one folder, and core updates merge in with git.</p>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<span style="border: 1.5px solid #DCD8FF; border-radius: 999px; padding: 6px 14px; font-size: 14px">Pages cached at the edge</span>
+<span style="border: 1.5px solid #DCD8FF; border-radius: 999px; padding: 6px 14px; font-size: 14px">Keys kept encrypted</span>
+<span style="border: 1.5px solid #DCD8FF; border-radius: 999px; padding: 6px 14px; font-size: 14px">Blocks you write yourself</span>
+</div>
+</div>
+<pre style="flex: 1 1 480px; min-width: 0; margin: 0; background: #0F1840; border: 3px solid #120C1F; border-radius: 18px; color: #DCD8FF; padding: 28px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 14px; line-height: 1.8; overflow-x: auto"><span style="color: #9898FF"># your site, beside the core</span>
+src/site/
+  config.ts      <span style="color: #9898FF">types, taxonomies, fields</span>
+  render.ts      <span style="color: #9898FF">blocks, cards, head</span>
+  editor.tsx     <span style="color: #9898FF">panels, settings</span>
+  styles/tokens.css
+
+<span style="color: #9898FF"># take core updates</span>
+<span style="color: #FDF152">git fetch upstream &amp;&amp; git merge upstream/main</span>
+<span style="color: #FDF152">npm run deploy</span></pre>
+</div>
+</section>
+
+<!-- CTA -->
+<section id="start" style="background: #F5D8EF; padding: 112px 0; text-align: center">
+<div class="mp-wrap" style="display: flex; flex-direction: column; align-items: center; gap: 32px">
+<h2 class="mp-serif mp-h2" style="margin: 0; font-size: 96px; line-height: 0.98; max-width: 860px">Free, open source, and yours to launch</h2>
+<div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center">
+<a href="/start/local-setup/" class="mp-pill" style="background: #1B2A6B; color: #DCD8FF">Read the setup guide</a>
+<a href="https://github.com/mjoslyn/moonpuck" class="mp-pill" style="border: 2px solid #120C1F; color: #120C1F">View on GitHub</a>
+</div>
+</div>
+</section>
+
+<!-- FOOTER -->
+<footer style="background: #2350E6; color: #F7F0F5; padding: 40px 0 48px">
+<div class="mp-wrap" style="display: flex; flex-wrap: wrap; gap: 28px; justify-content: space-between; align-items: center">
+<div style="display: flex; align-items: center; gap: 8px">
+<svg width="26" height="26" viewBox="0 0 34 34" aria-hidden="true"><path d="M22 3 A14 14 0 1 0 31 22 A11 11 0 0 1 22 3 Z" fill="#FFA5FF"></path></svg>
+<span class="mp-serif" style="font-size: 28px; line-height: 1; color: #FFA5FF">moonpuck</span>
+<span class="mp-serif" style="font-size: 18px; font-style: italic; margin-left: 12px">made on Earth, for small organisations</span>
+</div>
+<nav aria-label="Footer" style="display: flex; flex-wrap: wrap; gap: 24px">
+<a href="/start/local-setup/" class="mp-nav-link mp-label" style="font-size: 13px">Docs</a>
+<a href="/guide/" class="mp-nav-link mp-label" style="font-size: 13px">Site guide</a>
+<a href="https://github.com/mjoslyn/moonpuck" class="mp-nav-link mp-label" style="font-size: 13px">GitHub</a>
+</nav>
+</div>
+</footer>
+</div>
+</body>
+</html>
