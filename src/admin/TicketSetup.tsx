@@ -2,7 +2,7 @@
 // (attach another, detach one), the form (src/puck/TicketsForm.tsx) with Save, and Delete for a ticket
 // without orders; POST /api/admin/ticket-setup (src/lib/tickets/setup.ts). Every attached event sells from
 // the ticket's one pool (types, capacity, orders, waitlist). Leaving with unsaved changes asks first.
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { TicketsForm } from '../puck/TicketsForm';
 import { TICKETS_KEY } from '../lib/tickets/config';
 
@@ -40,9 +40,13 @@ export default function TicketSetup({ ticketId, name: savedName, tickets, events
   const [saved, setSaved] = useState(() => JSON.stringify(fields));
   const [status, setStatus] = useState('');
   const dirty = JSON.stringify(fields) !== saved || name.trim() !== savedName;
+  // Set once a save or action has gone through, just before the page reloads or leaves: no warning then.
+  const leaving = useRef(false);
   useEffect(() => {
     if (!dirty) return;
-    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    const warn = (e: BeforeUnloadEvent) => {
+      if (!leaving.current) e.preventDefault();
+    };
     addEventListener('beforeunload', warn);
     return () => removeEventListener('beforeunload', warn);
   }, [dirty]);
@@ -54,6 +58,7 @@ export default function TicketSetup({ ticketId, name: savedName, tickets, events
     setSaved(JSON.stringify(fields));
     setStatus('Saved.');
     // The counts and tabs above follow the setup.
+    leaving.current = true;
     location.reload();
   };
 
@@ -64,6 +69,7 @@ export default function TicketSetup({ ticketId, name: savedName, tickets, events
     const problem = await post(body);
     if (problem) return setStatus(`Not saved: ${problem}`);
     setSaved(JSON.stringify(fields));
+    leaving.current = true;
     then();
   };
   const panel = 'max-w-xl rounded bg-white p-5 shadow-[0_0_0_1px_rgba(26,26,46,0.08)]';
