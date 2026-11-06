@@ -815,6 +815,9 @@ a.c-cal__arrow:hover {
   color: inherit;
   font-weight: 600;
 }
+.c-tickets__again {
+  margin: 1rem 0 0;
+}
 .c-tickets__note {
   margin: 0 0 1rem;
 }

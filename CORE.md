@@ -912,7 +912,9 @@ tickets (30-120 minutes), and the emails with the reminder's and follow-up's tim
   there, to the section's anchor (`ticketsAt`: `#tickets` on an attached event's own page, else
   `#tickets-<ticket id>`); the form posts the ticket's id as `event`; emails' `{order_link}` goes there too (a waitlist's: the tickets where they
   joined). `prepareTickets` loads what's taken (`ticket_sold`) and, with `?order=<token>`, the buyer's
-  order (`ticket_order_status`; both read with the site's key), shown in its ticket's section.
+  order (`ticket_order_status`; both read with the site's key), shown in its ticket's section: a paid order's
+  confirmation takes the form's place, with **Order more tickets** linking to the form without the order, and
+  one being confirmed shows only its note; an expired, cancelled or refunded order keeps the form below.
   `?tickets=<reason>&event=<ticket id>` shows a checkout's outcome in that ticket's section.
   Pages with either are never cached. `public/assets/js/tickets.js` adds the total, the address only
   for paid orders, and what's left now (`GET /api/tickets/availability`). Checkout, the waitlist and

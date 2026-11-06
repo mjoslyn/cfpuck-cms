@@ -72,4 +72,24 @@ describe('event tickets', () => {
     expect(html).not.toContain('Sunday draft');
     expect(html.match(/<section class="c-tickets/g)).toHaveLength(2);
   });
+
+  it('shows a paid order in place of the form, with a link back to it; a cancelled one keeps the form', async () => {
+    const db = siteDb();
+    const { id: ticket } = await createTicket(db, 'Fair tickets', { types: [{ id: 'ga', name: 'Fair admission', price: 0 }] });
+    await db.from('entries').insert({ type: 'event', slug: 'fair', title: 'Fair', status: 'publish', template: 'plain-event', content: doc([]), fields: { start: '2099-08-01T10:00', end: '2099-08-01T16:00', ticket } });
+    const order = (token: string, status: string) => ({ token, code: token.slice(0, 9), entry_id: ticket, status, provider: 'free', name: 'Mike Example', email: 'mike@example.org', items: [{ type: 'ga', name: 'Fair admission', price: 0, quantity: 1 }], quantity: 1, amount: 0 });
+    const paid = 'paidtoken-0123456789abcdefghij';
+    const cancelled = 'canctoken-0123456789abcdefghij';
+    const { error } = await db.from('ticket_orders').insert([order(paid, 'paid'), order(cancelled, 'cancelled')]);
+    expect(error).toBeNull();
+
+    const shown = (await renderRequest(new URL(`http://localhost/event/fair/?order=${paid}`), db)).html;
+    expect(shown).toContain('going, Mike!');
+    expect(shown).not.toContain('<form');
+    expect(shown).toContain('<a href="/event/fair/#tickets">Order more tickets</a>');
+
+    const again = (await renderRequest(new URL(`http://localhost/event/fair/?order=${cancelled}`), db)).html;
+    expect(again).toContain('is cancelled');
+    expect(again).toContain('<form');
+  });
 });
