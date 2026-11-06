@@ -2,7 +2,7 @@
 title: Common questions
 description: "Quick answers when something isn't working as expected: signing in, saving and publishing, pages that don't show, pictures, forms, Compose, events and tickets."
 sidebar:
-  order: 11
+  order: 12
 ---
 
 ## Signing in

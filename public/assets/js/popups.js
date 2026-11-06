@@ -159,8 +159,15 @@
   });
 
   document.addEventListener('keydown', (e) => {
+    // Escape closes the open dialog. On the consent banner it keeps only the cookies the site needs, as its
+    // × does; a banner shown as a bar or in a corner takes it only while focus is in it, so Escape used
+    // elsewhere on the page (closing a menu) never answers for the visitor.
+    if (e.key === 'Escape') {
+      if (open) return void (open.o.consent ? choose('necessary') : close(open));
+      if (banner && !banner.el.hidden && banner.el.contains(document.activeElement)) choose('necessary');
+      return;
+    }
     if (!open) return;
-    if (e.key === 'Escape' && !open.o.consent) return void close(open);
     // Keep focus inside an open dialog.
     if (e.key !== 'Tab') return;
     const items = [...open.el.querySelectorAll('a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])')].filter((x) => !x.disabled && x.offsetParent !== null);

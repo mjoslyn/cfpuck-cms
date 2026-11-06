@@ -483,7 +483,12 @@ on the site, or host and path elsewhere, `mailto:`/`tel:` as written, without qu
 (`statTarget`); a referrer as its host (`referrerHost`). Machines (`scannerAgent`) and signed-in editors
 aren't counted; addresses that aren't pages (`/admin`, `/api`, `/media`...) are refused (`statPath`). **Campaigns**: a view whose address has `utm_campaign`
 or `utm_source` (with `utm_medium`) counts under kind `campaign`, target `campaign|source|medium`
-(`campaignKey`; migration `*_site_stats_campaigns.sql`), listed and exported with the others. **The Stats
+(`campaignKey`; migration `*_site_stats_campaigns.sql`), listed and exported with the others. **Make a
+campaign link** above that table (`src/admin/CampaignLink.tsx`; `campaignLink` in `src/lib/campaign-link.ts`)
+adds a campaign's name, source and optional medium to a page on the site (a path or the link picker; the
+home page when empty; other sites refused), lower case with hyphens for spaces and no `|` (`campaignPart`),
+on `SITE_URL` (else the request's address), replacing any utm values the address had and keeping its other
+query values and anchor; the names already counted are suggested, and the link is copied or opened. **The Stats
 cookie** (Settings > Stats, `settings.site.stats.cookies`): stats.js keeps a random id in `site_vid` (13
 months) and sends it; the visitor is kept under its hash (`cookieHash`, `site_stat_visitors.cookie`, kept
 as long as the counts; migration `*_site_stats_cookie.sql`), so Visitors counts each once over the range
@@ -508,7 +513,9 @@ Accept and Reject buttons, ordinary Button blocks linking to `#accept-cookies` a
 policy link (`CONSENT_STARTER`, edited like any content); a banner whose content has no Accept link gets
 Accept and Reject added, styled alike (`hasOwnConsentButtons`, `data-consent-choice`). It shows on every page until the visitor chooses (cookie
 `site_consent`: `all` or `necessary`, six months); links to `#cookie-settings` open it again, and
-`#accept-cookies` / `#reject-cookies` choose. While it waits, no other popup shows. Accepting runs the
+`#accept-cookies` / `#reject-cookies` choose. Its × (`data-consent-choice="necessary"`) and Escape count as Reject
+(Escape on a banner that isn't a dialog only while focus is in it, so Escape elsewhere, such as closing a menu,
+never answers for the visitor); a click outside it doesn't close it. While it waits, no other popup shows. Accepting runs the
 code snippets kept for consent and fires `c-consent` (the Stats cookie starts); rejecting fires
 `c-consent-reject` (the Stats cookie is removed).
 

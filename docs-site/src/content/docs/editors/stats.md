@@ -2,7 +2,7 @@
 title: Stats
 description: "How many people visit the site, which pages they read, which links they follow, where they come from and which campaigns bring them."
 sidebar:
-  order: 10
+  order: 11
 ---
 
 **Stats** in the top bar shows how the site is used: how many pages were viewed, by how many people,
@@ -82,20 +82,40 @@ aren't in this list.
 Visits that came by a link tagged with a campaign, with their **Campaign**, **Source**, **Medium** and
 **Visits**. A part left out of the link shows as **(none)**.
 
-### Tracking a campaign
+### Making a campaign link
 
-To see how many visits a newsletter, an advert or a social media post brings, add `utm_` tags to the link
-you share:
+To see how many visits a newsletter, an advert or a social media post brings, share a campaign link
+instead of the page's own address. **Make a campaign link**, above the **Campaigns** table, makes one:
+
+1. **Page**: the page the link opens. Type its address (such as `/events/`), or click **Find** to search
+   for it. Leave it empty for the home page.
+2. Fill in:
+   - **Campaign name**: what you're promoting, such as `spring-fair`.
+   - **Source**: where you'll share it, such as `newsletter`, `facebook` or `poster`.
+   - **Medium (optional)**: the kind of link, such as `email`, `social`, `print` or `qr`.
+3. **Your link** appears underneath. Click **Copy link** and paste it into your email, post or advert,
+   or **Open** to try it.
+
+![Make a campaign link, with a link made for the events page](../../../assets/guide/stats-campaign-link.png)
+
+Names already used are suggested as you type, so a campaign keeps one spelling and its visits add up
+on one line. Names are made lower case, with hyphens for spaces: "Spring Fair" becomes `spring-fair`.
+
+For a poster or flyer, make a QR code from the link (with **Medium** set to `qr` or `print`) using any
+free QR code maker.
+
+### What a campaign link is
+
+A campaign link is the page's address with `utm_` tags added:
 
 `https://example.org/sale/?utm_campaign=spring-sale&utm_source=newsletter&utm_medium=email`
 
-- `utm_campaign`: the campaign's name, such as `spring-sale`.
-- `utm_source`: where the link is, such as `newsletter`, `facebook` or `poster`.
-- `utm_medium`: the kind of link, such as `email`, `social` or `print`.
+- `utm_campaign`: the campaign's name.
+- `utm_source`: where the link is shared.
+- `utm_medium`: the kind of link.
 
-A link needs at least `utm_campaign` or `utm_source` to count as a campaign. Use the same words each
-time (all in small letters is easiest), so visits add up under one line. Free tools such as Google's
-Campaign URL Builder make these links, and a QR code made from such a link tracks a poster or flyer.
+A link needs at least `utm_campaign` or `utm_source` to count as a campaign. You can also write these
+by hand, or with another tool, as long as they lead to a page on this site.
 
 ## Downloading the numbers
 

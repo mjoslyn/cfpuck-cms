@@ -28,6 +28,7 @@ The **?** button at the top of every admin screen brings admins here, and editor
 - [Connections](/admins/connections/): Claude, card payments and Mailgun.
 - [Kinds of content and taxonomies](/admins/content-types/): adding your own types of content and ways to sort it.
 - [People and access](/admins/people/): inviting editors and admins, and removing access.
-- [Popups and cookie consent](/admins/popups-and-cookies/): popups, the cookie banner and the Stats cookie.
+- [Popups and cookie consent](/admins/popups-and-cookies/): popups, building a cookie consent banner, and
+  the Stats cookie.
 - [Redirects and missing pages](/admins/redirects/): old addresses, broken links and the "not found" page.
 - [Email log and backups](/admins/email-log-and-backups/): checking emails went out, and backups.

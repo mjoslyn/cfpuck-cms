@@ -20,6 +20,9 @@ export function renderPopup(p: Popup, env: Env): string {
   const actions = p.consent && !hasOwnConsentButtons(content)
     ? `<div class="c-popup__actions"><div class="c-button"><button type="button" class="c-button__link" data-consent-choice="all">${esc(p.acceptLabel ?? 'Accept')}</button></div><div class="c-button"><button type="button" class="c-button__link" data-consent-choice="necessary">${esc(p.rejectLabel ?? 'Reject')}</button></div>${p.policyUrl ? `<a class="c-popup__policy" href="${esc(p.policyUrl)}">${esc(p.policyLabel ?? 'Privacy policy')}</a>` : ''}</div>`
     : '';
-  const closer = p.consent ? '' : '<button type="button" class="c-popup__close" aria-label="Close" data-popup-close><span aria-hidden="true">&times;</span></button>';
+  // The banner's × (and Escape, popups.js) keeps only the cookies the site needs, as Reject does.
+  const closer = p.consent
+    ? '<button type="button" class="c-popup__close" aria-label="Close: only the cookies the site needs" data-consent-choice="necessary"><span aria-hidden="true">&times;</span></button>'
+    : '<button type="button" class="c-popup__close" aria-label="Close" data-popup-close><span aria-hidden="true">&times;</span></button>';
   return `<div class="c-popup is-${p.layout}${p.consent ? ' is-consent' : ''}" id="popup-${p.id}" data-popup="${esc(JSON.stringify(settings))}" role="dialog" aria-label="${esc(p.name)}"${modal ? ' aria-modal="true"' : ''} hidden>${modal && !p.consent ? '<div class="c-popup__backdrop" data-popup-close></div>' : modal ? '<div class="c-popup__backdrop"></div>' : ''}<div class="c-popup__box" tabindex="-1">${closer}${content}${actions}</div></div>`;
 }

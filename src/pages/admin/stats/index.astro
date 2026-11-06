@@ -5,6 +5,8 @@
 import Admin from '../../../layouts/Admin.astro';
 import { consentPopup, type Popup } from '../../../lib/popups';
 import { STATS_MAX_DAYS, STATS_RANGES, statsDay, statsRange, statsSummary } from '../../../lib/stats';
+import { env } from '../../../lib/env';
+import CampaignLink from '../../../admin/CampaignLink';
 
 const range = statsRange(Astro.url.searchParams);
 // How visitors are counted: with the Stats cookie (Settings > Stats) and the cookie consent banner (Settings > Popups).
@@ -43,6 +45,10 @@ const empty = !s.totals.views && !s.totals.clicks;
 const csv = (table: string) => `/api/admin/stats.csv${href({ table })}`;
 const csvLink = 'text-xs font-normal text-admin-accent hover:underline';
 const sortLink = (k: 'views' | 'clicks', label: string) => (sort === k ? `${label} ↓` : label);
+// Make a campaign link: links are made on the site's public address, with the names already used offered.
+const siteOrigin = (() => { try { return new URL(env('SITE_URL') || Astro.url.origin).origin; } catch { return Astro.url.origin; } })();
+const usedOf = (k: 'campaign' | 'source' | 'medium') => [...new Set(s.campaigns.map((c) => c[k]).filter(Boolean))] as string[];
+const used = { campaigns: usedOf('campaign'), sources: usedOf('source'), mediums: usedOf('medium') };
 ---
 <Admin title="Stats">
   <div class="flex flex-wrap items-end justify-between gap-6">
@@ -160,7 +166,8 @@ const sortLink = (k: 'views' | 'clicks', label: string) => (sort === k ? `${labe
     </section>
     <section class="lg:col-span-2">
       <h2 class="flex justify-between gap-2 text-sm font-semibold">Campaigns <a class={csvLink} href={csv('campaigns')} download>Download CSV</a></h2>
-      <p class="text-xs text-admin-muted">Visits that arrived by an address with <code>utm_campaign</code> or <code>utm_source</code> (and <code>utm_medium</code> if you like), such as <code>/?utm_campaign=spring-sale&amp;utm_source=newsletter&amp;utm_medium=email</code>.</p>
+      <p class="text-xs text-admin-muted">Visits that arrived by an address with <code>utm_campaign</code> or <code>utm_source</code> (and <code>utm_medium</code> if you like), such as <code>/?utm_campaign=spring-sale&amp;utm_source=newsletter&amp;utm_medium=email</code>. Make one below.</p>
+      <div class="mt-2"><CampaignLink client:load origin={siteOrigin} used={used} /></div>
       <table class="mt-2 w-full border-collapse overflow-hidden rounded bg-white text-sm shadow-[0_0_0_1px_rgba(26,26,46,0.08)]">
         <thead class="bg-admin-soft text-left text-xs tracking-wider text-admin-muted uppercase"><tr><th class={th}>Campaign</th><th class={th}>Source</th><th class={th}>Medium</th><th class={`${th} text-right`}>Visits</th></tr></thead>
         <tbody>

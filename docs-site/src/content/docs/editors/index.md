@@ -156,5 +156,7 @@ If you can't see something this guide mentions, it is probably for admins (see t
   or taking sign-ups.
 - [Mailing lists](/editors/mailing-lists/): writing and testing campaigns, the weekly digest, segments,
   sign-up forms, and how each email went.
-- [Stats](/editors/stats/): how many people visit, what they read and where they come from.
+- [Popups](/editors/popups/): changing what a popup or the cookie consent banner says.
+- [Stats](/editors/stats/): how many people visit, what they read and where they come from, and making
+  campaign links.
 - [Common questions](/editors/common-questions/): quick answers when something isn't working.

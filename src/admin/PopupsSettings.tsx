@@ -160,7 +160,7 @@ export default function PopupsSettings({ value, parts: initialParts, onChange }:
             {p.consent && (
               <>
                 <p className="text-xs text-admin-muted sm:col-span-2">
-                  Its Accept and Reject buttons and the privacy policy link are in its content: use <strong>Edit content</strong> to change their words, size and look like any other button (Accept links to <code>#accept-cookies</code>, Reject to <code>#reject-cookies</code>). Shows on every page until the visitor chooses, then not again for six months. Until they accept, the Stats cookie isn't set and code snippets marked “Only after visitors accept cookies” don't run. A link to <code>#cookie-settings</code> anywhere on the site (in the footer, say) opens it again so they can change their mind.
+                  Its Accept and Reject buttons and the privacy policy link are in its content: use <strong>Edit content</strong> to change their words, size and look like any other button (Accept links to <code>#accept-cookies</code>, Reject to <code>#reject-cookies</code>). Shows on every page until the visitor chooses, then not again for six months. Its × and the Escape key count as Reject. Until they accept, the Stats cookie isn't set and code snippets marked “Only after visitors accept cookies” don't run. A link to <code>#cookie-settings</code> anywhere on the site (in the footer, say) opens it again so they can change their mind.
                 </p>
               </>
             )}

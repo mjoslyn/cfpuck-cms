@@ -54,6 +54,8 @@ describe('popups', () => {
     // Accept and Reject look alike: neither is played down.
     expect(offer).toContain('<div class="c-button"><button type="button" class="c-button__link" data-consent-choice="necessary">Reject</button>');
     expect(offer).toContain('<a class="c-popup__policy" href="/privacy/">Privacy policy</a>');
+    // The banner closes with an ×, which keeps only the cookies the site needs, as Reject does.
+    expect(offer).toMatch(/<div class="c-popup is-[^"]* is-consent" id="popup-cookies"[^>]*>(?:<div class="c-popup__backdrop"><\/div>)?<div class="c-popup__box" tabindex="-1"><button type="button" class="c-popup__close" aria-label="Close: only the cookies the site needs" data-consent-choice="necessary">/);
     expect(offer).toContain('<template data-consent-snippet><script src="https://analytics.example/a.js"></script></template>\n</head>');
     expect(offer).toContain('<script>window.ok = 1</script>\n</body>');
     expect(offer).toContain('/assets/js/popups.js');
@@ -74,7 +76,8 @@ describe('popups', () => {
     expect(html).toMatch(/<a class="c-button__link" href="#accept-cookies"[^>]*>Accept<\/a>/);
     expect(html).toMatch(/<a class="c-button__link" href="#reject-cookies"[^>]*>Reject<\/a>/);
     expect(html).toContain('href="/privacy/"');
-    expect(html).not.toContain('data-consent-choice');
+    expect(html).not.toContain('c-popup__actions');
+    expect(html).not.toContain('data-consent-choice="all"');
   });
 });
 
