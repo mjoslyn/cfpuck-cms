@@ -45,10 +45,10 @@ already has that name, a number is added (for example "Christmas Stroll 2"). Or 
 **New ticket** and press **Make ticket**. Then, under **Ticket types and settings**:
 
 1. Add a ticket type, for example "Adult" or "Free entry", with its price (0 for free).
-2. Optionally set **How many** are available, and when it is **On sale from** and **until**. Leave
-   **How many** empty for no limit: 0 means none left, and the tickets show as sold out. The ticket
-   type's row shows how many are available while it is closed.
-3. Set the overall capacity if there is one, and whether to offer a **Waitlist when sold out**.
+2. Under **How many of this type**, leave **Unlimited** ticked, or untick it and enter the **Number
+   available** (0 means none left, and the tickets show as sold out). Set when it is **On sale from**
+   and **until**. The ticket type's row shows how many are available while it is closed.
+3. Set the overall **Capacity** if there is one (untick **Unlimited**), and whether to offer a **Waitlist when sold out**.
 4. Press **Save tickets**.
 5. If you made the ticket from the Tickets list, attach the event: under **Events selling this
    ticket**, choose it and press **Attach**. (Or choose the ticket in the event's settings, under

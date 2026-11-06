@@ -880,7 +880,7 @@ dates, from the first start (reminders) to the last end (sales close). Migration
 `*_tickets_own_records.sql` made a ticket of every event's own tickets (named after it) and attached the
 events that shared them. The setup:
 ticket types (name, description, price in cents, capacity, most per order, (an empty capacity is no
-limit; 0 is none left, sold out: the type's row says so while it is closed, and a 0 is flagged under its box) sales window as local times
+limit; 0 is none left, sold out; both capacities are an **Unlimited** box, ticked unless a number is set, with the number shown once it is unticked, `CapacityField`; the type's row shows its count while it is closed, and a 0 is flagged) sales window as local times
 in the event's timezone, hidden for past ones), the ticket's capacity (per date for one recurring event),
 most per order, phone (off, optional, required), address (off, for paid orders, always), the ticket's own
 questions (asked once per order) and a waitlist (`off`, `auto`, `manual`). Settings > Tickets
