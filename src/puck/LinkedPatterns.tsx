@@ -22,7 +22,7 @@ export function LinkedContentPanel({ type, a, set }: { type: string; a: Attrs; s
         f.kind === 'rich' ? (
           <RichText key={f.key} title={f.label} value={a[f.key] ?? ''} onChange={(v) => set({ [f.key]: v || undefined })} />
         ) : f.kind === 'media' ? (
-          <MediaPicker key={f.key} title={f.label} url={a.src} onSelect={(m) => set({ mediaId: m.mediaId ?? m.id ?? undefined, src: m.url, alt: a.alt || m.alt || undefined })} />
+          <MediaPicker key={f.key} title={f.label} url={a.src} mediaId={a.mediaId} onSelect={(m) => set({ mediaId: m.mediaId ?? m.id ?? undefined, src: m.url, alt: a.alt || m.alt || undefined })} />
         ) : f.kind === 'link' ? (
           <LinkInput key={f.key} title={f.label} value={a[f.key]} placeholder="https://" onChange={(v) => set({ [f.key]: v || undefined })} />
         ) : (

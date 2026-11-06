@@ -221,19 +221,63 @@ export function JsonAttrs({ value, onChange }: { value: Attrs; onChange: (v: Att
 
 // Media ----------------------------------------------------------------------------------------
 
-export function MediaPicker({ title, url, onSelect, fit = 'cover' }: { title: string; url?: string; fit?: 'cover' | 'contain'; onSelect: (m: { url: string; id: number | null; mediaId?: number; alt: string; width?: number | null; height?: number | null }) => void }) {
+/** Where the media library shows a file's details (src/admin/MediaDetail.tsx opens `?id=`). */
+export const mediaLibraryUrl = (id: number) => `/admin/media/?id=${id}`;
+
+/**
+ * A file chosen from the media library (an image, or a video with `only="video"`): its preview,
+ * Choose/Replace, and Edit, which opens it in the media library in a new tab. The file's id is
+ * `mediaId` when the caller keeps it, else found from its address.
+ */
+export function MediaPicker({ title, url, mediaId, onSelect, fit = 'cover', only = 'image' }: { title: string; url?: string; mediaId?: number | null; fit?: 'cover' | 'contain'; only?: 'image' | 'video'; onSelect: (m: { url: string; id: number | null; mediaId?: number; alt: string; width?: number | null; height?: number | null }) => void }) {
   const [open, setOpen] = useState(false);
+  const id = useLibraryId(url, mediaId);
+  const button = 'rounded border border-admin-ink/15 bg-white px-3 py-1.5 text-xs hover:border-admin-accent';
+  const name = url ? decodeURIComponent(url.split('?')[0].split('/').pop() ?? '') : '';
   return (
     <FieldGroup title={title}>
       <div className="flex items-center gap-2">
-        {url ? <img src={url} alt="" className={`h-14 w-20 rounded border border-admin-ink/10 ${fit === 'contain' ? 'object-contain p-1' : 'object-cover'}`} /> : <div className="h-14 w-20 rounded border border-dashed border-admin-ink/20" />}
-        <button type="button" className="rounded border border-admin-ink/15 bg-white px-3 py-1.5 text-xs hover:border-admin-accent" onClick={() => setOpen(true)}>
-          {url ? 'Replace' : 'Choose'}
-        </button>
+        {url && only === 'video' ? (
+          <span className="flex h-14 w-20 shrink-0 items-center justify-center rounded bg-admin-ink text-[10px] font-semibold tracking-wider text-white uppercase">Video</span>
+        ) : url ? (
+          <img src={url} alt="" className={`h-14 w-20 shrink-0 rounded border border-admin-ink/10 ${fit === 'contain' ? 'object-contain p-1' : 'object-cover'}`} />
+        ) : (
+          <div className="h-14 w-20 shrink-0 rounded border border-dashed border-admin-ink/20" />
+        )}
+        <div className="flex min-w-0 flex-col gap-1">
+          {only === 'video' && name && <span className="truncate text-xs" title={name}>{name}</span>}
+          <div className="flex gap-1">
+            <button type="button" className={button} onClick={() => setOpen(true)}>
+              {url ? 'Replace' : 'Choose'}
+            </button>
+            {id ? (
+              <a className={button} href={mediaLibraryUrl(id)} target="_blank" rel="noopener" title="Open it in the media library (a new tab)">
+                Edit
+              </a>
+            ) : null}
+          </div>
+        </div>
       </div>
-      {open && <MediaModal onClose={() => setOpen(false)} onSelect={(m) => { onSelect(m); setOpen(false); }} />}
+      {open && <MediaModal only={only} onClose={() => setOpen(false)} onSelect={(m) => { onSelect(m); setOpen(false); }} />}
     </FieldGroup>
   );
+}
+
+/** A library file's id: `mediaId` when known, else looked up from its /media/ address (null when it isn't one). */
+function useLibraryId(url: string | undefined, mediaId: number | null | undefined): number | null {
+  const [found, setFound] = useState<number | null>(null);
+  const path = !mediaId && url?.startsWith(mediaUrl('')) ? decodeURIComponent(url.slice(mediaUrl('').length).split('?')[0]) : '';
+  useEffect(() => {
+    setFound(null);
+    if (!path) return;
+    browserClient()
+      .from('media')
+      .select('id')
+      .eq('path', path)
+      .maybeSingle()
+      .then(({ data }) => data && setFound(Number(data.id)));
+  }, [path]);
+  return Number(mediaId) || found;
 }
 
 type Picked = { url: string; id: number | null; mediaId?: number; alt: string; width?: number | null; height?: number | null; kind?: 'image' | 'video' | 'document'; name?: string };

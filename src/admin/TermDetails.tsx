@@ -133,7 +133,7 @@ export default function TermDetails({ taxonomy }: { taxonomy: string }) {
             <p className="mt-1 text-xs text-admin-muted">Shown by the Excerpt block on its page, and the meta description when SEO has none.</p>
           </section>
           <section>
-            <MediaPicker title="Featured image" url={f.image_url} onSelect={(m) => set({ fields: { ...f, image: m.id ?? m.mediaId ?? undefined, image_url: m.url } })} />
+            <MediaPicker title="Featured image" url={f.image_url} mediaId={f.image} onSelect={(m) => set({ fields: { ...f, image: m.id ?? m.mediaId ?? undefined, image_url: m.url } })} />
             <p className="-mt-2 text-xs text-admin-muted">Shown by the Featured image block on its page, and when it is shared. Without one, the taxonomy's (Settings &gt; Types) is used.</p>
             {!!f.image && (
               <button type="button" className="mt-1 text-xs text-[#b3261e]" onClick={() => set({ fields: { ...f, image: undefined, image_url: undefined } })}>

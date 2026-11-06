@@ -3,7 +3,7 @@
 // (crop_images), shown wherever this one is cropped to that shape; with that shape chosen, clicks set the
 // focal point for that use (kept with this image; the other image's own are untouched). A document
 // shows a preview (PDFs) with its title, caption and size. Every file has Open and Copy link (its full
-// address). Opens on `cms:media-open` events.
+// address). A video shows a player with its title and caption. Opens on `cms:media-open` events, and at once for `?id=<media id>` (Edit beside a media chooser).
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { browserClient } from '../lib/db/browser';
 import { mediaUrl } from '../lib/media/image';
@@ -58,6 +58,9 @@ export default function MediaDetail() {
     };
     window.addEventListener('cms:media-open', open);
     document.body.dataset.mediaReady = '1';
+    // A link to one file (Edit beside a media chooser: ?id=<media id>) opens it at once.
+    const linked = Number(new URLSearchParams(location.search).get('id'));
+    if (linked) open(new CustomEvent('cms:media-open', { detail: linked }));
     return () => window.removeEventListener('cms:media-open', open);
   }, []);
 
@@ -81,6 +84,9 @@ export default function MediaDetail() {
   const src = mediaUrl((m.sizes?.large ?? m.sizes?.medium_large ?? m).path);
   // Documents (PDF, Office...) have no alt text, focal points or crops: a preview (PDFs) and their details.
   const doc = isDocument(m.mime_type);
+  // Videos likewise: a player, their title and caption.
+  const video = m.mime_type.startsWith('video/');
+  const plain = doc || video;
   const fileUrl = mediaUrl(m.path);
   /** The file's full address on the site, to paste into an email or another page. */
   const copyLink = async () => {
@@ -144,7 +150,9 @@ export default function MediaDetail() {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-admin-ink/50 p-6" onClick={() => setM(null)}>
       <div className="flex max-h-full w-full max-w-5xl overflow-hidden rounded bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex min-w-0 flex-1 flex-col overflow-y-auto bg-admin-soft p-4">
-          {doc ? (
+          {video ? (
+            <video src={fileUrl} controls preload="metadata" className="max-h-[70vh] w-full rounded bg-admin-ink" />
+          ) : doc ? (
             m.mime_type === 'application/pdf' ? (
               <iframe src={fileUrl} title={`Preview of ${m.path.split('/').pop()}`} className="min-h-[60vh] w-full flex-1 rounded border border-admin-ink/10 bg-white" />
             ) : (
@@ -244,7 +252,7 @@ export default function MediaDetail() {
               Close
             </button>
           </div>
-          {!doc && (
+          {!plain && (
           <div className="mb-3">
             <div className="mb-1 flex items-end justify-between gap-2">
               <label htmlFor="media-alt" className="block text-xs font-medium text-admin-muted">
@@ -272,7 +280,7 @@ export default function MediaDetail() {
             <span className={label}>Caption</span>
             <textarea className={input} rows={2} value={draft.caption} onChange={(e) => setDraft({ ...draft, caption: e.target.value })} />
           </label>
-          {!doc && (
+          {!plain && (
           <div className="mb-3 flex items-center justify-between text-xs text-admin-muted">
             <span>Main focal point: {draft.focal ? `${Math.round(focal.x * 100)}%, ${Math.round(focal.y * 100)}%` : 'centre (default)'}</span>
             {draft.focal && (
@@ -287,7 +295,7 @@ export default function MediaDetail() {
           </button>
           {status && <p className={`mt-2 text-xs ${status === 'Saved' ? 'text-[#047857]' : 'text-admin-muted'}`}>{status}</p>}
           <dl className="mt-5 space-y-1 border-t border-admin-ink/10 pt-3 text-xs text-admin-muted">
-            {!doc && (
+            {!plain && (
               <div className="flex justify-between">
                 <dt>Dimensions</dt>
                 <dd>{m.width && m.height ? `${m.width} × ${m.height}` : '-'}</dd>
@@ -303,7 +311,7 @@ export default function MediaDetail() {
               <dt>Type</dt>
               <dd>{doc ? docLabel(m.mime_type, m.path) : m.mime_type}</dd>
             </div>
-            {!doc && (
+            {!plain && (
               <>
                 <div className="flex justify-between">
                   <dt>Modern formats</dt>

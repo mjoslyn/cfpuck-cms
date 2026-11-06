@@ -63,7 +63,7 @@ export function SeoForm({ type, title, excerpt, fields, path, pageItems, entry =
         <p className="truncate text-sm text-[#1a0dab]">{shownTitle} – {site.name}</p>
         <p className="line-clamp-2 text-xs text-[#475569]">{shownDescription}</p>
       </div>
-      <MediaPicker title="Share image" url={seo.image_url} onSelect={(m) => set({ image: m.id ?? m.mediaId ?? undefined, image_url: m.url })} />
+      <MediaPicker title="Share image" url={seo.image_url} mediaId={seo.image} onSelect={(m) => set({ image: m.id ?? m.mediaId ?? undefined, image_url: m.url })} />
       <p className="-mt-2 mb-3 text-xs text-admin-muted">Shown when the page is shared. The featured image, then the site's default, when empty.</p>
       {!!seo.image && (
         <button type="button" className="mb-3 text-xs text-[#b3261e]" onClick={() => set({ image: undefined, image_url: undefined })}>

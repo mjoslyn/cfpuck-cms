@@ -390,7 +390,7 @@ export function EntryForm({ type, value, onChange, templates, pageItems }: { typ
         <textarea className={inputClass} rows={3} value={value.excerpt} onChange={(e) => set({ excerpt: e.target.value })} />
       </Row>
       <ExcerptWriter type={type} title={value.title} pageItems={pageItems} onWrite={(excerpt) => set({ excerpt })} />
-      <MediaPicker title="Featured image" url={value.featured_image ?? undefined} onSelect={(m) => set({ featured_image: m.url, featured_media_id: m.id })} />
+      <MediaPicker title="Featured image" url={value.featured_image ?? undefined} mediaId={(value as any).featured_media_id} onSelect={(m) => set({ featured_image: m.url, featured_media_id: m.id })} />
       {taxonomiesOf(type).map((tax) => (
         <EntryTermsField key={tax} taxonomy={tax} value={value.terms?.[tax] ?? []} onChange={(ids) => set({ terms: { ...(value.terms ?? {}), [tax]: ids } })} />
       ))}

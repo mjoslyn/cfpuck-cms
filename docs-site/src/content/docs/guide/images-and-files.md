@@ -73,7 +73,12 @@ good reason to write alt text.
 
 - **Videos from YouTube or Vimeo**: add an **Embed** or video block to the page and paste the video's
   web address.
-- **Video files**: upload them like images. Large videos take a while to upload.
+- **Video files**: add a **Video** block, then in its settings click **Choose** under **Video** to pick
+  one from the media library or upload it there. Large videos take a while to upload. You can also
+  choose a **Poster image**, shown before the video plays.
+
+Beside a chosen picture, video or file, **Replace** picks another, and **Edit** opens it in **Media** in a
+new tab, to change its title, caption, alt text or focal point. Save there, then come back to the page.
 
 ## Documents (PDFs, Word, Excel...)
 

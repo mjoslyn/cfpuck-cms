@@ -215,14 +215,14 @@ export default function SiteSettings({ section, site: initialSite, options: init
         <button type="button" className="mb-4 rounded-sm border border-dashed border-admin-ink/25 px-3 py-1.5 text-xs text-admin-muted hover:border-admin-ink/50" onClick={() => setSite({ ...site, social: [...(site.social ?? []), { network: 'facebook', url: '' }] })}>
           Add link
         </button>
-        <MediaPicker title="Site icon (favicon)" url={site.icon_preview ?? site.icons?.['192']} onSelect={(m) => setSite({ ...site, icon_media_id: m.id ?? m.mediaId ?? null, icon_preview: m.url })} />
+        <MediaPicker title="Site icon (favicon)" url={site.icon_preview ?? site.icons?.['192']} mediaId={site.icon_media_id} onSelect={(m) => setSite({ ...site, icon_media_id: m.id ?? m.mediaId ?? null, icon_preview: m.url })} />
         <p className="-mt-2 mb-3 text-xs text-admin-muted">A square image at least 512px wide works best (it's cropped square around its focal point). Shown in browser tabs, on phone home screens and in the site header; made into the icon files when you save.</p>
         {(site.icon_media_id || site.icons?.['192']) && (
           <button type="button" className="mb-4 block text-xs text-[#b3261e]" onClick={() => setSite({ ...site, icon_media_id: null, icon_preview: undefined, icons: undefined })}>
             Remove site icon
           </button>
         )}
-        <MediaPicker title="Default share image" url={site.share_image_url} onSelect={(m) => setSite({ ...site, share_image: m.id ?? m.mediaId ?? undefined, share_image_url: m.url })} />
+        <MediaPicker title="Default share image" url={site.share_image_url} mediaId={site.share_image} onSelect={(m) => setSite({ ...site, share_image: m.id ?? m.mediaId ?? undefined, share_image_url: m.url })} />
         <p className="-mt-2 mb-3 text-xs text-admin-muted">Shown when a page without its own image is shared.</p>
         {!!site.share_image && (
           <button type="button" className="mb-3 block text-xs text-[#b3261e]" onClick={() => setSite({ ...site, share_image: undefined, share_image_url: undefined })}>
@@ -617,7 +617,7 @@ function PageDefaults({ kind, name, label, path, value, onChange }: { kind: 'tax
       ) : (
         <p className="mb-3 text-xs text-admin-muted">For the {label.toLowerCase()} listing at {path}. The image is its share image and shows in a Featured image block on it (outside a collection).{name === 'event' ? ' The calendar views (month, day, past) keep their own titles and get the image and noindex.' : ''}</p>
       )}
-      <MediaPicker title="Featured image" url={value.image_url} onSelect={(m) => onChange({ ...value, image: m.id ?? m.mediaId ?? undefined, image_url: m.url })} />
+      <MediaPicker title="Featured image" url={value.image_url} mediaId={value.image} onSelect={(m) => onChange({ ...value, image: m.id ?? m.mediaId ?? undefined, image_url: m.url })} />
       {!!value.image && (
         <button type="button" className="-mt-2 mb-2 text-xs text-[#b3261e]" onClick={() => onChange({ ...value, image: undefined, image_url: undefined })}>
           Remove featured image
@@ -741,7 +741,7 @@ function AdminThemePanel({ value, onChange }: { value: AdminTheme; onChange: (t:
   return (
     <>
       <p className="mb-3 text-xs text-admin-muted">The logo and colors of these admin screens and the page editor, for everyone who signs in. They change here as you pick them; Save keeps them.</p>
-      <MediaPicker title="Logo" fit="contain" url={value.logo_url} onSelect={(m) => onChange({ ...value, logo: m.id ?? m.mediaId ?? undefined, logo_url: m.url })} />
+      <MediaPicker title="Logo" fit="contain" url={value.logo_url} mediaId={value.logo} onSelect={(m) => onChange({ ...value, logo: m.id ?? m.mediaId ?? undefined, logo_url: m.url })} />
       <p className="-mt-2 mb-3 text-xs text-admin-muted">In the menu bar, in place of the site name, up to 32px tall. Choose one that reads on the menu bar's color.</p>
       {!!value.logo && (
         <>

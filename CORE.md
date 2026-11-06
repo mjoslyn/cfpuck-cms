@@ -634,7 +634,12 @@ a PDF without the sandbox (Chrome's viewer refuses a sandboxed one; nosniff keep
 OpenDocument files as downloads, everything else sandboxed. `media.filesize` (bytes) is kept for
 documents, videos and new images. The library shows documents with their type and size; their details
 panel previews a PDF and has title and caption (no alt text or focal points). Every file's details have
-**Copy link** (its full address). Links reach documents through the **File** block (`file`: the
+**Copy link** (its full address). A video's details show a player, its title and caption. The file
+choosers (`MediaPicker`, `src/puck/fields.tsx`: images, and videos with `only="video"`; the File block's)
+show the file with **Choose**/**Replace** and **Edit**, which opens it in the media library in a new tab
+(`/admin/media/?id=<id>`, `mediaLibraryUrl`; the id the setting keeps, else found from its `/media/`
+address). The **Video** block (`video`) picks its file (`src`, `mediaId`) and poster image (`poster`,
+`posterId`) from the library, or takes a video file's address. Links reach documents through the **File** block (`file`: the
 document's name, type and size and a Download button; or any address, the media library opening on
 documents, `MediaModal only="document"`) and the link picker.
 

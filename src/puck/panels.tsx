@@ -1,7 +1,7 @@
 // Editor panels for the content blocks (src/render/c/content.ts). Values are stored as CSS, with the
 // design tokens as var(--color-*), var(--space-*), var(--text-*), var(--font-*).
 import type { ReactNode } from 'react';
-import { Code, LinkInput, MediaModal, MediaPicker, RichText, Row, Segmented, Select, Text, Toggle, inputClass, type Attrs, FieldGroup } from './fields';
+import { Code, LinkInput, MediaModal, MediaPicker, mediaLibraryUrl, RichText, Row, Segmented, Select, Text, Toggle, inputClass, type Attrs, FieldGroup } from './fields';
 import { videoEmbedAttrs } from '../lib/media/video-link';
 import { PRESETS as themeJson } from '../lib/site';
 import { site } from '../lib/site';
@@ -285,7 +285,7 @@ function LayoutControls({ a, set }: { a: Attrs; set: SetFn }) {
 }
 
 const imagePicker = (a: Attrs, set: SetFn) => (
-  <MediaPicker title="Image" url={a.src} onSelect={(m) => set({ mediaId: m.mediaId ?? undefined, src: m.url, alt: a.alt || m.alt || undefined, focal: undefined, focalTablet: undefined, focalPhone: undefined })} />
+  <MediaPicker title="Image" url={a.src} mediaId={a.mediaId} onSelect={(m) => set({ mediaId: m.mediaId ?? undefined, src: m.url, alt: a.alt || m.alt || undefined, focal: undefined, focalTablet: undefined, focalPhone: undefined })} />
 );
 
 export const CONTENT_PANELS: Record<string, Panel> = {
@@ -404,7 +404,7 @@ export const CONTENT_PANELS: Record<string, Panel> = {
   ),
   hero: (a, set) => (
     <>
-      <MediaPicker title="Image" url={a.src} onSelect={(m) => set({ mediaId: m.mediaId ?? undefined, src: m.url, focal: undefined, focalTablet: undefined, focalPhone: undefined })} />
+      <MediaPicker title="Image" url={a.src} mediaId={a.mediaId} onSelect={(m) => set({ mediaId: m.mediaId ?? undefined, src: m.url, focal: undefined, focalTablet: undefined, focalPhone: undefined })} />
       <FocalPoints a={a} set={set} ratios={[16 / 9, 3 / 4, 3 / 4]} />
       <Segmented title="Overlay (keeps the text readable)" value={a.overlay ?? 'medium'} options={[['none', 'None'], ['light', 'Light'], ['medium', 'Medium'], ['strong', 'Strong']]} onChange={(v) => set({ overlay: v === 'medium' ? undefined : v })} />
       {a.overlay !== 'none' && <Segmented title="Darkest at" value={a.overlayFrom ?? 'bottom'} options={[['bottom', 'Bottom'], ['left', 'Left'], ['even', 'All over']]} onChange={(v) => set({ overlayFrom: v === 'bottom' ? undefined : v })} />}
@@ -597,8 +597,14 @@ Object.assign(CONTENT_PANELS, {
   pattern: (a: Attrs, set: SetFn) => <Text title="Pattern" value={a.slug} onChange={(v) => set({ slug: v })} />,
   video: (a: Attrs, set: SetFn) => (
     <>
-      <Text title="Video file URL" value={a.src} placeholder="/media/2026/09/clip.mp4" onChange={(v) => set({ src: v || undefined })} />
-      <Text title="Poster image URL" value={a.poster} onChange={(v) => set({ poster: v || undefined })} />
+      <MediaPicker title="Video" only="video" url={a.src} mediaId={a.mediaId} onSelect={(m) => set({ src: m.url, mediaId: m.mediaId ?? undefined })} />
+      {!a.mediaId && <Text title="Or a video file's address" value={a.src} placeholder="https://" onChange={(v) => set({ src: v || undefined, mediaId: undefined })} />}
+      <MediaPicker title="Poster image (shown before it plays)" url={a.poster} mediaId={a.posterId} onSelect={(m) => set({ poster: m.url, posterId: m.mediaId ?? undefined })} />
+      {a.poster && (
+        <button type="button" className="-mt-2 mb-3 text-xs text-admin-muted hover:text-admin-ink" onClick={() => set({ poster: undefined, posterId: undefined })}>
+          Remove the poster
+        </button>
+      )}
       <RichText title="Caption" value={a.caption} onChange={(v) => set({ caption: v || undefined })} />
       <Toggle title="Autoplay (muted)" value={a.autoplay} onChange={(v) => set({ autoplay: v || undefined })} />
       <Toggle title="Loop" value={a.loop} onChange={(v) => set({ loop: v || undefined })} />
@@ -631,6 +637,11 @@ function FilePanel({ a, set }: { a: Attrs; set: SetFn }) {
           <button type="button" className="shrink-0 rounded border border-admin-ink/15 bg-white px-3 py-1.5 text-xs hover:border-admin-accent" onClick={() => setPicking(true)}>
             {a.mediaId || a.href ? 'Replace' : 'Choose'}
           </button>
+          {a.mediaId ? (
+            <a className="shrink-0 rounded border border-admin-ink/15 bg-white px-3 py-1.5 text-xs hover:border-admin-accent" href={mediaLibraryUrl(Number(a.mediaId))} target="_blank" rel="noopener" title="Open it in the media library (a new tab)">
+              Edit
+            </a>
+          ) : null}
         </div>
       </FieldGroup>
       {picking && <MediaModal only="document" onClose={() => setPicking(false)} onSelect={(m) => (set({ mediaId: m.mediaId ?? undefined, href: undefined, name: m.name }), setPicking(false))} />}
